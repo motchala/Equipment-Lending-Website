@@ -65,6 +65,9 @@ CREATE TABLE tbl_requests (
   request_date DATETIME DEFAULT CURRENT_TIMESTAMP 
   );
 
+INSERT INTO tbl_requests (student_id,student_name,equipment_name,status)
+VALUES
+("2023-004","John Doe","Volleyball","Waiting");
 --
 -- Dumping data for table `tbl_lending`
 --
