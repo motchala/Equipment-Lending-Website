@@ -55,6 +55,16 @@ CREATE TABLE `tbl_lending` (
   `available` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- (New Table added) **Remove this comment if magpupush ulit thanks**
+CREATE TABLE tbl_requests ( 
+  request_id INT AUTO_INCREMENT PRIMARY KEY, 
+  student_id VARCHAR(50) NOT NULL, 
+  student_name VARCHAR(255) NOT NULL, 
+  equipment_name VARCHAR(255) NOT NULL, 
+  status VARCHAR(20) NOT NULL DEFAULT 'Waiting', 
+  request_date DATETIME DEFAULT CURRENT_TIMESTAMP 
+  );
+
 --
 -- Dumping data for table `tbl_lending`
 --
