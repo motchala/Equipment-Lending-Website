@@ -189,7 +189,14 @@ $declined_result = mysqli_query($conn, $declined_sql);
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
                     <thead class="table-dark">
-                        <tr><th>Photo</th><th>Item Name</th><th>Category</th><th>Qty</th><th>Status</th><th>Actions</th></tr>
+                        <tr>
+                        <th>Photo</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Qty</th>
+                        <th>Status</th>
+                        
+                        <th>Actions</th></tr>
                     </thead>
                     <tbody id="inventory-list"></tbody>
                 </table>
@@ -200,7 +207,13 @@ $declined_result = mysqli_query($conn, $declined_sql);
             <h4 class="fw-bold mb-4 text-success"><i class="bi bi-patch-check me-2"></i>Approved Requests</h4>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
-                    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Item</th><th>Status</th></tr></thead>
+                    <thead class="table-dark"><tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Item</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
                         <tbody id="approved-list">
                             <?php while($row = mysqli_fetch_assoc($approved_result)) { ?>
                             <tr>
@@ -225,7 +238,14 @@ $declined_result = mysqli_query($conn, $declined_sql);
             <h4 class="fw-bold mb-4 text-danger"><i class="bi bi-x-octagon me-2"></i>Declined Requests</h4>
             <div class="table-responsive">
                 <table class="table table-striped align-middle">
-                    <thead class="table-dark"><tr><th>ID</th><th>Name</th><th>Item</th><th>Status</th></tr></thead>
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Item</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
                     <tbody id="declined-list">
                         <?php while($row = mysqli_fetch_assoc($declined_result)) { ?>
                         <tr>
