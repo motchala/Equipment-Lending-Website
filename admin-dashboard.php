@@ -321,7 +321,7 @@ $declined_result = mysqli_query($conn, $declined_sql);
     }
 
     function handleLogout() {
-        if(confirm("Confirm Logout?")) { window.location.href = "login.php"; }
+        if(confirm("Confirm Logout?")) { window.location.href = "landing-page.php"; }
     }
 
     // CRUD/Utility Functions
