@@ -406,5 +406,7 @@ $declined_result = mysqli_query($conn, $declined_sql);
     renderInventory();
 </script>
 
+
+
 </body>
 </html>
