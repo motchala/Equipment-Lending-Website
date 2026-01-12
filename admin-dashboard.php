@@ -22,7 +22,110 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     mysqli_query($conn, $update_sql);
 
     // redirect to avoid resubmission
-    header("Location: admin-dashboard.php");
+    header("Location: admin-dashboard.php#sec-waiting");
+    exit();
+}
+
+// Add item
+if (isset($_POST['add_item'])) {
+
+    $name = $_POST['item_name'];
+    $category = $_POST['category'];
+    $qty = $_POST['quantity'];
+
+    // Image upload
+    $image_path = "uploads/default.png";
+
+    if (!empty($_FILES['item_image']['name'])) {
+
+        //  ALLOWED IMAGE TYPES
+        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $file_type = $_FILES['item_image']['type'];
+
+        if (!in_array($file_type, $allowed_types)) {
+            die("Only JPG, PNG, and WEBP images are allowed.");
+        }
+
+        //  MAX FILE SIZE (2MB)
+        $max_size = 2 * 1024 * 1024; // 2MB
+        if ($_FILES['item_image']['size'] > $max_size) {
+            die("Image too large. Maximum size is 2MB.");
+        }
+
+
+        $image_name = time() . "_" . $_FILES['item_image']['name'];
+        $target = "uploads/" . $image_name;
+
+        move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
+        $image_path = $target;
+    }
+
+    $sql = "INSERT INTO tbl_inventory (item_name, category, quantity, image_path)
+            VALUES ('$name', '$category', $qty, '$image_path')";
+
+    mysqli_query($conn, $sql);
+    header("Location: admin-dashboard.php#sec-inventory");
+    exit();
+}
+
+//Edit Item
+if (isset($_POST['update_item'])) {
+
+    $item_id = intval($_POST['item_id']);
+    $name = $_POST['item_name'];
+    $category = $_POST['category'];
+    $qty = intval($_POST['quantity']);
+
+    // Keep old image by default
+    $image_path = $_POST['old_image'];
+
+    // Upload new image if provided
+    if (!empty($_FILES['item_image']['name'])) {
+
+        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $file_type = $_FILES['item_image']['type'];
+
+        if (!in_array($file_type, $allowed_types)) {
+            die("Only JPG, PNG, and WEBP images are allowed.");
+        }
+
+        $max_size = 2 * 1024 * 1024;
+        if ($_FILES['item_image']['size'] > $max_size) {
+            die("Image too large. Maximum size is 2MB.");
+        }
+        
+        $image_name = time() . "_" . $_FILES['item_image']['name'];
+        $target = "uploads/" . $image_name;
+
+        move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
+        $image_path = $target;
+    }
+
+    $sql = "UPDATE tbl_inventory 
+            SET item_name='$name',
+                category='$category',
+                quantity=$qty,
+                image_path='$image_path'
+            WHERE item_id=$item_id";
+
+    mysqli_query($conn, $sql);
+
+    header("Location: admin-dashboard.php#sec-inventory");
+    exit();
+}
+// Delete Item
+if (isset($_GET['delete_item'])) {
+    $id = intval($_GET['delete_item']);
+
+    $res = mysqli_query($conn, "SELECT image_path FROM tbl_inventory WHERE item_id=$id");
+    $row = mysqli_fetch_assoc($res);
+
+    if ($row && $row['image_path'] !== 'uploads/default.png') {
+        unlink($row['image_path']);
+    }
+
+    mysqli_query($conn, "DELETE FROM tbl_inventory WHERE item_id=$id");
+    header("Location: admin-dashboard.php#sec-inventory");
     exit();
 }
 
@@ -34,6 +137,17 @@ $declined_sql = "SELECT * FROM tbl_requests WHERE status='Declined'";
 $waiting_result = mysqli_query($conn, $waiting_sql);
 $approved_result = mysqli_query($conn, $approved_sql);
 $declined_result = mysqli_query($conn, $declined_sql);
+
+$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory ORDER BY created_at DESC");
+
+$edit_item = null;
+
+if (isset($_GET['edit_item'])) {
+    $edit_id = intval($_GET['edit_item']);
+    $edit_query = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE item_id=$edit_id");
+    $edit_item = mysqli_fetch_assoc($edit_query);
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -191,7 +305,61 @@ $declined_result = mysqli_query($conn, $declined_sql);
                     <thead class="table-dark">
                         <tr><th>Photo</th><th>Item Name</th><th>Category</th><th>Qty</th><th>Status</th><th>Actions</th></tr>
                     </thead>
-                    <tbody id="inventory-list"></tbody>
+                    <tbody>
+                       <?php if (mysqli_num_rows($inventory_result) == 0) { ?>
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-5">
+                                    Inventory is empty.
+                                </td>
+                            </tr>
+                        <?php } else { ?>
+                            <?php while ($item = mysqli_fetch_assoc($inventory_result)) { ?>
+                                <tr>
+                                    <td>
+                                        <img src="<?php echo $item['image_path']; ?>" class="item-img shadow-sm">
+                                    </td>
+
+                                    <td class="fw-bold text-maroon">
+                                        <?php echo htmlspecialchars($item['item_name']); ?>
+                                    </td>
+
+                                    <td>
+                                        <?php echo htmlspecialchars($item['category']); ?>
+                                    </td>
+
+                                    <td>
+                                        <span class="badge bg-info text-dark">
+                                            <?php echo $item['quantity']; ?> units
+                                        </span>
+                                    </td>
+
+                                    <td>
+                                        <?php if ($item['quantity'] > 0) { ?>
+                                            <span class="badge bg-success">Available</span>
+                                        <?php } else { ?>
+                                            <span class="badge bg-danger">No Stock</span>
+                                        <?php } ?>
+                                    </td>
+
+                                    <td>
+                                        <!-- EDIT (future improvement) -->
+                                        <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>#sec-inventory"
+                                            class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-pencil"></i>
+                                        </a>
+                                        
+
+                                        <!-- DELETE -->
+                                        <a href="admin-dashboard.php?delete_item=<?php echo $item['item_id']; ?>"
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('Delete this item?');">
+                                            <i class="bi bi-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        <?php } ?>
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -256,44 +424,67 @@ $declined_result = mysqli_query($conn, $declined_sql);
 <div class="modal fade" id="itemModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content shadow-lg border-0 rounded-4">
+
             <div class="modal-header text-white" style="background: var(--maroon);">
-                <h5 class="modal-title fw-bold" id="modalTitle">Equipment Details</h5>
+                <h5 class="modal-title fw-bold">
+                    <?php echo $edit_item ? "Edit Equipment" : "Add Equipment"; ?>
+                </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body p-4">
-                <form id="itemForm">
-                    <input type="hidden" id="editIndex">
-                    <div class="text-center mb-4">
-                        <img id="imagePreview" src="" alt="Preview">
-                        <label class="form-label d-block small text-muted">Upload Item Image</label>
-                        <input type="file" id="itemFile" class="form-control form-control-sm mt-1" accept="image/*" onchange="previewImage(this)">
+                <form method="POST" enctype="multipart/form-data">
+
+                    <?php if ($edit_item) { ?>
+                        <input type="hidden" name="item_id" value="<?php echo $edit_item['item_id']; ?>">
+                        <input type="hidden" name="old_image" value="<?php echo $edit_item['image_path']; ?>">
+                    <?php } ?>
+
+                    <div class="text-center mb-3">
+                        <img src="<?php echo $edit_item ? $edit_item['image_path'] : 'uploads/default.png'; ?>"
+                             class="item-img mb-2">
+                        <input type="file" name="item_image" class="form-control">
                     </div>
+
                     <div class="mb-3">
                         <label class="form-label fw-bold">Item Name</label>
-                        <input type="text" id="itemName" class="form-control rounded-3" placeholder="Enter name..." required>
+                        <input type="text" name="item_name" class="form-control"
+                               value="<?php echo $edit_item['item_name'] ?? ''; ?>" required>
                     </div>
+
                     <div class="row">
                         <div class="col-6 mb-3">
                             <label class="form-label fw-bold">Quantity</label>
-                            <input type="number" id="itemQty" class="form-control rounded-3" min="0" value="1">
+                            <input type="number" name="quantity" class="form-control" min="0"
+                                   value="<?php echo $edit_item['quantity'] ?? 1; ?>" required>
                         </div>
+
                         <div class="col-6 mb-3">
                             <label class="form-label fw-bold">Category</label>
-                            <select id="itemCategory" class="form-select rounded-3">
-                                <option>Photography</option>
-                                <option>Laptops</option>
-                                <option>Projectors</option>
+                            <select name="category" class="form-select">
+                                <?php
+                                $categories = ["Photography", "Laptops", "Projectors"];
+                                foreach ($categories as $cat) {
+                                    $selected = ($edit_item && $edit_item['category'] == $cat) ? "selected" : "";
+                                    echo "<option $selected>$cat</option>";
+                                }
+                                ?>
                             </select>
                         </div>
                     </div>
+
+                    <button type="submit"
+                            name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                            class="btn btn-success w-100 py-3 rounded-3 fw-bold">
+                        Save Changes
+                    </button>
+
                 </form>
-            </div>
-            <div class="modal-footer border-0 p-4 pt-0">
-                <button type="button" class="btn btn-success w-100 py-3 rounded-3 fw-bold shadow-sm" onclick="saveItem()">Save Changes</button>
             </div>
         </div>
     </div>
 </div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -406,7 +597,23 @@ $declined_result = mysqli_query($conn, $declined_sql);
     renderInventory();
 </script>
 
+<?php if ($edit_item) { ?>
+<script>
+    window.onload = function () {
+        new bootstrap.Modal(document.getElementById('itemModal')).show();
+    };
+</script>
+<?php } ?>
 
+<!-- this prevents going back to waiting list section after reload -->
+<script>
+    window.addEventListener('DOMContentLoaded', function() {
+    const hash = window.location.hash.replace('#sec-', '');
+    if (hash) {
+        showSection(hash);
+    }
+});
+</script>
 
 </body>
 </html>

@@ -55,7 +55,7 @@ CREATE TABLE `tbl_lending` (
   `available` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- (New Table added) **Remove this comment if magpupush ulit thanks**
+
 CREATE TABLE tbl_requests ( 
   request_id INT AUTO_INCREMENT PRIMARY KEY, 
   student_id VARCHAR(50) NOT NULL, 
@@ -64,6 +64,18 @@ CREATE TABLE tbl_requests (
   status VARCHAR(20) NOT NULL DEFAULT 'Waiting', 
   request_date DATETIME DEFAULT CURRENT_TIMESTAMP 
   );
+
+-- (New Table added) **Remove this comment if magpupush ulit thanks**
+CREATE TABLE tbl_inventory (
+    item_id INT AUTO_INCREMENT PRIMARY KEY,
+    item_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    image_path VARCHAR(255),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
 
 INSERT INTO tbl_requests (student_id,student_name,equipment_name,status)
 VALUES
