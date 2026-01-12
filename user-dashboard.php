@@ -1,3 +1,16 @@
+<?php
+$conn = mysqli_connect("localhost", "root", "", "lending_db");
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
+}
+
+$inventory_result = mysqli_query(
+    $conn,
+    "SELECT * FROM tbl_inventory WHERE quantity > 0 ORDER BY item_name ASC"
+);
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -158,16 +171,36 @@
                     </div>
 
                     <div class="row g-4" id="equipmentList">
-                        <div class="col-md-4 col-lg-3 item-node" data-name="DSLR Camera">
-                            <figure class="equipment-card card">
-                                <i class="fas fa-camera fa-3x mb-3 text-dark"></i>
-                                <figcaption>
-                                    <h3 class="h6 fw-bold">DSLR Camera</h3>
-                                    <button class="btn btn-success w-100 mt-2"
-                                        onclick="openForm('DSLR Camera')">Borrow</button>
-                                </figcaption>
-                            </figure>
-                        </div>
+                        <?php if (mysqli_num_rows($inventory_result) == 0) { ?>
+                            <div class="col-12 text-center text-muted py-5">
+                                No equipment available at the moment.
+                            </div>
+                            <?php } else { ?>
+                                <?php while ($item = mysqli_fetch_assoc($inventory_result)) { ?>
+                                    <div class="col-md-4 col-lg-3 item-node" 
+                                                data-name="<?php echo htmlspecialchars($item['item_name']); ?>">
+
+                                        <figure class="equipment-card card">
+                                            <img src="<?php echo $item['image_path']; ?>"
+                                                style="width:100%; height:140px; object-fit:cover; border-radius:10px;"
+                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>">
+
+                                            <figcaption class="mt-3">
+                                                <h3 class="h6 fw-bold">
+                                                    <?php echo htmlspecialchars($item['item_name']); ?>
+                                                </h3>
+
+                                                <button class="btn btn-success w-100 mt-2"
+                                                    onclick="openForm('<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>')">
+                                                    Borrow
+                                                </button>
+
+                                            </figcaption>
+                                        </figure>
+                                    </div>
+                                <?php } ?>
+                        <?php } ?>
+
                     </div>
                 </article>
             </section>

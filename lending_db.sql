@@ -65,7 +65,7 @@ CREATE TABLE tbl_requests (
   request_date DATETIME DEFAULT CURRENT_TIMESTAMP 
   );
 
--- (New Table added) **Remove this comment if magpupush ulit thanks**
+
 CREATE TABLE tbl_inventory (
     item_id INT AUTO_INCREMENT PRIMARY KEY,
     item_name VARCHAR(255) NOT NULL,
@@ -75,7 +75,12 @@ CREATE TABLE tbl_inventory (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-
+CREATE TABLE tbl_users (
+    fullname VARCHAR(255) NOT NULL,
+    student_id VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL
+);
 
 INSERT INTO tbl_requests (student_id,student_name,equipment_name,status)
 VALUES
