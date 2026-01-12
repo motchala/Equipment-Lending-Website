@@ -67,7 +67,9 @@ CREATE TABLE tbl_requests (
 
 INSERT INTO tbl_requests (student_id,student_name,equipment_name,status)
 VALUES
-("2023-004","John Doe","Volleyball","Waiting");
+("2023-001","Juan Dela Cruz","Canon DSLR","Waiting"),
+("2023-002","Maria Santos","Projector","Waiting"),
+("2023-003","John Doe","Volleyball","Waiting");
 --
 -- Dumping data for table `tbl_lending`
 --

@@ -22,7 +22,7 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     mysqli_query($conn, $update_sql);
 
     // redirect to avoid resubmission
-    header("Location: Admindash.php");
+    header("Location: admin-dashboard.php");
     exit();
 }
 
@@ -164,10 +164,10 @@ $declined_result = mysqli_query($conn, $declined_sql);
                             </span>
                         </td>
                         <td>
-                            <a href="Admindash.php?action=approve&id=<?php echo $row['request_id']; ?>" class="btn btn-success btn-sm rounded-circle p-2">
+                            <a href="admin-dashboard.php?action=approve&id=<?php echo $row['request_id']; ?>" class="btn btn-success btn-sm rounded-circle p-2">
                                 <i class="bi bi-check-lg"></i>
                             </a>
-                            <a href="Admindash.php?action=decline&id=<?php echo $row['request_id']; ?>" class="btn btn-danger btn-sm rounded-circle p-2 ms-1">
+                            <a href="admin-dashboard.php?action=decline&id=<?php echo $row['request_id']; ?>" class="btn btn-danger btn-sm rounded-circle p-2 ms-1">
                                 <i class="bi bi-x-lg"></i>
                             </a>
                         </td>
