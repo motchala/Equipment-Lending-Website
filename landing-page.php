@@ -1,19 +1,38 @@
 <?php
 /**
- * SECTION 1: PHP AUTHENTICATION LOGIC
+ * SECTION 1: DATABASE & AUTH LOGIC (NO SESSIONS)
  */
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
-
 $login_error = "";
+
 if (isset($_POST['login'])) {
-    if ($_POST['email'] == 'main@admin.edu' && $_POST['password'] == 'admin123') {
+    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $password = $_POST['password'];
+
+    // Hardcoded Admin Check
+    if ($email == 'main@admin.edu' && $password == 'admin123') {
         header("Location: admin-dashboard.php");
         exit();
+    } 
+
+    $query = "SELECT * FROM tbl_users WHERE email = '$email'";
+    $result = mysqli_query($conn, $query);
+    
+    if ($result && mysqli_num_rows($result) > 0) {
+        $user = mysqli_fetch_assoc($result);
+        if (password_verify($password, $user['password'])) {
+            header("Location: user-dashboard.php");
+            exit();
+        } else {
+            $login_error = "Incorrect password.";
+        }
     } else {
-        $login_error = "Invalid email or password.";
+        $login_error = "No account found with that email.";
     }
 }
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -21,15 +40,16 @@ if (isset($_POST['login'])) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <title>IskoLending</title>
+    <title>Equipment Lending</title>
 
     <style>
         /**
-         * SECTION 2: CSS STYLES (NEW LINE FORMATTING)
+         * SECTION 2: CSS STYLES
          */
         body {
             margin: 0;
@@ -311,44 +331,95 @@ if (isset($_POST['login'])) {
 
         <div class="hero-right" id="hero-right">
             <button id="close-sidebar"><i class="bi bi-x-lg"></i></button>
-            
+
             <div class="auth-container">
                 <ul class="nav nav-tabs" id="authTab" role="tablist">
                     <li class="nav-item">
-                        <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab">Sign In</button>
+                        <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane"
+                            type="button" role="tab">Sign In</button>
                     </li>
                     <li class="nav-item">
-                        <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab">Register</button>
+                        <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane"
+                            type="button" role="tab">Register</button>
                     </li>
                 </ul>
 
                 <div class="tab-content" id="authTabContent">
-                    
+
+
                     <div class="tab-pane fade show active" id="login-pane" role="tabpanel">
                         <h2>Welcome Back</h2>
                         <form method="POST">
                             <input type="email" name="email" placeholder="Email" required>
                             <input type="password" name="password" placeholder="Password" required>
-                            
-                            <?php if($login_error): ?>
-                                <p style="color: #ff6b6b; font-size: 0.9rem; margin-bottom: 1rem;"><?php echo $login_error; ?></p>
+
+                            <?php if ($login_error): ?>
+                                <p style="color: #ff6b6b; font-size: 0.9rem; margin-bottom: 1rem;">
+                                    <?php echo $login_error; ?></p>
                             <?php endif; ?>
-                            
+
                             <button type="submit" name="login" class="btn btn-light">Sign In</button>
                         </form>
                     </div>
+
+
 
                     <div class="tab-pane fade" id="register-pane" role="tabpanel">
                         <h2>Create Account</h2>
                         <form method="POST">
                             <input type="text" name="fullname" placeholder="Full Name" required>
+                            <input type="text" name="student_id" placeholder="Student ID" required>
                             <input type="email" name="email" placeholder="Student Email" required>
                             <input type="password" name="password" placeholder="Create Password" required>
                             <input type="password" name="confirm_password" placeholder="Confirm Password" required>
-                            
+
                             <button type="submit" name="register" class="btn btn-light">Register</button>
                         </form>
                     </div>
+
+                    <?php
+
+                    $hostname = "localhost";
+                    $DBUser = "root";
+                    $DBPassword = ""; // Kept blank assuming XAMPP default
+                    $DBName = "lending_db";
+                    
+                    // Added error suppression (@) to prevent connection errors from breaking the HTML layout
+                    $conn = @mysqli_connect($hostname, $DBUser, $DBPassword, $DBName);
+
+                    if (isset($_POST["register"])) {
+                        // Move connection check inside the post request so page loads even if DB is offline
+                        if (!$conn) {
+                             echo "<br>Connection Failed: " . mysqli_connect_error();
+                        } else {
+                            $fullname = $_POST["fullname"];
+                            $student_id = $_POST["student_id"];
+                            $email = $_POST["email"];
+                            $password = $_POST["password"];
+                            
+                            // ERROR FIX 2: Fixed variable name (was $password = $_POST...)
+                            $confirm_password = $_POST["confirm_password"];
+
+
+                            if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
+                                echo "<br>Please fill in all fields.";
+                            } elseif ($password !== $confirm_password) {
+                                echo "<br>Passwords do not match.";
+                            } else {
+                                $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+                                $sql = "INSERT INTO tbl_users (fullname, student_id, email, password)
+                                        VALUES ('$fullname', '$student_id', '$email', '$hashed_password')";
+                                if (mysqli_query($conn, $sql)) {
+                                    echo "<br>Registration successful. You can now sign in.";
+                                } else {
+                                    echo "<br>Error: " . mysqli_error($conn);
+                                }
+                            }
+                        }
+                    }
+
+                    ?>
+
 
                 </div>
             </div>
@@ -360,7 +431,8 @@ if (isset($_POST['login'])) {
             <div class="row gy-4 align-items-center">
                 <div class="col-md-6 text-center text-md-start">
                     <h5 class="footer-title">EquipmentLending</h5>
-                    <p class="footer-text">A student-led equipment lending platform built to support academic needs through shared access and responsibility.</p>
+                    <p class="footer-text">A student-led equipment lending platform built to support academic needs
+                        through shared access and responsibility.</p>
                 </div>
                 <div class="col-md-6 text-center text-md-end">
                     <p class="footer-meta">Need more help?<br><span>Contact an Admin or Lending Committee</span></p>
@@ -369,6 +441,8 @@ if (isset($_POST['login'])) {
             </div>
         </div>
     </footer>
+
+
 
     <script>
         const nav = document.querySelector('.navbar');
@@ -395,11 +469,12 @@ if (isset($_POST['login'])) {
         closeBtn.addEventListener('click', closeAll);
         overlay.addEventListener('click', closeAll);
 
-        <?php if($login_error): ?>
+        <?php if ($login_error): ?>
             sidebar.classList.add('active');
             overlay.classList.add('active');
         <?php endif; ?>
     </script>
 
 </body>
+
 </html>
