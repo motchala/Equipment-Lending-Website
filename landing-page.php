@@ -1,33 +1,48 @@
 <?php
 session_start();
+if (isset($_SESSION['user_id'])) {
+    header("Location: user-dashboard.php");
+    exit();
+}
+
+if (isset($_SESSION['admin'])) {
+    header("Location: admin-dashboard.php");
+    exit();
+}
+
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 $login_error = "";
 $register_error = "";
 $register_success = "";
 
+
 // ----------- LOGIN -----------
 if (isset($_POST['login'])) {
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $email = trim($_POST['email']);
     $password = $_POST['password'];
 
     // Admin login
-    if ($email == 'main@admin.edu' && $password == 'admin123') {
+    if ($email === 'main@admin.edu' && $password === 'admin123') {
         $_SESSION['admin'] = true;
+        $_SESSION['login_time'] = time();
         header("Location: admin-dashboard.php");
         exit();
     }
 
     // User login
-    $stmt = $conn->prepare("SELECT * FROM tbl_users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
 
-    if ($result && $result->num_rows > 0) {
+    if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
+
         if (password_verify($password, $user['password'])) {
             $_SESSION['user_id'] = $user['student_id'];
             $_SESSION['fullname'] = $user['fullname'];
+            $_SESSION['login_time'] = time();
+
             header("Location: user-dashboard.php");
             exit();
         } else {
@@ -37,6 +52,7 @@ if (isset($_POST['login'])) {
         $login_error = "No account found with that email.";
     }
 }
+
 
 // ----------- REGISTRATION -----------
 if (isset($_POST['register'])) {
@@ -396,11 +412,14 @@ if (isset($_POST['register'])) {
                             <input type="email" name="email" placeholder="Email" required>
                             <input type="password" name="password" placeholder="Password" required>
 
+                            <?php if ($login_error): ?>
+                                <div class="alert alert-danger mt-2">
+                                    <?= $login_error ?>
+                                </div>
+                            <?php endif; ?>
                             <button type="submit" name="login" class="btn btn-light">Sign In</button>
                         </form>
                     </div>
-
-
 
                     <div class="tab-pane fade" id="register-pane" role="tabpanel">
                         <h2>Create Account</h2>
@@ -411,19 +430,21 @@ if (isset($_POST['register'])) {
                             <input type="password" name="password" placeholder="Create Password" required>
                             <input type="password" name="confirm_password" placeholder="Confirm Password" required>
 
+                            <?php if ($register_error): ?>
+                                <div class="alert alert-danger mt-2">
+                                    <?= $register_error ?>
+                                </div>
+                            <?php endif; ?>
+
+                            <?php if ($register_success): ?>
+                                <div class="alert alert-success mt-2">
+                                    <?= $register_success ?>
+                                </div>
+                            <?php endif; ?>
+                            
                             <button type="submit" name="register" class="btn btn-light">Register</button>
                         </form>
                     </div>
-
-
-                    <?php if ($login_error || $register_error): ?>
-                        sidebar.classList.add('active');
-                        overlay.classList.add('active');
-                    <?php endif; ?>
-
-
-
-
 
                 </div>
             </div>
@@ -473,9 +494,10 @@ if (isset($_POST['register'])) {
         closeBtn.addEventListener('click', closeAll);
         overlay.addEventListener('click', closeAll);
 
-        <?php if ($login_error): ?>
+        <?php if (!empty($login_error) || !empty($register_error)): ?>
             sidebar.classList.add('active');
             overlay.classList.add('active');
+            document.getElementById('login-tab').click();
         <?php endif; ?>
     </script>
 

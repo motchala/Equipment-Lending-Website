@@ -1,5 +1,12 @@
 <?php
 session_start();
+if (!isset($_SESSION['user_id'])) {
+    header("Location: landing-page.php");
+    exit();
+}
+$fullname = $_SESSION['fullname'];
+
+
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
@@ -75,6 +82,8 @@ if (isset($_SESSION['user_id'])) {
     <title>EQUIPLEND | User Portal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
 
     <style>
         :root {
@@ -110,10 +119,12 @@ if (isset($_SESSION['user_id'])) {
         /* Sidebar Styling */
         aside#sidebar {
             width: 280px;
+            display: flex;
+            flex-direction: column;
             background: white;
             border-right: 1px solid #ddd;
             transition: margin-left 0.3s ease;
-            height: 100%;
+            height: 100vh;
             position: relative;
             z-index: 1060;
         }
@@ -192,6 +203,54 @@ if (isset($_SESSION['user_id'])) {
         #loading-overlay.hidden {
             display: none !important;
         }
+
+        /* Sidebar Logout Button - Admin Style */
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 15px 0 50px 0;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar-btn {
+            background: none;
+            border: none;
+            border-left: 4px solid transparent;
+            color: rgba(0, 0, 0, 0.75);
+            padding: 14px 25px;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            transition: 0.2s ease;
+            cursor: pointer;
+        }
+
+        .sidebar-btn i {
+            font-size: 1.25rem;
+            width: 35px;
+            display: inline-block;
+        }
+
+        .sidebar-btn:hover {
+            color: #fff;
+            background: rgba(139, 0, 0, 0.3);
+            /* semi-transparent dark red */
+        }
+
+        .sidebar-btn.active {
+            color: #fff;
+            background: rgba(139, 0, 0, 0.5);
+            border-left: 4px solid #8B0000;
+            font-weight: 600;
+        }
+
+        nav.nav.flex-column {
+            display: flex;
+            /* make nav a flex container */
+            flex-direction: column;
+            flex-grow: 1;
+            /* allow it to grow and fill sidebar */
+        }
     </style>
 </head>
 
@@ -202,8 +261,6 @@ if (isset($_SESSION['user_id'])) {
                     class="fas fa-bars"></i></button>
             <h1 class="h5 mb-0 text-white fw-bold">EQUIPLEND <small class="fw-light opacity-75">USER</small></h1>
         </div>
-        <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="handleLogout()">
-            <i class="fas fa-sign-out-alt"></i> Logout</button>
     </header>
 
     <div class="d-flex flex-grow-1 overflow-hidden">
@@ -217,6 +274,11 @@ if (isset($_SESSION['user_id'])) {
                     onclick="showSection('status-section', 'btn-status')">
                     <i class="fas fa-clipboard-check me-3"></i> My Requests
                 </button>
+                <div class="sidebar-footer">
+                    <button type="button" class="sidebar-btn border-0" onclick="handleLogout()">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </div>
             </nav>
         </aside>
 
@@ -428,7 +490,7 @@ if (isset($_SESSION['user_id'])) {
 
         function handleLogout() {
             if (confirm("Confirm Logout?")) {
-                window.location.href = "landing-page.php";
+                window.location.href = "logout.php";
             }
         }
 
