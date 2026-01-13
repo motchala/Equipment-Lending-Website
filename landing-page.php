@@ -13,11 +13,11 @@ if (isset($_POST['login'])) {
     if ($email == 'main@admin.edu' && $password == 'admin123') {
         header("Location: admin-dashboard.php");
         exit();
-    } 
+    }
 
     $query = "SELECT * FROM tbl_users WHERE email = '$email'";
     $result = mysqli_query($conn, $query);
-    
+
     if ($result && mysqli_num_rows($result) > 0) {
         $user = mysqli_fetch_assoc($result);
         if (password_verify($password, $user['password'])) {
@@ -41,7 +41,7 @@ if (isset($_POST['login'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -107,7 +107,8 @@ if (isset($_POST['login'])) {
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            padding: 5rem 2rem;
+            padding: 2rem;
+            justify-content: flex-start;
             color: #fff;
             box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5);
         }
@@ -174,16 +175,18 @@ if (isset($_POST['login'])) {
 
         /* Sign In & Register Form Styles */
         .auth-container h2 {
-            margin-bottom: 1.5rem;
+            max-width: 400px;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
             font-weight: 700;
         }
 
         .auth-container input {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
+            margin-bottom: .75rem;
+            padding: 0.5rem;
             width: 100%;
             border-radius: 0.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.1);
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
         }
@@ -355,7 +358,8 @@ if (isset($_POST['login'])) {
 
                             <?php if ($login_error): ?>
                                 <p style="color: #ff6b6b; font-size: 0.9rem; margin-bottom: 1rem;">
-                                    <?php echo $login_error; ?></p>
+                                    <?php echo $login_error; ?>
+                                </p>
                             <?php endif; ?>
 
                             <button type="submit" name="login" class="btn btn-light">Sign In</button>
@@ -377,29 +381,24 @@ if (isset($_POST['login'])) {
                         </form>
                     </div>
 
-                    <?php
 
+                    <?php
                     $hostname = "localhost";
                     $DBUser = "root";
-                    $DBPassword = ""; // Kept blank assuming XAMPP default
+                    $DBPassword = ""; 
                     $DBName = "lending_db";
-                    
-                    // Added error suppression (@) to prevent connection errors from breaking the HTML layout
+
                     $conn = @mysqli_connect($hostname, $DBUser, $DBPassword, $DBName);
 
                     if (isset($_POST["register"])) {
-                        // Move connection check inside the post request so page loads even if DB is offline
                         if (!$conn) {
-                             echo "<br>Connection Failed: " . mysqli_connect_error();
+                            echo "<br>Connection Failed: " . mysqli_connect_error();
                         } else {
                             $fullname = $_POST["fullname"];
                             $student_id = $_POST["student_id"];
                             $email = $_POST["email"];
                             $password = $_POST["password"];
-                            
-                            // ERROR FIX 2: Fixed variable name (was $password = $_POST...)
                             $confirm_password = $_POST["confirm_password"];
-
 
                             if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
                                 echo "<br>Please fill in all fields.";
@@ -417,7 +416,6 @@ if (isset($_POST['login'])) {
                             }
                         }
                     }
-
                     ?>
 
 
