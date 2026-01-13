@@ -8,38 +8,46 @@ if (!$conn) {
 /* ============================
    1. HANDLE BORROW REQUEST
    ============================ */
-if (isset($_POST['borrow_submit'])) {
-    echo "DEBUG: Session ID is " . session_id() . "<br>";
-    echo "DEBUG: User ID is " . ($_SESSION['user_id'] ?? 'EMPTY') . "<br>";
-    // print_r($_SESSION); // Uncomment this to see everything in the session
-
+// checks both the button click and the hidden input from JS
+if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
 
     if (!isset($_SESSION['user_id'])) {
         die("Unauthorized access");
     }
+
     $user_id = $_SESSION['user_id'];
-    $user_query = mysqli_query($conn, "SELECT fullname, student_id FROM tbl_users WHERE student_id = '$user_id'");
+
+    // Fetch user details safely
+    $user_query = mysqli_query($conn, "SELECT fullname, student_id FROM tbl_users WHERE student_id = '" . mysqli_real_escape_string($conn, $user_id) . "'");
     $user = mysqli_fetch_assoc($user_query);
+
+    if (!$user) {
+        die("User profile not found.");
+    }
 
     $student_name = $user['fullname'];
     $student_id = $user['student_id'];
 
-    $borrow_date = $_POST['borrow_date'];
-    $return_date = $_POST['return_date'];
+    // Sanitize all inputs to prevent SQL Injection
+    $borrow_date = mysqli_real_escape_string($conn, $_POST['borrow_date']);
+    $return_date = mysqli_real_escape_string($conn, $_POST['return_date']);
     $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
     $room = mysqli_real_escape_string($conn, $_POST['room']);
     $instructor = mysqli_real_escape_string($conn, $_POST['instructor']);
 
     // Insert into tbl_requests
-    mysqli_query($conn, "
-        INSERT INTO tbl_requests
-        (student_name, student_id, equipment_name, instructor, room, borrow_date, return_date, status, request_date)
-        VALUES
-        ('$student_name', '$student_id', '$equipment_name', '$instructor', '$room', '$borrow_date', '$return_date', 'Waiting', NOW())
-    ");
+    $insert_query = "INSERT INTO tbl_requests 
+                    (student_name, student_id, equipment_name, instructor, room, borrow_date, return_date, status, request_date) 
+                    VALUES 
+                    ('$student_name', '$student_id', '$equipment_name', '$instructor', '$room', '$borrow_date', '$return_date', 'Waiting', NOW())";
 
-    header("Location: user-dashboard.php?success=1");
-    exit();
+    if (mysqli_query($conn, $insert_query)) {
+        // Successful insert, redirect to dashboard
+        header("Location: user-dashboard.php?success=1");
+        exit();
+    } else {
+        die("Error processing request: " . mysqli_error($conn));
+    }
 }
 
 /* ============================
@@ -54,7 +62,8 @@ $inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory ORDER BY it
 $my_requests_result = null;
 if (isset($_SESSION['user_id'])) {
     $user_id = $_SESSION['user_id'];
-$my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id = '$user_id' ORDER BY request_date DESC");}
+    $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id = '$user_id' ORDER BY request_date DESC");
+}
 ?>
 
 <!DOCTYPE html>
@@ -174,6 +183,15 @@ $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE stud
             overflow-y: auto;
             padding: 25px;
         }
+
+        /* Ensure overlay is hidden by default and displays as flex when active */
+        #loading-overlay.active {
+            display: flex !important;
+        }
+
+        #loading-overlay.hidden {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -203,6 +221,14 @@ $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE stud
         </aside>
 
         <main>
+            <?php if (isset($_GET['success'])): ?>
+                <div id="success-alert" class="alert alert-success alert-dismissible fade show shadow-sm mb-4" role="alert">
+                    <i class="fas fa-check-circle me-2"></i> <strong>Success!</strong> Your borrow request has been
+                    submitted for approval.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <?php endif; ?>
+
             <div id="overdue-alert" class="alert alert-danger shadow-sm hidden" role="alert">
                 <i class="fas fa-exclamation-triangle me-2"></i> <strong>Overdue Alert:</strong> Please return your
                 equipment to the laboratory immediately!
@@ -301,7 +327,7 @@ $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE stud
                         <button class="btn-close" onclick="showSection('browser-section', 'btn-browse')"></button>
                     </header>
                     <div class="card-body p-4">
-                        <form method="POST" action="">
+                        <form id="borrowForm" method="POST" action="">
                             <input type="hidden" name="equipment_name" id="selectedItem">
 
                             <div class="row g-3">
@@ -429,13 +455,49 @@ $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE stud
                 item.style.display = (matchesName && matchesCategory) ? "" : "none";
             });
         }
+        function cleanURL() {
+            const url = new URL(window.location);
+            url.searchParams.delete('success');
+            window.history.replaceState({}, document.title, url.pathname);
+        }
 
         // Pre-fills equipment name and opens the form
         function openForm(itemName) {
             document.getElementById('selectedItem').value = itemName;
             showSection('form-section');
         }
+
+        window.addEventListener('DOMContentLoaded', (event) => {
+            if (document.getElementById('success-alert')) {
+                cleanURL();
+            }
+        });
+        // Add this inside your <script> tags
+        document.getElementById('borrowForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const overlay = document.getElementById('loading-overlay');
+
+            overlay.classList.add('active');
+            overlay.classList.remove('hidden');
+
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'borrow_submit';
+            hiddenInput.value = '1';
+            this.appendChild(hiddenInput);
+
+            setTimeout(() => {
+                this.submit();
+            }, 2000);
+        });
+
     </script>
+
+    <div id="loading-overlay" class="hidden"
+        style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
+        <div class="spinner-border text-danger" role="status" style="width: 3rem; height: 3rem;"></div>
+        <p class="mt-3 fw-bold text-dark">Processing your request...</p>
+    </div>
 </body>
 
 </html>
