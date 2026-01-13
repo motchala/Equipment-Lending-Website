@@ -4,9 +4,14 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+$category_result = mysqli_query(
+    $conn,
+    "SELECT DISTINCT category FROM tbl_inventory ORDER BY category ASC"
+);
+
 $inventory_result = mysqli_query(
     $conn,
-    "SELECT * FROM tbl_inventory WHERE quantity > 0 ORDER BY item_name ASC"
+    "SELECT * FROM tbl_inventory ORDER BY item_name ASC"
 );
 ?>
 
@@ -163,12 +168,32 @@ $inventory_result = mysqli_query(
             <section id="browser-section">
                 <article class="card p-4">
                     <h2 class="h5 fw-bold mb-4">Browse Available Equipment</h2>
-                    <div class="input-group mb-4 shadow-sm" style="max-width: 400px;">
-                        <span class="input-group-text bg-white border-end-0"><i
-                                class="fas fa-search text-muted"></i></span>
-                        <input type="text" id="equipmentSearch" class="form-control border-start-0"
-                            placeholder="Search by name..." onkeyup="searchEquipment()">
+                    <div class="d-flex gap-2 mb-4" style="max-width: 520px;">
+                        <!-- Search -->
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" id="equipmentSearch" class="form-control border-start-0"
+                                placeholder="Search by name..." onkeyup="filterEquipment()">
+                        </div>
+
+                        <!-- Category Dropdown -->
+                        <select id="categoryFilter" class="form-select shadow-sm" onchange="filterEquipment()">
+                            <option value="">All Categories</option>
+                            <?php 
+                            while ($cat = mysqli_fetch_assoc($category_result)) { 
+
+                                if (strtolower($cat['category']) === 'others') continue;
+                            ?>
+                                <option value="<?php echo htmlspecialchars($cat['category']); ?>">
+                                    <?php echo htmlspecialchars($cat['category']); ?>
+                                </option>
+                            <?php } ?>
+                            <option value="Others">Others</option>
+                        </select>
                     </div>
+
 
                     <div class="row g-4" id="equipmentList">
                         <?php if (mysqli_num_rows($inventory_result) == 0) { ?>
@@ -178,7 +203,8 @@ $inventory_result = mysqli_query(
                             <?php } else { ?>
                                 <?php while ($item = mysqli_fetch_assoc($inventory_result)) { ?>
                                     <div class="col-md-4 col-lg-3 item-node" 
-                                                data-name="<?php echo htmlspecialchars($item['item_name']); ?>">
+                                                data-name="<?php echo strtolower($item['item_name']); ?>"
+                                                data-category="<?php echo strtolower($item['category']); ?>">
 
                                         <figure class="equipment-card card">
                                             <img src="<?php echo $item['image_path']; ?>"
@@ -190,7 +216,28 @@ $inventory_result = mysqli_query(
                                                     <?php echo htmlspecialchars($item['item_name']); ?>
                                                 </h3>
 
+                                                <p class="small mt-1 mb-2">
+                                                    Status:
+                                                    <?php if ($item['quantity'] > 0) { ?>
+                                                        <span class="text-success fw-bold">Available</span>
+                                                    <?php } else { ?>
+                                                        <span class="text-danger fw-bold">Unavailable</span>
+                                                    <?php } ?>
+                                                </p>
+                                                <p class="small mt-1 mb-2">
+                                                    Stock:
+                                                    <?php if ($item['quantity'] > 0) { ?>
+                                                        <span class="badge bg-success">
+                                                            <?php echo (int)$item['quantity']; ?> left
+                                                        </span>
+                                                    <?php } else { ?>
+                                                        <span class="badge bg-danger">Out of stock</span>
+                                                    <?php } ?>
+                                                </p>
+
+
                                                 <button class="btn btn-success w-100 mt-2"
+                                                    <?php if ($item['quantity'] <= 0) echo "disabled"; ?>
                                                     onclick="openForm('<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>')">
                                                     Borrow
                                                 </button>
@@ -309,6 +356,21 @@ $inventory_result = mysqli_query(
                 item.style.display = name.includes(filter) ? "" : "none";
             });
         }
+
+        function filterEquipment() {
+    const searchText = document.getElementById('equipmentSearch').value.toLowerCase();
+    const selectedCategory = document.getElementById('categoryFilter').value.toLowerCase();
+
+    document.querySelectorAll('.item-node').forEach(item => {
+        const name = item.getAttribute('data-name');
+        const category = item.getAttribute('data-category');
+
+        const matchesName = name.includes(searchText);
+        const matchesCategory = selectedCategory === "" || category === selectedCategory;
+
+        item.style.display = (matchesName && matchesCategory) ? "" : "none";
+    });
+}
 
         // Pre-fills equipment name and opens the form
         function openForm(itemName) {

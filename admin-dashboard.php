@@ -601,25 +601,21 @@ if (isset($_GET['edit_item'])) {
                                 value="<?php echo $edit_item['item_name'] ?? ''; ?>" required>
                         </div>
 
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                <label class="form-label fw-bold">Quantity</label>
-                                <input type="number" name="quantity" class="form-control" min="0"
-                                    value="<?php echo $edit_item['quantity'] ?? 1; ?>" required>
-                            </div>
-
-                            <div class="col-6 mb-3">
-                                <label class="form-label fw-bold">Category</label>
-                                <select name="category" class="form-select">
-                                    <?php
-                                    $categories = ["Photography", "Laptops", "Projectors"];
-                                    foreach ($categories as $cat) {
-                                        $selected = ($edit_item && $edit_item['category'] == $cat) ? "selected" : "";
-                                        echo "<option $selected>$cat</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label fw-bold">Category</label>
+                            <select name="category" class="form-select">
+                                <?php
+                                $categories = ["Electronics and Accessories", 
+                                                "Academic tools", 
+                                                "Sports and Physical Education Equipment",
+                                                "Others"
+                                              ];
+                                foreach ($categories as $cat) {
+                                    $selected = ($edit_item && $edit_item['category'] == $cat) ? "selected" : "";
+                                    echo "<option $selected>$cat</option>";
+                                }
+                                ?>
+                            </select>
                         </div>
 
                         <button type="submit" name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
