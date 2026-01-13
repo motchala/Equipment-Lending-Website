@@ -1,20 +1,61 @@
 <?php
+session_start();
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-$category_result = mysqli_query(
-    $conn,
-    "SELECT DISTINCT category FROM tbl_inventory ORDER BY category ASC"
-);
+/* ============================
+   1. HANDLE BORROW REQUEST
+   ============================ */
+if (isset($_POST['borrow_submit'])) {
+    echo "DEBUG: Session ID is " . session_id() . "<br>";
+    echo "DEBUG: User ID is " . ($_SESSION['user_id'] ?? 'EMPTY') . "<br>";
+    // print_r($_SESSION); // Uncomment this to see everything in the session
 
-$inventory_result = mysqli_query(
-    $conn,
-    "SELECT * FROM tbl_inventory ORDER BY item_name ASC"
-);
+
+    if (!isset($_SESSION['user_id'])) {
+        die("Unauthorized access");
+    }
+    $user_id = $_SESSION['user_id'];
+    $user_query = mysqli_query($conn, "SELECT fullname, student_id FROM tbl_users WHERE student_id = '$user_id'");
+    $user = mysqli_fetch_assoc($user_query);
+
+    $student_name = $user['fullname'];
+    $student_id = $user['student_id'];
+
+    $borrow_date = $_POST['borrow_date'];
+    $return_date = $_POST['return_date'];
+    $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
+    $room = mysqli_real_escape_string($conn, $_POST['room']);
+    $instructor = mysqli_real_escape_string($conn, $_POST['instructor']);
+
+    // Insert into tbl_requests
+    mysqli_query($conn, "
+        INSERT INTO tbl_requests
+        (student_name, student_id, equipment_name, instructor, room, borrow_date, return_date, status, request_date)
+        VALUES
+        ('$student_name', '$student_id', '$equipment_name', '$instructor', '$room', '$borrow_date', '$return_date', 'Waiting', NOW())
+    ");
+
+    header("Location: user-dashboard.php?success=1");
+    exit();
+}
+
+/* ============================
+   2. INVENTORY LOADING
+   ============================ */
+$category_result = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory ORDER BY category ASC");
+$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory ORDER BY item_name ASC");
+
+/* ============================
+   3. MY REQUESTS
+   ============================ */
+$my_requests_result = null;
+if (isset($_SESSION['user_id'])) {
+    $user_id = $_SESSION['user_id'];
+$my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id = '$user_id' ORDER BY request_date DESC");}
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -64,6 +105,8 @@ $inventory_result = mysqli_query(
             border-right: 1px solid #ddd;
             transition: margin-left 0.3s ease;
             height: 100%;
+            position: relative;
+            z-index: 1060;
         }
 
         aside#sidebar.collapsed {
@@ -142,8 +185,7 @@ $inventory_result = mysqli_query(
             <h1 class="h5 mb-0 text-white fw-bold">EQUIPLEND <small class="fw-light opacity-75">USER</small></h1>
         </div>
         <button class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="handleLogout()">
-            <i class="fas fa-sign-out-alt">
-            </i> Logout</button>
+            <i class="fas fa-sign-out-alt"></i> Logout</button>
     </header>
 
     <div class="d-flex flex-grow-1 overflow-hidden">
@@ -181,11 +223,12 @@ $inventory_result = mysqli_query(
                         <!-- Category Dropdown -->
                         <select id="categoryFilter" class="form-select shadow-sm" onchange="filterEquipment()">
                             <option value="">All Categories</option>
-                            <?php 
-                            while ($cat = mysqli_fetch_assoc($category_result)) { 
+                            <?php
+                            while ($cat = mysqli_fetch_assoc($category_result)) {
 
-                                if (strtolower($cat['category']) === 'others') continue;
-                            ?>
+                                if (strtolower($cat['category']) === 'others')
+                                    continue;
+                                ?>
                                 <option value="<?php echo htmlspecialchars($cat['category']); ?>">
                                     <?php echo htmlspecialchars($cat['category']); ?>
                                 </option>
@@ -194,64 +237,63 @@ $inventory_result = mysqli_query(
                         </select>
                     </div>
 
-
                     <div class="row g-4" id="equipmentList">
                         <?php if (mysqli_num_rows($inventory_result) == 0) { ?>
                             <div class="col-12 text-center text-muted py-5">
                                 No equipment available at the moment.
                             </div>
-                            <?php } else { ?>
-                                <?php while ($item = mysqli_fetch_assoc($inventory_result)) { ?>
-                                    <div class="col-md-4 col-lg-3 item-node" 
-                                                data-name="<?php echo strtolower($item['item_name']); ?>"
-                                                data-category="<?php echo strtolower($item['category']); ?>">
+                        <?php } else { ?>
+                            <?php while ($item = mysqli_fetch_assoc($inventory_result)) { ?>
+                                <div class="col-md-4 col-lg-3 item-node"
+                                    data-name="<?php echo strtolower($item['item_name']); ?>"
+                                    data-category="<?php echo strtolower($item['category']); ?>">
 
-                                        <figure class="equipment-card card">
-                                            <img src="<?php echo $item['image_path']; ?>"
-                                                style="width:100%; height:140px; object-fit:cover; border-radius:10px;"
-                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>">
+                                    <figure class="equipment-card card">
+                                        <img src="<?php echo $item['image_path']; ?>"
+                                            style="width:100%; height:140px; object-fit:cover; border-radius:10px;"
+                                            alt="<?php echo htmlspecialchars($item['item_name']); ?>">
 
-                                            <figcaption class="mt-3">
-                                                <h3 class="h6 fw-bold">
-                                                    <?php echo htmlspecialchars($item['item_name']); ?>
-                                                </h3>
+                                        <figcaption class="mt-3">
+                                            <h3 class="h6 fw-bold">
+                                                <?php echo htmlspecialchars($item['item_name']); ?>
+                                            </h3>
 
-                                                <p class="small mt-1 mb-2">
-                                                    Status:
-                                                    <?php if ($item['quantity'] > 0) { ?>
-                                                        <span class="text-success fw-bold">Available</span>
-                                                    <?php } else { ?>
-                                                        <span class="text-danger fw-bold">Unavailable</span>
-                                                    <?php } ?>
-                                                </p>
-                                                <p class="small mt-1 mb-2">
-                                                    Stock:
-                                                    <?php if ($item['quantity'] > 0) { ?>
-                                                        <span class="badge bg-success">
-                                                            <?php echo (int)$item['quantity']; ?> left
-                                                        </span>
-                                                    <?php } else { ?>
-                                                        <span class="badge bg-danger">Out of stock</span>
-                                                    <?php } ?>
-                                                </p>
+                                            <p class="small mt-1 mb-2">
+                                                Status:
+                                                <?php if ($item['quantity'] > 0) { ?>
+                                                    <span class="text-success fw-bold">Available</span>
+                                                <?php } else { ?>
+                                                    <span class="text-danger fw-bold">Unavailable</span>
+                                                <?php } ?>
+                                            </p>
+                                            <p class="small mt-1 mb-2">
+                                                Stock:
+                                                <?php if ($item['quantity'] > 0) { ?>
+                                                    <span class="badge bg-success">
+                                                        <?php echo (int) $item['quantity']; ?> left
+                                                    </span>
+                                                <?php } else { ?>
+                                                    <span class="badge bg-danger">Out of stock</span>
+                                                <?php } ?>
+                                            </p>
 
+                                            <button class="btn btn-success w-100 mt-2" <?php if ($item['quantity'] <= 0)
+                                                echo 'disabled'; ?>
+                                                onclick="openForm('<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>')">
+                                                Borrow
+                                            </button>
 
-                                                <button class="btn btn-success w-100 mt-2"
-                                                    <?php if ($item['quantity'] <= 0) echo "disabled"; ?>
-                                                    onclick="openForm('<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>')">
-                                                    Borrow
-                                                </button>
-
-                                            </figcaption>
-                                        </figure>
-                                    </div>
-                                <?php } ?>
+                                        </figcaption>
+                                    </figure>
+                                </div>
+                            <?php } ?>
                         <?php } ?>
 
                     </div>
                 </article>
             </section>
 
+            <!-- Borrow Form Section -->
             <section id="form-section" class="hidden">
                 <article class="card shadow mx-auto" style="max-width: 750px;">
                     <header class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
@@ -259,49 +301,39 @@ $inventory_result = mysqli_query(
                         <button class="btn-close" onclick="showSection('browser-section', 'btn-browse')"></button>
                     </header>
                     <div class="card-body p-4">
-                        <form id="borrowForm">
+                        <form method="POST" action="">
+                            <input type="hidden" name="equipment_name" id="selectedItem">
+
                             <div class="row g-3">
-                                <div class="col-md-6"><label class="form-label small fw-bold">Full Name</label>
-                                    <input type="text" id="stdName" class="form-control" required>
-                                </div>
-                                <div class="col-md-6"><label class="form-label small fw-bold">Student ID</label>
-                                    <input type="text" id="stdID" class="form-control" required>
-                                </div>
-                                <div class="col-md-6"><label class="form-label small fw-bold">Year &
-                                        Section</label><input type="text" id="stdYearSec" class="form-control" required>
-                                </div>
-                                <div class="col-md-6"><label class="form-label small fw-bold">Contact
-                                        Number</label><input type="tel" id="stdContact" class="form-control" required>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Instructor</label>
+                                    <input type="text" name="instructor" class="form-control" required>
                                 </div>
 
-                                <div class="col-md-12"><label
-                                        class="form-label small fw-bold">Professor/Instructor</label><input type="text"
-                                        id="profInput" class="form-control" placeholder="Manual Input Name" required>
+                                <div class="col-md-12">
+                                    <label class="form-label small fw-bold">Room / Laboratory</label>
+                                    <input type="text" name="room" class="form-control" required>
                                 </div>
-                                <div class="col-md-12"><label class="form-label small fw-bold">Room /
-                                        Laboratory</label><input type="text" id="roomInput" class="form-control"
-                                        placeholder="e.g. Room 402 or ComLab 1" required></div>
 
-                                <div class="col-md-4"><label class="form-label small fw-bold">Equipment</label>
-                                    <input type="text" id="selectedItem" class="form-control bg-light" readonly>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Borrow Date</label>
+                                    <input type="date" name="borrow_date" class="form-control" required>
                                 </div>
-                                <div class="col-md-4"><label class="form-label small fw-bold">Date Borrowed</label>
-                                    <input type="date" id="borrowDate" class="form-control" required>
-                                </div>
-                                <div class="col-md-4"><label class="form-label small fw-bold">Time Borrowed</label>
-                                    <input type="time" id="borrowTime" class="form-control" required>
-                                </div>
-                                <div class="col-md-12"><label class="form-label small fw-bold">Return Date</label>
-                                    <input type="date" id="returnDate" class="form-control" required>
+
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Return Date</label>
+                                    <input type="date" name="return_date" class="form-control" required>
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-danger w-100 fw-bold py-2 mt-4"
-                                style="background: var(--equi-red);">Submit Request</button>
+                            <button type="submit" name="borrow_submit" class="btn btn-danger w-100 fw-bold py-2 mt-4">
+                                Submit Request
+                            </button>
                         </form>
                     </div>
                 </article>
             </section>
 
+            <!-- My Requests Section -->
             <section id="status-section" class="hidden">
                 <article class="card shadow">
                     <header class="card-header bg-white py-3">
@@ -312,19 +344,49 @@ $inventory_result = mysqli_query(
                             <thead>
                                 <tr>
                                     <th>Item</th>
-                                    <th>Student Info</th>
                                     <th>Instructor</th>
                                     <th>Room</th>
-                                    <th>Date/Time Borrowed</th>
+                                    <th>Borrow Date</th>
+                                    <th>Return Date</th>
                                     <th>Status</th>
-                                    <th class="text-center">Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="requestTableBody"></tbody>
+                            <tbody>
+                                <?php
+                                // Only run the loop if we actually have database results
+                                if ($my_requests_result && mysqli_num_rows($my_requests_result) > 0):
+                                    while ($r = mysqli_fetch_assoc($my_requests_result)):
+                                        ?>
+                                        <tr>
+                                            <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['instructor']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['room']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['borrow_date']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['return_date']); ?></td>
+                                            <td>
+                                                <?php
+                                                $status = $r['status'];
+                                                $badge_class = ($status == 'Approved') ? 'success' : (($status == 'Declined') ? 'danger' : 'warning');
+                                                ?>
+                                                <span class="badge bg-<?php echo $badge_class; ?>">
+                                                    <?php echo htmlspecialchars($status); ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <?php
+                                    endwhile;
+                                else:
+                                    ?>
+                                    <tr>
+                                        <td colspan="6" class="text-center">No requests found.</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
                         </table>
                     </div>
                 </article>
             </section>
+
         </main>
     </div>
 
@@ -334,12 +396,16 @@ $inventory_result = mysqli_query(
         const todayStr = new Date().toISOString().split('T')[0];
 
         // Sidebar Toggle Function
-        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
-
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
 
         function handleLogout() {
-            if (confirm("Confirm Logout?")) { window.location.href = "landing-page.php"; }
+            if (confirm("Confirm Logout?")) {
+                window.location.href = "landing-page.php";
+            }
         }
+
         // Switcher Function to hide/show sections
         function showSection(sectionId, btnId) {
             document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
@@ -349,85 +415,25 @@ $inventory_result = mysqli_query(
         }
 
         // Real-time Search Filter for equipment
-        function searchEquipment() {
-            let filter = document.getElementById('equipmentSearch').value.toLowerCase();
+        function filterEquipment() {
+            const searchText = document.getElementById('equipmentSearch').value.toLowerCase();
+            const selectedCategory = document.getElementById('categoryFilter').value.toLowerCase();
+
             document.querySelectorAll('.item-node').forEach(item => {
-                let name = item.getAttribute('data-name').toLowerCase();
-                item.style.display = name.includes(filter) ? "" : "none";
+                const name = item.getAttribute('data-name');
+                const category = item.getAttribute('data-category');
+
+                const matchesName = name.includes(searchText);
+                const matchesCategory = selectedCategory === "" || category === selectedCategory;
+
+                item.style.display = (matchesName && matchesCategory) ? "" : "none";
             });
         }
-
-        function filterEquipment() {
-    const searchText = document.getElementById('equipmentSearch').value.toLowerCase();
-    const selectedCategory = document.getElementById('categoryFilter').value.toLowerCase();
-
-    document.querySelectorAll('.item-node').forEach(item => {
-        const name = item.getAttribute('data-name');
-        const category = item.getAttribute('data-category');
-
-        const matchesName = name.includes(searchText);
-        const matchesCategory = selectedCategory === "" || category === selectedCategory;
-
-        item.style.display = (matchesName && matchesCategory) ? "" : "none";
-    });
-}
 
         // Pre-fills equipment name and opens the form
         function openForm(itemName) {
             document.getElementById('selectedItem').value = itemName;
-            // Auto-fill today's date for convenience
-            document.getElementById('borrowDate').value = todayStr;
-            showSection('form-section', 'btn-browse');
-        }
-
-        // Submission
-        document.getElementById('borrowForm').onsubmit = function (e) {
-            e.preventDefault();
-            const data = {
-                item: document.getElementById('selectedItem').value,
-                name: document.getElementById('stdName').value,
-                id: document.getElementById('stdID').value,
-                ys: document.getElementById('stdYearSec').value,
-                room: document.getElementById('roomInput').value,
-                prof: document.getElementById('profInput').value,
-                bDate: document.getElementById('borrowDate').value,
-                bTime: document.getElementById('borrowTime').value,
-                rDate: document.getElementById('returnDate').value,
-                contact: document.getElementById('stdContact').value
-            };
-
-            // Trigger for Overdue notification
-            const isOverdue = data.rDate < todayStr;
-            if (isOverdue) document.getElementById('overdue-alert').classList.remove('hidden');
-
-            const tbody = document.getElementById('requestTableBody');
-            const row = document.createElement('tr');
-            if (isOverdue) row.classList.add('table-danger'); // Highlights row red if overdue
-
-            row.innerHTML = `
-                <td><b>${data.item}</b></td>
-                <td><small>${data.name}<br>${data.id} | ${data.ys}<br>${data.contact}</small></td>
-                <td>${data.prof}</td>
-                <td>${data.room}</td>
-                <td><small>${data.bDate}<br>${data.bTime}</small></td>
-                <td><span class="status-pill"></span> ${isOverdue ? '<b class="text-danger small ms-1">OVERDUE</b>' : ''}</td>
-                <td class="text-center">
-                    <button class="btn btn-sm btn-outline-danger" onclick="cancelRequest(this)">
-                        <i class="fas fa-trash-alt me-1"></i> Cancel
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(row);
-            this.reset();
-            showSection('status-section', 'btn-status');
-        };
-
-        // Function for the Cancel button to remove specific rows
-        function cancelRequest(btn) {
-            if (confirm("Are you sure you want to cancel this borrowing request?")) {
-                btn.closest('tr').remove();
-                if (!document.querySelector('.table-danger')) document.getElementById('overdue-alert').classList.add('hidden');
-            }
+            showSection('form-section');
         }
     </script>
 </body>
