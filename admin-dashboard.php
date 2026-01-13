@@ -6,25 +6,43 @@ if (!$conn) {
 }
 
 // Handle Approve / Decline actions
-// Handle Approve / Decline actions
 if (isset($_GET['action'], $_GET['id'])) {
     $request_id = (int) $_GET['id'];
     $action = $_GET['action'];
 
     if ($action === 'approve') {
-        $status = 'Approved';
+        // 1. Get the item name from the request before updating
+        $stmt_get = $conn->prepare("SELECT equipment_name FROM tbl_requests WHERE id = ?");
+        $stmt_get->bind_param("i", $request_id);
+        $stmt_get->execute();
+        $res = $stmt_get->get_result();
+        $request_data = $res->fetch_assoc();
+
+        if ($request_data) {
+            $item_name = $request_data['equipment_name'];
+
+            // 2. Update request status to Approved
+            $stmt_upd = $conn->prepare("UPDATE tbl_requests SET status = 'Approved' WHERE id = ?");
+            $stmt_upd->bind_param("i", $request_id);
+
+            if ($stmt_upd->execute()) {
+                // 3. Subtract 1 from tbl_inventory where the name matches
+                // We add "AND quantity > 0" as a safety measure
+                $stmt_inv = $conn->prepare("UPDATE tbl_inventory SET quantity = quantity - 1 WHERE item_name = ? AND quantity > 0");
+                $stmt_inv->bind_param("s", $item_name);
+                $stmt_inv->execute();
+            }
+        }
+        header("Location: admin-dashboard.php#sec-approved");
+        exit();
+
     } elseif ($action === 'decline') {
-        $status = 'Declined';
-    } else {
+        $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined' WHERE id = ?");
+        $stmt->bind_param("i", $request_id);
+        $stmt->execute();
+        header("Location: admin-dashboard.php#sec-declined");
         exit();
     }
-
-    $stmt = $conn->prepare("UPDATE tbl_requests SET status = ? WHERE request_id = ?");
-    $stmt->bind_param("si", $status, $request_id);
-    $stmt->execute();
-
-    header("Location: admin-dashboard.php#sec-waiting");
-    exit();
 }
 
 
@@ -32,16 +50,16 @@ if (isset($_GET['action'], $_GET['id'])) {
 // Add item
 if (isset($_POST['add_item'])) {
 
-    $name = $_POST['item_name'];
+    // Sanitize and format basic inputs
+    $name = trim($_POST['item_name']);
     $category = $_POST['category'];
-    $qty = $_POST['quantity'];
+    $qty = (int) $_POST['quantity'];
 
-    // Image upload
+    // Default image path
     $image_path = "uploads/default.png";
 
+    // Handle Image upload
     if (!empty($_FILES['item_image']['name'])) {
-
-        //  ALLOWED IMAGE TYPES
         $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
         $file_type = $_FILES['item_image']['type'];
 
@@ -49,26 +67,31 @@ if (isset($_POST['add_item'])) {
             die("Only JPG, PNG, and WEBP images are allowed.");
         }
 
-        //  MAX FILE SIZE (2MB)
-        $max_size = 2 * 1024 * 1024; // 2MB
+        $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
             die("Image too large. Maximum size is 2MB.");
         }
 
-
-        $image_name = time() . "_" . $_FILES['item_image']['name'];
+        $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
         $target = "uploads/" . $image_name;
 
-        move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
-        $image_path = $target;
+        if (move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
+            $image_path = $target;
+        }
     }
 
-    $sql = "INSERT INTO tbl_inventory (item_name, category, quantity, image_path)
-            VALUES ('$name', '$category', $qty, '$image_path')";
+    // --- SECURE DATABASE INSERT ---
+    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path) VALUES (?, ?, ?, ?)");
 
-    mysqli_query($conn, $sql);
-    header("Location: admin-dashboard.php#sec-inventory");
-    exit();
+    $stmt->bind_param("ssis", $name, $category, $qty, $image_path);
+
+    if ($stmt->execute()) {
+        $stmt->close();
+        header("Location: admin-dashboard.php#sec-inventory");
+        exit();
+    } else {
+        die("Error saving to database: " . $conn->error);
+    }
 }
 
 //Edit Item
@@ -79,7 +102,6 @@ if (isset($_POST['update_item'])) {
     $category = $_POST['category'];
     $qty = intval($_POST['quantity']);
 
-    // Keep old image by default
     $image_path = $_POST['old_image'];
 
     // Upload new image if provided
@@ -116,6 +138,7 @@ if (isset($_POST['update_item'])) {
     header("Location: admin-dashboard.php#sec-inventory");
     exit();
 }
+
 // Delete Item
 if (isset($_GET['delete_item'])) {
     $id = intval($_GET['delete_item']);
@@ -178,7 +201,7 @@ if (isset($_GET['edit_item'])) {
             font-family: 'Inter', sans-serif;
         }
 
-        /* NAVBAR - Enhanced Shadow for depth */
+        /* NAVBAR - Shadow effect for depth */
         .navbar {
             background-color: var(--maroon) !important;
             z-index: 2100;
@@ -217,7 +240,7 @@ if (isset($_GET['edit_item'])) {
             left: 0;
         }
 
-        /* SIDEBAR NAVIGATION - Visual Hierarchy */
+        /* SIDEBAR NAVIGATION */
         #sidebar .nav-label {
             color: rgba(255, 255, 255, 0.4);
             font-size: 0.7rem;
@@ -392,10 +415,10 @@ if (isset($_GET['edit_item'])) {
                                         <?php echo $row['student_id']; ?>
                                     </td>
                                     <td class="fw-bold">
-                                        <?php echo $row['student_name']; ?>
+                                        <?php echo htmlspecialchars($row['student_name']); ?>
                                     </td>
                                     <td>
-                                        <?php echo $row['equipment_name']; ?>
+                                        <?php echo htmlspecialchars($row['equipment_name']); ?>
                                     </td>
                                     <td>
                                         <span class="badge bg-warning text-dark px-3 py-2">
@@ -403,11 +426,11 @@ if (isset($_GET['edit_item'])) {
                                         </span>
                                     </td>
                                     <td>
-                                        <a href="admin-dashboard.php?action=approve&id=<?php echo $row['request_id']; ?>"
+                                        <a href="admin-dashboard.php?action=approve&id=<?php echo $row['id']; ?>"
                                             class="btn btn-success btn-sm rounded-circle p-2">
                                             <i class="bi bi-check-lg"></i>
                                         </a>
-                                        <a href="admin-dashboard.php?action=decline&id=<?php echo $row['request_id']; ?>"
+                                        <a href="admin-dashboard.php?action=decline&id=<?php echo $row['id']; ?>"
                                             class="btn btn-danger btn-sm rounded-circle p-2 ms-1">
                                             <i class="bi bi-x-lg"></i>
                                         </a>
@@ -477,12 +500,10 @@ if (isset($_GET['edit_item'])) {
                                         </td>
 
                                         <td>
-                                            <!-- EDIT (future improvement) -->
                                             <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>#sec-inventory"
                                                 class="btn btn-sm btn-outline-primary">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
-
 
                                             <!-- DELETE -->
                                             <a href="admin-dashboard.php?delete_item=<?php echo $item['item_id']; ?>"
@@ -772,7 +793,6 @@ if (isset($_GET['edit_item'])) {
         </script>
     <?php } ?>
 
-    <!-- this prevents going back to waiting list section after reload -->
     <script>
         window.addEventListener('DOMContentLoaded', function () {
             const hash = window.location.hash.replace('#sec-', '');

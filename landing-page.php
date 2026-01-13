@@ -1,26 +1,33 @@
 <?php
-/**
- * SECTION 1: DATABASE & AUTH LOGIC (NO SESSIONS)
- */
+session_start();
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 $login_error = "";
+$register_error = "";
+$register_success = "";
 
+// ----------- LOGIN -----------
 if (isset($_POST['login'])) {
     $email = mysqli_real_escape_string($conn, $_POST['email']);
     $password = $_POST['password'];
 
-    // Hardcoded Admin Check
+    // Admin login
     if ($email == 'main@admin.edu' && $password == 'admin123') {
+        $_SESSION['admin'] = true;
         header("Location: admin-dashboard.php");
         exit();
     }
 
-    $query = "SELECT * FROM tbl_users WHERE email = '$email'";
-    $result = mysqli_query($conn, $query);
+    // User login
+    $stmt = $conn->prepare("SELECT * FROM tbl_users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    if ($result && mysqli_num_rows($result) > 0) {
-        $user = mysqli_fetch_assoc($result);
+    if ($result && $result->num_rows > 0) {
+        $user = $result->fetch_assoc();
         if (password_verify($password, $user['password'])) {
+            $_SESSION['user_id'] = $user['student_id'];
+            $_SESSION['fullname'] = $user['fullname'];
             header("Location: user-dashboard.php");
             exit();
         } else {
@@ -28,6 +35,39 @@ if (isset($_POST['login'])) {
         }
     } else {
         $login_error = "No account found with that email.";
+    }
+}
+
+// ----------- REGISTRATION -----------
+if (isset($_POST['register'])) {
+    $fullname = trim($_POST['fullname']);
+    $student_id = trim($_POST['student_id']);
+    $email = trim($_POST['email']);
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+
+    if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
+        $register_error = "Please fill in all fields.";
+    } elseif ($password !== $confirm_password) {
+        $register_error = "Passwords do not match.";
+    } else {
+        // Check if email or student_id exists
+        $stmt = $conn->prepare("SELECT * FROM tbl_users WHERE email = ? OR student_id = ?");
+        $stmt->bind_param("ss", $email, $student_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $register_error = "Email or Student ID already exists.";
+        } else {
+            $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+            $stmt = $conn->prepare("INSERT INTO tbl_users (fullname, student_id, email, password) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $fullname, $student_id, $email, $hashed_password);
+            if ($stmt->execute()) {
+                $register_success = "Registration successful. You can now sign in.";
+            } else {
+                $register_error = "Error: " . $stmt->error;
+            }
+        }
     }
 }
 ?>
@@ -356,12 +396,6 @@ if (isset($_POST['login'])) {
                             <input type="email" name="email" placeholder="Email" required>
                             <input type="password" name="password" placeholder="Password" required>
 
-                            <?php if ($login_error): ?>
-                                <p style="color: #ff6b6b; font-size: 0.9rem; margin-bottom: 1rem;">
-                                    <?php echo $login_error; ?>
-                                </p>
-                            <?php endif; ?>
-
                             <button type="submit" name="login" class="btn btn-light">Sign In</button>
                         </form>
                     </div>
@@ -382,41 +416,13 @@ if (isset($_POST['login'])) {
                     </div>
 
 
-                    <?php
-                    $hostname = "localhost";
-                    $DBUser = "root";
-                    $DBPassword = ""; 
-                    $DBName = "lending_db";
+                    <?php if ($login_error || $register_error): ?>
+                        sidebar.classList.add('active');
+                        overlay.classList.add('active');
+                    <?php endif; ?>
 
-                    $conn = @mysqli_connect($hostname, $DBUser, $DBPassword, $DBName);
 
-                    if (isset($_POST["register"])) {
-                        if (!$conn) {
-                            echo "<br>Connection Failed: " . mysqli_connect_error();
-                        } else {
-                            $fullname = $_POST["fullname"];
-                            $student_id = $_POST["student_id"];
-                            $email = $_POST["email"];
-                            $password = $_POST["password"];
-                            $confirm_password = $_POST["confirm_password"];
 
-                            if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
-                                echo "<br>Please fill in all fields.";
-                            } elseif ($password !== $confirm_password) {
-                                echo "<br>Passwords do not match.";
-                            } else {
-                                $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-                                $sql = "INSERT INTO tbl_users (fullname, student_id, email, password)
-                                        VALUES ('$fullname', '$student_id', '$email', '$hashed_password')";
-                                if (mysqli_query($conn, $sql)) {
-                                    echo "<br>Registration successful. You can now sign in.";
-                                } else {
-                                    echo "<br>Error: " . mysqli_error($conn);
-                                }
-                            }
-                        }
-                    }
-                    ?>
 
 
                 </div>
