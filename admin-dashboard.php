@@ -463,7 +463,11 @@ if (isset($_GET['edit_item'])) {
                             <label class="form-label fw-bold">Category</label>
                             <select name="category" class="form-select">
                                 <?php
-                                $categories = ["Photography", "Laptops", "Projectors"];
+                                $categories = ["Electronics and Accessories", 
+                                                "Academic tools", 
+                                                "Sports and Physical Education Equipment",
+                                                "Others"
+                                              ];
                                 foreach ($categories as $cat) {
                                     $selected = ($edit_item && $edit_item['category'] == $cat) ? "selected" : "";
                                     echo "<option $selected>$cat</option>";
