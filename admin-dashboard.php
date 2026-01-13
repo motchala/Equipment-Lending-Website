@@ -1,5 +1,11 @@
 <?php
 // Admindash.php
+session_start();
+if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+    header("Location: landing-page.php");
+    exit();
+}
+
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
@@ -700,7 +706,8 @@ if (isset($_GET['edit_item'])) {
 
         function handleLogout() {
             if (confirm("Confirm Logout?")) {
-                window.location.href = "landing-page.php";
+                window.location.href = "logout.php";
+
             }
         }
         // CRUD/Utility Functions
