@@ -6,6 +6,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 $fullname = $_SESSION['fullname'];
 
+$user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) {
@@ -21,6 +22,9 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['user_id'])) {
         die("Unauthorized access");
     }
+
+    $instructor = preg_replace("/[^a-zA-Z\s.']/", "", $_POST['instructor']);
+    $instructor = mysqli_real_escape_string($conn, trim($instructor));
 
     $user_id = $_SESSION['user_id'];
 
@@ -41,6 +45,21 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
     $room = mysqli_real_escape_string($conn, $_POST['room']);
     $instructor = mysqli_real_escape_string($conn, $_POST['instructor']);
+
+    /* --- START DATE VALIDATION --- */
+    $current_date = date('Y-m-d'); // Get today's date on server
+
+    // 1. Check if Borrow Date is in the past
+    if ($borrow_date < $current_date) {
+        die("Error: You cannot select a borrow date in the past.");
+    }
+
+    // 2. Check if Return Date is before Borrow Date
+    if ($return_date < $borrow_date) {
+        die("Error: Return date cannot be before the borrow date.");
+    }
+    /* --- END DATE VALIDATION --- */
+
 
     // Insert into tbl_requests
     $insert_query = "INSERT INTO tbl_requests 
@@ -86,6 +105,11 @@ if (isset($_SESSION['user_id'])) {
 
 
     <style>
+        /* naka organized na sya gois :> */
+        /* =========================================
+       1. GLOBAL SETTINGS & VARIABLES
+       Defines the root variables and base body styles.
+       ========================================= */
         :root {
             --equi-red: #8B0000;
         }
@@ -98,11 +122,15 @@ if (isset($_SESSION['user_id'])) {
             overflow: hidden;
         }
 
-        /* Navigation Header Styling */
+        /* =========================================
+       2. HEADER REGION
+       Top navigation bar and its internal trigger buttons.
+       ========================================= */
         header.navbar-custom {
             background-color: var(--equi-red);
             color: white;
             height: 60px;
+            flex-shrink: 0;
             z-index: 1050;
             border-bottom: 2px solid rgba(0, 0, 0, 0.1);
         }
@@ -116,15 +144,19 @@ if (isset($_SESSION['user_id'])) {
             margin-right: 15px;
         }
 
-        /* Sidebar Styling */
+        /* =========================================
+       3. SIDEBAR LAYOUT (PARENT CONTAINERS)
+       Defines the sidebar container, its collapsed state, and internal layout structure.
+       ========================================= */
         aside#sidebar {
-            width: 280px;
+            width: 285px;
+            flex-shrink: 0;
             display: flex;
             flex-direction: column;
             background: white;
             border-right: 1px solid #ddd;
             transition: margin-left 0.3s ease;
-            height: 100vh;
+            height: 100%;
             position: relative;
             z-index: 1060;
         }
@@ -133,6 +165,28 @@ if (isset($_SESSION['user_id'])) {
             margin-left: -280px;
         }
 
+        /* Inner Flex Container for Navigation Links */
+        nav.nav.flex-column {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            margin: .1%;
+        }
+
+        /* Sidebar Footer Container (Logout Area) */
+        .sidebar-footer {
+            margin-top: auto;
+            margin-bottom: 15px;
+            padding: 15px 5px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* =========================================
+       4. SIDEBAR ITEMS (CHILDREN)
+       Styles for the actual clickable links and buttons inside the sidebar.
+       ========================================= */
+
+        /* -- Standard Navigation Links -- */
         .nav-link {
             color: #444;
             font-weight: 500;
@@ -147,7 +201,77 @@ if (isset($_SESSION['user_id'])) {
             border-left-color: var(--equi-red);
         }
 
-        /* Card & Table Styling */
+        .nav-link i {
+            width: 25px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        /* -- Sidebar Buttons (e.g., Logout) -- */
+        .sidebar-btn {
+            background: none;
+            border: none;
+            border-left: 4px solid transparent;
+            color: #8B0000;
+            /* Equi-Red color */
+            font-weight: 600;
+            /* Makes it pop */
+            padding: 14px 25px;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            transition: 0.2s ease;
+            cursor: pointer;
+        }
+
+        .sidebar-btn:hover {
+            color: #fff;
+            background: rgba(139, 0, 0, 0.3);
+        }
+
+        .sidebar-btn.active {
+            color: #fff;
+            background: rgba(139, 0, 0, 0.5);
+            border-left: 4px solid #8B0000;
+            font-weight: 600;
+        }
+
+        .sidebar-btn i {
+            font-size: 1.25rem;
+            width: 25px;
+            display: inline-block;
+            color: #8B0000;
+        }
+
+        /* -- Shared Icon Spacing Rule -- */
+        /* This connects both Nav Links and Sidebar Buttons to ensure identical spacing */
+        .nav-link i,
+        .sidebar-btn i {
+            margin-right: 15px !important;
+            /* Micro-adjustment: change this number to taste */
+        }
+
+        /* =========================================
+       5. MAIN CONTENT AREA
+       The area to the right of the sidebar where content loads.
+       ========================================= */
+        main {
+            flex-grow: 1;
+            /* Takes up remaining horizontal space */
+            overflow-x: hidden;
+            overflow-y: auto;
+            /* Enables vertical scrolling */
+            padding: 25px;
+            background-color: #f4f4f4;
+        }
+
+        /* =========================================
+       6. COMPONENT STYLING
+       Specific UI elements used within the Main Content area.
+       ========================================= */
+
+        /* -- General Card Container -- */
         article.card {
             border-radius: 15px;
             border: none;
@@ -155,22 +279,7 @@ if (isset($_SESSION['user_id'])) {
             margin-bottom: 20px;
         }
 
-        .table thead th {
-            background-color: #222;
-            color: white;
-            border: none;
-            font-size: 0.85rem;
-        }
-
-        .status-pill {
-            height: 12px;
-            width: 28px;
-            border-radius: 4px;
-            display: inline-block;
-            background-color: #FFB300;
-        }
-
-        /* Equipment Browser Grid */
+        /* -- Equipment Grid Cards -- */
         figure.equipment-card {
             border: 1px solid #eee;
             border-radius: 12px;
@@ -185,17 +294,32 @@ if (isset($_SESSION['user_id'])) {
             transform: translateY(-3px);
         }
 
+        /* -- Table Styling -- */
+        .table thead th {
+            background-color: #222;
+            color: white;
+            border: none;
+            font-size: 0.85rem;
+        }
+
+        /* -- Status Indicators -- */
+        .status-pill {
+            height: 12px;
+            width: 28px;
+            border-radius: 4px;
+            display: inline-block;
+            background-color: #FFB300;
+        }
+
+        /* =========================================
+       7. UTILITY & STATE CLASSES
+       Helpers for hiding elements or showing overlays.
+       ========================================= */
         .hidden {
             display: none !important;
         }
 
-        main {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 25px;
-        }
-
-        /* Ensure overlay is hidden by default and displays as flex when active */
+        /* Loading Overlay States */
         #loading-overlay.active {
             display: flex !important;
         }
@@ -203,83 +327,49 @@ if (isset($_SESSION['user_id'])) {
         #loading-overlay.hidden {
             display: none !important;
         }
-
-        /* Sidebar Logout Button - Admin Style */
-        .sidebar-footer {
-            margin-top: auto;
-            padding: 15px 0 50px 0;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        .sidebar-btn {
-            background: none;
-            border: none;
-            border-left: 4px solid transparent;
-            color: rgba(0, 0, 0, 0.75);
-            padding: 14px 25px;
-            display: flex;
-            align-items: center;
-            width: 100%;
-            text-align: left;
-            transition: 0.2s ease;
-            cursor: pointer;
-        }
-
-        .sidebar-btn i {
-            font-size: 1.25rem;
-            width: 35px;
-            display: inline-block;
-        }
-
-        .sidebar-btn:hover {
-            color: #fff;
-            background: rgba(139, 0, 0, 0.3);
-            /* semi-transparent dark red */
-        }
-
-        .sidebar-btn.active {
-            color: #fff;
-            background: rgba(139, 0, 0, 0.5);
-            border-left: 4px solid #8B0000;
-            font-weight: 600;
-        }
-
-        nav.nav.flex-column {
-            display: flex;
-            /* make nav a flex container */
-            flex-direction: column;
-            flex-grow: 1;
-            /* allow it to grow and fill sidebar */
-        }
     </style>
 </head>
 
 <body>
     <header class="navbar-custom px-4 d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center">
-            <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar"><i
-                    class="fas fa-bars"></i></button>
+            <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
             <h1 class="h5 mb-0 text-white fw-bold">EQUIPLEND <small class="fw-light opacity-75">USER</small></h1>
+        </div>
+
+        <div class="text-white small d-none d-md-block">
+            <i class="fas fa-user-circle me-1"></i> Welcome,
+            <strong>
+                <?php
+                // Split the name by space
+                $name_parts = explode(' ', trim($fullname));
+                // Get the first part (the first name)
+                $firstname = $name_parts[0];
+                echo htmlspecialchars($firstname);
+                ?>
+            </strong>
         </div>
     </header>
 
     <div class="d-flex flex-grow-1 overflow-hidden">
         <aside id="sidebar">
             <nav class="nav flex-column mt-3">
-                <button class="nav-link active text-start border-0 w-100 bg-transparent" id="btn-browse"
+                <button class="nav-link active text-start border-6 w-100 bg-transparent" id="btn-browse"
                     onclick="showSection('browser-section', 'btn-browse')">
-                    <i class="fas fa-search me-3"></i> Browse Equipment
+                    <i class="fas fa-search me-2"></i> Browse Equipment
                 </button>
-                <button class="nav-link text-start border-0 w-100 bg-transparent" id="btn-status"
+                <button class="nav-link text-start border-6 w-100 bg-transparent" id="btn-status"
                     onclick="showSection('status-section', 'btn-status')">
-                    <i class="fas fa-clipboard-check me-3"></i> My Requests
+                    <i class="fas fa-clipboard-check me-2"></i> My Requests
                 </button>
-                <div class="sidebar-footer">
-                    <button type="button" class="sidebar-btn border-0" onclick="handleLogout()">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </button>
-                </div>
             </nav>
+            <div class="sidebar-footer">
+                <button type="button" class="sidebar-btn border-6" onclick="handleLogout()">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </button>
+            </div>
         </aside>
 
         <main>
@@ -337,7 +427,7 @@ if (isset($_SESSION['user_id'])) {
                                     data-category="<?php echo strtolower($item['category']); ?>">
 
                                     <figure class="equipment-card card">
-                                        <img src="<?php echo $item['image_path']; ?>"
+                                        <img src="/Equipment-Lending-Website/<?php echo $item['image_path']; ?>"
                                             style="width:100%; height:140px; object-fit:cover; border-radius:10px;"
                                             alt="<?php echo htmlspecialchars($item['item_name']); ?>">
 
@@ -395,7 +485,8 @@ if (isset($_SESSION['user_id'])) {
                             <div class="row g-3">
                                 <div class="col-md-12">
                                     <label class="form-label small fw-bold">Instructor</label>
-                                    <input type="text" name="instructor" class="form-control" required>
+                                    <input type="text" name="instructor" id="instructorField" class="form-control"
+                                        oninput="validateLetters(this)" placeholder="e.g. Sir. Migs" required>
                                 </div>
 
                                 <div class="col-md-12">
@@ -405,12 +496,14 @@ if (isset($_SESSION['user_id'])) {
 
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold">Borrow Date</label>
-                                    <input type="date" name="borrow_date" class="form-control" required>
+                                    <input type="date" name="borrow_date" id="borrow_date" class="form-control"
+                                        required>
                                 </div>
 
                                 <div class="col-md-6">
                                     <label class="form-label small fw-bold">Return Date</label>
-                                    <input type="date" name="return_date" class="form-control" required>
+                                    <input type="date" name="return_date" id="return_date" class="form-control"
+                                        required>
                                 </div>
                             </div>
                             <button type="submit" name="borrow_submit" class="btn btn-danger w-100 fw-bold py-2 mt-4">
@@ -480,7 +573,7 @@ if (isset($_SESSION['user_id'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Set reference for current date to check for overdue items
+        // Set reference for current date
         const todayStr = new Date().toISOString().split('T')[0];
 
         // Sidebar Toggle Function
@@ -517,6 +610,7 @@ if (isset($_SESSION['user_id'])) {
                 item.style.display = (matchesName && matchesCategory) ? "" : "none";
             });
         }
+
         function cleanURL() {
             const url = new URL(window.location);
             url.searchParams.delete('success');
@@ -533,9 +627,56 @@ if (isset($_SESSION['user_id'])) {
             if (document.getElementById('success-alert')) {
                 cleanURL();
             }
+            const userSlug = "<?php echo $user_slug; ?>";
+
+            if (!window.location.search.includes(userSlug)) {
+                const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?u=' + userSlug;
+                window.history.replaceState({ path: newUrl }, '', newUrl);
+            }
+
+            // --- INITIALIZE DATE RESTRICTIONS ---
+            const borrowInput = document.querySelector('input[name="borrow_date"]');
+            const returnInput = document.querySelector('input[name="return_date"]');
+
+            if (borrowInput && returnInput) {
+                // Disable past dates for both
+                borrowInput.min = todayStr;
+                returnInput.min = todayStr;
+
+                // When borrow date changes, update the minimum return date
+                borrowInput.addEventListener('change', function () {
+                    returnInput.min = this.value;
+                    if (returnInput.value && returnInput.value < this.value) {
+                        returnInput.value = this.value; // Reset return date if it becomes invalid
+                    }
+                });
+            }
         });
-        // Add this inside your <script> tags
+
+        // Function to allow ONLY letters, spaces, and dots
+        function validateLetters(input) {
+            input.value = input.value.replace(/[^a-zA-Z\s.']/g, '');
+        }
+
+        // --- FORM SUBMISSION WITH VALIDATION ---
         document.getElementById('borrowForm').addEventListener('submit', function (e) {
+            const borrowDate = document.querySelector('input[name="borrow_date"]').value;
+            const returnDate = document.querySelector('input[name="return_date"]').value;
+
+            // 1. Final check: Don't allow submission if date is in the past
+            if (borrowDate < todayStr) {
+                e.preventDefault();
+                alert("Error: The borrow date cannot be in the past.");
+                return;
+            }
+
+            // 2. Final check: Return date vs Borrow date
+            if (returnDate < borrowDate) {
+                e.preventDefault();
+                alert("Error: The return date cannot be earlier than the borrow date.");
+                return;
+            }
+
             e.preventDefault();
             const overlay = document.getElementById('loading-overlay');
 
@@ -552,7 +693,6 @@ if (isset($_SESSION['user_id'])) {
                 this.submit();
             }, 2000);
         });
-
     </script>
 
     <div id="loading-overlay" class="hidden"
