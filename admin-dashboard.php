@@ -500,19 +500,16 @@ if (isset($_GET['edit_item'])) {
                     <input type="hidden" name="view" value="waiting">
 
                     <div class="input-group">
-                        <input type="text" 
-                               name="waiting_search" 
-                               class="form-control"
-                               placeholder="Search by Student ID, Name or Item"
-                               value="<?= $_GET['waiting_search'] ?? '' ?>">
+                        <input type="text" name="waiting_search" class="form-control"
+                            placeholder="Search by Student ID, Name or Item"
+                            value="<?= $_GET['waiting_search'] ?? '' ?>">
 
                         <button class="btn btn-dark">
                             <i class="bi bi-search"></i> Search
                         </button>
 
                         <?php if (!empty($_GET['waiting_search'])): ?>
-                            <a href="admin-dashboard.php#sec-waiting"
-                            class="btn btn-outline-secondary">
+                            <a href="admin-dashboard.php#sec-waiting" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-clockwise"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -596,18 +593,15 @@ if (isset($_GET['edit_item'])) {
                     <input type="hidden" name="view" value="inventory">
 
                     <div class="input-group">
-                        <input type="text" 
-                               name="inventory_search" 
-                               class="form-control"
-                               placeholder="Search by Item Name or Category"
-                               value="<?= $_GET['inventory_search'] ?? '' ?>">
+                        <input type="text" name="inventory_search" class="form-control"
+                            placeholder="Search by Item Name or Category"
+                            value="<?= $_GET['inventory_search'] ?? '' ?>">
                         <button class="btn btn-dark">
                             <i class="bi bi-search"></i> Search
                         </button>
 
                         <?php if (!empty($_GET['inventory_search'])): ?>
-                            <a href="admin-dashboard.php#sec-inventory"
-                            class="btn btn-outline-secondary">
+                            <a href="admin-dashboard.php#sec-inventory" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-clockwise"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -689,19 +683,15 @@ if (isset($_GET['edit_item'])) {
                     <input type="hidden" name="view" value="approved">
 
                     <div class="input-group">
-                        <input type="text" 
-                               name="approved_search" 
-                               class="form-control"
-                               placeholder="Search by ID, Name, or Item..."
-                               value="<?= $_GET['approved_search'] ?? '' ?>">
+                        <input type="text" name="approved_search" class="form-control"
+                            placeholder="Search by ID, Name, or Item..." value="<?= $_GET['approved_search'] ?? '' ?>">
 
                         <button class="btn btn-dark">
                             <i class="bi bi-search"></i> Search
                         </button>
 
                         <?php if (!empty($_GET['approved_search'])): ?>
-                            <a href="admin-dashboard.php#sec-approved"
-                            class="btn btn-outline-secondary">
+                            <a href="admin-dashboard.php#sec-approved" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-clockwise"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -753,19 +743,15 @@ if (isset($_GET['edit_item'])) {
                     <input type="hidden" name="view" value="declined">
 
                     <div class="input-group">
-                        <input type="text" 
-                               name="declined_search" 
-                               class="form-control"
-                               placeholder="Search by ID, Name, or Item..."
-                               value="<?= $_GET['declined_search'] ?? '' ?>">
+                        <input type="text" name="declined_search" class="form-control"
+                            placeholder="Search by ID, Name, or Item..." value="<?= $_GET['declined_search'] ?? '' ?>">
 
                         <button class="btn btn-dark">
                             <i class="bi bi-search"></i> Search
                         </button>
 
                         <?php if (!empty($_GET['declined_search'])): ?>
-                            <a href="admin-dashboard.php#sec-declined"
-                            class="btn btn-outline-secondary">
+                            <a href="admin-dashboard.php#sec-declined" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-clockwise"></i> Clear
                             </a>
                         <?php endif; ?>
@@ -1009,25 +995,47 @@ if (isset($_GET['edit_item'])) {
         });
 
         // Navigation Logic
+        // 1. Navigation Logic (Updates the URL without reloading)
         function showSection(sectionId) {
-            // Hide All sections
             document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
-
-            // Show Active section
             const target = document.getElementById('sec-' + sectionId);
             if (target) target.classList.add('active');
 
-            // UI Highlighting for Sidebar Buttons
             document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
             const activeBtn = document.getElementById('link-' + sectionId);
             if (activeBtn) activeBtn.classList.add('active');
 
-            // Auto-close sidebar on mobile after clicking
             if (window.innerWidth < 992) {
                 document.body.classList.remove('sidebar-open');
                 document.getElementById('ui-overlay').classList.remove('active');
             }
+
+            // Updates the URL bar so refresh remembers this tab
+            history.replaceState(null, null, '#sec-' + sectionId);
         }
+
+        // 2. Handle Page Reloads (Handles the 'Clear' button and browser refresh)
+        window.addEventListener('DOMContentLoaded', function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewParam = urlParams.get('view');
+            const hash = window.location.hash.replace('#sec-', '');
+
+            if (viewParam) {
+                const target = viewParam === 'raw' ? 'raw-data' : viewParam;
+                showSection(target);
+            } else if (hash) {
+                showSection(hash);
+            }
+        });
+
+        // 3. Force Scroll to Top on every reload
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+
+        window.addEventListener('load', function () {
+            window.scrollTo(0, 0);
+        });
 
         function handleLogout() {
             if (confirm("Confirm Logout?")) {
