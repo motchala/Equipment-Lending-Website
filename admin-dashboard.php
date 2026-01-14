@@ -163,14 +163,62 @@ if (isset($_GET['delete_item'])) {
 
 // Fetch all requests
 $waiting_sql = "SELECT * FROM tbl_requests WHERE status='Waiting'";
+if (!empty($_GET['waiting_search'])) {
+    $search = "%" . $_GET['waiting_search'] . "%";
+    $waiting_sql .= " AND (equipment_name LIKE ? OR category LIKE ?)";
+    $stmt = $conn->prepare($waiting_sql);
+    $stmt->bind_param("ss", $search, $search);
+    $stmt->execute();
+    $waiting_result = $stmt->get_result();
+} else {
+    $waiting_result = mysqli_query($conn, $waiting_sql);
+}
+
 $approved_sql = "SELECT * FROM tbl_requests WHERE status='Approved'";
+if (!empty($_GET['approved_search'])) {
+    $search = "%" . $_GET['approved_search'] . "%";
+    $approved_sql .= " AND (
+        student_id LIKE ?
+        OR student_name LIKE ?
+        OR equipment_name LIKE ?
+    )";
+    $stmt = $conn->prepare($approved_sql);
+    $stmt->bind_param("sss", $search, $search, $search);
+    $stmt->execute();
+    $approved_result = $stmt->get_result();
+} else {
+    $approved_result = mysqli_query($conn, $approved_sql);
+}
+
 $declined_sql = "SELECT * FROM tbl_requests WHERE status='Declined'";
+if (!empty($_GET['declined_search'])) {
+    $search = "%" . $_GET['declined_search'] . "%";
+    $declined_sql .= " AND (
+        student_id LIKE ?
+        OR student_name LIKE ?
+        OR equipment_name LIKE ?
+    )";
+    $stmt = $conn->prepare($declined_sql);
+    $stmt->bind_param("sss", $search, $search, $search);
+    $stmt->execute();
+    $declined_result = $stmt->get_result();
+} else {
+    $declined_result = mysqli_query($conn, $declined_sql);
+}
 
-$waiting_result = mysqli_query($conn, $waiting_sql);
-$approved_result = mysqli_query($conn, $approved_sql);
-$declined_result = mysqli_query($conn, $declined_sql);
+$inventory_sql = "SELECT * FROM tbl_inventory";
 
-$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory ORDER BY created_at DESC");
+if (!empty($_GET['inventory_search'])) {
+    $search = "%" . $_GET['inventory_search'] . "%";
+    $inventory_sql .= " WHERE item_name LIKE ? OR category LIKE ? ORDER BY created_at DESC";
+    $stmt = $conn->prepare($inventory_sql);
+    $stmt->bind_param("ss", $search, $search);
+    $stmt->execute();
+    $inventory_result = $stmt->get_result();
+} else {
+    $inventory_sql .= " ORDER BY created_at DESC";
+    $inventory_result = mysqli_query($conn, $inventory_sql);
+}
 
 $edit_item = null;
 
@@ -401,7 +449,21 @@ if (isset($_GET['edit_item'])) {
 
             <!-- WAITING LIST SECTION -->
             <div id="sec-waiting" class="view-section active">
-                <h4 class="fw-bold mb-4 text-maroon"><i class="bi bi-people me-2"></i>Student Waiting List</h4>
+                <h4 class="fw-bold mb-4 text-maroon">
+                    <i class="bi bi-people me-2"></i>
+                    Student Waiting List
+                </h4>
+                <form method="GET" action="admin-dashboard.php#sec-waiting" class="mb-3">
+                    <input type="hidden" name="view" value="waiting">
+                    <div class="input-group">
+                        <input type="text"
+                            name="waiting_search"
+                            class="form-control"
+                            placeholder="Search by Item Name or Category"
+                            value="<?php echo $_GET['waiting_search'] ?? ''; ?>">
+                        <button class="btn btn-dark">Search</button>
+                    </div>
+                </form>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-dark">
@@ -415,6 +477,14 @@ if (isset($_GET['edit_item'])) {
                         </thead>
 
                         <tbody id="waiting-body">
+                            <?php if (mysqli_num_rows($waiting_result) === 0) { ?>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-5">
+                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                        No students are currently in the waiting list.
+                                    </td>
+                                </tr>
+                            <?php } else { ?>
                             <?php while ($row = mysqli_fetch_assoc($waiting_result)) { ?>
                                 <tr>
                                     <td>
@@ -443,6 +513,7 @@ if (isset($_GET['edit_item'])) {
                                     </td>
                                 </tr>
                             <?php } ?>
+                        <?php } ?>
                         </tbody>
 
                     </table>
@@ -457,6 +528,18 @@ if (isset($_GET['edit_item'])) {
                         <i class="bi bi-plus-lg me-1"></i> Add Item
                     </button>
                 </div>
+                <form method="GET" action="admin-dashboard.php#sec-inventory" class="mb-3">
+                    <input type="hidden" name="view" value="inventory">
+                    <div class="input-group">
+                        <input type="text"
+                            name="inventory_search"
+                            class="form-control"
+                            placeholder="Search by Item Name or Category"
+                            value="<?php echo $_GET['inventory_search'] ?? ''; ?>">
+                        <button class="btn btn-dark">Search</button>
+                    </div>
+                </form>
+
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-dark">
@@ -528,6 +611,18 @@ if (isset($_GET['edit_item'])) {
             <!-- APPROVED SECTION -->
             <div id="sec-approved" class="view-section">
                 <h4 class="fw-bold mb-4 text-success"><i class="bi bi-patch-check me-2"></i>Approved Requests</h4>
+                <form method="GET" action="admin-dashboard.php#sec-approved" class="mb-3">
+                    <input type="hidden" name="view" value="inventory">
+                    <div class="input-group">
+                        <input type="text"
+                            name="approved_search"
+                            class="form-control"
+                            placeholder="Search by ID, Name, or Item"
+                            value="<?php echo $_GET['approved_search'] ?? ''; ?>">
+                        <button class="btn btn-dark">Search</button>
+                    </div>
+                </form>
+
                 <div class="table-responsive">
                     <table class="table table-striped align-middle">
                         <thead class="table-dark">
@@ -539,17 +634,26 @@ if (isset($_GET['edit_item'])) {
                             </tr>
                         </thead>
                         <tbody id="approved-list">
-                            <?php while ($row = mysqli_fetch_assoc($approved_result)) { ?>
+                            <?php if (mysqli_num_rows($approved_result) === 0) { ?>
                                 <tr>
-                                    <td><?php echo $row['student_id']; ?></td>
-                                    <td class="fw-bold"><?php echo $row['student_name']; ?></td>
-                                    <td><?php echo $row['equipment_name']; ?></td>
-                                    <td>
-                                        <span class="badge bg-success">
-                                            <?php echo $row['status']; ?>
-                                        </span>
+                                    <td colspan="4" class="text-center text-muted py-5">
+                                        <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                                        No approved requests yet.
                                     </td>
                                 </tr>
+                            <?php } else { ?>
+                                <?php while ($row = mysqli_fetch_assoc($approved_result)) { ?>
+                                    <tr>
+                                        <td><?php echo $row['student_id']; ?></td>
+                                        <td class="fw-bold"><?php echo $row['student_name']; ?></td>
+                                        <td><?php echo $row['equipment_name']; ?></td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                <?php echo $row['status']; ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
                             <?php } ?>
                         </tbody>
 
@@ -560,6 +664,18 @@ if (isset($_GET['edit_item'])) {
             <!-- DECLINED SECTION -->
             <div id="sec-declined" class="view-section">
                 <h4 class="fw-bold mb-4 text-danger"><i class="bi bi-x-octagon me-2"></i>Declined Requests</h4>
+                <form method="GET" action="admin-dashboard.php#sec-declined" class="mb-3">
+                    <input type="hidden" name="view" value="inventory">
+                    <div class="input-group">
+                        <input type="text"
+                            name="declined_search"
+                            class="form-control"
+                            placeholder="Search by ID, Name, or Item"
+                            value="<?php echo $_GET['declined_search'] ?? ''; ?>">
+                        <button class="btn btn-dark">Search</button>
+                    </div>
+                </form>
+
                 <div class="table-responsive">
                     <table class="table table-striped align-middle">
                         <thead class="table-dark">
@@ -571,22 +687,31 @@ if (isset($_GET['edit_item'])) {
                             </tr>
                         </thead>
                         <tbody id="declined-list">
-                            <?php while ($row = mysqli_fetch_assoc($declined_result)) { ?>
+                            <?php if (mysqli_num_rows($declined_result) === 0) { ?>
                                 <tr>
-                                    <td>
-                                        <?php echo $row['student_id']; ?>
-                                    </td>
-                                    <td class="fw-bold">
-                                        <?php echo $row['student_name']; ?>
-                                    </td>
-                                    <td>
-                                        <?php echo $row['equipment_name']; ?>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-danger"><?php echo $row['status']; ?>
-                                        </span>
+                                    <td colspan="4" class="text-center text-muted py-5">
+                                        <i class="bi bi-x-circle fs-1 d-block mb-2 text-danger"></i>
+                                        No declined requests.
                                     </td>
                                 </tr>
+                            <?php } else { ?>
+                                <?php while ($row = mysqli_fetch_assoc($declined_result)) { ?>
+                                    <tr>
+                                        <td>
+                                            <?php echo $row['student_id']; ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo $row['student_name']; ?>
+                                        </td>
+                                        <td>
+                                            <?php echo $row['equipment_name']; ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger"><?php echo $row['status']; ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
                             <?php } ?>
                         </tbody>
 
@@ -617,9 +742,31 @@ if (isset($_GET['edit_item'])) {
                         <?php } ?>
 
                         <div class="text-center mb-3">
-                            <img src="<?php echo $edit_item ? $edit_item['image_path'] : 'uploads/default.png'; ?>"
-                                class="item-img mb-2">
-                            <input type="file" name="item_image" class="form-control">
+                            <div id="dropZone"
+                                class="border rounded-3 p-3 text-center mb-3 position-relative"
+                                style="cursor:pointer; background:#f8f9fa;">
+
+                                <!-- REMOVE IMAGE BUTTON -->
+                                <button type="button"
+                                        id="removeImageBtn"
+                                        class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 d-none">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+
+                                <img id="imagePreview"
+                                    src="<?php echo $edit_item ? $edit_item['image_path'] : 'uploads/default.png'; ?>"
+                                    class="item-img mb-2">
+
+                                <p class="text-muted mb-0">
+                                    Drag & drop image here<br>
+                                    or click / paste (Ctrl + V)
+                                </p>
+
+                                <input type="file" name="item_image" id="itemImageInput"
+                                    class="d-none" accept="image/*">
+                            </div>
+
+
                         </div>
 
                         <div class="mb-3">
@@ -808,6 +955,78 @@ if (isset($_GET['edit_item'])) {
             }
         });
     </script>
+
+   <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('itemImageInput');
+        const preview = document.getElementById('imagePreview');
+        const removeBtn = document.getElementById('removeImageBtn');
+
+        const DEFAULT_IMAGE = 'uploads/default.png';
+
+        // Click to open file picker
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // Drag hover
+        ['dragenter','dragover'].forEach(e =>
+            dropZone.addEventListener(e, ev => {
+                ev.preventDefault();
+                dropZone.classList.add('border-primary');
+            })
+        );
+
+        ['dragleave','drop'].forEach(e =>
+            dropZone.addEventListener(e, ev => {
+                ev.preventDefault();
+                dropZone.classList.remove('border-primary');
+            })
+        );
+
+        // Drop image
+        dropZone.addEventListener('drop', e => {
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        // File picker
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files[0]) handleFile(fileInput.files[0]);
+        });
+
+        // Paste image
+        document.addEventListener('paste', e => {
+            const item = [...e.clipboardData.items].find(i => i.type.startsWith('image'));
+            if (!item) return;
+            handleFile(item.getAsFile());
+        });
+
+        // Handle file
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert("Only image files allowed.");
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = e => preview.src = e.target.result;
+            reader.readAsDataURL(file);
+
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+
+            removeBtn.classList.remove('d-none');
+        }
+
+        // ❌ RESET IMAGE
+        removeBtn.addEventListener('click', e => {
+            e.stopPropagation(); // prevent opening file picker
+
+            preview.src = DEFAULT_IMAGE;
+            fileInput.value = ""; // clear file input
+            removeBtn.classList.add('d-none');
+        });
+</script>
 
 </body>
 
