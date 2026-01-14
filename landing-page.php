@@ -15,11 +15,19 @@ $login_error = "";
 $register_error = "";
 $register_success = "";
 
+// Initialize variables to hold input values (This keeps text in the box)
+$login_email_val = "";
+$reg_fullname_val = "";
+$reg_studentid_val = "";
+$reg_email_val = "";
 
 // ----------- LOGIN -----------
 if (isset($_POST['login'])) {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
+
+    // Save input to refill form on error
+    $login_email_val = $email;
 
     // Admin login
     if ($email === 'main@admin.edu' && $password === 'admin123') {
@@ -62,10 +70,23 @@ if (isset($_POST['register'])) {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
 
+    // Save inputs to refill form on error
+    $reg_fullname_val = $fullname;
+    $reg_studentid_val = $student_id;
+    $reg_email_val = $email;
+
     if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
         $register_error = "Please fill in all fields.";
     } elseif ($password !== $confirm_password) {
         $register_error = "Passwords do not match.";
+    } elseif (strlen($student_id) != 15) {
+        $register_error = "Student ID must be exactly 15 characters.";
+    } elseif (strlen($password) < 4) {
+        $register_error = "Password must be at least 4 characters.";  
+    } elseif (strlen($fullname) < 5 || strlen($fullname) > 70) {
+        $register_error = "Full Name must be between 5 and 70 characters.";
+    } elseif (strlen($email) < 15 || strlen($email) > 254) {
+        $register_error = "Email must be between 15 and 254 characters.";
     } else {
         // Check if email or student_id exists
         $stmt = $conn->prepare("SELECT * FROM tbl_users WHERE email = ? OR student_id = ?");
@@ -79,7 +100,11 @@ if (isset($_POST['register'])) {
             $stmt = $conn->prepare("INSERT INTO tbl_users (fullname, student_id, email, password) VALUES (?, ?, ?, ?)");
             $stmt->bind_param("ssss", $fullname, $student_id, $email, $hashed_password);
             if ($stmt->execute()) {
-                $register_success = "Registration successful. You can now sign in.";
+                $register_success = "Registration successful! Redirecting to login...";
+                // Clear the saved values on success so the next form is empty
+                $reg_fullname_val = "";
+                $reg_studentid_val = "";
+                $reg_email_val = "";
             } else {
                 $register_error = "Error: " . $stmt->error;
             }
@@ -368,6 +393,25 @@ if (isset($_POST['register'])) {
             opacity: 0.6;
             font-size: 0.8rem;
         }
+
+        /* Styling for the Full Name field validation */
+        #fullname:focus:invalid {
+            border: 2px solid red;
+            outline: none;
+        }
+
+        #fullname:valid {
+            border: 2px solid green;
+        }
+
+        /* Optional: make all inputs look consistent */
+        input {
+            display: block;
+            margin-bottom: 10px;
+            padding: 8px;
+            width: 100%;
+            border: 1px solid #ccc;
+        }
     </style>
 </head>
 
@@ -393,7 +437,8 @@ if (isset($_POST['register'])) {
             <h1>Access When It Matters Most</h1>
             <p>A student-built platform ensuring essential school equipment is always within reach.</p>
             <div class="hero-actions">
-                <a href="https://www.pup.edu.ph/binan/" target="_blank" class="btn btn-outline-light custom-about-btn">About Us</a>
+                <a href="https://www.pup.edu.ph/binan/" target="_blank"
+                    class="btn btn-outline-light custom-about-btn">About Us</a>
             </div>
         </div>
 
@@ -424,11 +469,12 @@ if (isset($_POST['register'])) {
                     <div class="tab-pane fade show active" id="login-pane" role="tabpanel">
                         <h2>Welcome Back</h2>
                         <form method="POST">
-                            <input type="email" name="email" placeholder="Email" required>
+                            <input type="email" name="email" placeholder="Email"
+                                value="<?= htmlspecialchars($login_email_val) ?>" required>
                             <input type="password" name="password" placeholder="Password" required>
 
                             <?php if ($login_error): ?>
-                                <div class="alert alert-danger mt-2">
+                                <div class="alert alert-danger mt-2" id="loginAlert">
                                     <?= $login_error ?>
                                 </div>
                             <?php endif; ?>
@@ -439,20 +485,30 @@ if (isset($_POST['register'])) {
                     <div class="tab-pane fade" id="register-pane" role="tabpanel">
                         <h2>Create Account</h2>
                         <form method="POST">
-                            <input type="text" name="fullname" placeholder="Full Name" required>
-                            <input type="text" name="student_id" placeholder="Student ID" required>
-                            <input type="email" name="email" placeholder="Student Email" required>
-                            <input type="password" name="password" placeholder="Create Password" required>
-                            <input type="password" name="confirm_password" placeholder="Confirm Password" required>
+                            <input type="text" name="fullname" minlength="5" maxlength="70" placeholder="Full Name"
+                                value="<?= htmlspecialchars($reg_fullname_val) ?>" oninput=" validateLettersName(this)"
+                                required>
+
+                            <input type="text" name="student_id" minlength="15" maxlength="15" placeholder="Student ID"
+                                value="<?= htmlspecialchars($reg_studentid_val) ?>"
+                                oninput=" validateLettersStudentID(this)" required>
+
+                            <input type="email" name="email" minlength="15" maxlength="254" placeholder="Student Email"
+                                value="<?= htmlspecialchars($reg_email_val) ?>" oninput=" validateLettersEmail(this)"
+                                required>
+
+                            <input type="password" name="password" minlength="4" placeholder="Create Password" required>
+                            <input type="password" name="confirm_password" minlength="4" placeholder="Confirm Password"
+                                required>
 
                             <?php if ($register_error): ?>
-                                <div class="alert alert-danger mt-2">
+                                <div class="alert alert-danger mt-2" id="registerAlert">
                                     <?= $register_error ?>
                                 </div>
                             <?php endif; ?>
 
                             <?php if ($register_success): ?>
-                                <div class="alert alert-success mt-2">
+                                <div class="alert alert-success mt-2" id="registerSuccess">
                                     <?= $register_success ?>
                                 </div>
                             <?php endif; ?>
@@ -460,7 +516,6 @@ if (isset($_POST['register'])) {
                             <button type="submit" name="register" class="btn btn-light">Register</button>
                         </form>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -491,16 +546,19 @@ if (isset($_POST['register'])) {
         const sidebar = document.getElementById('hero-right');
         const overlay = document.getElementById('ui-overlay');
 
+        // Scroll Effect
         window.addEventListener('scroll', () => {
             nav.classList.toggle('navbar-scrolled', window.scrollY > 50);
         });
 
+        // Open Sidebar
         signInBtn.addEventListener('click', (e) => {
             e.preventDefault();
             sidebar.classList.add('active');
             overlay.classList.add('active');
         });
 
+        // Close Sidebar Function
         const closeAll = () => {
             sidebar.classList.remove('active');
             overlay.classList.remove('active');
@@ -509,11 +567,65 @@ if (isset($_POST['register'])) {
         closeBtn.addEventListener('click', closeAll);
         overlay.addEventListener('click', closeAll);
 
-        <?php if (!empty($login_error) || !empty($register_error)): ?>
+        // Input Validation Functions (kept as is)
+        function validateLettersName(input) {
+            let val = input.value;
+            if (val.length > 0 && !/^[a-zA-Z]/.test(val)) {
+                input.value = '';
+                return;
+            }
+            input.value = input.value.replace(/[^a-zA-Z\s.']/g, '');
+        }
+
+        function validateLettersStudentID(input) {
+            let val = input.value;
+            if (val.length > 0 && !/^[0-9]/.test(val)) {
+                input.value = '';
+                return;
+            }
+            input.value = input.value.replace(/[^a-zA-Z0-9-]/g, '');
+        }
+        function validateLettersEmail(input) {
+            let val = input.value;
+            if (val.length > 0 && !/^[a-zA-Z0-9]/.test(val)) {
+                input.value = '';
+                return;
+            }
+            input.value = input.value.replace(/[^a-zA-Z0-9.@_-]/g, '');
+        }
+
+
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.style.transition = "opacity 0.5s ease";
+                alert.style.opacity = "0";
+                setTimeout(() => alert.style.display = "none", 500);
+            });
+        }, 5000);
+
+        <?php if (!empty($login_error) || !empty($register_error) || !empty($register_success)): ?>
             sidebar.classList.add('active');
             overlay.classList.add('active');
-            document.getElementById('login-tab').click();
         <?php endif; ?>
+
+        const triggerLogin = document.querySelector('#login-tab');
+        const triggerRegister = document.querySelector('#register-tab');
+
+        <?php if (!empty($register_error)): ?>
+            const regTab = new bootstrap.Tab(triggerRegister);
+            regTab.show();
+        <?php elseif (!empty($register_success)): ?>
+            const regTab = new bootstrap.Tab(triggerRegister);
+            regTab.show(); 
+            setTimeout(() => {
+                alert("Registration Successful! Please Sign In."); 
+                const loginTab = new bootstrap.Tab(triggerLogin);
+                loginTab.show(); 
+            }, 1000);
+        <?php else: ?>
+        <?php endif; ?>
+
     </script>
 
 </body>
