@@ -163,16 +163,24 @@ if (isset($_GET['delete_item'])) {
 
 // Fetch all requests
 $waiting_sql = "SELECT * FROM tbl_requests WHERE status='Waiting'";
+
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";
-    $waiting_sql .= " AND (equipment_name LIKE ? OR category LIKE ?)";
+    $waiting_sql .= " AND (
+        student_id LIKE ?
+        OR student_name LIKE ?
+        OR equipment_name LIKE ?
+    ) ORDER BY request_date DESC";
+
     $stmt = $conn->prepare($waiting_sql);
-    $stmt->bind_param("ss", $search, $search);
+    $stmt->bind_param("sss", $search, $search, $search);
     $stmt->execute();
     $waiting_result = $stmt->get_result();
 } else {
+    $waiting_sql .= " ORDER BY request_date DESC";
     $waiting_result = mysqli_query($conn, $waiting_sql);
 }
+
 
 $approved_sql = "SELECT * FROM tbl_requests WHERE status='Approved'";
 if (!empty($_GET['approved_search'])) {
@@ -181,12 +189,13 @@ if (!empty($_GET['approved_search'])) {
         student_id LIKE ?
         OR student_name LIKE ?
         OR equipment_name LIKE ?
-    )";
+    ) ORDER BY request_date DESC";
     $stmt = $conn->prepare($approved_sql);
     $stmt->bind_param("sss", $search, $search, $search);
     $stmt->execute();
     $approved_result = $stmt->get_result();
 } else {
+    $approved_sql .= " ORDER BY request_date DESC";
     $approved_result = mysqli_query($conn, $approved_sql);
 }
 
@@ -197,12 +206,13 @@ if (!empty($_GET['declined_search'])) {
         student_id LIKE ?
         OR student_name LIKE ?
         OR equipment_name LIKE ?
-    )";
+    ) ORDER BY request_date DESC";
     $stmt = $conn->prepare($declined_sql);
     $stmt->bind_param("sss", $search, $search, $search);
     $stmt->execute();
     $declined_result = $stmt->get_result();
 } else {
+    $declined_sql .= " ORDER BY request_date DESC";
     $declined_result = mysqli_query($conn, $declined_sql);
 }
 
@@ -219,6 +229,7 @@ if (!empty($_GET['inventory_search'])) {
     $inventory_sql .= " ORDER BY created_at DESC";
     $inventory_result = mysqli_query($conn, $inventory_sql);
 }
+
 
 $raw_data_sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
 
@@ -487,11 +498,24 @@ if (isset($_GET['edit_item'])) {
                 </h4>
                 <form method="GET" action="admin-dashboard.php#sec-waiting" class="mb-3">
                     <input type="hidden" name="view" value="waiting">
+
                     <div class="input-group">
-                        <input type="text" name="waiting_search" class="form-control"
-                            placeholder="Search by Item Name or Category"
-                            value="<?php echo $_GET['waiting_search'] ?? ''; ?>">
-                        <button class="btn btn-dark">Search</button>
+                        <input type="text" 
+                               name="waiting_search" 
+                               class="form-control"
+                               placeholder="Search by Student ID, Name or Item"
+                               value="<?= $_GET['waiting_search'] ?? '' ?>">
+
+                        <button class="btn btn-dark">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['waiting_search'])): ?>
+                            <a href="admin-dashboard.php#sec-waiting"
+                            class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </form>
                 <div class="table-responsive">
@@ -570,11 +594,23 @@ if (isset($_GET['edit_item'])) {
                 </div>
                 <form method="GET" action="admin-dashboard.php#sec-inventory" class="mb-3">
                     <input type="hidden" name="view" value="inventory">
+
                     <div class="input-group">
-                        <input type="text" name="inventory_search" class="form-control"
-                            placeholder="Search by Item Name or Category"
-                            value="<?php echo $_GET['inventory_search'] ?? ''; ?>">
-                        <button class="btn btn-dark">Search</button>
+                        <input type="text" 
+                               name="inventory_search" 
+                               class="form-control"
+                               placeholder="Search by Item Name or Category"
+                               value="<?= $_GET['inventory_search'] ?? '' ?>">
+                        <button class="btn btn-dark">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['inventory_search'])): ?>
+                            <a href="admin-dashboard.php#sec-inventory"
+                            class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </form>
 
@@ -651,11 +687,24 @@ if (isset($_GET['edit_item'])) {
                 <h4 class="fw-bold mb-4 text-success"><i class="bi bi-patch-check me-2"></i>Approved Requests</h4>
                 <form method="GET" action="admin-dashboard.php#sec-approved" class="mb-3">
                     <input type="hidden" name="view" value="approved">
+
                     <div class="input-group">
-                        <input type="text" name="approved_search" class="form-control"
-                            placeholder="Search by ID, Name, or Item"
-                            value="<?php echo $_GET['approved_search'] ?? ''; ?>">
-                        <button class="btn btn-dark">Search</button>
+                        <input type="text" 
+                               name="approved_search" 
+                               class="form-control"
+                               placeholder="Search by ID, Name, or Item..."
+                               value="<?= $_GET['approved_search'] ?? '' ?>">
+
+                        <button class="btn btn-dark">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['approved_search'])): ?>
+                            <a href="admin-dashboard.php#sec-approved"
+                            class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </form>
 
@@ -702,11 +751,24 @@ if (isset($_GET['edit_item'])) {
                 <h4 class="fw-bold mb-4 text-danger"><i class="bi bi-x-octagon me-2"></i>Declined Requests</h4>
                 <form method="GET" action="admin-dashboard.php#sec-declined" class="mb-3">
                     <input type="hidden" name="view" value="declined">
+
                     <div class="input-group">
-                        <input type="text" name="declined_search" class="form-control"
-                            placeholder="Search by ID, Name, or Item"
-                            value="<?php echo $_GET['declined_search'] ?? ''; ?>">
-                        <button class="btn btn-dark">Search</button>
+                        <input type="text" 
+                               name="declined_search" 
+                               class="form-control"
+                               placeholder="Search by ID, Name, or Item..."
+                               value="<?= $_GET['declined_search'] ?? '' ?>">
+
+                        <button class="btn btn-dark">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['declined_search'])): ?>
+                            <a href="admin-dashboard.php#sec-declined"
+                            class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </form>
 
