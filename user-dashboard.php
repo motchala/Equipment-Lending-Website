@@ -213,9 +213,7 @@ if (isset($_SESSION['user_id'])) {
             border: none;
             border-left: 4px solid transparent;
             color: #8B0000;
-            /* Equi-Red color */
             font-weight: 600;
-            /* Makes it pop */
             padding: 14px 25px;
             display: flex;
             align-items: center;
@@ -248,8 +246,7 @@ if (isset($_SESSION['user_id'])) {
         /* This connects both Nav Links and Sidebar Buttons to ensure identical spacing */
         .nav-link i,
         .sidebar-btn i {
-            margin-right: 15px !important;
-            /* Micro-adjustment: change this number to taste */
+            margin-right: 15px !important;              /* Micro-adjustment: change this number to taste */
         }
 
         /* =========================================
@@ -258,10 +255,8 @@ if (isset($_SESSION['user_id'])) {
        ========================================= */
         main {
             flex-grow: 1;
-            /* Takes up remaining horizontal space */
             overflow-x: hidden;
             overflow-y: auto;
-            /* Enables vertical scrolling */
             padding: 25px;
             background-color: #f4f4f4;
         }
@@ -466,7 +461,6 @@ if (isset($_SESSION['user_id'])) {
                                 </div>
                             <?php } ?>
                         <?php } ?>
-
                     </div>
                 </article>
             </section>
@@ -567,16 +561,15 @@ if (isset($_SESSION['user_id'])) {
                     </div>
                 </article>
             </section>
-
         </main>
     </div>
 
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Set reference for current date
         const todayStr = new Date().toISOString().split('T')[0];
 
-        // Sidebar Toggle Function
         function toggleSidebar() {
             document.getElementById('sidebar').classList.toggle('collapsed');
         }
@@ -695,11 +688,11 @@ if (isset($_SESSION['user_id'])) {
         });
     </script>
 
+    <!-- Overlay page / fake load screen -->
     <div id="loading-overlay" class="hidden"
         style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;">
         <div class="spinner-border text-danger" role="status" style="width: 3rem; height: 3rem;"></div>
         <p class="mt-3 fw-bold text-dark">Processing your request...</p>
     </div>
 </body>
-
 </html>
