@@ -230,6 +230,7 @@ if (!empty($_GET['inventory_search'])) {
     $inventory_result = mysqli_query($conn, $inventory_sql);
 }
 
+
 $raw_data_sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
 
 if (!empty($_GET['raw_search'])) {
@@ -593,11 +594,23 @@ if (isset($_GET['edit_item'])) {
                 </div>
                 <form method="GET" action="admin-dashboard.php#sec-inventory" class="mb-3">
                     <input type="hidden" name="view" value="inventory">
+
                     <div class="input-group">
-                        <input type="text" name="inventory_search" class="form-control"
-                            placeholder="Search by Item Name or Category"
-                            value="<?php echo $_GET['inventory_search'] ?? ''; ?>">
-                        <button class="btn btn-dark">Search</button>
+                        <input type="text" 
+                               name="inventory_search" 
+                               class="form-control"
+                               placeholder="Search by Item Name or Category"
+                               value="<?= $_GET['inventory_search'] ?? '' ?>">
+                        <button class="btn btn-dark">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['inventory_search'])): ?>
+                            <a href="admin-dashboard.php#sec-inventory"
+                            class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </form>
 
