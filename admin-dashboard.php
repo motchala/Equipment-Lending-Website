@@ -11,7 +11,7 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// Handle Approve / Decline actions
+// Handle Approve / Decline actions 
 if (isset($_GET['action'], $_GET['id'])) {
     $request_id = (int) $_GET['id'];
     $action = $_GET['action'];
@@ -220,6 +220,20 @@ if (!empty($_GET['inventory_search'])) {
     $inventory_result = mysqli_query($conn, $inventory_sql);
 }
 
+$raw_data_sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
+
+if (!empty($_GET['raw_search'])) {
+    $search = "%" . $_GET['raw_search'] . "%";
+    $raw_data_sql .= " WHERE student_name LIKE ? OR equipment_name LIKE ? OR student_id LIKE ? ORDER BY request_date DESC";
+    $stmt = $conn->prepare($raw_data_sql);
+    $stmt->bind_param("sss", $search, $search, $search);
+    $stmt->execute();
+    $raw_data_result = $stmt->get_result();
+} else {
+    $raw_data_sql .= " ORDER BY request_date DESC";
+    $raw_data_result = mysqli_query($conn, $raw_data_sql);
+}
+
 $edit_item = null;
 
 if (isset($_GET['edit_item'])) {
@@ -400,6 +414,18 @@ if (isset($_GET['edit_item'])) {
             border-radius: 10px;
             border: 1px solid #eee;
         }
+
+        /* A specific class for round action buttons */
+        .btn-circle-sm {
+            width: 32px;
+            height: 32px;
+            line-height: 32px;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50% !important;
+        }
     </style>
 </head>
 
@@ -437,6 +463,12 @@ if (isset($_GET['edit_item'])) {
             <i class="bi bi-x-octagon"></i> Declined
         </button>
 
+        <div class="nav-label">Records</div>
+
+        <button type="button" onclick="showSection('raw-data')" id="link-raw-data" class="sidebar-btn">
+            <i class="bi bi-database-fill"></i> Raw Data
+        </button>
+
         <div class="sidebar-footer">
             <button type="button" class="sidebar-btn border-0" onclick="handleLogout()">
                 <i class="bi bi-box-arrow-right"></i> Logout
@@ -456,9 +488,7 @@ if (isset($_GET['edit_item'])) {
                 <form method="GET" action="admin-dashboard.php#sec-waiting" class="mb-3">
                     <input type="hidden" name="view" value="waiting">
                     <div class="input-group">
-                        <input type="text"
-                            name="waiting_search"
-                            class="form-control"
+                        <input type="text" name="waiting_search" class="form-control"
                             placeholder="Search by Item Name or Category"
                             value="<?php echo $_GET['waiting_search'] ?? ''; ?>">
                         <button class="btn btn-dark">Search</button>
@@ -471,6 +501,8 @@ if (isset($_GET['edit_item'])) {
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Requested Item</th>
+                                <th>Borrow Date</th>
+                                <th>Return Date</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -479,41 +511,49 @@ if (isset($_GET['edit_item'])) {
                         <tbody id="waiting-body">
                             <?php if (mysqli_num_rows($waiting_result) === 0) { ?>
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-5">
-                                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    <td colspan="7" class="text-center text-muted py-5"> <i
+                                            class="bi bi-inbox fs-1 d-block mb-2"></i>
                                         No students are currently in the waiting list.
                                     </td>
                                 </tr>
                             <?php } else { ?>
-                            <?php while ($row = mysqli_fetch_assoc($waiting_result)) { ?>
-                                <tr>
-                                    <td>
-                                        <?php echo $row['student_id']; ?>
-                                    </td>
-                                    <td class="fw-bold">
-                                        <?php echo htmlspecialchars($row['student_name']); ?>
-                                    </td>
-                                    <td>
-                                        <?php echo htmlspecialchars($row['equipment_name']); ?>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-warning text-dark px-3 py-2">
-                                            <?php echo $row['status']; ?>
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <a href="admin-dashboard.php?action=approve&id=<?php echo $row['id']; ?>"
-                                            class="btn btn-success btn-sm rounded-circle p-2">
-                                            <i class="bi bi-check-lg"></i>
-                                        </a>
-                                        <a href="admin-dashboard.php?action=decline&id=<?php echo $row['id']; ?>"
-                                            class="btn btn-danger btn-sm rounded-circle p-2 ms-1">
-                                            <i class="bi bi-x-lg"></i>
-                                        </a>
-                                    </td>
-                                </tr>
+                                <?php while ($row = mysqli_fetch_assoc($waiting_result)) { ?>
+                                    <tr>
+                                        <td><?php echo $row['student_id']; ?></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($row['student_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($row['equipment_name']); ?></td>
+
+                                        <td class="<?php
+                                        $isPast = strtotime($row['borrow_date']) < strtotime(date('Y-m-d'));
+                                        echo $isPast ? 'text-danger fw-bold' : '';
+                                        ?>">
+                                            <?php echo date('M d, Y', strtotime($row['borrow_date'])); ?>
+                                            <?php if ($isPast): ?>
+                                                <small class="d-block" style="font-size: 0.7rem;">(Date Passed)</small>
+                                            <?php endif; ?>
+                                        </td>
+
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($row['return_date'])); ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning text-dark px-3 py-2">
+                                                <?php echo $row['status']; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="admin-dashboard.php?action=approve&id=<?php echo $row['id']; ?>"
+                                                class="btn btn-success btn-sm btn-circle-sm">
+                                                <i class="bi bi-check-lg"></i>
+                                            </a>
+                                            <a href="admin-dashboard.php?action=decline&id=<?php echo $row['id']; ?>"
+                                                class="btn btn-danger btn-sm btn-circle-sm ms-1">
+                                                <i class="bi bi-x-lg"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
                             <?php } ?>
-                        <?php } ?>
                         </tbody>
 
                     </table>
@@ -531,9 +571,7 @@ if (isset($_GET['edit_item'])) {
                 <form method="GET" action="admin-dashboard.php#sec-inventory" class="mb-3">
                     <input type="hidden" name="view" value="inventory">
                     <div class="input-group">
-                        <input type="text"
-                            name="inventory_search"
-                            class="form-control"
+                        <input type="text" name="inventory_search" class="form-control"
                             placeholder="Search by Item Name or Category"
                             value="<?php echo $_GET['inventory_search'] ?? ''; ?>">
                         <button class="btn btn-dark">Search</button>
@@ -612,11 +650,9 @@ if (isset($_GET['edit_item'])) {
             <div id="sec-approved" class="view-section">
                 <h4 class="fw-bold mb-4 text-success"><i class="bi bi-patch-check me-2"></i>Approved Requests</h4>
                 <form method="GET" action="admin-dashboard.php#sec-approved" class="mb-3">
-                    <input type="hidden" name="view" value="inventory">
+                    <input type="hidden" name="view" value="approved">
                     <div class="input-group">
-                        <input type="text"
-                            name="approved_search"
-                            class="form-control"
+                        <input type="text" name="approved_search" class="form-control"
                             placeholder="Search by ID, Name, or Item"
                             value="<?php echo $_GET['approved_search'] ?? ''; ?>">
                         <button class="btn btn-dark">Search</button>
@@ -665,11 +701,9 @@ if (isset($_GET['edit_item'])) {
             <div id="sec-declined" class="view-section">
                 <h4 class="fw-bold mb-4 text-danger"><i class="bi bi-x-octagon me-2"></i>Declined Requests</h4>
                 <form method="GET" action="admin-dashboard.php#sec-declined" class="mb-3">
-                    <input type="hidden" name="view" value="inventory">
+                    <input type="hidden" name="view" value="declined">
                     <div class="input-group">
-                        <input type="text"
-                            name="declined_search"
-                            class="form-control"
+                        <input type="text" name="declined_search" class="form-control"
                             placeholder="Search by ID, Name, or Item"
                             value="<?php echo $_GET['declined_search'] ?? ''; ?>">
                         <button class="btn btn-dark">Search</button>
@@ -719,7 +753,91 @@ if (isset($_GET['edit_item'])) {
                 </div>
             </div>
 
+
+            <div id="sec-raw-data" class="view-section">
+                <h4 class="fw-bold mb-4 text-secondary">
+                    <i class="bi bi-database-fill me-2"></i> Master Request Log (Raw Data)
+                </h4>
+
+                <form method="GET" action="admin-dashboard.php#sec-raw-data" class="mb-3">
+                    <input type="hidden" name="view" value="raw">
+                    <div class="input-group">
+                        <input type="text" name="raw_search" class="form-control"
+                            placeholder="Search by Student Name, ID, or Item..."
+                            value="<?php echo $_GET['raw_search'] ?? ''; ?>">
+
+                        <button class="btn btn-dark" type="submit">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+
+                        <?php if (!empty($_GET['raw_search'])): ?>
+                            <a href="admin-dashboard.php#sec-raw-data" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-clockwise"></i> Clear Search
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Student Name</th>
+                                <th>Equipment</th>
+                                <th>Instructor</th>
+                                <th>Room</th>
+                                <th>Borrow Date</th>
+                                <th>Return Date</th>
+                                <th>Date Filed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (mysqli_num_rows($raw_data_result) === 0) { ?>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-5">
+                                        No historical records found.
+                                    </td>
+                                </tr>
+                            <?php } else { ?>
+                                <?php while ($row = mysqli_fetch_assoc($raw_data_result)) { ?>
+                                    <tr>
+                                        <td>
+                                            <?php echo $row['student_id']; ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($row['student_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($row['equipment_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($row['instructor']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($row['room']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($row['borrow_date'])); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($row['return_date'])); ?>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <?php echo date('M d, Y g:i A', strtotime($row['request_date'])); ?>
+                                            </small>
+                                        </td>
+                                    </tr>
+                                <?php } ?>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
+    </div>
     </div>
 
     <div class="modal fade" id="itemModal" tabindex="-1">
@@ -742,14 +860,12 @@ if (isset($_GET['edit_item'])) {
                         <?php } ?>
 
                         <div class="text-center mb-3">
-                            <div id="dropZone"
-                                class="border rounded-3 p-3 text-center mb-3 position-relative"
+                            <div id="dropZone" class="border rounded-3 p-3 text-center mb-3 position-relative"
                                 style="cursor:pointer; background:#f8f9fa;">
 
                                 <!-- REMOVE IMAGE BUTTON -->
-                                <button type="button"
-                                        id="removeImageBtn"
-                                        class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 d-none">
+                                <button type="button" id="removeImageBtn"
+                                    class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 d-none">
                                     <i class="bi bi-x-lg"></i>
                                 </button>
 
@@ -762,8 +878,8 @@ if (isset($_GET['edit_item'])) {
                                     or click / paste (Ctrl + V)
                                 </p>
 
-                                <input type="file" name="item_image" id="itemImageInput"
-                                    class="d-none" accept="image/*">
+                                <input type="file" name="item_image" id="itemImageInput" class="d-none"
+                                    accept="image/*">
                             </div>
 
 
@@ -949,14 +1065,22 @@ if (isset($_GET['edit_item'])) {
 
     <script>
         window.addEventListener('DOMContentLoaded', function () {
-            const hash = window.location.hash.replace('#sec-', '');
-            if (hash) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewParam = urlParams.get('view'); // Checks ?view=
+            const hash = window.location.hash.replace('#sec-', ''); // Checks #sec-
+
+            // Priority: 1. URL Parameter (from search) 2. Hash (from direct link)
+            if (viewParam) {
+                // Map 'raw' to 'raw-data' to match your IDs
+                const target = viewParam === 'raw' ? 'raw-data' : viewParam;
+                showSection(target);
+            } else if (hash) {
                 showSection(hash);
             }
         });
     </script>
 
-   <script>
+    <script>
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('itemImageInput');
         const preview = document.getElementById('imagePreview');
@@ -968,14 +1092,14 @@ if (isset($_GET['edit_item'])) {
         dropZone.addEventListener('click', () => fileInput.click());
 
         // Drag hover
-        ['dragenter','dragover'].forEach(e =>
+        ['dragenter', 'dragover'].forEach(e =>
             dropZone.addEventListener(e, ev => {
                 ev.preventDefault();
                 dropZone.classList.add('border-primary');
             })
         );
 
-        ['dragleave','drop'].forEach(e =>
+        ['dragleave', 'drop'].forEach(e =>
             dropZone.addEventListener(e, ev => {
                 ev.preventDefault();
                 dropZone.classList.remove('border-primary');
@@ -1026,7 +1150,7 @@ if (isset($_GET['edit_item'])) {
             fileInput.value = ""; // clear file input
             removeBtn.classList.add('d-none');
         });
-</script>
+    </script>
 
 </body>
 
