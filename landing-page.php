@@ -262,6 +262,22 @@ if (isset($_POST['register'])) {
             margin-top: 1rem;
         }
 
+        .custom-about-btn {
+            border-width: 1px !important;
+            padding: 15px 40px;
+            display: inline-block;
+            min-width: 200px;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+
+        .custom-about-btn:hover {
+            border-width: 10px !important;
+            background-color: white;
+            color: #8B0000;
+        }
+
         /* Rest of Hero Content */
         .hero-content {
             position: relative;
@@ -377,8 +393,7 @@ if (isset($_POST['register'])) {
             <h1>Access When It Matters Most</h1>
             <p>A student-built platform ensuring essential school equipment is always within reach.</p>
             <div class="hero-actions">
-                <a href="#borrow" class="btn btn-light">Borrow Equipment</a>
-                <a href="#inventory" class="btn btn-outline-light">View Inventory</a>
+                <a href="https://www.pup.edu.ph/binan/" target="_blank" class="btn btn-outline-light custom-about-btn">About Us</a>
             </div>
         </div>
 
@@ -441,7 +456,7 @@ if (isset($_POST['register'])) {
                                     <?= $register_success ?>
                                 </div>
                             <?php endif; ?>
-                            
+
                             <button type="submit" name="register" class="btn btn-light">Register</button>
                         </form>
                     </div>
