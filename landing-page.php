@@ -658,6 +658,7 @@ if (isset($_POST['register'])) {
             input.value = result;
         }
 
+        // Set placeholder for Student ID field
         function addStudentIDPlaceholder() {
             const studentIdInput = document.querySelector('input[name="student_id"]');
             if (studentIdInput) {
