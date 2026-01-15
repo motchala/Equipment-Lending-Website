@@ -936,7 +936,8 @@ if (isset($_GET['edit_item'])) {
                         <div class="mb-3">
                             <label class="form-label fw-bold">Item Name</label>
                             <input type="text" name="item_name" class="form-control"
-                                value="<?php echo $edit_item['item_name'] ?? ''; ?>" required>
+                                value="<?php echo $edit_item['item_name'] ?? ''; ?>"
+                                oninput="if(this.value.length > 25) this.value = this.value.slice(0, 25);" required>
                         </div>
 
                         <div class="row">
