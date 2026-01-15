@@ -1,5 +1,13 @@
 <?php
 session_start();
+
+// for signup student id year validation
+function validateStudentIDYear($student_id)
+{
+    $year = intval(substr($student_id, 0, 4));
+    return $year >= 2000 && $year <= 2030;
+}
+
 if (isset($_SESSION['user_id'])) {
     header("Location: user-dashboard.php");
     exit();
@@ -81,8 +89,12 @@ if (isset($_POST['register'])) {
         $register_error = "Passwords do not match.";
     } elseif (strlen($student_id) != 15) {
         $register_error = "Student ID must be exactly 15 characters.";
+    } elseif (!preg_match('/^2[0-9]{3}-[0-9]{5}-BN-[0-9]$/', $student_id)) {
+        $register_error = "Invalid Student ID format. Use: YYYY-XXXXX-BN-X (e.g., 2023-00251-BN-0)";
+    } elseif (!validateStudentIDYear($student_id)) {
+        $register_error = "Year must be between 2000 and 2030.";
     } elseif (strlen($password) < 4) {
-        $register_error = "Password must be at least 4 characters.";  
+        $register_error = "Password must be at least 4 characters.";
     } elseif (strlen($fullname) < 5 || strlen($fullname) > 70) {
         $register_error = "Full Name must be between 5 and 70 characters.";
     } elseif (strlen($email) < 15 || strlen($email) > 254) {
@@ -489,7 +501,7 @@ if (isset($_POST['register'])) {
                                 value="<?= htmlspecialchars($reg_fullname_val) ?>" oninput=" validateLettersName(this)"
                                 required>
 
-                            <input type="text" name="student_id" minlength="15" maxlength="15" placeholder="Student ID"
+                            <input type="text" name="student_id" minlength="15" maxlength="15" placeholder="Student ID (2xxx-xxxxx-BN-x)"
                                 value="<?= htmlspecialchars($reg_studentid_val) ?>"
                                 oninput=" validateLettersStudentID(this)" required>
 
@@ -577,14 +589,84 @@ if (isset($_POST['register'])) {
             input.value = input.value.replace(/[^a-zA-Z\s.']/g, '');
         }
 
+
+        // for student id pattern strict
         function validateLettersStudentID(input) {
-            let val = input.value;
-            if (val.length > 0 && !/^[0-9]/.test(val)) {
-                input.value = '';
-                return;
+            let val = input.value.toUpperCase(); // Convert to uppercase for consistency
+            let result = '';
+
+            // Remove any characters that aren't numbers, letters, or hyphens
+            val = val.replace(/[^0-9A-Z-]/g, '');
+
+            // Process character by character based on position
+            for (let i = 0; i < val.length && i < 17; i++) {
+                let char = val[i];
+
+                if (i < 4) {
+                    // First 4 positions: only numbers
+                    if (/[0-9]/.test(char)) {
+                        // Validate year range (2000-2030)
+                        if (i === 0 && char !== '2') continue; // First digit must be 2
+                        if (i === 1 && result[0] === '2' && char !== '0') continue; // Second digit must be 0
+                        if (i === 2 && result === '20') {
+                            // Third digit: 0-3 only (for 2000-2030)
+                            if (!/[0-3]/.test(char)) continue;
+                        }
+                        if (i === 3 && result === '203') {
+                            // Fourth digit: 0 only (for 2030 max)
+                            if (char !== '0') continue;
+                        }
+                        result += char;
+                    }
+                } else if (i === 4) {
+                    // Position 4: hyphen
+                    if (char === '-') {
+                        result += char;
+                    }
+                } else if (i >= 5 && i < 10) {
+                    // Positions 5-9: only numbers (5 digits)
+                    if (/[0-9]/.test(char)) {
+                        result += char;
+                    }
+                } else if (i === 10) {
+                    // Position 10: hyphen
+                    if (char === '-') {
+                        result += char;
+                    }
+                } else if (i === 11) {
+                    // Position 11: must be 'B'
+                    if (char === 'B') {
+                        result += char;
+                    }
+                } else if (i === 12) {
+                    // Position 12: must be 'N'
+                    if (char === 'N') {
+                        result += char;
+                    }
+                } else if (i === 13) {
+                    // Position 13: hyphen
+                    if (char === '-') {
+                        result += char;
+                    }
+                } else if (i === 14) {
+                    // Position 14: single digit (0-9)
+                    if (/[0-9]/.test(char)) {
+                        result += char;
+                    }
+                }
             }
-            input.value = input.value.replace(/[^a-zA-Z0-9-]/g, '');
+            input.value = result;
         }
+
+        // Set placeholder for Student ID field
+        function addStudentIDPlaceholder() {
+            const studentIdInput = document.querySelector('input[name="student_id"]');
+            if (studentIdInput) {
+                studentIdInput.placeholder = "2023-00251-BN-0";
+                studentIdInput.setAttribute('title', 'Format: YYYY-XXXXX-BN-X (Year: 2000-2030)');
+            }
+        }
+
         function validateLettersEmail(input) {
             let val = input.value;
             if (val.length > 0 && !/^[a-zA-Z0-9]/.test(val)) {
@@ -617,11 +699,11 @@ if (isset($_POST['register'])) {
             regTab.show();
         <?php elseif (!empty($register_success)): ?>
             const regTab = new bootstrap.Tab(triggerRegister);
-            regTab.show(); 
+            regTab.show();
             setTimeout(() => {
-                alert("Registration Successful! Please Sign In."); 
+                alert("Registration Successful! Please Sign In.");
                 const loginTab = new bootstrap.Tab(triggerLogin);
-                loginTab.show(); 
+                loginTab.show();
             }, 1000);
         <?php else: ?>
         <?php endif; ?>
