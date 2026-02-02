@@ -334,17 +334,6 @@ if (isset($_GET['edit_item'])) {
                                class="form-control"
                                placeholder="Search by Student ID, Name or Item"
                                value="<?= $_GET['waiting_search'] ?? '' ?>">
-
-                        <button class="btn btn-dark">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-
-                        <?php if (!empty($_GET['waiting_search'])): ?>
-                            <a href="admin-dashboard.php#sec-waiting"
-                            class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Clear
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </form>
                 <div class="table-responsive">
@@ -431,16 +420,6 @@ if (isset($_GET['edit_item'])) {
                                class="form-control"
                                placeholder="Search by Item Name or Category"
                                value="<?= $_GET['inventory_search'] ?? '' ?>">
-                        <button class="btn btn-dark">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-
-                        <?php if (!empty($_GET['inventory_search'])): ?>
-                            <a href="admin-dashboard.php#sec-inventory"
-                            class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Clear
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </form>
 
@@ -525,17 +504,6 @@ if (isset($_GET['edit_item'])) {
                                class="form-control"
                                placeholder="Search by ID, Name, or Item..."
                                value="<?= $_GET['approved_search'] ?? '' ?>">
-
-                        <button class="btn btn-dark">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-
-                        <?php if (!empty($_GET['approved_search'])): ?>
-                            <a href="admin-dashboard.php#sec-approved"
-                            class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Clear
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </form>
 
@@ -590,17 +558,6 @@ if (isset($_GET['edit_item'])) {
                                class="form-control"
                                placeholder="Search by ID, Name, or Item..."
                                value="<?= $_GET['declined_search'] ?? '' ?>">
-
-                        <button class="btn btn-dark">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-
-                        <?php if (!empty($_GET['declined_search'])): ?>
-                            <a href="admin-dashboard.php#sec-declined"
-                            class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Clear
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </form>
 
@@ -662,16 +619,6 @@ if (isset($_GET['edit_item'])) {
                                class="form-control"
                                placeholder="Search by Student Name, ID, or Item..."
                                value="<?php echo $_GET['raw_search'] ?? ''; ?>">
-
-                        <button class="btn btn-dark" type="submit">
-                            <i class="bi bi-search"></i> Search
-                        </button>
-
-                        <?php if (!empty($_GET['raw_search'])): ?>
-                            <a href="admin-dashboard.php#sec-raw-data" class="btn btn-outline-secondary">
-                                <i class="bi bi-arrow-clockwise"></i> Clear Search
-                            </a>
-                        <?php endif; ?>
                     </div>
                 </form>
 
