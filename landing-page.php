@@ -693,12 +693,13 @@ if (isset($_POST['register'])) {
 
         const triggerLogin = document.querySelector('#login-tab');
         const triggerRegister = document.querySelector('#register-tab');
+        let regTab;
 
         <?php if (!empty($register_error)): ?>
-            const regTab = new bootstrap.Tab(triggerRegister);
+            regTab = new bootstrap.Tab(triggerRegister);
             regTab.show();
         <?php elseif (!empty($register_success)): ?>
-            const regTab = new bootstrap.Tab(triggerRegister);
+            regTab = new bootstrap.Tab(triggerRegister);
             regTab.show();
             setTimeout(() => {
                 alert("Registration Successful! Please Sign In.");
