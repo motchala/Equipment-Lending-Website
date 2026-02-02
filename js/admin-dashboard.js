@@ -225,3 +225,67 @@ if (removeBtn) {
         removeBtn.classList.add('d-none');
     });
 }
+
+// ------------------------------
+// Live Search for All Sections
+// ------------------------------
+function setupLiveSearch(inputId, tbodyId, section) {
+    const input = document.getElementById(inputId);
+    const tbody = document.getElementById(tbodyId);
+
+    // Trigger search on every key press
+    input.addEventListener("keyup", function () {
+        const query = this.value.trim();
+
+        // Send AJAX request
+        fetch(`ajax/live-search.php?q=${encodeURIComponent(query)}&section=${section}`)
+            .then(res => res.text())
+            .then(data => {
+                tbody.innerHTML = data; // Replace table body with new rows
+            })
+            .catch(err => {
+                console.error("Live search error:", err);
+                tbody.innerHTML = "<tr><td colspan='10' class='text-center text-danger'>Error fetching data</td></tr>";
+            });
+    });
+}
+
+// ------------------------------
+// Initialize Live Searches
+// ------------------------------
+
+// Make sure your HTML inputs and tbody elements have these IDs
+setupLiveSearch("waitingSearch", "waiting-body", "waiting");
+setupLiveSearch("approvedSearch", "approved-list", "approved");
+setupLiveSearch("declinedSearch", "declined-list", "declined");
+setupLiveSearch("inventorySearch", "inventory-body", "inventory");
+setupLiveSearch("rawSearch", "raw-data-body", "raw");
+
+// ------------------------------
+// Optional: Clear input functionality
+// ------------------------------
+function setupClearButton(inputId, tbodyId, section) {
+    const input = document.getElementById(inputId);
+    const clearBtn = document.getElementById(inputId + "-clear");
+    const tbody = document.getElementById(tbodyId);
+
+    if (!clearBtn) return;
+
+    clearBtn.addEventListener("click", function () {
+        input.value = "";
+        // Trigger search with empty string to show all rows
+        fetch(`ajax/live-search.php?q=&section=${section}`)
+            .then(res => res.text())
+            .then(data => {
+                tbody.innerHTML = data;
+            });
+    });
+}
+
+// Example: setup clear buttons if you have them
+setupClearButton("waitingSearch", "waiting-body", "waiting");
+setupClearButton("approvedSearch", "approved-list", "approved");
+setupClearButton("declinedSearch", "declined-list", "declined");
+setupClearButton("inventorySearch", "inventory-body", "inventory");
+setupClearButton("rawSearch", "raw-data-body", "raw");
+

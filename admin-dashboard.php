@@ -329,7 +329,8 @@ if (isset($_GET['edit_item'])) {
 
                     <div class="input-group">
                         <input type="text" 
-                               name="waiting_search" 
+                               name="waiting_search"
+                               id="waitingSearch" 
                                class="form-control"
                                placeholder="Search by Student ID, Name or Item"
                                value="<?= $_GET['waiting_search'] ?? '' ?>">
@@ -426,6 +427,7 @@ if (isset($_GET['edit_item'])) {
                     <div class="input-group">
                         <input type="text" 
                                name="inventory_search" 
+                               id="inventorySearch" 
                                class="form-control"
                                placeholder="Search by Item Name or Category"
                                value="<?= $_GET['inventory_search'] ?? '' ?>">
@@ -454,7 +456,7 @@ if (isset($_GET['edit_item'])) {
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="inventory-body">
                             <?php if (mysqli_num_rows($inventory_result) == 0) { ?>
                                 <tr>
                                     <td colspan="6" class="text-center text-muted py-5">
@@ -518,7 +520,8 @@ if (isset($_GET['edit_item'])) {
 
                     <div class="input-group">
                         <input type="text" 
-                               name="approved_search" 
+                               name="approved_search"
+                               id="approvedSearch"  
                                class="form-control"
                                placeholder="Search by ID, Name, or Item..."
                                value="<?= $_GET['approved_search'] ?? '' ?>">
@@ -583,6 +586,7 @@ if (isset($_GET['edit_item'])) {
                     <div class="input-group">
                         <input type="text" 
                                name="declined_search" 
+                               id="declinedSearch" 
                                class="form-control"
                                placeholder="Search by ID, Name, or Item..."
                                value="<?= $_GET['declined_search'] ?? '' ?>">
@@ -652,9 +656,12 @@ if (isset($_GET['edit_item'])) {
                 <form method="GET" action="admin-dashboard.php#sec-raw-data" class="mb-3">
                     <input type="hidden" name="view" value="raw">
                     <div class="input-group">
-                        <input type="text" name="raw_search" class="form-control"
-                            placeholder="Search by Student Name, ID, or Item..."
-                            value="<?php echo $_GET['raw_search'] ?? ''; ?>">
+                        <input type="text" 
+                               name="raw_search"
+                               id="rawSearch"  
+                               class="form-control"
+                               placeholder="Search by Student Name, ID, or Item..."
+                               value="<?php echo $_GET['raw_search'] ?? ''; ?>">
 
                         <button class="btn btn-dark" type="submit">
                             <i class="bi bi-search"></i> Search
@@ -682,7 +689,7 @@ if (isset($_GET['edit_item'])) {
                                 <th>Date Filed</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="raw-data-body">
                             <?php if (mysqli_num_rows($raw_data_result) === 0) { ?>
                                 <tr>
                                     <td colspan="8" class="text-center text-muted py-5">
