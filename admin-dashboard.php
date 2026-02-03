@@ -732,14 +732,16 @@ if (isset($_GET['edit_item'])) {
                         <div class="mb-3">
                             <label class="form-label fw-bold">Item Name</label>
                             <input type="text" name="item_name" class="form-control"
-                                value="<?php echo $edit_item['item_name'] ?? ''; ?>" required>
+                                value="<?php echo $edit_item['item_name'] ?? ''; ?>"
+                                oninput="if(this.value.length > 25) this.value = this.value.slice(0, 25);" required>
                         </div>
 
                         <div class="row">
                             <div class="col-6 mb-3">
                                 <label class="form-label fw-bold">Quantity</label>
-                                <input type="number" name="quantity" class="form-control" min="0"
-                                    value="<?php echo $edit_item['quantity'] ?? 1; ?>" required>
+                                <input type="number" name="quantity" class="form-control" min="0" max="100"
+                                    value="<?php echo $edit_item['quantity'] ?? 1; ?>"
+                                    oninput="if(this.value > 100) this.value = this.value = 100;" required>
                             </div>
 
                             <div class="col-6 mb-3">
