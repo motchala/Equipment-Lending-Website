@@ -11,38 +11,131 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+// ================= AUTO DECLINE EXPIRED REQUESTS =================
+
+$today = date('Y-m-d');
+$reason_expired = "Request expired – borrow date has already passed";
+
+$stmt_expired = $conn->prepare("
+    UPDATE tbl_requests
+    SET status = 'Declined', reason = ?
+    WHERE status = 'Waiting'
+    AND borrow_date < ?
+");
+$stmt_expired->bind_param("ss", $reason_expired, $today);
+$stmt_expired->execute();
+
+
 // Handle Approve / Decline actions 
 if (isset($_GET['action'], $_GET['id'])) {
     $request_id = (int) $_GET['id'];
     $action = $_GET['action'];
 
     if ($action === 'approve') {
-        // 1. Get the item name from the request before updating
-        $stmt_get = $conn->prepare("SELECT equipment_name FROM tbl_requests WHERE id = ?");
-        $stmt_get->bind_param("i", $request_id);
-        $stmt_get->execute();
-        $res = $stmt_get->get_result();
-        $request_data = $res->fetch_assoc();
 
-        if ($request_data) {
-            $item_name = $request_data['equipment_name'];
+    // Get equipment name
+    $stmt_req = $conn->prepare("
+        SELECT equipment_name 
+        FROM tbl_requests 
+        WHERE id = ?
+    ");
+    $stmt_req->bind_param("i", $request_id);
+    $stmt_req->execute();
+    $req_result = $stmt_req->get_result();
+    $request = $req_result->fetch_assoc();
 
-            // 2. Update request status to Approved
-            $stmt_upd = $conn->prepare("UPDATE tbl_requests SET status = 'Approved' WHERE id = ?");
-            $stmt_upd->bind_param("i", $request_id);
-
-            if ($stmt_upd->execute()) {
-                // 3. Subtract 1 from tbl_inventory where the name matches
-                // We add "AND quantity > 0" as a safety measure
-                $stmt_inv = $conn->prepare("UPDATE tbl_inventory SET quantity = quantity - 1 WHERE item_name = ? AND quantity > 0");
-                $stmt_inv->bind_param("s", $item_name);
-                $stmt_inv->execute();
-            }
-        }
-        header("Location: admin-dashboard.php#sec-approved");
+    if (!$request) {
+        header("Location: admin-dashboard.php");
         exit();
+    }
 
-    } elseif ($action === 'decline') {
+    $equipment_name = $request['equipment_name'];
+
+    // Get stock quantity
+    $stmt_stock = $conn->prepare("
+        SELECT quantity 
+        FROM tbl_inventory 
+        WHERE item_name = ?
+    ");
+    $stmt_stock->bind_param("s", $equipment_name);
+    $stmt_stock->execute();
+    $stock_result = $stmt_stock->get_result();
+    $stock = $stock_result->fetch_assoc();
+
+    if (!$stock) {
+        header("Location: admin-dashboard.php");
+        exit();
+    }
+
+    $total_stock = (int)$stock['quantity'];
+
+    // Count approved requests
+    $stmt_count = $conn->prepare("
+        SELECT COUNT(*) AS approved_count
+        FROM tbl_requests
+        WHERE equipment_name = ?
+        AND status = 'Approved'
+    ");
+    $stmt_count->bind_param("s", $equipment_name);
+    $stmt_count->execute();
+    $count_result = $stmt_count->get_result();
+    $count_data = $count_result->fetch_assoc();
+
+    $approved_count = (int)$count_data['approved_count'];
+
+    // Check if stock still available
+    if ($approved_count < $total_stock) {
+
+        // Approve this request
+        $stmt_approve = $conn->prepare("
+            UPDATE tbl_requests 
+            SET status = 'Approved', reason = NULL 
+            WHERE id = ?
+        ");
+        $stmt_approve->bind_param("i", $request_id);
+        $stmt_approve->execute();
+
+        // Deduct stock
+        $stmt_deduct = $conn->prepare("
+            UPDATE tbl_inventory 
+            SET quantity = quantity - 1
+            WHERE item_name = ?
+        ");
+        $stmt_deduct->bind_param("s", $equipment_name);
+        $stmt_deduct->execute();
+
+        // AUTO-DECLINE remaining WAITING requests if stock is now full
+        if (($approved_count + 1) >= $total_stock) {
+
+            $reason = "Out of stock – maximum approved requests reached";
+
+            $stmt_auto_decline = $conn->prepare("
+                UPDATE tbl_requests
+                SET status = 'Declined', reason = ?
+                WHERE equipment_name = ?
+                AND status = 'Waiting'
+            ");
+            $stmt_auto_decline->bind_param("ss", $reason, $equipment_name);
+            $stmt_auto_decline->execute();
+        }
+
+    } else {
+
+        // Stock already full → decline this request
+        $reason = "Out of stock – maximum approved requests reached";
+
+        $stmt_decline = $conn->prepare("
+            UPDATE tbl_requests 
+            SET status = 'Declined', reason = ?
+            WHERE id = ?
+        ");
+        $stmt_decline->bind_param("si", $reason, $request_id);
+        $stmt_decline->execute();
+    }
+
+    header("Location: admin-dashboard.php");
+    exit();
+} elseif ($action === 'decline') {
         $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined' WHERE id = ?");
         $stmt->bind_param("i", $request_id);
         $stmt->execute();
@@ -569,6 +662,7 @@ if (isset($_GET['edit_item'])) {
                                 <th>Name</th>
                                 <th>Item</th>
                                 <th>Status</th>
+                                <th>Reason</th>
                             </tr>
                         </thead>
                         <tbody id="declined-list">
@@ -595,6 +689,7 @@ if (isset($_GET['edit_item'])) {
                                             <span class="badge bg-danger"><?php echo $row['status']; ?>
                                             </span>
                                         </td>
+                                        <td><?php echo htmlspecialchars($row['reason'] ?? ''); ?></td>
                                     </tr>
                                 <?php } ?>
                             <?php } ?>

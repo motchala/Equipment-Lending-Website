@@ -64,6 +64,10 @@ CREATE TABLE tbl_requests (
   status VARCHAR(20) NOT NULL DEFAULT 'Waiting', 
   request_date DATETIME DEFAULT CURRENT_TIMESTAMP 
   );
+-- Column "reason" added
+ALTER TABLE tbl_requests
+ADD COLUMN reason VARCHAR(255) NULL;
+
 
 
 CREATE TABLE tbl_inventory (
