@@ -29,6 +29,10 @@
     <div id="sidebar">
         <div class="nav-label">Management</div>
 
+        <button type="button" onclick="showSection('archive')" id="link-archive" class="sidebar-btn">
+            <i class="bi bi-archive"></i> Archive
+        </button>
+
         <button type="button" onclick="showSection('waiting')" id="link-waiting" class="sidebar-btn active">
             <i class="bi bi-people"></i> Waiting List
         </button>
@@ -224,8 +228,7 @@
 
                                             <!-- DELETE -->
                                             <a href="admin-dashboard.php?delete_item=<?php echo $item['item_id']; ?>"
-                                                class="btn btn-sm btn-outline-danger"
-                                                onclick="return confirm('Delete this item?');">
+                                                class="btn btn-sm btn-outline-danger">
                                                 <i class="bi bi-trash"></i>
                                             </a>
                                         </td>
@@ -236,6 +239,72 @@
                     </table>
                 </div>
             </div>
+            <!-- ARCHIVE SECTION -->
+             <div id="sec-archive" class="view-section">
+    <h4 class="fw-bold mb-4 text-secondary">
+        <i class="bi bi-archive me-2"></i> Archived Equipment
+    </h4>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Photo</th>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th>Qty</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (mysqli_num_rows($archive_result) == 0) { ?>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-5">
+                            No archived equipment.
+                        </td>
+                    </tr>
+                <?php } else { ?>
+                    <?php while ($item = mysqli_fetch_assoc($archive_result)) { ?>
+                        <tr>
+                            <td>
+                                <img src="<?php echo $item['image_path']; ?>" class="item-img shadow-sm">
+                            </td>
+
+                            <td class="fw-bold text-muted">
+                                <?php echo htmlspecialchars($item['item_name']); ?>
+                            </td>
+
+                            <td><?php echo htmlspecialchars($item['category']); ?></td>
+
+                            <td>
+                                <span class="badge bg-secondary">
+                                    <?php echo $item['quantity']; ?> units
+                                </span>
+                            </td>
+
+                            <td>
+                                <!-- RESTORE -->
+                                <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                                   class="btn btn-sm btn-outline-success"
+                                   onclick="return confirm('Are you sure you want to restore this item?');">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </a>
+
+                                <!-- PERMANENT DELETE -->
+                                <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                                   class="btn btn-sm btn-outline-danger"
+                                   onclick="return confirm('Permanently delete this item?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php } ?>
+                <?php } ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
             <!-- APPROVED SECTION -->
             <div id="sec-approved" class="view-section">
                 <h4 class="fw-bold mb-4 text-success"><i class="bi bi-patch-check me-2"></i>Approved Requests</h4>

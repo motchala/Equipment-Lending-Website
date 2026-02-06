@@ -78,6 +78,11 @@ CREATE TABLE tbl_inventory (
     image_path VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+-- Column "is_archived" added
+-- 0 → Active (Inventory)
+-- 1 → Archived
+ALTER TABLE tbl_inventory
+ADD COLUMN is_archived TINYINT(1) DEFAULT 0;
 
 CREATE TABLE tbl_users (
     fullname VARCHAR(255) NOT NULL,

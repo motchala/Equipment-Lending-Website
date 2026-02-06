@@ -249,10 +249,36 @@ if (isset($_GET['delete_item'])) {
         unlink($row['image_path']);
     }
 
-    mysqli_query($conn, "DELETE FROM tbl_inventory WHERE item_id=$id");
+    $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
+    mysqli_stmt_bind_param($stmt, "i", $id);
+    mysqli_stmt_execute($stmt);
     header("Location: admin-dashboard.php#sec-inventory");
     exit();
 }
+// restore
+if (isset($_GET['restore_item'])) {
+    $item_id = intval($_GET['restore_item']);
+
+    $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 0 WHERE item_id = ?");
+    mysqli_stmt_bind_param($stmt, "i", $item_id);
+    mysqli_stmt_execute($stmt);
+
+    header("Location: admin-dashboard.php?view=archive");
+    exit();
+}
+// permanently delete
+if (isset($_GET['force_delete'])) {
+    $item_id = intval($_GET['force_delete']);
+
+    $stmt = mysqli_prepare($conn, "DELETE FROM tbl_inventory WHERE item_id = ?");
+    mysqli_stmt_bind_param($stmt, "i", $item_id);
+    mysqli_stmt_execute($stmt);
+
+    header("Location: admin-dashboard.php?view=archive");
+    exit();
+}
+
+
 
 // Fetch all requests
 // Search Function for every section in admin-dashboard
@@ -311,11 +337,14 @@ if (!empty($_GET['declined_search'])) {
     $declined_result = mysqli_query($conn, $declined_sql);
 }
 
-$inventory_sql = "SELECT * FROM tbl_inventory";
+$inventory_sql = "SELECT * FROM tbl_inventory WHERE is_archived = 0";
 
 if (!empty($_GET['inventory_search'])) {
     $search = "%" . $_GET['inventory_search'] . "%";
-    $inventory_sql .= " WHERE item_name LIKE ? OR category LIKE ? ORDER BY created_at DESC";
+    $inventory_sql .= "
+        AND (item_name LIKE ? OR category LIKE ?) 
+        ORDER BY created_at DESC
+    ";
     $stmt = $conn->prepare($inventory_sql);
     $stmt->bind_param("ss", $search, $search);
     $stmt->execute();
@@ -324,6 +353,15 @@ if (!empty($_GET['inventory_search'])) {
     $inventory_sql .= " ORDER BY created_at DESC";
     $inventory_result = mysqli_query($conn, $inventory_sql);
 }
+
+// archive
+$archive_sql = "
+    SELECT * FROM tbl_inventory
+    WHERE is_archived = 1
+    ORDER BY item_name ASC
+";
+$archive_result = mysqli_query($conn, $archive_sql);
+
 
 
 $raw_data_sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
