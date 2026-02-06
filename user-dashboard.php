@@ -12,6 +12,20 @@ $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
+// ================= AUTO DECLINE EXPIRED REQUESTS =================
+
+$today = date('Y-m-d');
+$reason_expired = "Request expired – borrow date has already passed";
+
+$stmt_expired = $conn->prepare("
+    UPDATE tbl_requests
+    SET status = 'Declined', reason = ?
+    WHERE status = 'Waiting'
+    AND borrow_date < ?
+");
+$stmt_expired->bind_param("ss", $reason_expired, $today);
+$stmt_expired->execute();
+
 
 /* ============================
    1. HANDLE BORROW REQUEST
@@ -524,6 +538,7 @@ if (isset($_SESSION['user_id'])) {
                                     <th>Borrow Date</th>
                                     <th>Return Date</th>
                                     <th>Status</th>
+                                    <th>Reason</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -546,6 +561,15 @@ if (isset($_SESSION['user_id'])) {
                                                 <span class="badge bg-<?php echo $badge_class; ?>">
                                                     <?php echo htmlspecialchars($status); ?>
                                                 </span>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                    if ($r['status'] === 'Declined') {
+                                                        echo htmlspecialchars($r['reason']);
+                                                    } else {
+                                                        echo '-';
+                                                    }
+                                                ?>
                                             </td>
                                         </tr>
                                         <?php
