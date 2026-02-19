@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+  <!-- Bottom box -->
+  <path d="M2 10l10-6 10 6v6H2z"/>
+  <!-- Middle box -->
+  <path d="M2 15l10-6 10 6v3H2z"/>
+  <!-- Top box (partial) -->
+  <path d="M2 19l10-6 10 6v2H2z"/>
+</svg>
