@@ -38,8 +38,9 @@ function showSection(sectionId) {
 
 function handleLogout() {
     if (confirm("Confirm Logout?")) {
-        window.location.href = "logout.php";
-
+        // logout script was moved into the includes folder, just like the
+        // user dashboard uses.  Update the path accordingly.
+        window.location.href = "includes/logout.php";
     }
 }
 // CRUD/Utility Functions

@@ -2,5 +2,5 @@
 session_start();
 session_unset();
 session_destroy();
-header("Location: landing-page.php");
+header("Location: ../landing-page.php");
 exit();
