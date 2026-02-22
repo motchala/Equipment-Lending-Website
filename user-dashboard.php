@@ -85,7 +85,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <link rel="stylesheet" href="css/user-dashboard.css">
-    
+
 </head>
 
 <body>
@@ -96,7 +96,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <header class="app-header">
         <div class="header-left">
             <div class="app-logo">
-                <img src="images/icon-boxes-stacked.svg" alt="EquipLend" class="logo-icon" style="color: var(--accent-maroon);" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon" style="color: var(--accent-maroon)" aria-label="EquipLend" aria-hidden="true">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg>
                 <div class="app-logo-text">
                     <strong>EQUIPLEND</strong>
                     <small>User Portal</small>
@@ -151,20 +155,17 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     </button>
                     <div class="dd-divider"></div>
                     <button class="dd-item dd-logout" data-action="logout">
-                        <div class="dd-icon"><img src="images/icon-logout.svg" alt="Logout" style="width:16px;height:16px;"/></div> Logout
+                        <div class="dd-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Logout" aria-hidden="true">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg></div> Logout
                     </button>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Context strip — visible when an overlay is active, shows current section -->
-    <div id="overlayContextStrip" class="overlay-context-strip">
-        <img src="images/icon-arrow-left.svg" class="icon-img" alt="Back" style="margin-right:6px;" />
-        <span id="overlayContextLabel">Settings</span>
-        <img src="images/icon-dot.svg" alt="dot" style="width:6px;height:6px;opacity:0.5;margin:0 8px;vertical-align:middle;" />
-        <span style="opacity:0.7; font-size:0.72rem;">Nav tabs are paused while you're here</span>
-    </div>
 
     <!-- ================================================================
      MAIN CONTENT
@@ -174,20 +175,33 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
         <!-- Success Alert -->
         <?php if (isset($_GET['success'])): ?>
             <div class="alert-banner alert-success" id="success-alert">
-                <img src="images/icon-circle-check.svg" class="icon-img" alt="Success" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Success" aria-hidden="true">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
                 <strong>Success!</strong> Your borrow request has been submitted for approval.
                 <button class="alert-close" data-action="dismiss-alert" data-target="success-alert">
-                    <img src="images/icon-xmark.svg" alt="Close" style="width:16px;height:16px;" />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                 </button>
             </div>
         <?php endif; ?>
 
         <!-- Overdue Alert -->
         <div class="alert-banner alert-danger hidden" id="overdue-alert">
-            <img src="images/icon-triangle-exclamation.svg" class="icon-img" alt="Alert" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Alert" aria-hidden="true">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
             <strong>Overdue Alert:</strong> You have overdue equipment — please return it immediately!
             <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert">
-                <img src="images/icon-xmark.svg" alt="Close" style="width:16px;height:16px;" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
             </button>
         </div>
 
@@ -196,7 +210,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     ============================================================ -->
         <div class="tab-panel active" id="panel-home">
             <div class="section-header">
-                <h2><img src="images/icon-home.svg" class="important-icon" alt="Home" />Welcome back, <?php echo htmlspecialchars($firstname); ?>! 👋</h2>
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Home" aria-hidden="true">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>Welcome back, <?php echo htmlspecialchars($firstname); ?>! 👋</h2>
                 <p><?php echo date('l, F j, Y'); ?> &mdash; Here's a summary of your activity.</p>
             </div>
 
@@ -208,29 +225,47 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
             <!-- Stats -->
             <p style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-light); margin-bottom:0.8rem;">
-                <img src="images/icon-chart.svg" class="important-icon" alt="Activity"/>Your Activity
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Activity" aria-hidden="true">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                    <line x1="2" y1="20" x2="22" y2="20" />
+                </svg>Your Activity
             </p>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon"><img src="images/icon-layer.svg" alt="Total" style="width:20px;height:20px;"/></div>
+                    <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Total" aria-hidden="true">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                            <polyline points="2 17 12 22 22 17" />
+                            <polyline points="2 12 12 17 22 12" />
+                        </svg></div>
                     <div class="stat-label">Total Requests</div>
                     <div class="stat-value"><?php echo $stat_total; ?></div>
                     <div class="stat-sub">All time</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon" style="background:#fff8e1; color:#c67c00;"><img src="images/icon-clock.svg" alt="Pending" style="width:20px;height:20px;"/></div>
+                    <div class="stat-icon" style="background:#fff8e1; color:#c67c00;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Pending" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg></div>
                     <div class="stat-label">Pending</div>
                     <div class="stat-value" style="color:var(--warning);"><?php echo $stat_waiting; ?></div>
                     <div class="stat-sub">Awaiting approval</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon" style="background:#e3fcef; color:#00875a;"><img src="images/icon-circle-check.svg" alt="Approved" style="width:20px;height:20px;"/></div>
+                    <div class="stat-icon" style="background:#e3fcef; color:#00875a;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Approved" aria-hidden="true">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg></div>
                     <div class="stat-label">Approved</div>
                     <div class="stat-value" style="color:var(--success);"><?php echo $stat_approved; ?></div>
                     <div class="stat-sub">Ready to pick up</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon" style="background:#ffeaea; color:var(--danger);"><img src="images/icon-xmark.svg" alt="Declined" style="width:20px;height:20px;"/></div>
+                    <div class="stat-icon" style="background:#ffeaea; color:var(--danger);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Declined" aria-hidden="true">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg></div>
                     <div class="stat-label">Declined</div>
                     <div class="stat-value" style="color:var(--danger);"><?php echo $stat_declined; ?></div>
                     <div class="stat-sub">Review reasons</div>
@@ -240,7 +275,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div class="home-grid">
                 <!-- Events -->
                 <div class="event-container">
-                    <h3><img src="images/icon-calendar.svg" class="icon-img" style="width:20px;height:20px;color:var(--accent-maroon); margin-right:8px;" alt="Calendar"/>Upcoming Events</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Calendar" aria-hidden="true">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>Upcoming Events</h3>
                     <div class="event-item">
                         <div class="date-badge"><span>17</span><small>Feb</small></div>
                         <div class="event-info">
@@ -269,18 +309,33 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Quick Actions -->
                 <div class="quick-actions">
-                    <h3><img src="images/icon-bolt.svg" class="icon-img" style="width:20px;height:20px;color:var(--accent-maroon); margin-right:8px;" alt="Quick"/>Quick Actions</h3>
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Quick" aria-hidden="true">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>Quick Actions</h3>
                     <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                        <img src="images/icon-search.svg" class="icon-img" alt="Search"/> Browse Equipment
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Search" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg> Browse Equipment
                     </button>
                     <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
-                        <img src="images/icon-clipboard.svg" class="icon-img" alt="Requests"/> My Requests
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        </svg> My Requests
                     </button>
                     <button class="qa-btn" data-action="go-tab" data-tab="rooms">
-                        <img src="images/icon-rooms.svg" class="icon-img" alt="Rooms"/> Reserve a Room
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                        </svg> Reserve a Room
                     </button>
                     <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                        <img src="images/icon-bell.svg" class="icon-img" alt="Notifications"/> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">3</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Notifications" aria-hidden="true">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">3</span>
                     </button>
                 </div>
             </div>
@@ -295,17 +350,26 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <!-- Lending Sub-Nav -->
             <div class="lending-nav">
                 <button class="lending-nav-btn active" data-lending-nav="browse">
-                    <img src="images/icon-search.svg" class="icon-img" alt="Browse"/> Browse Equipment
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Browse" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg> Browse Equipment
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="requests">
-                    <img src="images/icon-clipboard.svg" class="icon-img" alt="Requests"/> My Requests
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    </svg> My Requests
                 </button>
             </div>
 
             <!-- ── Sub: Browse Equipment ─────────────────────────── -->
             <div class="lending-sub active" id="lending-browse">
                 <div class="page-header">
-                    <h2><img src="images/icon-search.svg" class="important-icon" alt="Browse equipment" />Browse Equipment</h2>
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Browse equipment" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>Browse Equipment</h2>
                     <p>Search and request available school equipment for academic use.</p>
                 </div>
 
@@ -313,7 +377,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     <div class="eq-card-body">
                         <div class="filter-row">
                             <div class="search-wrap">
-                                <img src="images/icon-search.svg" class="search-icon" alt="Search" />
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon" aria-label="Search" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
                                 <input type="text" id="equipmentSearch" placeholder="Search by equipment name...">
                             </div>
                             <select id="categoryFilter" class="filter-select">
@@ -332,7 +399,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                         <div class="eq-grid" id="equipmentList">
                             <?php if (mysqli_num_rows($inventory_result) == 0): ?>
                                 <div style="grid-column:1/-1; text-align:center; padding:3rem; color:var(--text-light);">
-                                    <img src="images/icon-box.svg" alt="No items" style="width:48px;height:48px;color:var(--khaki-border);display:block;margin-bottom:0.8rem;opacity:0.7;" />
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;color:var(--khaki-border);display:block;margin-bottom:0.8rem;opacity:0.7;" aria-label="No items" aria-hidden="true">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                                    </svg>
                                     No equipment available at the moment.
                                 </div>
                             <?php else: ?>
@@ -345,27 +416,40 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                             <img class="eq-item-img"
                                                 src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
                                                 alt="<?php echo htmlspecialchars($item['item_name']); ?>">
-                                            <?php else: ?>
+                                        <?php else: ?>
                                             <div class="eq-item-img-placeholder">
-                                                <img src="images/icon-box.svg" alt="Item" style="width:36px;height:36px;" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;" aria-label="Item" aria-hidden="true">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                                                </svg>
                                             </div>
                                         <?php endif; ?>
 
                                         <div class="eq-item-body">
                                             <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
                                             <div class="eq-item-meta">
-                                                <img src="images/icon-tag.svg" alt="Category" style="width:14px;height:14px;" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Category" aria-hidden="true">
+                                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                                                    <line x1="7" y1="7" x2="7.01" y2="7" />
+                                                </svg>
                                                 <?php echo htmlspecialchars($item['category']); ?>
                                             </div>
                                             <div style="margin-bottom:6px;">
                                                 <?php if ($item['quantity'] > 0): ?>
                                                     <span class="stock-badge stock-avail">
-                                                        <img src="images/icon-circle-check.svg" alt="Available" style="width:12px;height:12px;" />
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="width:12px;height:12px;" aria-label="Available" aria-hidden="true">
+                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                                            <polyline points="22 4 12 14.01 9 11.01" />
+                                                        </svg>
                                                         <?php echo (int)$item['quantity']; ?> available
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="stock-badge stock-unavail">
-                                                        <img src="images/icon-xmark.svg" alt="Unavailable" style="width:12px;height:12px;" />
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="width:12px;height:12px;" aria-label="Unavailable" aria-hidden="true">
+                                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                                        </svg>
                                                         Out of stock
                                                     </span>
                                                 <?php endif; ?>
@@ -374,7 +458,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                                 <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
                                                 data-action="open-borrow-form"
                                                 data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                <img src="images/icon-hand.svg" alt="Borrow" style="width:14px;height:14px;" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Borrow" aria-hidden="true">
+                                                    <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
+                                                    <path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" />
+                                                    <path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" />
+                                                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                                                </svg>
                                                 <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
                                             </button>
                                         </div>
@@ -397,12 +486,19 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     <div class="form-card-header">
                         <h2>Borrowing Form</h2>
                         <button class="btn-close-custom" data-action="lending-back" title="Go back">
-                            <img src="images/icon-xmark.svg" alt="Close" style="width:16px;height:16px;" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
                         </button>
                     </div>
                     <div class="form-card-body">
                         <div class="selected-item-banner" id="selectedItemBanner">
-                            <img src="images/icon-box.svg" alt="Selected" style="width:18px;height:18px;" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="width:18px;height:18px;" aria-label="Selected" aria-hidden="true">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                <line x1="12" y1="22.08" x2="12" y2="12" />
+                            </svg>
                             <span id="selectedItemLabel">No item selected</span>
                         </div>
 
@@ -430,7 +526,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                 </div>
                             </div>
                             <button type="submit" class="btn-submit-form">
-                                <img src="images/icon-paper-plane.svg" alt="Send" style="width:16px;height:16px;"/> Submit Borrow Request
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Send" aria-hidden="true">
+                                    <line x1="22" y1="2" x2="11" y2="13" />
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                </svg> Submit Borrow Request
                             </button>
                         </form>
                     </div>
@@ -440,7 +539,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <!-- ── Sub: My Requests ──────────────────────────────── -->
             <div class="lending-sub" id="lending-requests">
                 <div class="page-header">
-                    <h2><img src="images/icon-clipboard.svg" class="important-icon" alt="Requests"/>My Borrow Requests</h2>
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Requests" aria-hidden="true">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        </svg>My Borrow Requests</h2>
                     <p>Track the status of all your submitted borrow requests.</p>
                 </div>
 
@@ -452,13 +554,41 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                         <table class="requests-table">
                             <thead>
                                 <tr>
-                                    <th><img src="images/icon-box.svg" class="icon-img" alt="Equipment" />Equipment</th>
-                                    <th><img src="images/icon-user.svg" class="icon-img" alt="Instructor" />Instructor</th>
-                                    <th><img src="images/icon-rooms.svg" class="icon-img" alt="Room" />Room</th>
-                                    <th><img src="images/icon-calendar.svg" class="icon-img" alt="Borrow date" />Borrow Date</th>
-                                    <th><img src="images/icon-calendar.svg" class="icon-img" alt="Return date" />Return Date</th>
-                                    <th><img src="images/icon-calendar.svg" class="icon-img" alt="Status" />Status</th>
-                                    <th><img src="images/icon-comment.svg" class="icon-img" alt="Reason" />Reason</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Equipment" aria-hidden="true">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                                        </svg>Equipment</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Instructor" aria-hidden="true">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>Instructor</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Room" aria-hidden="true">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="9" y1="3" x2="9" y2="21" />
+                                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                                        </svg>Room</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Borrow date" aria-hidden="true">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>Borrow Date</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Return date" aria-hidden="true">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>Return Date</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Status" aria-hidden="true">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>Status</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Reason" aria-hidden="true">
+                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                        </svg>Reason</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -484,11 +614,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                             <td>
                                                 <span class="status-pill <?php echo $pill; ?>">
                                                     <?php
-                                                        $icon_file = 'images/icon-clock.svg';
-                                                        if ($icon === 'fa-circle-check') $icon_file = 'images/icon-circle-check.svg';
-                                                        elseif ($icon === 'fa-circle-xmark') $icon_file = 'images/icon-xmark.svg';
-                                                        elseif ($icon === 'fa-clock') $icon_file = 'images/icon-clock.svg';
-                                                        echo '<img src="'.$icon_file.'" style="width:12px;height:12px;margin-right:6px;vertical-align:middle;" alt="status" />';
+                                                    $s = 12;
+                                                    $sa = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' . $s . '" height="' . $s . '" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle;"';
+                                                    if ($icon === 'fa-circle-check') echo '<svg ' . $sa . '><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+                                                    elseif ($icon === 'fa-circle-xmark') echo '<svg ' . $sa . '><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+                                                    else echo '<svg ' . $sa . '><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
                                                     ?>
                                                     <?php echo htmlspecialchars($r['status']); ?>
                                                 </span>
@@ -502,7 +632,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <tr>
                                         <td colspan="7">
                                             <div class="table-empty">
-                                                <img src="images/icon-clipboard.svg" alt="Empty" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;" />
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;" aria-label="Empty" aria-hidden="true">
+                                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                                                </svg>
                                                 No borrow requests yet.
                                             </div>
                                         </td>
@@ -522,13 +655,20 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     ============================================================ -->
         <div class="tab-panel" id="panel-rooms">
             <div class="section-header">
-                <h2><img src="images/icon-rooms.svg" class="important-icon" alt="Rooms"/>Room Reservation</h2>
+                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Rooms" aria-hidden="true">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                        <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                    </svg>Room Reservation</h2>
                 <p>Browse available rooms and make a reservation for your class or event.</p>
             </div>
 
             <!-- Coming Soon Banner -->
             <div class="coming-soon-banner">
-                <img src="images/icon-clock.svg" class="icon-img" alt="Coming soon" style="width:20px;height:20px;" />
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Coming soon" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                </svg>
                 <h3>Room Reservation — Coming Soon</h3>
                 <p>This feature is under development. You can preview available rooms below and fill a reservation form when it launches.</p>
             </div>
@@ -537,7 +677,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div class="room-list" id="roomList">
                 <!-- Room 1 -->
                 <div class="room-card">
-                    <div class="room-img"><img src="images/icon-desktop.svg" alt="Lab" style="width:48px;height:48px;"/></div>
+                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Lab" aria-hidden="true">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg></div>
                     <div class="room-info">
                         <div>
                             <div class="room-header">
@@ -545,19 +689,45 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <h3>Computer Laboratory 301</h3>
                                     <p>3rd Floor, Main Building</p>
                                 </div>
-                                <span class="capacity-badge"><img src="images/icon-users.svg" alt="Seats" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/>40 seats</span>
+                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    </svg>40 seats</span>
                             </div>
                             <div class="amenities" style="margin-top:10px;">
-                                <span><img src="images/icon-wifi.svg" alt="WiFi" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> WiFi</span>
-                                <span><img src="images/icon-ac.svg" alt="A/C" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> A/C</span>
-                                <span><img src="images/icon-tv.svg" alt="Projector" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Projector</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="WiFi" aria-hidden="true">
+                                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                                        <line x1="12" y1="20" x2="12.01" y2="20" />
+                                    </svg> WiFi</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
+                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+                                    </svg> A/C</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Projector" aria-hidden="true">
+                                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+                                        <polyline points="17 2 12 7 7 2" />
+                                    </svg> Projector</span>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-avail"><img src="images/icon-dot.svg" alt="Available" style="width:6px;height:6px;margin-right:6px;vertical-align:middle;opacity:0.85;"/> Available</span>
+                            <span class="room-avail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
+                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
+                                </svg> Available</span>
                             <button class="btn-borrow" style="width:auto; padding:9px 24px;"
                                 data-action="open-room-form" data-room="Computer Laboratory 301">
-                                <img src="images/icon-calendar-plus.svg" alt="Reserve" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Reserve
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="16" y1="2" x2="16" y2="6" />
+                                    <line x1="8" y1="2" x2="8" y2="6" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                    <line x1="12" y1="15" x2="12" y2="19" />
+                                    <line x1="10" y1="17" x2="14" y2="17" />
+                                </svg> Reserve
                             </button>
                         </div>
                     </div>
@@ -565,7 +735,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Room 2 -->
                 <div class="room-card">
-                    <div class="room-img"><img src="images/icon-flask.svg" alt="Lab" style="width:48px;height:48px;"/></div>
+                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Lab" aria-hidden="true">
+                            <path d="M9 3h6" />
+                            <path d="M10 3v7l-5 11h14L14 10V3" />
+                        </svg></div>
                     <div class="room-info">
                         <div>
                             <div class="room-header">
@@ -573,19 +746,41 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <h3>Science Laboratory</h3>
                                     <p>2nd Floor, Science Wing</p>
                                 </div>
-                                <span class="capacity-badge"><img src="images/icon-users.svg" alt="Seats" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/>30 seats</span>
+                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    </svg>30 seats</span>
                             </div>
                             <div class="amenities" style="margin-top:10px;">
-                                <span><img src="images/icon-ac.svg" alt="A/C" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> A/C</span>
-                                <span><img src="images/icon-faucet.svg" alt="Water" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Running Water</span>
-                                <span><img src="images/icon-fire.svg" alt="Safety" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Safety Kit</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
+                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+                                    </svg> A/C</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Water" aria-hidden="true">
+                                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+                                    </svg> Running Water</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Safety" aria-hidden="true">
+                                        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                                    </svg> Safety Kit</span>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-occupied"><img src="images/icon-dot.svg" alt="Occupied" style="width:6px;height:6px;margin-right:6px;vertical-align:middle;opacity:0.85;"/> Occupied until 3 PM</span>
+                            <span class="room-occupied"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
+                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
+                                </svg> Occupied until 3 PM</span>
                             <button class="btn-borrow" style="width:auto; padding:9px 24px;"
                                 data-action="open-room-form" data-room="Science Laboratory">
-                                <img src="images/icon-calendar-plus.svg" alt="Reserve" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Reserve
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="16" y1="2" x2="16" y2="6" />
+                                    <line x1="8" y1="2" x2="8" y2="6" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                    <line x1="12" y1="15" x2="12" y2="19" />
+                                    <line x1="10" y1="17" x2="14" y2="17" />
+                                </svg> Reserve
                             </button>
                         </div>
                     </div>
@@ -593,7 +788,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Room 3 -->
                 <div class="room-card">
-                    <div class="room-img"><img src="images/icon-chalkboard.svg" alt="Hall" style="width:48px;height:48px;"/></div>
+                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Hall" aria-hidden="true">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                            <path d="M9 10l2 2 4-4" />
+                        </svg></div>
                     <div class="room-info">
                         <div>
                             <div class="room-header">
@@ -601,20 +801,51 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <h3>Lecture Hall A</h3>
                                     <p>Ground Floor, Academic Building</p>
                                 </div>
-                                <span class="capacity-badge"><img src="images/icon-users.svg" alt="Seats" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/>80 seats</span>
+                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    </svg>80 seats</span>
                             </div>
                             <div class="amenities" style="margin-top:10px;">
-                                <span><img src="images/icon-wifi.svg" alt="WiFi" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> WiFi</span>
-                                <span><img src="images/icon-ac.svg" alt="A/C" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> A/C</span>
-                                <span><img src="images/icon-microphone.svg" alt="PA" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> PA System</span>
-                                <span><img src="images/icon-tv.svg" alt="Projector" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Projector</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="WiFi" aria-hidden="true">
+                                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                                        <line x1="12" y1="20" x2="12.01" y2="20" />
+                                    </svg> WiFi</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
+                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+                                    </svg> A/C</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="PA" aria-hidden="true">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                        <line x1="12" y1="19" x2="12" y2="23" />
+                                        <line x1="8" y1="23" x2="16" y2="23" />
+                                    </svg> PA System</span>
+                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Projector" aria-hidden="true">
+                                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+                                        <polyline points="17 2 12 7 7 2" />
+                                    </svg> Projector</span>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-avail"><img src="images/icon-dot.svg" alt="Available" style="width:6px;height:6px;margin-right:6px;vertical-align:middle;opacity:0.85;"/> Available</span>
+                            <span class="room-avail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
+                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
+                                </svg> Available</span>
                             <button class="btn-borrow" style="width:auto; padding:9px 24px;"
                                 data-action="open-room-form" data-room="Lecture Hall A">
-                                <img src="images/icon-calendar-plus.svg" alt="Reserve" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Reserve
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="16" y1="2" x2="16" y2="6" />
+                                    <line x1="8" y1="2" x2="8" y2="6" />
+                                    <line x1="3" y1="10" x2="21" y2="10" />
+                                    <line x1="12" y1="15" x2="12" y2="19" />
+                                    <line x1="10" y1="17" x2="14" y2="17" />
+                                </svg> Reserve
                             </button>
                         </div>
                     </div>
@@ -625,19 +856,34 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div id="room-form-section" class="hidden" style="margin-top:2rem;">
                 <div class="eq-card room-form-card">
                     <div class="form-card-header">
-                        <h2><img src="images/icon-rooms.svg" class="icon-img" style="color:var(--accent-maroon); margin-right:8px;" alt="Room Form"/>Room Reservation Form</h2>
+                        <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Room Form" aria-hidden="true">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <line x1="9" y1="3" x2="9" y2="21" />
+                                <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                            </svg>Room Reservation Form</h2>
                         <button class="btn-close-custom" data-action="close-room-form" title="Close">
-                            <img src="images/icon-xmark.svg" alt="Close" style="width:16px;height:16px;" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
                         </button>
                     </div>
                     <div class="form-card-body">
                         <div class="selected-item-banner" id="selectedRoomBanner">
-                            <img src="images/icon-rooms.svg" alt="Room" style="width:18px;height:18px;" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="width:18px;height:18px;" aria-label="Room" aria-hidden="true">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <line x1="9" y1="3" x2="9" y2="21" />
+                                <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                            </svg>
                             <span id="selectedRoomLabel">No room selected</span>
                         </div>
 
                         <div class="coming-soon-banner" style="margin-bottom:1.5rem;">
-                            <img src="images/icon-info.svg" class="icon-img" alt="Info" style="width:18px;height:18px;" />
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Info" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="12" />
+                                <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
                             <h3>Preview Mode</h3>
                             <p>Reservations are not yet processed. This form shows the planned layout.</p>
                         </div>
@@ -677,7 +923,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                             <textarea class="form-control-custom" rows="3" placeholder="Any special requirements or notes..."></textarea>
                         </div>
                         <button type="button" class="btn-submit-form" data-action="room-reserve-preview">
-                            <img src="images/icon-paper-plane.svg" alt="Submit" style="width:16px;height:16px;margin-right:8px;"/> Submit Reservation (Preview)
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;margin-right:8px;" aria-label="Submit" aria-hidden="true">
+                                <line x1="22" y1="2" x2="11" y2="13" />
+                                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                            </svg> Submit Reservation (Preview)
                         </button>
                     </div>
                 </div>
@@ -690,41 +939,83 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
      OVERLAY: ACCOUNT PAGE
 ================================================================ -->
     <div class="overlay-page" id="accountOverlay">
+
+        <!-- Own top bar — replaces the hidden app header while overlay is open -->
+        <div class="overlay-topbar">
+            <button class="overlay-topbar-back" data-action="close-overlay" data-target="accountOverlay">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 5 5 12 12 19" />
+                </svg> Back to Dashboard
+            </button>
+            <div class="overlay-topbar-sep"></div>
+            <span class="overlay-topbar-title">My Account</span>
+            <div class="overlay-topbar-brand">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span>EQUIPLEND</span>
+            </div>
+        </div>
+
         <div class="account-layout">
             <div class="account-sidebar">
-                <button class="overlay-back-btn" data-action="close-overlay" data-target="accountOverlay">
-                    <img src="images/icon-arrow-left.svg" class="icon-img" alt="Back" style="width:14px;height:14px;margin-right:8px;"/> Back to Dashboard
-                </button>
-                <div class="divider-line"></div>
                 <span class="account-sidebar-label">My Account</span>
                 <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                    <img src="images/icon-id-card.svg" class="icon-img" alt="Overview"/> Overview
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Overview" aria-hidden="true">
+                        <rect x="2" y="5" width="20" height="14" rx="2" />
+                        <circle cx="8" cy="12" r="2" />
+                        <path d="M14 9h4" />
+                        <path d="M14 12h4" />
+                        <path d="M14 15h2" />
+                    </svg> Overview
                 </button>
                 <button class="acc-nav-btn" data-acc-tab="acc-academic">
-                    <img src="images/icon-graduation.svg" class="icon-img" alt="Academic"/> Academic Info
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Academic" aria-hidden="true">
+                        <path d="M22 10v6" />
+                        <path d="M2 10l10-5 10 5-10 5z" />
+                        <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                    </svg> Academic Info
                 </button>
                 <button class="acc-nav-btn" data-acc-tab="acc-contact">
-                    <img src="images/icon-address-book.svg" class="icon-img" alt="Contact"/> Contact Details
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Contact" aria-hidden="true">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                    </svg> Contact Details
                 </button>
                 <span class="account-sidebar-label" style="margin-top:0.5rem;">Emergency</span>
                 <button class="acc-nav-btn" data-acc-tab="acc-emergency">
-                    <img src="images/icon-heart-pulse.svg" class="icon-img" alt="Emergency"/> Emergency Contact
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Emergency" aria-hidden="true">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg> Emergency Contact
                 </button>
             </div>
 
             <div class="account-content">
                 <!-- Overview -->
                 <div id="acc-overview" class="overlay-sub-panel active">
+                    <div class="overlay-section-header" style="margin-bottom:1.4rem;">
+                        <span class="section-eyebrow">My Account › Overview</span>
+                        <h2>Profile &amp; Identity</h2>
+                        <p>Your personal details and login information.</p>
+                    </div>
                     <div class="account-hero-card">
                         <div class="acc-avatar-large">
                             <?php echo htmlspecialchars($initials); ?>
-                            <div class="cam-btn" title="Change photo"><img src="images/icon-camera.svg" alt="Camera" style="width:14px;height:14px;"/></div>
+                            <div class="cam-btn" title="Change photo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Camera" aria-hidden="true">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                    <circle cx="12" cy="13" r="4" />
+                                </svg></div>
                         </div>
                         <div class="acc-hero-info">
                             <h2><?php echo htmlspecialchars($fullname); ?></h2>
                             <p>ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></p>
                             <span class="acc-badge">
-                                <img src="images/icon-dot-green.svg" alt="Active" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" style="vertical-align:middle;margin-right:6px;">
+                                    <circle cx="12" cy="12" r="7" fill="#22c55e" stroke="none" />
+                                </svg>
                                 Active Student
                             </span>
                         </div>
@@ -733,7 +1024,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                 Edit Profile
                             </button>
                             <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
-                                <img src="images/icon-check.svg" alt="Save" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;"/> Save
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Save" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12" />
+                                </svg> Save
                             </button>
                             <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">
                                 Cancel
@@ -798,8 +1091,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Academic -->
                 <div id="acc-academic" class="overlay-sub-panel">
-                    <h2 style="font-size:1.4rem; font-weight:700; color:var(--text-dark); margin-bottom:3px;">Academic Information</h2>
-                    <p style="color:var(--text-light); font-size:0.875rem; margin-bottom:1.6rem;">Your enrollment and program details.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Academic</span>
+                        <h2>Academic Information</h2>
+                        <p>Your enrollment and program details.</p>
+                    </div>
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Enrollment</h3>
@@ -815,8 +1111,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Contact -->
                 <div id="acc-contact" class="overlay-sub-panel">
-                    <h2 style="font-size:1.4rem; font-weight:700; color:var(--text-dark); margin-bottom:3px;">Contact Details</h2>
-                    <p style="color:var(--text-light); font-size:0.875rem; margin-bottom:1.6rem;">How we can reach you.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Contact</span>
+                        <h2>Contact Details</h2>
+                        <p>How we can reach you.</p>
+                    </div>
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Address</h3>
@@ -835,8 +1134,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Emergency -->
                 <div id="acc-emergency" class="overlay-sub-panel">
-                    <h2 style="font-size:1.4rem; font-weight:700; color:var(--text-dark); margin-bottom:3px;">Emergency Contact</h2>
-                    <p style="color:var(--text-light); font-size:0.875rem; margin-bottom:1.6rem;">Person to contact in an emergency.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Emergency</span>
+                        <h2>Emergency Contact</h2>
+                        <p>Person to contact in an emergency.</p>
+                    </div>
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Primary Contact</h3>
@@ -854,30 +1156,78 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
      OVERLAY: SETTINGS PAGE
 ================================================================ -->
     <div class="overlay-page" id="settingsOverlay">
+
+        <!-- Own top bar -->
+        <div class="overlay-topbar">
+            <button class="overlay-topbar-back" data-action="close-overlay" data-target="settingsOverlay">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 5 5 12 12 19" />
+                </svg> Back to Dashboard
+            </button>
+            <div class="overlay-topbar-sep"></div>
+            <span class="overlay-topbar-title">Settings</span>
+            <div class="overlay-topbar-brand">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span>EQUIPLEND</span>
+            </div>
+        </div>
+
         <div class="settings-layout">
             <div class="settings-sidebar">
-                <button class="overlay-back-btn" data-action="close-overlay" data-target="settingsOverlay">
-                    <i class="fa-solid fa-arrow-left"></i> Back
-                </button>
-                <div class="divider-line"></div>
                 <span class="s-cat-label">Appearance</span>
-                <button class="s-nav-item active" data-sett-tab="st-appearance"><i class="fa-solid fa-palette"></i> Appearance</button>
-                <button class="s-nav-item" data-sett-tab="st-accessibility"><i class="fa-solid fa-universal-access"></i> Accessibility</button>
+                <button class="s-nav-item active" data-sett-tab="st-appearance"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
+                        <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
+                        <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
+                        <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
+                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                    </svg> Appearance</button>
+                <button class="s-nav-item" data-sett-tab="st-accessibility"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <circle cx="12" cy="6" r="2" />
+                        <path d="m4 14 8-2 8 2" />
+                        <path d="M8 12v1.5l-3 5" />
+                        <path d="M16 12v1.5l3 5" />
+                        <path d="m9 22 3-6 3 6" />
+                    </svg> Accessibility</button>
                 <span class="s-cat-label">Account</span>
-                <button class="s-nav-item" data-sett-tab="st-privacy"><i class="fa-solid fa-shield-halved"></i> Privacy & Security</button>
-                <button class="s-nav-item" data-sett-tab="st-notif-prefs"><i class="fa-solid fa-bell"></i> Notifications</button>
-                <button class="s-nav-item" data-sett-tab="st-language"><i class="fa-solid fa-language"></i> Language & Region</button>
+                <button class="s-nav-item" data-sett-tab="st-privacy"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <polyline points="9 12 11 14 15 10" />
+                    </svg> Privacy &amp; Security</button>
+                <button class="s-nav-item" data-sett-tab="st-notif-prefs"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg> Notifications</button>
+                <!-- <button class="s-nav-item" data-sett-tab="st-language"><i class="fa-solid fa-language"></i> Language & Region</button> -->
                 <div class="s-divider"></div>
                 <span class="s-cat-label">System</span>
-                <button class="s-nav-item" data-sett-tab="st-advanced"><i class="fa-solid fa-sliders"></i> Advanced</button>
+                <button class="s-nav-item" data-sett-tab="st-advanced"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                        <line x1="4" y1="21" x2="4" y2="14" />
+                        <line x1="4" y1="10" x2="4" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12" y2="3" />
+                        <line x1="20" y1="21" x2="20" y2="16" />
+                        <line x1="20" y1="12" x2="20" y2="3" />
+                        <line x1="1" y1="14" x2="7" y2="14" />
+                        <line x1="9" y1="8" x2="15" y2="8" />
+                        <line x1="17" y1="16" x2="23" y2="16" />
+                    </svg> Advanced</button>
             </div>
 
             <div class="settings-content">
 
                 <!-- Appearance -->
                 <div id="st-appearance" class="overlay-sub-panel active">
-                    <h2 class="settings-title">Appearance</h2>
-                    <p class="settings-desc">Customize how the portal looks and feels.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">Settings › Appearance</span>
+                        <h2>Appearance</h2>
+                        <p>Customize how the portal looks and feels.</p>
+                    </div>
 
                     <div class="settings-card">
                         <div class="settings-card-head">
@@ -891,7 +1241,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">Light <i class="fa-solid fa-check" id="tc-light" style="color:var(--accent-maroon);font-size:0.7rem;"></i></div>
+                                <div class="theme-lbl">Light <svg id="tc-light" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg></div>
                             </div>
                             <div class="theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
                                 <div class="theme-prev tp-dark">
@@ -899,7 +1251,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">Dark <i class="fa-solid fa-check" id="tc-dark" style="color:var(--accent-maroon);font-size:0.7rem;display:none;"></i></div>
+                                <div class="theme-lbl">Dark <svg id="tc-dark" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg></div>
                             </div>
                             <div class="theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
                                 <div class="theme-prev tp-hc">
@@ -907,7 +1261,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">High Contrast <i class="fa-solid fa-check" id="tc-hc" style="color:var(--accent-maroon);font-size:0.7rem;display:none;"></i></div>
+                                <div class="theme-lbl">High Contrast <svg id="tc-hc" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg></div>
                             </div>
                         </div>
                     </div>
@@ -947,8 +1303,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Accessibility -->
                 <div id="st-accessibility" class="overlay-sub-panel">
-                    <h2 class="settings-title">Accessibility</h2>
-                    <p class="settings-desc">Make the portal easier to use.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">Settings › Accessibility</span>
+                        <h2>Accessibility</h2>
+                        <p>Make the portal easier to use.</p>
+                    </div>
 
                     <div class="settings-card">
                         <div class="settings-card-head">
@@ -996,8 +1355,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Privacy -->
                 <div id="st-privacy" class="overlay-sub-panel">
-                    <h2 class="settings-title">Privacy & Security</h2>
-                    <p class="settings-desc">Control your data and account security.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">Settings › Privacy</span>
+                        <h2>Privacy &amp; Security</h2>
+                        <p>Control your data and account security.</p>
+                    </div>
                     <div class="settings-card">
                         <div class="settings-card-head">
                             <h3>Login Sessions</h3>
@@ -1035,8 +1397,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
                 <!-- Notification Prefs -->
                 <div id="st-notif-prefs" class="overlay-sub-panel">
-                    <h2 class="settings-title">Notification Preferences</h2>
-                    <p class="settings-desc">Control which notifications you receive.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">Settings › Notifications</span>
+                        <h2>Notification Preferences</h2>
+                        <p>Control which notifications you receive.</p>
+                    </div>
                     <div class="settings-card">
                         <div class="settings-card-head">
                             <h3>Borrow & Return Alerts</h3>
@@ -1079,7 +1444,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     </div>
                 </div>
 
-                <!-- Language -->
+
+                <!-- Language & Region (commented out for now since we only have English, but structure is ready for future localization features)
+                
                 <div id="st-language" class="overlay-sub-panel">
                     <h2 class="settings-title">Language & Region</h2>
                     <p class="settings-desc">Set your preferred language and date/time format.</p>
@@ -1129,11 +1496,15 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                         </div>
                     </div>
                 </div>
+                -->
 
                 <!-- Advanced -->
                 <div id="st-advanced" class="overlay-sub-panel">
-                    <h2 class="settings-title">Advanced</h2>
-                    <p class="settings-desc">Power user settings. Be careful.</p>
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">Settings › Advanced</span>
+                        <h2>Advanced</h2>
+                        <p>Power user settings. Be careful.</p>
+                    </div>
                     <div class="settings-card">
                         <div class="settings-card-head">
                             <h3>Display</h3>
@@ -1172,17 +1543,36 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <!-- ================================================================
      OVERLAY: NOTIFICATIONS
 ================================================================ -->
-    <div class="overlay-page" id="notifOverlay" style="flex-direction:column; overflow-y:auto;">
-        <div class="notif-wrapper">
-            <button class="overlay-back-btn" data-action="close-overlay" data-target="notifOverlay">
-                <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+    <div class="overlay-page" id="notifOverlay" style="display:flex; flex-direction:column; overflow-y:auto;">
+
+        <!-- Own top bar -->
+        <div class="overlay-topbar" style="flex-shrink:0;">
+            <button class="overlay-topbar-back" data-action="close-overlay" data-target="notifOverlay">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 5 5 12 12 19" />
+                </svg> Back to Dashboard
             </button>
+            <div class="overlay-topbar-sep"></div>
+            <span class="overlay-topbar-title">Notifications</span>
+            <div class="overlay-topbar-brand">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span>EQUIPLEND</span>
+            </div>
+        </div>
+
+        <div class="notif-wrapper">
             <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.2rem; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <h2 style="font-size:1.45rem; font-weight:700; color:var(--text-dark); margin-bottom:3px;">Notifications</h2>
-                    <p style="color:var(--text-light); font-size:0.875rem;">You have <strong style="color:var(--accent-maroon);" id="unreadCount">3 unread</strong> notifications.</p>
+                <div class="overlay-section-header" style="flex:1; margin-bottom:0;">
+                    <span class="section-eyebrow">Inbox › All Notifications</span>
+                    <h2>Notifications</h2>
+                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount">3 unread</strong> notifications.</p>
                 </div>
-                <button class="mark-read-btn" data-action="mark-all-read">Mark all as read</button>
+                <button class="mark-read-btn" data-action="mark-all-read" style="margin-top:0.5rem;">Mark all as read</button>
             </div>
 
             <div class="notif-filter-tabs">
@@ -1194,7 +1584,9 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
             <div class="notif-group">Today</div>
             <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-success"><i class="fa-solid fa-check"></i></div>
+                <div class="notif-icon ni-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg></div>
                 <div class="notif-body-wrap">
                     <h4>Borrow Request Approved</h4>
                     <p>Your latest borrow request has been approved. Please pick up the item at the Admin Office before 5:00 PM.</p>
@@ -1204,7 +1596,10 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 </div>
             </div>
             <div class="notif-item unread" data-cat="system">
-                <div class="notif-icon ni-alert"><i class="fa-solid fa-gear"></i></div>
+                <div class="notif-icon ni-alert"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg></div>
                 <div class="notif-body-wrap">
                     <h4>System Maintenance Tonight</h4>
                     <p>EQUIPLEND will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</p>
@@ -1216,7 +1611,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
             <div class="notif-group">Yesterday</div>
             <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-warn"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="notif-icon ni-warn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg></div>
                 <div class="notif-body-wrap">
                     <h4>Return Reminder</h4>
                     <p>You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</p>
@@ -1226,7 +1625,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 </div>
             </div>
             <div class="notif-item" data-cat="borrow">
-                <div class="notif-icon ni-success"><i class="fa-solid fa-box"></i></div>
+                <div class="notif-icon ni-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg></div>
                 <div class="notif-body-wrap">
                     <h4>Request Submitted</h4>
                     <p>Your borrow request for Lab Equipment was successfully submitted and is under review.</p>
@@ -1248,9 +1651,6 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
     <!-- ================================================================
      JAVASCRIPT — Single event-delegation model. No inline onclick.
-     All overlays toggle `.nav-disabled` on the nav bar.
-     applyReduceMotion only touches animation, never transition —
-     touching transition: none on * was the root cause of the freeze.
 ================================================================ -->
     <script>
         (function() {
@@ -1258,31 +1658,233 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
             const todayStr = new Date().toISOString().split('T')[0];
 
+            /* ══════════════════════════════════════════════════════════════════
+               STATE PERSISTENCE — localStorage
+               Saves settings, account edits, and notification read state so
+               everything survives a page reload. Active tab is intentionally
+               NOT restored (reload always lands on Home per UX contract).
+            ══════════════════════════════════════════════════════════════════ */
+            const LS = {
+                get: k => {
+                    try {
+                        return localStorage.getItem('eq_' + k);
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                set: (k, v) => {
+                    try {
+                        localStorage.setItem('eq_' + k, String(v));
+                    } catch (e) {}
+                },
+                del: k => {
+                    try {
+                        localStorage.removeItem('eq_' + k);
+                    } catch (e) {}
+                },
+                getJ: k => {
+                    try {
+                        return JSON.parse(localStorage.getItem('eq_' + k) || 'null');
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                setJ: (k, v) => {
+                    try {
+                        localStorage.setItem('eq_' + k, JSON.stringify(v));
+                    } catch (e) {}
+                }
+            };
+
+            /* ── Restore all persisted state on load ─────────────────────── */
+            function restorePersistedState() {
+                // 1. Theme
+                const theme = LS.get('theme');
+                if (theme && theme !== 'light') _applyThemeDOM(theme);
+
+                // 2. Accent color
+                const ac = LS.get('accentColor'),
+                    al = LS.get('accentLight');
+                if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
+
+                // 3. Compact mode
+                if (LS.get('compact') === 'true') {
+                    const ct = document.getElementById('compactToggle');
+                    if (ct) ct.checked = true;
+                    document.documentElement.style.setProperty('--radius', '9px');
+                }
+
+                // 4. Font size
+                const fs = LS.get('fontSize');
+                if (fs && fs !== '100') {
+                    const fr = document.getElementById('fontSizeRange');
+                    if (fr) fr.value = fs;
+                    const lbl = document.getElementById('fontSizeLbl');
+                    if (lbl) lbl.textContent = fs + '%';
+                    document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
+                }
+
+                // 5. Reduce motion
+                if (LS.get('reduceMotion') === 'true') {
+                    const rmt = document.getElementById('reduceMotionToggle');
+                    if (rmt) rmt.checked = true;
+                    let s = document.getElementById('reduceMotionStyle');
+                    if (!s) {
+                        s = document.createElement('style');
+                        s.id = 'reduceMotionStyle';
+                        document.head.appendChild(s);
+                    }
+                    s.textContent = '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }';
+                }
+
+                // 6. Focus ring
+                if (LS.get('focusRing') === 'true') {
+                    const frt = document.getElementById('focusRingToggle');
+                    if (frt) frt.checked = true;
+                    let s = document.getElementById('focusRingStyle');
+                    if (!s) {
+                        s = document.createElement('style');
+                        s.id = 'focusRingStyle';
+                        document.head.appendChild(s);
+                    }
+                    s.textContent = '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }';
+                }
+
+                // 7. Account profile fields
+                const profileFields = ['fullname', 'dob', 'gender', 'nationality', 'email'];
+                profileFields.forEach(key => {
+                    const val = LS.get('prof_' + key);
+                    if (!val) return;
+                    const span = document.querySelector('[data-field="' + key + '"]');
+                    const input = document.querySelector('[data-input="' + key + '"]');
+                    if (span) {
+                        span.textContent = val;
+                        span.classList.remove('empty');
+                    }
+                    if (input) {
+                        if (input.tagName === 'SELECT') {
+                            for (let opt of input.options) {
+                                if (opt.text === val || opt.value === val) {
+                                    opt.selected = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            input.value = val;
+                        }
+                    }
+                });
+
+                // 8. Notification read state
+                const readIdxArr = LS.getJ('notifRead');
+                if (readIdxArr && readIdxArr.length) {
+                    const items = document.querySelectorAll('.notif-item');
+                    let unread = 0;
+                    items.forEach((item, i) => {
+                        if (readIdxArr.includes(i)) {
+                            item.classList.remove('unread');
+                            const dot = item.querySelector('.unread-dot');
+                            if (dot) dot.style.display = 'none';
+                        } else if (item.classList.contains('unread')) {
+                            unread++;
+                        }
+                    });
+                    const uc = document.getElementById('unreadCount');
+                    if (uc) uc.textContent = unread + ' unread';
+                    if (unread === 0) document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
+                    else document.querySelectorAll('.notif-badge').forEach(b => {
+                        b.style.display = '';
+                        b.textContent = unread;
+                    });
+                }
+            }
+
+            /* ── DOM-only helpers (no save, used by restore + public fns) ── */
+            function _applyThemeDOM(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                // Remove any JS-set inline tint overrides so the new theme's
+                // CSS variable values take over cleanly
+                document.documentElement.style.removeProperty('--section-tint-start');
+                document.documentElement.style.removeProperty('--section-tint-end');
+                const tMap = {
+                    'light': 'light',
+                    'dark': 'dark',
+                    'high-contrast': 'hc'
+                };
+                ['light', 'dark', 'hc'].forEach(k => {
+                    const el = document.getElementById('tp-' + k);
+                    const ch = document.getElementById('tc-' + k);
+                    if (el) el.classList.remove('selected');
+                    if (ch) ch.style.display = 'none';
+                });
+                const key = tMap[theme] || theme;
+                const el = document.getElementById('tp-' + key);
+                const ch = document.getElementById('tc-' + key);
+                if (el) el.classList.add('selected');
+                if (ch) ch.style.display = '';
+            }
+
+            function _applyAccentDOM(color, light) {
+                document.querySelectorAll('.c-dot').forEach(d => d.classList.remove('selected'));
+                const dot = document.querySelector('.c-dot[data-color="' + color + '"]');
+                if (dot) dot.classList.add('selected');
+                document.documentElement.style.setProperty('--accent-maroon', color);
+                document.documentElement.style.setProperty('--accent-light', light);
+                // Parse hex to rgb for the tint variables so the section header gradient
+                // always uses the new accent color at the right opacity — never the old light pastel
+                const r = parseInt(color.slice(1, 3), 16),
+                    g = parseInt(color.slice(3, 5), 16),
+                    b = parseInt(color.slice(5, 7), 16);
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                const isHC = document.documentElement.getAttribute('data-theme') === 'high-contrast';
+                const alpha = isHC ? 0.16 : isDark ? 0.13 : 0.09;
+                document.documentElement.style.setProperty('--section-tint-start', `rgba(${r},${g},${b},${alpha})`);
+                document.documentElement.style.setProperty('--section-tint-end', `rgba(${r},${g},${b},0)`);
+            }
+
             /* ── Toast ─────────────────────────────────────────────────────────── */
             let toastTimer;
 
             function showToast(msg) {
                 const t = document.getElementById('app-toast');
                 if (!t) return;
-                t.innerHTML = '<i class="fa-solid fa-circle-check"></i> ' + msg;
+                t.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg> ' + msg;
                 t.classList.add('show');
                 clearTimeout(toastTimer);
                 toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
             }
 
-            /* ── Nav tab enable / disable ──────────────────────────────────────── */
-            function disableNavTabs() {
-                const nav = document.querySelector('.nav-tabs-wrap');
-                if (nav) nav.classList.add('nav-disabled');
+            /* ── Browser Back/Forward Navigation ───────────────────────────────── */
+            // We use a lightweight pushState approach: each tab switch or overlay open
+            // pushes a state object onto the history stack. popstate restores the UI.
+            // Reload always lands on Home because initPage() calls replaceState with
+            // the home state and never reads the hash back on load.
+            let _navSuppressed = false;
+
+            function _pushNav(state) {
+                if (_navSuppressed) return;
+                const hash = '#' + state.type + '-' + state.value + (state.sub ? '-' + state.sub : '');
+                history.pushState(state, '', hash);
             }
 
-            function enableNavTabs() {
-                // Only re-enable if NO overlay is still open
-                if (!document.querySelector('.overlay-page.active')) {
-                    const nav = document.querySelector('.nav-tabs-wrap');
-                    if (nav) nav.classList.remove('nav-disabled');
+            function _restoreNav(state) {
+                _navSuppressed = true;
+                // Always close all overlays first
+                document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+                if (!state || state.type === 'tab') {
+                    const tab = (state && state.value) ? state.value : 'home';
+                    _switchTabDOM(tab);
+                    if (state && state.sub) switchLendingSub(state.sub);
+                } else if (state.type === 'overlay') {
+                    _switchTabDOM('home'); // ensure a tab is active behind overlay
+                    _openOverlayDOM(state.value);
                 }
+                _navSuppressed = false;
             }
+
+            window.addEventListener('popstate', function(e) {
+                _restoreNav(e.state);
+            });
 
             /* ── Profile Dropdown ──────────────────────────────────────────────── */
             function openDropdown() {
@@ -1300,75 +1902,88 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             }
 
             /* ── Overlays ──────────────────────────────────────────────────────── */
-            const overlayLabels = {
-                accountOverlay: 'My Account',
-                settingsOverlay: 'Settings',
-                notifOverlay: 'Notifications'
-            };
 
-            function openOverlay(id) {
+            function _openOverlayDOM(id) {
                 closeDropdown();
                 const el = document.getElementById(id);
-                if (el) {
-                    el.classList.add('active');
-                    disableNavTabs();
-                    const strip = document.getElementById('overlayContextStrip');
-                    const lbl = document.getElementById('overlayContextLabel');
-                    if (strip && lbl) {
-                        lbl.textContent = overlayLabels[id] || 'Sub-page';
-                        strip.classList.add('visible');
-                    }
-                }
+                if (!el) return;
+                el.classList.add('active');
+                document.querySelectorAll('.overlay-page.active').forEach(o => {
+                    if (o !== el) o.classList.remove('active');
+                });
+            }
+
+            function openOverlay(id) {
+                _pushNav({
+                    type: 'overlay',
+                    value: id
+                });
+                _openOverlayDOM(id);
             }
 
             function closeOverlay(id) {
+                // Use history.back() so the browser's forward button also works.
+                // We also immediately remove the class for instant visual feedback.
                 const el = document.getElementById(id);
                 if (el) el.classList.remove('active');
-                enableNavTabs();
-                if (!document.querySelector('.overlay-page.active')) {
-                    const strip = document.getElementById('overlayContextStrip');
-                    if (strip) strip.classList.remove('visible');
-                }
+                history.back();
             }
 
             /* ── Main Tab Switcher ─────────────────────────────────────────────── */
-            function switchTab(tabName) {
+            function _switchTabDOM(tabName) {
+                const panel = document.getElementById('panel-' + tabName);
+                if (panel) panel.classList.add('active');
                 document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
                 const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
                 if (btn) btn.classList.add('active');
-                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                const panel = document.getElementById('panel-' + tabName);
-                if (panel) panel.classList.add('active');
+                document.querySelectorAll('.tab-panel').forEach(p => {
+                    if (p !== panel) p.classList.remove('active');
+                });
+            }
+
+            function switchTab(tabName, sub) {
+                _pushNav({
+                    type: 'tab',
+                    value: tabName,
+                    sub: sub || null
+                });
+                _switchTabDOM(tabName);
             }
 
             /* ── Lending Sub-Sections ──────────────────────────────────────────── */
             function switchLendingSub(subName) {
+                const sub = document.getElementById('lending-' + subName);
+                if (sub) sub.classList.add('active');
                 document.querySelectorAll('.lending-nav-btn').forEach(b => b.classList.remove('active'));
                 const btn = document.querySelector('.lending-nav-btn[data-lending-nav="' + subName + '"]');
                 if (btn) btn.classList.add('active');
-                document.querySelectorAll('.lending-sub').forEach(s => s.classList.remove('active'));
-                const sub = document.getElementById('lending-' + subName);
-                if (sub) sub.classList.add('active');
+                document.querySelectorAll('.lending-sub').forEach(s => {
+                    if (s !== sub) s.classList.remove('active');
+                });
             }
 
             /* ── Account Sub-Tabs ──────────────────────────────────────────────── */
             function switchAccTab(panelId) {
+                const panel = document.getElementById(panelId);
+                if (panel) panel.classList.add('active');
                 document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
                 const btn = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
                 if (btn) btn.classList.add('active');
-                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-                const panel = document.getElementById(panelId);
-                if (panel) panel.classList.add('active');
+                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => {
+                    if (p !== panel) p.classList.remove('active');
+                });
             }
 
             /* ── Settings Sub-Tabs ─────────────────────────────────────────────── */
             function switchSettTab(panelId) {
+                const panel = document.getElementById(panelId);
+                if (panel) panel.classList.add('active');
                 document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
                 const btn = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
                 if (btn) btn.classList.add('active');
-                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-                const panel = document.getElementById(panelId);
-                if (panel) panel.classList.add('active');
+                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => {
+                    if (p !== panel) p.classList.remove('active');
+                });
             }
 
             /* ── Equipment Search/Filter ───────────────────────────────────────── */
@@ -1386,7 +2001,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             function openBorrowForm(itemName) {
                 document.getElementById('selectedItem').value = itemName;
                 document.getElementById('selectedItemLabel').textContent = itemName;
-                switchTab('lending');
+                switchTab('lending', 'form');
                 switchLendingSub('form');
             }
 
@@ -1421,52 +2036,39 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             }
 
             function markAllRead() {
-                document.querySelectorAll('.notif-item').forEach(item => {
+                const readArr = [];
+                document.querySelectorAll('.notif-item').forEach((item, i) => {
                     item.classList.remove('unread');
                     const dot = item.querySelector('.unread-dot');
                     if (dot) dot.style.display = 'none';
+                    readArr.push(i);
                 });
                 const uc = document.getElementById('unreadCount');
                 if (uc) uc.textContent = '0 unread';
                 document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
+                LS.setJ('notifRead', readArr);
                 showToast('All notifications marked as read.');
             }
 
             /* ── Settings: Theme ───────────────────────────────────────────────── */
             function applyTheme(theme) {
-                document.documentElement.setAttribute('data-theme', theme);
-                const tMap = {
-                    'light': 'light',
-                    'dark': 'dark',
-                    'high-contrast': 'hc'
-                };
-                ['light', 'dark', 'hc'].forEach(k => {
-                    const el = document.getElementById('tp-' + k);
-                    const ch = document.getElementById('tc-' + k);
-                    if (el) el.classList.remove('selected');
-                    if (ch) ch.style.display = 'none';
-                });
-                const key = tMap[theme] || theme;
-                const el = document.getElementById('tp-' + key);
-                const ch = document.getElementById('tc-' + key);
-                if (el) el.classList.add('selected');
-                if (ch) ch.style.display = '';
+                _applyThemeDOM(theme);
+                LS.set('theme', theme);
                 showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1));
             }
 
             /* ── Settings: Accent Color ────────────────────────────────────────── */
             function applyAccent(color, light) {
-                document.querySelectorAll('.c-dot').forEach(d => d.classList.remove('selected'));
-                const dot = document.querySelector('.c-dot[data-color="' + color + '"]');
-                if (dot) dot.classList.add('selected');
-                document.documentElement.style.setProperty('--accent-maroon', color);
-                document.documentElement.style.setProperty('--accent-light', light);
+                _applyAccentDOM(color, light);
+                LS.set('accentColor', color);
+                LS.set('accentLight', light);
                 showToast('Accent color updated!');
             }
 
             /* ── Settings: Compact ─────────────────────────────────────────────── */
             function applyCompact(on) {
                 document.documentElement.style.setProperty('--radius', on ? '9px' : '16px');
+                LS.set('compact', on);
                 showToast(on ? 'Compact mode enabled' : 'Compact mode disabled');
             }
 
@@ -1475,6 +2077,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 const lbl = document.getElementById('fontSizeLbl');
                 if (lbl) lbl.textContent = val + '%';
                 document.documentElement.style.fontSize = (val / 100) + 'rem';
+                LS.set('fontSize', val);
             }
 
             /* ── Settings: Reduce Motion ───────────────────────────────────────── */
@@ -1491,6 +2094,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 s.textContent = on ?
                     '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }' :
                     '';
+                LS.set('reduceMotion', on);
                 showToast(on ? 'Animations disabled' : 'Animations re-enabled');
             }
 
@@ -1505,6 +2109,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 s.textContent = on ?
                     '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }' :
                     '';
+                LS.set('focusRing', on);
                 showToast(on ? 'Focus rings enhanced' : 'Focus rings reset');
             }
 
@@ -1532,6 +2137,8 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     applyFocusRing(false);
                 }
                 applyAccent('#6d1b23', '#f3e5e6');
+                // Clear persisted settings (but keep account + notif state)
+                ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
                 showToast('All settings reset to defaults.');
             }
 
@@ -1582,9 +2189,11 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     if (val) {
                         span.textContent = val;
                         span.classList.remove('empty');
+                        LS.set('prof_' + key, val);
                     } else {
                         span.textContent = '— Not provided';
                         span.classList.add('empty');
+                        LS.del('prof_' + key);
                     }
                 });
                 cancelProfileEdit();
@@ -1661,7 +2270,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                             break;
                         }
                         case 'go-tab':
-                            switchTab(el.dataset.tab);
+                            switchTab(el.dataset.tab, el.dataset.lending || null);
                             if (el.dataset.lending) switchLendingSub(el.dataset.lending);
                             break;
                         case 'open-borrow-form':
@@ -1791,21 +2400,38 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 
             /* ── Page Init ────────────────────────────────────────────────────── */
             function initPage() {
+                // Restore settings, account edits, and notification state from localStorage
+                // (called before URL/slug logic so themes apply before first paint)
+                restorePersistedState();
+
                 // URL slug
                 const userSlug = '<?php echo $user_slug; ?>';
                 if (!window.location.search.includes(userSlug)) {
                     const newUrl = window.location.protocol + '//' + window.location.host +
                         window.location.pathname + '?u=' + userSlug;
                     window.history.replaceState({
-                        path: newUrl
+                        type: 'tab',
+                        value: 'home',
+                        sub: null
                     }, '', newUrl);
+                } else {
+                    // Stamp the initial home state so popstate has something to land on
+                    window.history.replaceState({
+                        type: 'tab',
+                        value: 'home',
+                        sub: null
+                    }, '', window.location.href.split('#')[0]);
                 }
                 // Auto-hide success alert + clean URL param
                 const sa = document.getElementById('success-alert');
                 if (sa) {
                     const url = new URL(window.location);
                     url.searchParams.delete('success');
-                    window.history.replaceState({}, document.title, url.pathname + (url.search || ''));
+                    window.history.replaceState({
+                        type: 'tab',
+                        value: 'home',
+                        sub: null
+                    }, document.title, url.pathname + (url.search || ''));
                     setTimeout(() => {
                         if (sa) sa.style.display = 'none';
                     }, 5000);
