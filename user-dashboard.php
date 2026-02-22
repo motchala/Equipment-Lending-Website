@@ -80,7 +80,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EQUIPLEND | User Portal</title>
+    <title>PUP Sync | User Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
@@ -96,13 +96,15 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
     <header class="app-header">
         <div class="header-left">
             <div class="app-logo">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon" style="color: var(--accent-maroon)" aria-label="EquipLend" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon" style="color: var(--accent-maroon)" aria-label="PUPSYNC" aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <div class="app-logo-text">
-                    <strong>EQUIPLEND</strong>
+                <div class="app-logo-text" style="display: flex; flex-direction: column;">
+                    <span style="white-space: nowrap; line-height: 1.1;">
+                        <strong style="font-size: 25px;">PUP</strong><span style="font-weight: 500; letter-spacing: -0.3px; font-size: 21px; vertical-align: baseline; margin-left: 1px;">SYNC</span>
+                    </span>
                     <small>User Portal</small>
                 </div>
             </div>
@@ -951,12 +953,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">My Account</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <span>EQUIPLEND</span>
+                <span>PUPSYNC</span>
             </div>
         </div>
 
@@ -1168,12 +1170,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">Settings</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <span>EQUIPLEND</span>
+                <span>PUPSYNC</span>
             </div>
         </div>
 
@@ -1556,12 +1558,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">Notifications</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="EquipLend" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <span>EQUIPLEND</span>
+                <span>PUPSYNC</span>
             </div>
         </div>
 
@@ -1602,7 +1604,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     </svg></div>
                 <div class="notif-body-wrap">
                     <h4>System Maintenance Tonight</h4>
-                    <p>EQUIPLEND will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</p>
+                    <p>PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</p>
                 </div>
                 <div class="notif-meta"><span class="notif-time">8:00 AM</span>
                     <div class="unread-dot"></div>
