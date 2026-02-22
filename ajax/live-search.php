@@ -85,8 +85,10 @@ switch ($section) {
         break;
 
     case 'inventory':
+        // only return active (non-archived) items during live search
         $sql = "SELECT * FROM tbl_inventory 
-                WHERE item_name LIKE ? OR category LIKE ?
+                WHERE is_archived = 0
+                  AND (item_name LIKE ? OR category LIKE ?)
                 ORDER BY created_at DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ss", $search, $search);
