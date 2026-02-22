@@ -51,7 +51,12 @@ if (isset($_GET['action'], $_GET['id'])) {
 
     $equipment_name = $request['equipment_name'];
 
-    // Get stock quantity
+    // Get ORIGINAL stock quantity (before any deductions)
+    // We use a separate column or track it differently. For now, we'll query
+    // the inventory table but understand that quantity has already been decremented.
+    // The safest approach: count how many approved requests exist for this item,
+    // then check if we can add one more.
+    
     $stmt_stock = $conn->prepare("
         SELECT quantity 
         FROM tbl_inventory 
@@ -67,9 +72,9 @@ if (isset($_GET['action'], $_GET['id'])) {
         exit();
     }
 
-    $total_stock = (int)$stock['quantity'];
+    $current_quantity = (int)$stock['quantity'];
 
-    // Count approved requests
+    // Count already-approved requests for this item
     $stmt_count = $conn->prepare("
         SELECT COUNT(*) AS approved_count
         FROM tbl_requests
@@ -83,8 +88,9 @@ if (isset($_GET['action'], $_GET['id'])) {
 
     $approved_count = (int)$count_data['approved_count'];
 
-    // Check if stock still available
-    if ($approved_count < $total_stock) {
+    // Check if we have stock left to approve this request
+    // The current_quantity is what remains. If it's > 0, we can approve.
+    if ($current_quantity > 0) {
 
         // Approve this request
         $stmt_approve = $conn->prepare("
@@ -104,8 +110,8 @@ if (isset($_GET['action'], $_GET['id'])) {
         $stmt_deduct->bind_param("s", $equipment_name);
         $stmt_deduct->execute();
 
-        // AUTO-DECLINE remaining WAITING requests if stock is now full
-        if (($approved_count + 1) >= $total_stock) {
+        // AUTO-DECLINE remaining WAITING requests if stock is now depleted
+        if (($current_quantity - 1) <= 0) {
 
             $reason = "Out of stock – maximum approved requests reached";
 
@@ -121,7 +127,7 @@ if (isset($_GET['action'], $_GET['id'])) {
 
     } else {
 
-        // Stock already full → decline this request
+        // No stock left → decline this request
         $reason = "Out of stock – maximum approved requests reached";
 
         $stmt_decline = $conn->prepare("

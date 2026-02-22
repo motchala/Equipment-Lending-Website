@@ -52,8 +52,9 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
 }
 
 // ── Inventory & Requests ───────────────────────────────────────────────────
-$category_result  = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory ORDER BY category ASC");
-$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory ORDER BY item_name ASC");
+// only show non-archived rows to regular users so they cannot borrow retired items
+$category_result  = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory WHERE is_archived = 0 ORDER BY category ASC");
+$inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
 $my_requests_result = null;
 if (isset($_SESSION['user_id'])) {
     $uid = $_SESSION['user_id'];

@@ -48,7 +48,7 @@
         </button>
 
         <button type="button" onclick="showSection('declined')" id="link-declined" class="sidebar-btn">
-            <i class="bi bi-x-octagon"></i> DeclinedF
+            <i class="bi bi-x-octagon"></i> Declined
         </button>
 
         <div class="nav-label">Records</div>
