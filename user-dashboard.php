@@ -1277,7 +1277,7 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                             <p>Pick a highlight color for buttons and active elements.</p>
                         </div>
                         <div class="color-dots">
-                            <div class="c-dot selected" style="background:#6d1b23;" data-action="apply-accent" data-color="#6d1b23" data-light="#f3e5e6" title="Maroon (Default)"></div>
+                            <div class="c-dot selected" style="background:#600302;" data-action="apply-accent" data-color="#600302" data-light="#f3e5e6" title="Maroon (Default)"></div>
                             <div class="c-dot" style="background:#1a5276;" data-action="apply-accent" data-color="#1a5276" data-light="#d6eaf8" title="Navy Blue"></div>
                             <div class="c-dot" style="background:#1e8449;" data-action="apply-accent" data-color="#1e8449" data-light="#d5f5e3" title="Forest Green"></div>
                             <div class="c-dot" style="background:#7d3c98;" data-action="apply-accent" data-color="#7d3c98" data-light="#f0e6fa" title="Purple"></div>
@@ -2157,7 +2157,7 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                     frt.checked = false;
                     applyFocusRing(false);
                 }
-                applyAccent('#6d1b23', '#f3e5e6');
+                applyAccent('#600302', '#f3e5e6');
                 // Clear persisted settings (but keep account + notif state)
                 ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
                 showToast('All settings reset to defaults.');

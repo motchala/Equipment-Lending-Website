@@ -2,7 +2,7 @@
 :root {
     --primary-white: #ffffff;
     --secondary-cream: #f9f7f2;
-    --accent-maroon: #6d1b23;
+    --accent-maroon: #600302;
     --accent-dark: #4a0f15;
     --accent-light: #f3e5e6;
     --text-dark: #2c2c2c;
@@ -14,14 +14,14 @@
     --dropdown-bg: #ffffff;
     --hover-bg: #f3e5e6;
     --radius: 16px;
-    --shadow: 0 4px 20px rgba(109, 27, 35, 0.08);
+    --shadow: 0 4px 20px rgba(96, 3, 2, 0.08);
     --success: #27ae60;
     --danger: #c0392b;
     --warning: #f39c12;
     /* Section header tint — opacity-based so it always adapts
        to both the background AND user-chosen accent colors     */
-    --section-tint-start: rgba(109, 27, 35, 0.09);
-    --section-tint-end: rgba(109, 27, 35, 0.00);
+    --section-tint-start: rgba(96, 3, 2, 0.09);
+    --section-tint-end: rgba(96, 3, 2, 0.00);
 }
 
 [data-theme="dark"] {
@@ -246,7 +246,7 @@ header.app-header {
 .nav-tab:hover {
     background-color: var(--accent-maroon);
     color: #ffffff;
-    box-shadow: 0 4px 12px rgba(109, 27, 35, 0.25);
+    box-shadow: 0 4px 12px rgba(96, 3, 2, 0.25);
 }
 
 /* ── Nav tabs — no disabled state needed, overlays cover full viewport */
@@ -846,7 +846,7 @@ main#app-main {
 
 .eq-item-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(109, 27, 35, 0.12);
+    box-shadow: 0 8px 24px rgba(96, 3, 2, 0.12);
     border-color: var(--accent-maroon);
 }
 
@@ -1180,7 +1180,7 @@ main#app-main {
 
 .room-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 28px rgba(109, 27, 35, 0.12);
+    box-shadow: 0 8px 28px rgba(96, 3, 2, 0.12);
 }
 
 .room-img {
@@ -2386,7 +2386,7 @@ input[type="range"] {
 }
 .stat-card-clickable:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 28px rgba(109, 27, 35, 0.13);
+    box-shadow: 0 8px 28px rgba(96, 3, 2, 0.13);
     border-color: var(--accent-maroon);
 }
 .stat-sub-link {
