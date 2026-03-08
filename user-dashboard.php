@@ -12,12 +12,34 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+// ── Handle Return Item (AJAX) ──────────────────────────────────────────────
+if (isset($_POST['action']) && $_POST['action'] === 'return_item') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) { echo json_encode(['success'=>false,'msg'=>'Unauthorized']); exit; }
+    $req_id = intval($_POST['request_id'] ?? 0);
+    $uid_r  = mysqli_real_escape_string($conn, $_SESSION['user_id']);
+    // Fetch the request (verify ownership)
+    $rq = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM tbl_requests WHERE id=$req_id AND student_id='$uid_r' LIMIT 1"));
+    if (!$rq) { echo json_encode(['success'=>false,'msg'=>'Request not found']); exit; }
+    if (!in_array($rq['status'], ['Approved','Overdue'])) { echo json_encode(['success'=>false,'msg'=>'Cannot return this item']); exit; }
+    // Mark as Returned
+    mysqli_query($conn, "UPDATE tbl_requests SET status='Returned' WHERE id=$req_id");
+    // Increment inventory quantity
+    $eq_name = mysqli_real_escape_string($conn, $rq['equipment_name']);
+    mysqli_query($conn, "UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name='$eq_name' LIMIT 1");
+    echo json_encode(['success'=>true,'msg'=>'Item returned successfully!']);
+    exit;
+}
+
 // ── Auto-decline expired requests ──────────────────────────────────────────
 $today = date('Y-m-d');
 $reason_expired = "Request expired – borrow date has already passed";
 $stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
 $stmt_expired->bind_param("ss", $reason_expired, $today);
 $stmt_expired->execute();
+
+// ── Auto-mark overdue approved requests ────────────────────────────────────
+mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
@@ -73,6 +95,22 @@ $stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 $stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Waiting'"))['c'];
 $stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Approved'"))['c'];
 $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Declined'"))['c'];
+$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue'"))['c'];
+
+// Build requests array for JS
+$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC");
+$requests_js = [];
+while ($row = mysqli_fetch_assoc($requests_raw)) {
+    $requests_js[] = $row;
+}
+$requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+
+// Overdue items for notifications
+$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
+$overdue_notifs = [];
+while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
+    $overdue_notifs[] = $row;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -150,7 +188,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
                         Notifications
-                        <span class="notif-badge" id="notifBadge">3</span>
+                        <span class="notif-badge" id="notifBadge"><?php echo (3 + count($overdue_notifs)); ?></span>
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="settingsOverlay">
                         Settings
@@ -245,32 +283,42 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     <div class="stat-value"><?php echo $stat_total; ?></div>
                     <div class="stat-sub">All time</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting" title="View Pending requests">
                     <div class="stat-icon" style="background:#fff8e1; color:#c67c00;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Pending" aria-hidden="true">
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
                         </svg></div>
                     <div class="stat-label">Pending</div>
                     <div class="stat-value" style="color:var(--warning);"><?php echo $stat_waiting; ?></div>
-                    <div class="stat-sub">Awaiting approval</div>
+                    <div class="stat-sub stat-sub-link">Awaiting approval →</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved" title="View Approved requests">
                     <div class="stat-icon" style="background:#e3fcef; color:#00875a;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Approved" aria-hidden="true">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg></div>
                     <div class="stat-label">Approved</div>
                     <div class="stat-value" style="color:var(--success);"><?php echo $stat_approved; ?></div>
-                    <div class="stat-sub">Ready to pick up</div>
+                    <div class="stat-sub stat-sub-link">Ready to pick up →</div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Declined" title="View Declined requests">
                     <div class="stat-icon" style="background:#ffeaea; color:var(--danger);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Declined" aria-hidden="true">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg></div>
                     <div class="stat-label">Declined</div>
                     <div class="stat-value" style="color:var(--danger);"><?php echo $stat_declined; ?></div>
-                    <div class="stat-sub">Review reasons</div>
+                    <div class="stat-sub stat-sub-link">Review reasons →</div>
+                </div>
+                <div class="stat-card stat-card-clickable<?php echo $stat_overdue > 0 ? ' stat-card-overdue' : ''; ?>" data-action="filter-requests" data-status="Overdue" title="View Overdue items">
+                    <div class="stat-icon" style="background:#fff3e0; color:#e65100;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Overdue" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg></div>
+                    <div class="stat-label">Overdue</div>
+                    <div class="stat-value" style="color:#e65100;" id="statOverdueVal"><?php echo $stat_overdue; ?></div>
+                    <div class="stat-sub stat-sub-link">Items past due →</div>
                 </div>
             </div>
 
@@ -337,7 +385,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Notifications" aria-hidden="true">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                        </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">3</span>
+                        </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;"><?php echo (3 + count($overdue_notifs)); ?></span>
                     </button>
                 </div>
             </div>
@@ -549,105 +597,58 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 </div>
 
                 <div class="eq-card">
-                    <div class="eq-card-header">
+                    <div class="eq-card-header" style="flex-wrap:wrap; gap:10px;">
                         <h2>Request History</h2>
+                        <div class="requests-toolbar">
+                            <!-- Status Filter -->
+                            <div class="req-filter-wrap">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;color:var(--text-light);" aria-hidden="true">
+                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                                </svg>
+                                <select id="reqStatusFilter" class="req-filter-select" data-action="filter-requests-dd">
+                                    <option value="All">All Statuses</option>
+                                    <option value="Waiting">Pending</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Declined">Declined</option>
+                                    <option value="Overdue">Overdue</option>
+                                    <option value="Returned">Returned</option>
+                                </select>
+                            </div>
+                            <!-- Sort Order -->
+                            <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort" title="Toggle sort order">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-hidden="true">
+                                    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="5 12 12 5 19 12"/>
+                                </svg>
+                                <span id="reqSortLabel">Latest First</span>
+                            </button>
+                        </div>
                     </div>
                     <div style="overflow-x:auto;">
-                        <table class="requests-table">
+                        <table class="requests-table" id="requestsTable">
                             <thead>
                                 <tr>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Equipment" aria-hidden="true">
-                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                                        </svg>Equipment</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Instructor" aria-hidden="true">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                            <circle cx="12" cy="7" r="4" />
-                                        </svg>Instructor</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Room" aria-hidden="true">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="9" y1="3" x2="9" y2="21" />
-                                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                                        </svg>Room</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Borrow date" aria-hidden="true">
-                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="16" y1="2" x2="16" y2="6" />
-                                            <line x1="8" y1="2" x2="8" y2="6" />
-                                            <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>Borrow Date</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Return date" aria-hidden="true">
-                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="16" y1="2" x2="16" y2="6" />
-                                            <line x1="8" y1="2" x2="8" y2="6" />
-                                            <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>Return Date</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Status" aria-hidden="true">
-                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="16" y1="2" x2="16" y2="6" />
-                                            <line x1="8" y1="2" x2="8" y2="6" />
-                                            <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>Status</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Reason" aria-hidden="true">
-                                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                        </svg>Reason</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Equipment</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Instructor</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><circle cx="6" cy="12" r="1" fill="currentColor" stroke="none"/></svg>Room</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Borrow Date</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Return Date</th>
+                                    <th>Status</th>
+                                    <th>Reason / Notes</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php if ($my_requests_result && mysqli_num_rows($my_requests_result) > 0):
-                                    while ($r = mysqli_fetch_assoc($my_requests_result)):
-                                        $pill = 'status-waiting';
-                                        $icon = 'fa-clock';
-                                        if ($r['status'] === 'Approved') {
-                                            $pill = 'status-approved';
-                                            $icon = 'fa-circle-check';
-                                        }
-                                        if ($r['status'] === 'Declined') {
-                                            $pill = 'status-declined';
-                                            $icon = 'fa-circle-xmark';
-                                        }
-                                ?>
-                                        <tr>
-                                            <td><strong><?php echo htmlspecialchars($r['equipment_name']); ?></strong></td>
-                                            <td><?php echo htmlspecialchars($r['instructor']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['room']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['borrow_date']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['return_date']); ?></td>
-                                            <td>
-                                                <span class="status-pill <?php echo $pill; ?>">
-                                                    <?php
-                                                    $s = 12;
-                                                    $sa = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' . $s . '" height="' . $s . '" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;vertical-align:middle;"';
-                                                    if ($icon === 'fa-circle-check') echo '<svg ' . $sa . '><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
-                                                    elseif ($icon === 'fa-circle-xmark') echo '<svg ' . $sa . '><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-                                                    else echo '<svg ' . $sa . '><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-                                                    ?>
-                                                    <?php echo htmlspecialchars($r['status']); ?>
-                                                </span>
-                                            </td>
-                                            <td style="font-size:0.8rem; color:var(--text-light);">
-                                                <?php echo ($r['status'] === 'Declined') ? htmlspecialchars($r['reason']) : '—'; ?>
-                                            </td>
-                                        </tr>
-                                    <?php endwhile;
-                                else: ?>
-                                    <tr>
-                                        <td colspan="7">
-                                            <div class="table-empty">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;" aria-label="Empty" aria-hidden="true">
-                                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                                                </svg>
-                                                No borrow requests yet.
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
+                            <tbody id="requestsTbody">
+                                <!-- Populated by JS from PHP JSON -->
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div><!-- /lending-requests -->
+
+            <!-- Embed requests data for JS -->
+            <script>
+                window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+            </script>
 
         </div><!-- /panel-lending -->
 
@@ -1572,7 +1573,7 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 <div class="overlay-section-header" style="flex:1; margin-bottom:0;">
                     <span class="section-eyebrow">Inbox › All Notifications</span>
                     <h2>Notifications</h2>
-                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount">3 unread</strong> notifications.</p>
+                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount"><?php echo (3 + count($overdue_notifs)); ?> unread</strong> notifications.</p>
                 </div>
                 <button class="mark-read-btn" data-action="mark-all-read" style="margin-top:0.5rem;">Mark all as read</button>
             </div>
@@ -1581,8 +1582,26 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
                 <button class="notif-tab" data-notif-filter="borrow">Borrow</button>
+                <button class="notif-tab" data-notif-filter="overdue">Overdue</button>
                 <button class="notif-tab" data-notif-filter="system">System</button>
             </div>
+
+            <?php if (!empty($overdue_notifs)): ?>
+            <div class="notif-group overdue-notif-group">⚠️ Overdue — Action Required</div>
+            <?php foreach ($overdue_notifs as $on): ?>
+            <div class="notif-item unread notif-overdue" data-cat="overdue">
+                <div class="notif-icon ni-overdue"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg></div>
+                <div class="notif-body-wrap">
+                    <h4>Overdue Item: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
+                    <p>This item was due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong>. Please return it to the admin immediately to avoid penalties.</p>
+                </div>
+                <div class="notif-meta"><span class="notif-time">Overdue since <?php echo htmlspecialchars($on['return_date']); ?></span><div class="unread-dot"></div></div>
+            </div>
+            <?php endforeach; ?>
+            <?php endif; ?>
 
             <div class="notif-group">Today</div>
             <div class="notif-item unread" data-cat="borrow">
@@ -2202,6 +2221,131 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 showToast('Profile updated successfully!');
             }
 
+            /* ── Requests Table — Client-Side Render ───────────────────────────── */
+            let _reqCurrentFilter = 'All';
+            let _reqSortOrder     = 'desc'; // desc = latest first
+
+            function _escHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            }
+
+            function _statusPill(status) {
+                const map = {
+                    'Waiting':  { cls:'status-waiting',  icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',   label:'Pending' },
+                    'Approved': { cls:'status-approved', icon:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',   label:'Approved' },
+                    'Declined': { cls:'status-declined', icon:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',   label:'Declined' },
+                    'Overdue':  { cls:'status-overdue',  icon:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',   label:'Overdue' },
+                    'Returned': { cls:'status-returned', icon:'<polyline points="20 6 9 17 4 12"/>',   label:'Returned' },
+                };
+                const d = map[status] || map['Waiting'];
+                const sa = `xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;"`;
+                return `<span class="status-pill ${d.cls}"><svg ${sa}>${d.icon}</svg>${d.label}</span>`;
+            }
+
+            function renderRequestsTable() {
+                const tbody = document.getElementById('requestsTbody');
+                if (!tbody) return;
+                const data = (window.REQUESTS_DATA || []).slice();
+
+                // Sort
+                data.sort((a, b) => {
+                    const da = new Date(a.request_date || a.borrow_date || '2000-01-01');
+                    const db = new Date(b.request_date || b.borrow_date || '2000-01-01');
+                    return _reqSortOrder === 'desc' ? db - da : da - db;
+                });
+
+                // Filter
+                const filtered = _reqCurrentFilter === 'All' ? data : data.filter(r => {
+                    if (_reqCurrentFilter === 'Waiting') return r.status === 'Waiting';
+                    return r.status === _reqCurrentFilter;
+                });
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = filtered.map(r => {
+                    const canReturn = r.status === 'Approved' || r.status === 'Overdue';
+                    const returnBtn = canReturn
+                        ? `<button class="btn-return-item" data-action="return-item" data-id="${_escHtml(r.id)}" data-name="${_escHtml(r.equipment_name)}" title="Return this item">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>Return
+                           </button>`
+                        : '—';
+                    const noteCol = r.status === 'Declined' ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
+                                  : r.status === 'Overdue' ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
+                                  : '—';
+                    return `<tr class="${r.status === 'Overdue' ? 'row-overdue' : ''}">
+                        <td><strong>${_escHtml(r.equipment_name)}</strong></td>
+                        <td>${_escHtml(r.instructor)}</td>
+                        <td>${_escHtml(r.room)}</td>
+                        <td>${_escHtml(r.borrow_date)}</td>
+                        <td>${_escHtml(r.return_date)}</td>
+                        <td>${_statusPill(r.status)}</td>
+                        <td>${noteCol}</td>
+                        <td>${returnBtn}</td>
+                    </tr>`;
+                }).join('');
+            }
+
+            function setRequestsFilter(status) {
+                _reqCurrentFilter = status;
+                const dd = document.getElementById('reqStatusFilter');
+                if (dd) dd.value = status === 'Waiting' ? 'Waiting' : status;
+                renderRequestsTable();
+            }
+
+            function toggleReqSort() {
+                _reqSortOrder = _reqSortOrder === 'desc' ? 'asc' : 'desc';
+                const lbl = document.getElementById('reqSortLabel');
+                const btn = document.getElementById('reqSortBtn');
+                if (lbl) lbl.textContent = _reqSortOrder === 'desc' ? 'Latest First' : 'Oldest First';
+                if (btn) {
+                    const svg = btn.querySelector('svg');
+                    if (svg) svg.style.transform = _reqSortOrder === 'asc' ? 'rotate(180deg)' : '';
+                }
+                renderRequestsTable();
+            }
+
+            function returnItem(reqId, itemName) {
+                if (!confirm('Confirm return of "' + itemName + '"? This will update the inventory.')) return;
+                const fd = new FormData();
+                fd.append('action', 'return_item');
+                fd.append('request_id', reqId);
+                fetch(window.location.pathname, { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update local data
+                            const req = (window.REQUESTS_DATA || []).find(r => String(r.id) === String(reqId));
+                            if (req) req.status = 'Returned';
+                            renderRequestsTable();
+                            showToast(data.msg || 'Item returned successfully!');
+                            // Update overdue count display if needed
+                            checkOverdueState();
+                        } else {
+                            showToast('Error: ' + (data.msg || 'Could not return item.'));
+                        }
+                    })
+                    .catch(() => showToast('Network error. Please try again.'));
+            }
+
+            function checkOverdueState() {
+                const overdueCount = (window.REQUESTS_DATA || []).filter(r => r.status === 'Overdue').length;
+                // Update overdue stat value
+                const statEl = document.getElementById('statOverdueVal');
+                if (statEl) statEl.textContent = overdueCount;
+                // Show/hide overdue alert
+                const alertEl = document.getElementById('overdue-alert');
+                if (alertEl) alertEl.style.display = overdueCount > 0 ? '' : 'none';
+                // Update notification badges
+                const baseUnread = 3 + overdueCount;
+                document.querySelectorAll('.notif-badge').forEach(b => {
+                    if (overdueCount > 0) { b.style.display = ''; b.textContent = baseUnread; }
+                });
+            }
+
             /* ── Borrow Form Init ──────────────────────────────────────────────── */
             function initBorrowForm() {
                 const form = document.getElementById('borrowForm');
@@ -2271,6 +2415,21 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                             if (t) t.style.display = 'none';
                             break;
                         }
+                        case 'filter-requests':
+                            // From stat card click — go to My Requests tab with filter
+                            switchTab('lending', 'requests');
+                            switchLendingSub('requests');
+                            setRequestsFilter(el.dataset.status);
+                            break;
+                        case 'filter-requests-dd':
+                            setRequestsFilter(el.value);
+                            break;
+                        case 'toggle-sort':
+                            toggleReqSort();
+                            break;
+                        case 'return-item':
+                            returnItem(el.dataset.id, el.dataset.name);
+                            break;
                         case 'go-tab':
                             switchTab(el.dataset.tab, el.dataset.lending || null);
                             if (el.dataset.lending) switchLendingSub(el.dataset.lending);
@@ -2373,6 +2532,12 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                 });
             });
 
+            /* ── Requests status filter dropdown ──────────────────────────────── */
+            const reqStatusFilter = document.getElementById('reqStatusFilter');
+            if (reqStatusFilter) reqStatusFilter.addEventListener('change', function() {
+                setRequestsFilter(this.value);
+            });
+
             /* ── Equipment search/filter ──────────────────────────────────────── */
             const eqSearch = document.getElementById('equipmentSearch');
             const eqCat = document.getElementById('categoryFilter');
@@ -2439,6 +2604,8 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
                     }, 5000);
                 }
                 initBorrowForm();
+                renderRequestsTable();
+                checkOverdueState();
             }
 
             if (document.readyState === 'loading') {

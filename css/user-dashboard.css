@@ -2374,3 +2374,150 @@ input[type="range"] {
 [data-theme="high-contrast"] .room-card {
     border-color: #666666;
 }
+/* ═══════════════════════════════════════════════════════════════════════
+   NEW FEATURES: Overdue, Clickable Stat Cards, Return Button,
+                 Requests Toolbar, Status Pills
+═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Clickable Stat Cards ─────────────────────────────────────────── */
+.stat-card-clickable {
+    cursor: pointer;
+    position: relative;
+}
+.stat-card-clickable:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(109, 27, 35, 0.13);
+    border-color: var(--accent-maroon);
+}
+.stat-sub-link {
+    color: var(--accent-maroon);
+    font-weight: 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.2px;
+}
+.stat-card-overdue {
+    border-color: #e65100 !important;
+    animation: overdueGlow 2s ease-in-out infinite alternate;
+}
+@keyframes overdueGlow {
+    from { box-shadow: 0 4px 20px rgba(230, 81, 0, 0.08); }
+    to   { box-shadow: 0 4px 28px rgba(230, 81, 0, 0.22); }
+}
+
+/* ── Requests Toolbar ─────────────────────────────────────────────── */
+.requests-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.req-filter-wrap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    border-radius: 9px;
+    padding: 5px 12px;
+}
+.req-filter-select {
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    padding: 0;
+    font-family: 'Poppins', sans-serif;
+}
+.req-sort-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    border-radius: 9px;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.req-sort-btn:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+.req-sort-btn svg {
+    transition: transform 0.25s ease;
+}
+
+/* ── Status Pills — Overdue & Returned ────────────────────────────── */
+.status-overdue {
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffb74d;
+}
+.status-returned {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+[data-theme="dark"] .status-overdue  { background: rgba(230,81,0,0.15); border-color: rgba(230,81,0,0.4); }
+[data-theme="dark"] .status-returned { background: rgba(46,125,50,0.15); border-color: rgba(46,125,50,0.4); }
+
+/* ── Return Button ────────────────────────────────────────────────── */
+.btn-return-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border: 1px solid var(--accent-maroon);
+    border-radius: 8px;
+    padding: 5px 11px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    transition: background-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
+    white-space: nowrap;
+}
+.btn-return-item:hover {
+    background: var(--accent-maroon);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(109,27,35,0.2);
+}
+
+/* ── Overdue Row Highlight ────────────────────────────────────────── */
+.row-overdue td {
+    background: rgba(230, 81, 0, 0.04) !important;
+}
+.row-overdue:hover td {
+    background: rgba(230, 81, 0, 0.09) !important;
+}
+[data-theme="dark"] .row-overdue td { background: rgba(230,81,0,0.1) !important; }
+
+/* ── Notification: Overdue Items ──────────────────────────────────── */
+.notif-overdue {
+    border-left: 3px solid #e65100 !important;
+}
+.ni-overdue {
+    background: #fff3e0;
+    color: #e65100;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+[data-theme="dark"] .ni-overdue { background: rgba(230,81,0,0.18); }
+.overdue-notif-group {
+    background: linear-gradient(90deg, rgba(230,81,0,0.09), transparent);
+    color: #e65100;
+    font-weight: 700;
+    border-left: 3px solid #e65100;
+}
