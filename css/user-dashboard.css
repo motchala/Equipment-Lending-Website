@@ -295,6 +295,17 @@ header.app-header {
     border: 2px solid transparent;
     flex-shrink: 0;
     transition: border-color 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+    position: relative;
+}
+
+.avatar-btn .avatar-img,
+.dd-avatar .avatar-img,
+.acc-avatar-large .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .avatar-btn:hover {
@@ -346,6 +357,8 @@ header.app-header {
     font-weight: 700;
     font-size: 1rem;
     flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
 }
 
 .dd-name {
@@ -1552,6 +1565,7 @@ main#app-main {
     font-size: 1.8rem;
     flex-shrink: 0;
     position: relative;
+    overflow: hidden;
 }
 
 .cam-btn {
@@ -1569,6 +1583,52 @@ main#app-main {
     cursor: pointer;
     font-size: 0.55rem;
     color: white;
+    z-index: 10;
+}
+
+.cam-btn:hover {
+    background: var(--accent-dark);
+}
+
+.picture-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    background: var(--dropdown-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    overflow: hidden;
+    z-index: 100;
+    min-width: 180px;
+}
+
+.pic-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-dark);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.2s;
+}
+
+.pic-menu-item:hover {
+    background: var(--hover-bg);
+}
+
+.pic-menu-item.pic-menu-danger {
+    color: var(--danger);
+}
+
+.pic-menu-item.pic-menu-danger:hover {
+    background: rgba(192, 57, 43, 0.1);
 }
 
 .acc-hero-info h2 {
@@ -2374,6 +2434,7 @@ input[type="range"] {
 [data-theme="high-contrast"] .room-card {
     border-color: #666666;
 }
+
 /* ═══════════════════════════════════════════════════════════════════════
    NEW FEATURES: Overdue, Clickable Stat Cards, Return Button,
                  Requests Toolbar, Status Pills
@@ -2384,24 +2445,33 @@ input[type="range"] {
     cursor: pointer;
     position: relative;
 }
+
 .stat-card-clickable:hover {
     transform: translateY(-3px);
     box-shadow: 0 8px 28px rgba(96, 3, 2, 0.13);
     border-color: var(--accent-maroon);
 }
+
 .stat-sub-link {
     color: var(--accent-maroon);
     font-weight: 600;
     font-size: 0.7rem;
     letter-spacing: 0.2px;
 }
+
 .stat-card-overdue {
     border-color: #e65100 !important;
     animation: overdueGlow 2s ease-in-out infinite alternate;
 }
+
 @keyframes overdueGlow {
-    from { box-shadow: 0 4px 20px rgba(230, 81, 0, 0.08); }
-    to   { box-shadow: 0 4px 28px rgba(230, 81, 0, 0.22); }
+    from {
+        box-shadow: 0 4px 20px rgba(230, 81, 0, 0.08);
+    }
+
+    to {
+        box-shadow: 0 4px 28px rgba(230, 81, 0, 0.22);
+    }
 }
 
 /* ── Requests Toolbar ─────────────────────────────────────────────── */
@@ -2411,6 +2481,7 @@ input[type="range"] {
     gap: 10px;
     flex-wrap: wrap;
 }
+
 .req-filter-wrap {
     display: flex;
     align-items: center;
@@ -2420,6 +2491,7 @@ input[type="range"] {
     border-radius: 9px;
     padding: 5px 12px;
 }
+
 .req-filter-select {
     background: transparent;
     border: none;
@@ -2431,6 +2503,7 @@ input[type="range"] {
     padding: 0;
     font-family: 'Poppins', sans-serif;
 }
+
 .req-sort-btn {
     display: flex;
     align-items: center;
@@ -2446,11 +2519,13 @@ input[type="range"] {
     font-family: 'Poppins', sans-serif;
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
+
 .req-sort-btn:hover {
     background: var(--accent-light);
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
 }
+
 .req-sort-btn svg {
     transition: transform 0.25s ease;
 }
@@ -2461,13 +2536,22 @@ input[type="range"] {
     color: #e65100;
     border: 1px solid #ffb74d;
 }
+
 .status-returned {
     background: #e8f5e9;
     color: #2e7d32;
     border: 1px solid #a5d6a7;
 }
-[data-theme="dark"] .status-overdue  { background: rgba(230,81,0,0.15); border-color: rgba(230,81,0,0.4); }
-[data-theme="dark"] .status-returned { background: rgba(46,125,50,0.15); border-color: rgba(46,125,50,0.4); }
+
+[data-theme="dark"] .status-overdue {
+    background: rgba(230, 81, 0, 0.15);
+    border-color: rgba(230, 81, 0, 0.4);
+}
+
+[data-theme="dark"] .status-returned {
+    background: rgba(46, 125, 50, 0.15);
+    border-color: rgba(46, 125, 50, 0.4);
+}
 
 /* ── Return Button ────────────────────────────────────────────────── */
 .btn-return-item {
@@ -2486,38 +2570,548 @@ input[type="range"] {
     transition: background-color 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
     white-space: nowrap;
 }
+
 .btn-return-item:hover {
     background: var(--accent-maroon);
     color: #fff;
     transform: translateY(-1px);
-    box-shadow: 0 3px 10px rgba(109,27,35,0.2);
+    box-shadow: 0 3px 10px rgba(109, 27, 35, 0.2);
 }
 
 /* ── Overdue Row Highlight ────────────────────────────────────────── */
 .row-overdue td {
     background: rgba(230, 81, 0, 0.04) !important;
 }
+
 .row-overdue:hover td {
     background: rgba(230, 81, 0, 0.09) !important;
 }
-[data-theme="dark"] .row-overdue td { background: rgba(230,81,0,0.1) !important; }
+
+[data-theme="dark"] .row-overdue td {
+    background: rgba(230, 81, 0, 0.1) !important;
+}
 
 /* ── Notification: Overdue Items ──────────────────────────────────── */
 .notif-overdue {
     border-left: 3px solid #e65100 !important;
 }
+
 .ni-overdue {
     background: #fff3e0;
     color: #e65100;
-    width: 34px; height: 34px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
-[data-theme="dark"] .ni-overdue { background: rgba(230,81,0,0.18); }
+
+[data-theme="dark"] .ni-overdue {
+    background: rgba(230, 81, 0, 0.18);
+}
+
 .overdue-notif-group {
-    background: linear-gradient(90deg, rgba(230,81,0,0.09), transparent);
+    background: linear-gradient(90deg, rgba(230, 81, 0, 0.09), transparent);
     color: #e65100;
     font-weight: 700;
     border-left: 3px solid #e65100;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CHANGE PASSWORD MODAL
+══════════════════════════════════════════════════════════════════ */
+.pw-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    backdrop-filter: blur(3px);
+    animation: fadeIn 0.18s ease;
+}
+
+.pw-modal-box {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 440px;
+    overflow: hidden;
+    animation: slideUp 0.22s ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pw-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.pw-modal-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+.pw-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    transition: color 0.15s, background 0.15s;
+}
+
+.pw-modal-close:hover {
+    color: var(--text-dark);
+    background: var(--hover-bg);
+}
+
+.pw-modal-body {
+    padding: 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pw-input-wrap {
+    position: relative;
+}
+
+.pw-input-wrap .form-control-custom {
+    padding-right: 2.6rem;
+}
+
+.pw-toggle-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.pw-toggle-btn svg {
+    opacity: 0.5;
+    transition: opacity 0.15s;
+}
+
+.pw-toggle-btn:hover svg {
+    opacity: 1;
+}
+
+.pw-strength-bar {
+    height: 5px;
+    background: var(--khaki-border);
+    border-radius: 99px;
+    margin-top: 6px;
+    overflow: hidden;
+}
+
+.pw-strength-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 99px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.pw-strength-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    display: block;
+    margin-top: 3px;
+    min-height: 1em;
+}
+
+.pw-modal-error {
+    font-size: 0.8rem;
+    color: var(--danger);
+    background: rgba(192, 57, 43, 0.08);
+    border-left: 3px solid var(--danger);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 0;
+}
+
+.pw-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 1rem 1.4rem;
+    border-top: 1px solid var(--khaki-border);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ACCOUNT COMPLETION PROGRESS BAR - SUBTLE INLINE VERSION
+══════════════════════════════════════════════════════════════════ */
+.account-progress-inline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+.progress-bar-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.progress-bar-small {
+    flex: 1;
+    max-width: 180px;
+    height: 6px;
+    background: var(--khaki-border);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.progress-bar-fill-small {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-maroon), var(--accent-light));
+    border-radius: 99px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-percentage-small {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 35px;
+}
+
+.progress-info-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: help;
+}
+
+.progress-info-icon svg {
+    color: var(--text-secondary);
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.progress-info-icon:hover svg {
+    opacity: 1;
+}
+
+.progress-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    background: var(--bg-panel);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    min-width: 220px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.progress-info-icon:hover .progress-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.progress-tooltip strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.progress-tooltip p {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Hide progress bar when 100% complete */
+.account-progress-inline.hidden {
+    display: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PROFILE PICTURE AND CHANGE BUTTON - CENTERED LAYOUT
+══════════════════════════════════════════════════════════════════ */
+.account-hero-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.acc-avatar-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+    flex-shrink: 0;
+}
+
+.acc-avatar-large {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.acc-avatar-large .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.btn-change-profile {
+    padding: 5px 14px;
+    background: var(--bg-panel);
+    border: 1px solid var(--khaki-border);
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-change-profile:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.btn-change-profile:active {
+    transform: scale(0.98);
+}
+
+/* Picture menu (dropdown) */
+.picture-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    min-width: 160px;
+    z-index: 100;
+    overflow: hidden;
+}
+
+.pic-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0.65rem 0.875rem;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: left;
+}
+
+.pic-menu-item:hover {
+    background: var(--bg-secondary);
+}
+
+.pic-menu-danger {
+    color: var(--danger);
+}
+
+.pic-menu-danger:hover {
+    background: rgba(192, 57, 43, 0.08);
+}
+
+/* Hide the old camera button completely */
+.cam-btn {
+    display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   CONFIRMATION MODAL - CHANGES SUMMARY
+══════════════════════════════════════════════════════════════════ */
+.changes-summary {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.change-item {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--khaki-border);
+    border-radius: calc(var(--radius) - 2px);
+    margin-bottom: 0.75rem;
+}
+
+.change-item:last-child {
+    margin-bottom: 0;
+}
+
+.change-field {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.change-values {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.change-from,
+.change-to {
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.change-from {
+    color: var(--text-secondary);
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.change-to {
+    color: var(--accent-maroon);
+    font-weight: 500;
+}
+
+.change-locked-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    background: #fff3cd;
+    color: #856404;
+    border-radius: 99px;
+    font-weight: 600;
+}
+
+.warning-box {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: var(--radius);
+    padding: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SECTION EDIT/SAVE BUTTONS IN CARD HEADERS
+══════════════════════════════════════════════════════════════════ */
+.info-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--khaki-border);
+    gap: 0.75rem;
+}
+
+.info-card-head .btn-edit-acc,
+.info-card-head .btn-save-acc,
+.info-card-head .btn-cancel-acc {
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   RESPONSIVE ADJUSTMENTS
+══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .account-hero-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .acc-hero-info {
+        width: 100%;
+    }
+
+    .account-progress-inline {
+        justify-content: center;
+    }
+
+    .change-item {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .change-field {
+        padding-bottom: 0.25rem;
+        border-bottom: 1px solid var(--khaki-border);
+    }
+
+    .progress-tooltip {
+        right: auto;
+        left: 50%;
+        transform: translateX(-50%);
+    }
 }

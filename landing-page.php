@@ -190,7 +190,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     </noscript>
 
-    <link rel="stylesheet" href="css/landing-page.css">
+    <link rel="stylesheet" href="CSS/landing-page.css">
 </head>
 
 <body>
@@ -652,7 +652,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     </div><!-- /modal-overlay -->
 
 
-    <script src="js/landing-page.js"></script>
+    <script src="JavaScript/landing-page.js"></script>
     <script>
         /* ================================================================
            INIT — PHP-generated values injected here

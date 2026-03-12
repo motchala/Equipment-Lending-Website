@@ -12,22 +12,44 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+// ── Email masking helper ────────────────────────────────────────────────────
+function maskEmail($email)
+{
+    if (!$email) return null;
+    $parts = explode('@', $email);
+    if (count($parts) !== 2) return htmlspecialchars($email);
+    $local  = $parts[0];
+    $domain = $parts[1];
+    // Always show first 4 chars + fixed "***" + @ + full domain
+    $visible = htmlspecialchars(mb_substr($local, 0, 4));
+    return $visible . '***@' . htmlspecialchars($domain);
+}
+
 // ── Handle Return Item (AJAX) ──────────────────────────────────────────────
 if (isset($_POST['action']) && $_POST['action'] === 'return_item') {
     header('Content-Type: application/json');
-    if (!isset($_SESSION['user_id'])) { echo json_encode(['success'=>false,'msg'=>'Unauthorized']); exit; }
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'msg' => 'Unauthorized']);
+        exit;
+    }
     $req_id = intval($_POST['request_id'] ?? 0);
     $uid_r  = mysqli_real_escape_string($conn, $_SESSION['user_id']);
     // Fetch the request (verify ownership)
     $rq = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM tbl_requests WHERE id=$req_id AND student_id='$uid_r' LIMIT 1"));
-    if (!$rq) { echo json_encode(['success'=>false,'msg'=>'Request not found']); exit; }
-    if (!in_array($rq['status'], ['Approved','Overdue'])) { echo json_encode(['success'=>false,'msg'=>'Cannot return this item']); exit; }
+    if (!$rq) {
+        echo json_encode(['success' => false, 'msg' => 'Request not found']);
+        exit;
+    }
+    if (!in_array($rq['status'], ['Approved', 'Overdue'])) {
+        echo json_encode(['success' => false, 'msg' => 'Cannot return this item']);
+        exit;
+    }
     // Mark as Returned
     mysqli_query($conn, "UPDATE tbl_requests SET status='Returned' WHERE id=$req_id");
     // Increment inventory quantity
     $eq_name = mysqli_real_escape_string($conn, $rq['equipment_name']);
     mysqli_query($conn, "UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name='$eq_name' LIMIT 1");
-    echo json_encode(['success'=>true,'msg'=>'Item returned successfully!']);
+    echo json_encode(['success' => true, 'msg' => 'Item returned successfully!']);
     exit;
 }
 
@@ -111,7 +133,48 @@ $overdue_notifs = [];
 while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
     $overdue_notifs[] = $row;
 }
+
+// ── Fetch extended user profile ─────────────────────────────────────────────
+$profile_row = mysqli_fetch_assoc(mysqli_query(
+    $conn,
+    "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
+     program, year_level, phone, present_address, permanent_address, landline,
+     emergency_name, emergency_relationship, emergency_phone 
+     FROM tbl_users WHERE student_id='$uid_safe' LIMIT 1"
+)) ?: [];
+$db_email         = $profile_row['email']         ?? '';
+$db_backup_email  = $profile_row['backup_email']  ?? '';
+$db_profile_pic   = $profile_row['profile_picture'] ?? '';
+$db_dob           = $profile_row['dob']           ?? '';
+$db_gender        = $profile_row['gender']        ?? '';
+$db_nationality   = $profile_row['nationality']   ?? '';
+// Academic
+$db_program       = $profile_row['program']       ?? '';
+$db_year_level    = $profile_row['year_level']    ?? '';
+// Contact
+$db_phone            = $profile_row['phone']            ?? '';
+$db_present_address  = $profile_row['present_address']  ?? '';
+$db_permanent_address = $profile_row['permanent_address'] ?? '';
+$db_landline         = $profile_row['landline']         ?? '';
+// Emergency
+$db_emergency_name   = $profile_row['emergency_name']        ?? '';
+$db_emergency_rel    = $profile_row['emergency_relationship'] ?? '';
+$db_emergency_phone  = $profile_row['emergency_phone']       ?? '';
+
+$masked_email     = maskEmail($db_email);
+$masked_backup    = maskEmail($db_backup_email);
+$dob_display      = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
+// Locked = value already exists in DB (one-time fields)
+$dob_locked         = !empty($db_dob);
+$gender_locked      = !empty($db_gender);
+$nationality_locked = !empty($db_nationality);
+$backup_locked      = !empty($db_backup_email);
+$program_locked     = !empty($db_program);
+// Profile picture path
+$profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 
@@ -122,7 +185,7 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-    <link rel="stylesheet" href="css/user-dashboard.css">
+    <link rel="stylesheet" href="CSS/user-dashboard.css">
 
 </head>
 
@@ -169,13 +232,23 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
 
             <div class="avatar-btn" id="avatarBtn" title="Account menu"
                 role="button" aria-haspopup="true" aria-expanded="false">
-                <?php echo htmlspecialchars($initials); ?>
+                <?php if ($profile_pic_url): ?>
+                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                <?php else: ?>
+                    <?php echo htmlspecialchars($initials); ?>
+                <?php endif; ?>
             </div>
 
             <!-- Profile Dropdown -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
-                    <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
+                    <div class="dd-avatar">
+                        <?php if ($profile_pic_url): ?>
+                            <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                        <?php else: ?>
+                            <?php echo htmlspecialchars($initials); ?>
+                        <?php endif; ?>
+                    </div>
                     <div>
                         <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
                         <span class="dd-sub">ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
@@ -603,7 +676,7 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                             <!-- Status Filter -->
                             <div class="req-filter-wrap">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;color:var(--text-light);" aria-hidden="true">
-                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                                 </svg>
                                 <select id="reqStatusFilter" class="req-filter-select" data-action="filter-requests-dd">
                                     <option value="All">All Statuses</option>
@@ -617,7 +690,8 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                             <!-- Sort Order -->
                             <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort" title="Toggle sort order">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-hidden="true">
-                                    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="5 12 12 5 19 12"/>
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <polyline points="5 12 12 5 19 12" />
                                 </svg>
                                 <span id="reqSortLabel">Latest First</span>
                             </button>
@@ -627,11 +701,32 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                         <table class="requests-table" id="requestsTable">
                             <thead>
                                 <tr>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>Equipment</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Instructor</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><circle cx="6" cy="12" r="1" fill="currentColor" stroke="none"/></svg>Room</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Borrow Date</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Return Date</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                            <line x1="12" y1="22.08" x2="12" y2="12" />
+                                        </svg>Equipment</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>Instructor</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="9" y1="3" x2="9" y2="21" />
+                                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                                        </svg>Room</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>Borrow Date</th>
+                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                            <line x1="16" y1="2" x2="16" y2="6" />
+                                            <line x1="8" y1="2" x2="8" y2="6" />
+                                            <line x1="3" y1="10" x2="21" y2="10" />
+                                        </svg>Return Date</th>
                                     <th>Status</th>
                                     <th>Reason / Notes</th>
                                     <th>Action</th>
@@ -1005,12 +1100,41 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                         <p>Your personal details and login information.</p>
                     </div>
                     <div class="account-hero-card">
-                        <div class="acc-avatar-large">
-                            <?php echo htmlspecialchars($initials); ?>
-                            <div class="cam-btn" title="Change photo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Camera" aria-hidden="true">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                                    <circle cx="12" cy="13" r="4" />
-                                </svg></div>
+                        <div class="acc-avatar-section">
+                            <div class="acc-avatar-large" id="profileAvatarLarge">
+                                <?php if ($profile_pic_url): ?>
+                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($initials); ?>
+                                <?php endif; ?>
+                            </div>
+                            <div style="position: relative;">
+                                <button class="btn-change-profile" id="changeProfileBtn">
+                                    Change Profile
+                                </button>
+                                <!-- Picture menu -->
+                                <div class="picture-menu" id="pictureMenu" style="display:none;">
+                                    <button class="pic-menu-item" data-action="upload-picture">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:8px;">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                            <polyline points="17 8 12 3 7 8" />
+                                            <line x1="12" y1="3" x2="12" y2="15" />
+                                        </svg>
+                                        Upload Photo
+                                    </button>
+                                    <?php if ($profile_pic_url): ?>
+                                        <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:8px;">
+                                                <polyline points="3 6 5 6 21 6" />
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                            </svg>
+                                            Remove Photo
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <!-- Hidden file input -->
+                            <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                         </div>
                         <div class="acc-hero-info">
                             <h2><?php echo htmlspecialchars($fullname); ?></h2>
@@ -1021,6 +1145,27 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                                 </svg>
                                 Active Student
                             </span>
+
+                            <!-- Subtle Progress Bar (hidden when 100%) -->
+                            <div class="account-progress-inline" id="inlineProgressContainer">
+                                <div class="progress-bar-wrapper">
+                                    <div class="progress-bar-small">
+                                        <div class="progress-bar-fill-small" id="completionBar" style="width: 0%;"></div>
+                                    </div>
+                                    <span class="progress-percentage-small" id="completionPercentage">0%</span>
+                                </div>
+                                <div class="progress-info-icon" id="progressInfoIcon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                    <div class="progress-tooltip" id="progressTooltip">
+                                        <strong>Account Completion</strong>
+                                        <p id="tooltipHint">Complete your profile to access all features</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="acc-action-wrap">
                             <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
@@ -1052,40 +1197,59 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Date of Birth</span>
-                            <span class="info-val empty" data-field="dob">— Not provided</span>
-                            <input class="info-input-f" type="date" data-input="dob" disabled style="display:none;">
+                            <span class="info-val <?php echo $dob_locked ? '' : 'empty'; ?>" data-field="dob"><?php echo $dob_locked ? htmlspecialchars($dob_display) : '— Not provided'; ?></span>
+                            <?php if (!$dob_locked): ?>
+                                <input class="info-input-f" type="date" data-input="dob" disabled style="display:none;" max="<?php echo date('Y-m-d'); ?>">
+                            <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Gender</span>
-                            <span class="info-val empty" data-field="gender">— Not provided</span>
-                            <select class="info-input-f" data-input="gender" disabled style="display:none;">
-                                <option value="">Select...</option>
-                                <option>Male</option>
-                                <option>Female</option>
-                                <option>Prefer not to say</option>
-                            </select>
+                            <span class="info-val <?php echo $gender_locked ? '' : 'empty'; ?>" data-field="gender"><?php echo $gender_locked ? htmlspecialchars($db_gender) : '— Not provided'; ?></span>
+                            <?php if (!$gender_locked): ?>
+                                <select class="info-input-f" data-input="gender" disabled style="display:none;">
+                                    <option value="">Select...</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                    <option>Prefer not to say</option>
+                                </select>
+                            <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Nationality</span>
-                            <span class="info-val empty" data-field="nationality">— Not provided</span>
-                            <input class="info-input-f" data-input="nationality" placeholder="e.g. Filipino" disabled style="display:none;">
+                            <span class="info-val <?php echo $nationality_locked ? '' : 'empty'; ?>" data-field="nationality"><?php echo $nationality_locked ? htmlspecialchars($db_nationality) : '— Not provided'; ?></span>
+                            <?php if (!$nationality_locked): ?>
+                                <input class="info-input-f" data-input="nationality" placeholder="e.g. Filipino" disabled style="display:none;">
+                            <?php endif; ?>
                         </div>
                     </div>
 
                     <div class="info-card">
                         <div class="info-card-head">
-                            <h3>Login & Security</h3>
+                            <h3>Login &amp; Security</h3>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Email</span>
-                            <span class="info-val empty" data-field="email">— Not provided</span>
-                            <input class="info-input-f" data-input="email" type="email" placeholder="your@school.edu.ph" disabled style="display:none;">
+                            <span class="info-lbl">Primary Email</span>
+                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>">
+                                <?php echo $masked_email ?: '— Not provided'; ?>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Backup Email</span>
+                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email">
+                                <?php echo $masked_backup ?: '— Not provided'; ?>
+                            </span>
+                            <?php if (!$backup_locked): ?>
+                                <button class="btn-borrow" style="width:auto; padding:6px 16px; font-size:0.75rem; margin-left:auto;"
+                                    data-action="open-backup-email-modal">
+                                    Add
+                                </button>
+                            <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Password</span>
                             <span class="info-val">••••••••••</span>
                             <button class="btn-borrow" style="width:auto; padding:6px 16px; font-size:0.75rem; margin-left:auto;"
-                                data-action="toast" data-msg="Change password feature coming soon!">
+                                data-action="open-email-verify-modal">
                                 Change
                             </button>
                         </div>
@@ -1102,13 +1266,62 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Enrollment</h3>
+                            <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">
+                                Edit
+                            </button>
+                            <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;" data-action="academic-save">
+                                Save Changes
+                            </button>
+                            <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;" data-action="academic-cancel">
+                                Cancel
+                            </button>
                         </div>
-                        <div class="info-row"><span class="info-lbl">Student ID</span><span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span></div>
-                        <div class="info-row"><span class="info-lbl">Full Name</span><span class="info-val"><?php echo htmlspecialchars($fullname); ?></span></div>
-                        <div class="info-row"><span class="info-lbl">Program</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Year Level</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Section</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Status</span><span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span></div>
+                        <div class="info-row">
+                            <span class="info-lbl">Student ID</span>
+                            <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Full Name</span>
+                            <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Program</span>
+                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program">
+                                <?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?>
+                            </span>
+                            <?php if (!$program_locked): ?>
+                                <select class="info-input-f" data-input="program" disabled style="display:none;">
+                                    <option value="">Select Program...</option>
+                                    <option value="BEED">BEED</option>
+                                    <option value="BSBA-HRM">BSBA-HRM</option>
+                                    <option value="BSCpE">BSCpE</option>
+                                    <option value="BSED">BSED</option>
+                                    <option value="BSIE">BSIE</option>
+                                    <option value="BSIT">BSIT</option>
+                                    <option value="BSPSY">BSPSY</option>
+                                    <option value="DCET">DCET</option>
+                                    <option value="DIT">DIT</option>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Year Level</span>
+                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level">
+                                <?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?>
+                            </span>
+                            <select class="info-input-f" data-input="year_level" disabled style="display:none;">
+                                <option value="">Select Year Level...</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="4th Year">4th Year</option>
+                                <option value="Ladderized">Ladderized</option>
+                            </select>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Status</span>
+                            <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
+                        </div>
                     </div>
                 </div>
 
@@ -1122,16 +1335,49 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Address</h3>
+                            <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit" style="display:inline-flex;">
+                                Edit
+                            </button>
+                            <button class="btn-save-acc" id="saveContactBtn" style="display:none;" data-action="contact-save">
+                                Save Changes
+                            </button>
+                            <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;" data-action="contact-cancel">
+                                Cancel
+                            </button>
                         </div>
-                        <div class="info-row"><span class="info-lbl">Present Address</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Permanent Address</span><span class="info-val empty">— Not provided</span></div>
+                        <div class="info-row">
+                            <span class="info-lbl">Present Address</span>
+                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address">
+                                <?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?>
+                            </span>
+                            <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none; min-height:60px;"></textarea>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Permanent Address</span>
+                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address">
+                                <?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?>
+                            </span>
+                            <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none; min-height:60px;"></textarea>
+                        </div>
                     </div>
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Phone</h3>
                         </div>
-                        <div class="info-row"><span class="info-lbl">Mobile Number</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Landline</span><span class="info-val empty">— Not provided</span></div>
+                        <div class="info-row">
+                            <span class="info-lbl">Mobile Number</span>
+                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone">
+                                <?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Landline</span>
+                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline">
+                                <?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
+                        </div>
                     </div>
                 </div>
 
@@ -1145,10 +1391,37 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                     <div class="info-card">
                         <div class="info-card-head">
                             <h3>Primary Contact</h3>
+                            <button class="btn-edit-acc" id="editEmergencyBtn" data-action="emergency-edit" style="display:inline-flex;">
+                                Edit
+                            </button>
+                            <button class="btn-save-acc" id="saveEmergencyBtn" style="display:none;" data-action="emergency-save">
+                                Save Changes
+                            </button>
+                            <button class="btn-cancel-acc" id="cancelEmergencyBtn" style="display:none;" data-action="emergency-cancel">
+                                Cancel
+                            </button>
                         </div>
-                        <div class="info-row"><span class="info-lbl">Name</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Relationship</span><span class="info-val empty">— Not provided</span></div>
-                        <div class="info-row"><span class="info-lbl">Mobile Number</span><span class="info-val empty">— Not provided</span></div>
+                        <div class="info-row">
+                            <span class="info-lbl">Name</span>
+                            <span class="info-val <?php echo $db_emergency_name ? '' : 'empty'; ?>" data-field="emergency_name">
+                                <?php echo $db_emergency_name ? htmlspecialchars($db_emergency_name) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_name" placeholder="Full name" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Relationship</span>
+                            <span class="info-val <?php echo $db_emergency_rel ? '' : 'empty'; ?>" data-field="emergency_relationship">
+                                <?php echo $db_emergency_rel ? htmlspecialchars($db_emergency_rel) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_relationship" placeholder="e.g. Mother, Father, Guardian" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Mobile Number</span>
+                            <span class="info-val <?php echo $db_emergency_phone ? '' : 'empty'; ?>" data-field="emergency_phone">
+                                <?php echo $db_emergency_phone ? htmlspecialchars($db_emergency_phone) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1447,60 +1720,6 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
                     </div>
                 </div>
 
-
-                <!-- Language & Region (commented out for now since we only have English, but structure is ready for future localization features)
-                
-                <div id="st-language" class="overlay-sub-panel">
-                    <h2 class="settings-title">Language & Region</h2>
-                    <p class="settings-desc">Set your preferred language and date/time format.</p>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Language</h3>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Display Language</h4>
-                            </div>
-                            <select class="s-select">
-                                <option selected>English (Philippines)</option>
-                                <option>Filipino</option>
-                                <option>English (US)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Date & Time</h3>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Time Zone</h4>
-                            </div><select class="s-select">
-                                <option selected>Asia/Manila (UTC+8)</option>
-                                <option>UTC</option>
-                            </select>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Date Format</h4>
-                            </div><select class="s-select">
-                                <option>MM/DD/YYYY</option>
-                                <option selected>DD/MM/YYYY</option>
-                                <option>YYYY-MM-DD</option>
-                            </select>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Time Format</h4>
-                            </div><select class="s-select">
-                                <option selected>12-hour (AM/PM)</option>
-                                <option>24-hour</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                -->
-
                 <!-- Advanced -->
                 <div id="st-advanced" class="overlay-sub-panel">
                     <div class="overlay-section-header">
@@ -1587,20 +1806,23 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
             </div>
 
             <?php if (!empty($overdue_notifs)): ?>
-            <div class="notif-group overdue-notif-group">⚠️ Overdue — Action Required</div>
-            <?php foreach ($overdue_notifs as $on): ?>
-            <div class="notif-item unread notif-overdue" data-cat="overdue">
-                <div class="notif-icon ni-overdue"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg></div>
-                <div class="notif-body-wrap">
-                    <h4>Overdue Item: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                    <p>This item was due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong>. Please return it to the admin immediately to avoid penalties.</p>
-                </div>
-                <div class="notif-meta"><span class="notif-time">Overdue since <?php echo htmlspecialchars($on['return_date']); ?></span><div class="unread-dot"></div></div>
-            </div>
-            <?php endforeach; ?>
+                <div class="notif-group overdue-notif-group">⚠️ Overdue — Action Required</div>
+                <?php foreach ($overdue_notifs as $on): ?>
+                    <div class="notif-item unread notif-overdue" data-cat="overdue">
+                        <div class="notif-icon ni-overdue"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg></div>
+                        <div class="notif-body-wrap">
+                            <h4>Overdue Item: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
+                            <p>This item was due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong>. Please return it to the admin immediately to avoid penalties.</p>
+                        </div>
+                        <div class="notif-meta"><span class="notif-time">Overdue since <?php echo htmlspecialchars($on['return_date']); ?></span>
+                            <div class="unread-dot"></div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             <?php endif; ?>
 
             <div class="notif-group">Today</div>
@@ -1660,6 +1882,221 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
         </div>
     </div><!-- /notifOverlay -->
 
+    <!-- ================================================================
+     CONFIRMATION MODAL (shows changes before saving)
+================================================================ -->
+    <div class="pw-modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle">
+        <div class="pw-modal-box" style="max-width: 600px;">
+            <div class="pw-modal-header">
+                <h3 id="confirmationTitle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                    </svg>Confirm Changes
+                </h3>
+                <button class="pw-modal-close" data-action="close-confirmation-modal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="pw-modal-body">
+                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">Please review the changes you're about to make:</p>
+
+                <div class="changes-summary" id="changesSummary" style="background: var(--bg-secondary); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; max-height: 300px; overflow-y: auto;">
+                    <!-- Changes will be populated here -->
+                </div>
+
+                <div class="warning-box" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: var(--radius); padding: 0.875rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                        <div>
+                            <strong style="color: #856404; display: block; margin-bottom: 0.25rem;">Important Notice</strong>
+                            <p style="color: #856404; margin: 0; font-size: 0.875rem;" id="warningMessage">
+                                Some changes cannot be reversed once saved. Please verify all information before confirming.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pw-modal-footer">
+                <button class="btn-cancel-acc" data-action="close-confirmation-modal">Cancel</button>
+                <button class="btn-save-acc" id="confirmChangesBtn" data-action="confirm-changes">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Confirm & Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+     EMAIL VERIFICATION MODAL (before password change)
+================================================================ -->
+    <div class="pw-modal-backdrop" id="emailVerifyModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="emailVerifyTitle">
+        <div class="pw-modal-box">
+            <div class="pw-modal-header">
+                <h3 id="emailVerifyTitle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>Verify Your Email
+                </h3>
+                <button class="pw-modal-close" data-action="close-email-verify-modal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="pw-modal-body">
+                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">For security, please verify your email address before changing your password.</p>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="verifyEmailInput" class="form-control-custom" placeholder="Enter your registered email" autocomplete="email">
+                </div>
+                <p class="pw-modal-error" id="emailVerifyError" style="display:none;"></p>
+            </div>
+            <div class="pw-modal-footer">
+                <button class="btn-cancel-acc" data-action="close-email-verify-modal">Cancel</button>
+                <button class="btn-save-acc" id="emailVerifyBtn" data-action="submit-email-verify">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Verify & Continue
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+     BACKUP EMAIL MODAL
+================================================================ -->
+    <div class="pw-modal-backdrop" id="backupEmailModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="backupEmailTitle">
+        <div class="pw-modal-box">
+            <div class="pw-modal-header">
+                <h3 id="backupEmailTitle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>Backup Email
+                </h3>
+                <button class="pw-modal-close" data-action="close-backup-email-modal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="pw-modal-body">
+                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">Add a backup email for account recovery and important notifications.</p>
+                <div class="form-group">
+                    <label>Backup Email Address</label>
+                    <input type="email" id="backupEmailInput" class="form-control-custom" placeholder="Enter backup email" autocomplete="email" value="<?php echo htmlspecialchars($db_backup_email); ?>">
+                </div>
+                <p class="pw-modal-error" id="backupEmailError" style="display:none;"></p>
+            </div>
+            <div class="pw-modal-footer">
+                <button class="btn-cancel-acc" data-action="close-backup-email-modal">Cancel</button>
+                <button class="btn-save-acc" id="backupEmailSaveBtn" data-action="save-backup-email">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Save Backup Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
+     CHANGE PASSWORD MODAL
+================================================================ -->
+    <div class="pw-modal-backdrop" id="pwModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pwModalTitle">
+        <div class="pw-modal-box">
+            <div class="pw-modal-header">
+                <h3 id="pwModalTitle">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>Change Password
+                </h3>
+                <button class="pw-modal-close" data-action="close-pw-modal" aria-label="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="pw-modal-body">
+                <div class="form-group">
+                    <label>Current Password</label>
+                    <div class="pw-input-wrap">
+                        <input type="password" id="pwCurrent" class="form-control-custom" placeholder="Enter your current password" autocomplete="current-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwCurrent" tabindex="-1" aria-label="Toggle visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <div class="pw-input-wrap">
+                        <input type="password" id="pwNew" class="form-control-custom" placeholder="At least 6 characters" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwNew" tabindex="-1" aria-label="Toggle visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="pw-strength-bar" id="pwStrengthBar" style="display:none;">
+                        <div class="pw-strength-fill" id="pwStrengthFill"></div>
+                    </div>
+                    <span class="pw-strength-label" id="pwStrengthLabel"></span>
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <div class="pw-input-wrap">
+                        <input type="password" id="pwConfirm" class="form-control-custom" placeholder="Repeat your new password" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwConfirm" tabindex="-1" aria-label="Toggle visibility">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <p class="pw-modal-error" id="pwModalError" style="display:none;"></p>
+            </div>
+            <div class="pw-modal-footer">
+                <button class="btn-cancel-acc" data-action="close-pw-modal">Cancel</button>
+                <button class="btn-save-acc" id="pwSubmitBtn" data-action="submit-pw-change">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Update Password
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Config for JS -->
+    <script>
+        window.USER_PROFILE_LOCKS = {
+            dob: <?php echo $dob_locked         ? 'true' : 'false'; ?>,
+            gender: <?php echo $gender_locked      ? 'true' : 'false'; ?>,
+            nationality: <?php echo $nationality_locked ? 'true' : 'false'; ?>
+        };
+    </script>
+
     <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="spinner"></div>
@@ -1670,952 +2107,9 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
     <div id="app-toast"></div>
 
 
-    <!-- ================================================================
-     JAVASCRIPT — Single event-delegation model. No inline onclick.
-================================================================ -->
-    <script>
-        (function() {
-            'use strict';
+    <!-- Scripts -->
+    <script src="JavaScript/user-dashboard.js"></script>
 
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            /* ══════════════════════════════════════════════════════════════════
-               STATE PERSISTENCE — localStorage
-               Saves settings, account edits, and notification read state so
-               everything survives a page reload. Active tab is intentionally
-               NOT restored (reload always lands on Home per UX contract).
-            ══════════════════════════════════════════════════════════════════ */
-            const LS = {
-                get: k => {
-                    try {
-                        return localStorage.getItem('eq_' + k);
-                    } catch (e) {
-                        return null;
-                    }
-                },
-                set: (k, v) => {
-                    try {
-                        localStorage.setItem('eq_' + k, String(v));
-                    } catch (e) {}
-                },
-                del: k => {
-                    try {
-                        localStorage.removeItem('eq_' + k);
-                    } catch (e) {}
-                },
-                getJ: k => {
-                    try {
-                        return JSON.parse(localStorage.getItem('eq_' + k) || 'null');
-                    } catch (e) {
-                        return null;
-                    }
-                },
-                setJ: (k, v) => {
-                    try {
-                        localStorage.setItem('eq_' + k, JSON.stringify(v));
-                    } catch (e) {}
-                }
-            };
-
-            /* ── Restore all persisted state on load ─────────────────────── */
-            function restorePersistedState() {
-                // 1. Theme
-                const theme = LS.get('theme');
-                if (theme && theme !== 'light') _applyThemeDOM(theme);
-
-                // 2. Accent color
-                const ac = LS.get('accentColor'),
-                    al = LS.get('accentLight');
-                if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
-
-                // 3. Compact mode
-                if (LS.get('compact') === 'true') {
-                    const ct = document.getElementById('compactToggle');
-                    if (ct) ct.checked = true;
-                    document.documentElement.style.setProperty('--radius', '9px');
-                }
-
-                // 4. Font size
-                const fs = LS.get('fontSize');
-                if (fs && fs !== '100') {
-                    const fr = document.getElementById('fontSizeRange');
-                    if (fr) fr.value = fs;
-                    const lbl = document.getElementById('fontSizeLbl');
-                    if (lbl) lbl.textContent = fs + '%';
-                    document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
-                }
-
-                // 5. Reduce motion
-                if (LS.get('reduceMotion') === 'true') {
-                    const rmt = document.getElementById('reduceMotionToggle');
-                    if (rmt) rmt.checked = true;
-                    let s = document.getElementById('reduceMotionStyle');
-                    if (!s) {
-                        s = document.createElement('style');
-                        s.id = 'reduceMotionStyle';
-                        document.head.appendChild(s);
-                    }
-                    s.textContent = '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }';
-                }
-
-                // 6. Focus ring
-                if (LS.get('focusRing') === 'true') {
-                    const frt = document.getElementById('focusRingToggle');
-                    if (frt) frt.checked = true;
-                    let s = document.getElementById('focusRingStyle');
-                    if (!s) {
-                        s = document.createElement('style');
-                        s.id = 'focusRingStyle';
-                        document.head.appendChild(s);
-                    }
-                    s.textContent = '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }';
-                }
-
-                // 7. Account profile fields
-                const profileFields = ['fullname', 'dob', 'gender', 'nationality', 'email'];
-                profileFields.forEach(key => {
-                    const val = LS.get('prof_' + key);
-                    if (!val) return;
-                    const span = document.querySelector('[data-field="' + key + '"]');
-                    const input = document.querySelector('[data-input="' + key + '"]');
-                    if (span) {
-                        span.textContent = val;
-                        span.classList.remove('empty');
-                    }
-                    if (input) {
-                        if (input.tagName === 'SELECT') {
-                            for (let opt of input.options) {
-                                if (opt.text === val || opt.value === val) {
-                                    opt.selected = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            input.value = val;
-                        }
-                    }
-                });
-
-                // 8. Notification read state
-                const readIdxArr = LS.getJ('notifRead');
-                if (readIdxArr && readIdxArr.length) {
-                    const items = document.querySelectorAll('.notif-item');
-                    let unread = 0;
-                    items.forEach((item, i) => {
-                        if (readIdxArr.includes(i)) {
-                            item.classList.remove('unread');
-                            const dot = item.querySelector('.unread-dot');
-                            if (dot) dot.style.display = 'none';
-                        } else if (item.classList.contains('unread')) {
-                            unread++;
-                        }
-                    });
-                    const uc = document.getElementById('unreadCount');
-                    if (uc) uc.textContent = unread + ' unread';
-                    if (unread === 0) document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
-                    else document.querySelectorAll('.notif-badge').forEach(b => {
-                        b.style.display = '';
-                        b.textContent = unread;
-                    });
-                }
-            }
-
-            /* ── DOM-only helpers (no save, used by restore + public fns) ── */
-            function _applyThemeDOM(theme) {
-                document.documentElement.setAttribute('data-theme', theme);
-                // Remove any JS-set inline tint overrides so the new theme's
-                // CSS variable values take over cleanly
-                document.documentElement.style.removeProperty('--section-tint-start');
-                document.documentElement.style.removeProperty('--section-tint-end');
-                const tMap = {
-                    'light': 'light',
-                    'dark': 'dark',
-                    'high-contrast': 'hc'
-                };
-                ['light', 'dark', 'hc'].forEach(k => {
-                    const el = document.getElementById('tp-' + k);
-                    const ch = document.getElementById('tc-' + k);
-                    if (el) el.classList.remove('selected');
-                    if (ch) ch.style.display = 'none';
-                });
-                const key = tMap[theme] || theme;
-                const el = document.getElementById('tp-' + key);
-                const ch = document.getElementById('tc-' + key);
-                if (el) el.classList.add('selected');
-                if (ch) ch.style.display = '';
-            }
-
-            function _applyAccentDOM(color, light) {
-                document.querySelectorAll('.c-dot').forEach(d => d.classList.remove('selected'));
-                const dot = document.querySelector('.c-dot[data-color="' + color + '"]');
-                if (dot) dot.classList.add('selected');
-                document.documentElement.style.setProperty('--accent-maroon', color);
-                document.documentElement.style.setProperty('--accent-light', light);
-                // Parse hex to rgb for the tint variables so the section header gradient
-                // always uses the new accent color at the right opacity — never the old light pastel
-                const r = parseInt(color.slice(1, 3), 16),
-                    g = parseInt(color.slice(3, 5), 16),
-                    b = parseInt(color.slice(5, 7), 16);
-                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                const isHC = document.documentElement.getAttribute('data-theme') === 'high-contrast';
-                const alpha = isHC ? 0.16 : isDark ? 0.13 : 0.09;
-                document.documentElement.style.setProperty('--section-tint-start', `rgba(${r},${g},${b},${alpha})`);
-                document.documentElement.style.setProperty('--section-tint-end', `rgba(${r},${g},${b},0)`);
-            }
-
-            /* ── Toast ─────────────────────────────────────────────────────────── */
-            let toastTimer;
-
-            function showToast(msg) {
-                const t = document.getElementById('app-toast');
-                if (!t) return;
-                t.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg> ' + msg;
-                t.classList.add('show');
-                clearTimeout(toastTimer);
-                toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
-            }
-
-            /* ── Browser Back/Forward Navigation ───────────────────────────────── */
-            // We use a lightweight pushState approach: each tab switch or overlay open
-            // pushes a state object onto the history stack. popstate restores the UI.
-            // Reload always lands on Home because initPage() calls replaceState with
-            // the home state and never reads the hash back on load.
-            let _navSuppressed = false;
-
-            function _pushNav(state) {
-                if (_navSuppressed) return;
-                const hash = '#' + state.type + '-' + state.value + (state.sub ? '-' + state.sub : '');
-                history.pushState(state, '', hash);
-            }
-
-            function _restoreNav(state) {
-                _navSuppressed = true;
-                // Always close all overlays first
-                document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
-                if (!state || state.type === 'tab') {
-                    const tab = (state && state.value) ? state.value : 'home';
-                    _switchTabDOM(tab);
-                    if (state && state.sub) switchLendingSub(state.sub);
-                } else if (state.type === 'overlay') {
-                    _switchTabDOM('home'); // ensure a tab is active behind overlay
-                    _openOverlayDOM(state.value);
-                }
-                _navSuppressed = false;
-            }
-
-            window.addEventListener('popstate', function(e) {
-                _restoreNav(e.state);
-            });
-
-            /* ── Profile Dropdown ──────────────────────────────────────────────── */
-            function openDropdown() {
-                document.getElementById('profileDropdown').classList.add('open');
-                document.getElementById('avatarBtn').setAttribute('aria-expanded', 'true');
-            }
-
-            function closeDropdown() {
-                document.getElementById('profileDropdown').classList.remove('open');
-                document.getElementById('avatarBtn').setAttribute('aria-expanded', 'false');
-            }
-
-            function toggleDropdown() {
-                document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
-            }
-
-            /* ── Overlays ──────────────────────────────────────────────────────── */
-
-            function _openOverlayDOM(id) {
-                closeDropdown();
-                const el = document.getElementById(id);
-                if (!el) return;
-                el.classList.add('active');
-                document.querySelectorAll('.overlay-page.active').forEach(o => {
-                    if (o !== el) o.classList.remove('active');
-                });
-            }
-
-            function openOverlay(id) {
-                _pushNav({
-                    type: 'overlay',
-                    value: id
-                });
-                _openOverlayDOM(id);
-            }
-
-            function closeOverlay(id) {
-                // Use history.back() so the browser's forward button also works.
-                // We also immediately remove the class for instant visual feedback.
-                const el = document.getElementById(id);
-                if (el) el.classList.remove('active');
-                history.back();
-            }
-
-            /* ── Main Tab Switcher ─────────────────────────────────────────────── */
-            function _switchTabDOM(tabName) {
-                const panel = document.getElementById('panel-' + tabName);
-                if (panel) panel.classList.add('active');
-                document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-                const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
-                if (btn) btn.classList.add('active');
-                document.querySelectorAll('.tab-panel').forEach(p => {
-                    if (p !== panel) p.classList.remove('active');
-                });
-            }
-
-            function switchTab(tabName, sub) {
-                _pushNav({
-                    type: 'tab',
-                    value: tabName,
-                    sub: sub || null
-                });
-                _switchTabDOM(tabName);
-            }
-
-            /* ── Lending Sub-Sections ──────────────────────────────────────────── */
-            function switchLendingSub(subName) {
-                const sub = document.getElementById('lending-' + subName);
-                if (sub) sub.classList.add('active');
-                document.querySelectorAll('.lending-nav-btn').forEach(b => b.classList.remove('active'));
-                const btn = document.querySelector('.lending-nav-btn[data-lending-nav="' + subName + '"]');
-                if (btn) btn.classList.add('active');
-                document.querySelectorAll('.lending-sub').forEach(s => {
-                    if (s !== sub) s.classList.remove('active');
-                });
-            }
-
-            /* ── Account Sub-Tabs ──────────────────────────────────────────────── */
-            function switchAccTab(panelId) {
-                const panel = document.getElementById(panelId);
-                if (panel) panel.classList.add('active');
-                document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-                const btn = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
-                if (btn) btn.classList.add('active');
-                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => {
-                    if (p !== panel) p.classList.remove('active');
-                });
-            }
-
-            /* ── Settings Sub-Tabs ─────────────────────────────────────────────── */
-            function switchSettTab(panelId) {
-                const panel = document.getElementById(panelId);
-                if (panel) panel.classList.add('active');
-                document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-                const btn = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
-                if (btn) btn.classList.add('active');
-                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => {
-                    if (p !== panel) p.classList.remove('active');
-                });
-            }
-
-            /* ── Equipment Search/Filter ───────────────────────────────────────── */
-            function filterEquipment() {
-                const search = (document.getElementById('equipmentSearch').value || '').toLowerCase();
-                const category = (document.getElementById('categoryFilter').value || '').toLowerCase();
-                document.querySelectorAll('.item-node').forEach(item => {
-                    const nameMatch = item.dataset.name.includes(search);
-                    const catMatch = !category || item.dataset.category === category;
-                    item.style.display = (nameMatch && catMatch) ? '' : 'none';
-                });
-            }
-
-            /* ── Borrow Form ───────────────────────────────────────────────────── */
-            function openBorrowForm(itemName) {
-                document.getElementById('selectedItem').value = itemName;
-                document.getElementById('selectedItemLabel').textContent = itemName;
-                switchTab('lending', 'form');
-                switchLendingSub('form');
-            }
-
-            /* ── Room Form ─────────────────────────────────────────────────────── */
-            function openRoomForm(roomName) {
-                document.getElementById('selectedRoomLabel').textContent = roomName;
-                const sec = document.getElementById('room-form-section');
-                if (sec) {
-                    sec.classList.remove('hidden');
-                    sec.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            }
-
-            function closeRoomForm() {
-                const sec = document.getElementById('room-form-section');
-                if (sec) sec.classList.add('hidden');
-            }
-
-            /* ── Notifications ─────────────────────────────────────────────────── */
-            function filterNotifs(cat) {
-                document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-                const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
-                if (btn) btn.classList.add('active');
-                document.querySelectorAll('.notif-item').forEach(item => {
-                    if (cat === 'all') item.style.display = '';
-                    else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
-                    else item.style.display = item.dataset.cat === cat ? '' : 'none';
-                });
-            }
-
-            function markAllRead() {
-                const readArr = [];
-                document.querySelectorAll('.notif-item').forEach((item, i) => {
-                    item.classList.remove('unread');
-                    const dot = item.querySelector('.unread-dot');
-                    if (dot) dot.style.display = 'none';
-                    readArr.push(i);
-                });
-                const uc = document.getElementById('unreadCount');
-                if (uc) uc.textContent = '0 unread';
-                document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
-                LS.setJ('notifRead', readArr);
-                showToast('All notifications marked as read.');
-            }
-
-            /* ── Settings: Theme ───────────────────────────────────────────────── */
-            function applyTheme(theme) {
-                _applyThemeDOM(theme);
-                LS.set('theme', theme);
-                showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1));
-            }
-
-            /* ── Settings: Accent Color ────────────────────────────────────────── */
-            function applyAccent(color, light) {
-                _applyAccentDOM(color, light);
-                LS.set('accentColor', color);
-                LS.set('accentLight', light);
-                showToast('Accent color updated!');
-            }
-
-            /* ── Settings: Compact ─────────────────────────────────────────────── */
-            function applyCompact(on) {
-                document.documentElement.style.setProperty('--radius', on ? '9px' : '16px');
-                LS.set('compact', on);
-                showToast(on ? 'Compact mode enabled' : 'Compact mode disabled');
-            }
-
-            /* ── Settings: Font Size ───────────────────────────────────────────── */
-            function applyFontSize(val) {
-                const lbl = document.getElementById('fontSizeLbl');
-                if (lbl) lbl.textContent = val + '%';
-                document.documentElement.style.fontSize = (val / 100) + 'rem';
-                LS.set('fontSize', val);
-            }
-
-            /* ── Settings: Reduce Motion ───────────────────────────────────────── */
-            /* IMPORTANT: We only kill animation-duration here, NEVER touch
-               `transition` on `*` — doing so was the root cause of the freeze bug
-               because it would also null-out pointer-event related repaint cycles. */
-            function applyReduceMotion(on) {
-                let s = document.getElementById('reduceMotionStyle');
-                if (!s) {
-                    s = document.createElement('style');
-                    s.id = 'reduceMotionStyle';
-                    document.head.appendChild(s);
-                }
-                s.textContent = on ?
-                    '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }' :
-                    '';
-                LS.set('reduceMotion', on);
-                showToast(on ? 'Animations disabled' : 'Animations re-enabled');
-            }
-
-            /* ── Settings: Focus Ring ──────────────────────────────────────────── */
-            function applyFocusRing(on) {
-                let s = document.getElementById('focusRingStyle');
-                if (!s) {
-                    s = document.createElement('style');
-                    s.id = 'focusRingStyle';
-                    document.head.appendChild(s);
-                }
-                s.textContent = on ?
-                    '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }' :
-                    '';
-                LS.set('focusRing', on);
-                showToast(on ? 'Focus rings enhanced' : 'Focus rings reset');
-            }
-
-            /* ── Settings: Reset All ───────────────────────────────────────────── */
-            function resetAllSettings() {
-                applyTheme('light');
-                const ct = document.getElementById('compactToggle');
-                if (ct) {
-                    ct.checked = false;
-                    applyCompact(false);
-                }
-                const fr = document.getElementById('fontSizeRange');
-                if (fr) {
-                    fr.value = 100;
-                    applyFontSize(100);
-                }
-                const rmt = document.getElementById('reduceMotionToggle');
-                if (rmt) {
-                    rmt.checked = false;
-                    applyReduceMotion(false);
-                }
-                const frt = document.getElementById('focusRingToggle');
-                if (frt) {
-                    frt.checked = false;
-                    applyFocusRing(false);
-                }
-                applyAccent('#600302', '#f3e5e6');
-                // Clear persisted settings (but keep account + notif state)
-                ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
-                showToast('All settings reset to defaults.');
-            }
-
-            /* ── Profile Edit ──────────────────────────────────────────────────── */
-            function toggleProfileEdit() {
-                const editBtn = document.getElementById('editProfileBtn');
-                const saveBtn = document.getElementById('saveProfileBtn');
-                const cancelBtn = document.getElementById('cancelProfileBtn');
-                if (editBtn) editBtn.style.display = 'none';
-                if (saveBtn) saveBtn.style.display = 'flex';
-                if (cancelBtn) cancelBtn.style.display = 'flex';
-                document.querySelectorAll('[data-field]').forEach(span => {
-                    const key = span.dataset.field;
-                    const input = document.querySelector('[data-input="' + key + '"]');
-                    if (!input) return;
-                    span.style.display = 'none';
-                    input.style.display = '';
-                    input.disabled = false;
-                    if (span.classList.contains('empty')) input.value = '';
-                });
-            }
-
-            function cancelProfileEdit() {
-                const editBtn = document.getElementById('editProfileBtn');
-                const saveBtn = document.getElementById('saveProfileBtn');
-                const cancelBtn = document.getElementById('cancelProfileBtn');
-                if (editBtn) editBtn.style.display = 'flex';
-                if (saveBtn) saveBtn.style.display = 'none';
-                if (cancelBtn) cancelBtn.style.display = 'none';
-                document.querySelectorAll('[data-input]').forEach(input => {
-                    const key = input.dataset.input;
-                    const span = document.querySelector('[data-field="' + key + '"]');
-                    if (!span) return;
-                    span.style.display = '';
-                    input.style.display = 'none';
-                    input.disabled = true;
-                });
-            }
-
-            function saveProfileEdit() {
-                document.querySelectorAll('[data-input]').forEach(input => {
-                    const key = input.dataset.input;
-                    const span = document.querySelector('[data-field="' + key + '"]');
-                    if (!span) return;
-                    const val = input.tagName === 'SELECT' ?
-                        input.options[input.selectedIndex].text :
-                        input.value.trim();
-                    if (val) {
-                        span.textContent = val;
-                        span.classList.remove('empty');
-                        LS.set('prof_' + key, val);
-                    } else {
-                        span.textContent = '— Not provided';
-                        span.classList.add('empty');
-                        LS.del('prof_' + key);
-                    }
-                });
-                cancelProfileEdit();
-                showToast('Profile updated successfully!');
-            }
-
-            /* ── Requests Table — Client-Side Render ───────────────────────────── */
-            let _reqCurrentFilter = 'All';
-            let _reqSortOrder     = 'desc'; // desc = latest first
-
-            function _escHtml(str) {
-                if (!str) return '';
-                return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-            }
-
-            function _statusPill(status) {
-                const map = {
-                    'Waiting':  { cls:'status-waiting',  icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',   label:'Pending' },
-                    'Approved': { cls:'status-approved', icon:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',   label:'Approved' },
-                    'Declined': { cls:'status-declined', icon:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',   label:'Declined' },
-                    'Overdue':  { cls:'status-overdue',  icon:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',   label:'Overdue' },
-                    'Returned': { cls:'status-returned', icon:'<polyline points="20 6 9 17 4 12"/>',   label:'Returned' },
-                };
-                const d = map[status] || map['Waiting'];
-                const sa = `xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;"`;
-                return `<span class="status-pill ${d.cls}"><svg ${sa}>${d.icon}</svg>${d.label}</span>`;
-            }
-
-            function renderRequestsTable() {
-                const tbody = document.getElementById('requestsTbody');
-                if (!tbody) return;
-                const data = (window.REQUESTS_DATA || []).slice();
-
-                // Sort
-                data.sort((a, b) => {
-                    const da = new Date(a.request_date || a.borrow_date || '2000-01-01');
-                    const db = new Date(b.request_date || b.borrow_date || '2000-01-01');
-                    return _reqSortOrder === 'desc' ? db - da : da - db;
-                });
-
-                // Filter
-                const filtered = _reqCurrentFilter === 'All' ? data : data.filter(r => {
-                    if (_reqCurrentFilter === 'Waiting') return r.status === 'Waiting';
-                    return r.status === _reqCurrentFilter;
-                });
-
-                if (filtered.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
-                    return;
-                }
-
-                tbody.innerHTML = filtered.map(r => {
-                    const canReturn = r.status === 'Approved' || r.status === 'Overdue';
-                    const returnBtn = canReturn
-                        ? `<button class="btn-return-item" data-action="return-item" data-id="${_escHtml(r.id)}" data-name="${_escHtml(r.equipment_name)}" title="Return this item">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>Return
-                           </button>`
-                        : '—';
-                    const noteCol = r.status === 'Declined' ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
-                                  : r.status === 'Overdue' ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
-                                  : '—';
-                    return `<tr class="${r.status === 'Overdue' ? 'row-overdue' : ''}">
-                        <td><strong>${_escHtml(r.equipment_name)}</strong></td>
-                        <td>${_escHtml(r.instructor)}</td>
-                        <td>${_escHtml(r.room)}</td>
-                        <td>${_escHtml(r.borrow_date)}</td>
-                        <td>${_escHtml(r.return_date)}</td>
-                        <td>${_statusPill(r.status)}</td>
-                        <td>${noteCol}</td>
-                        <td>${returnBtn}</td>
-                    </tr>`;
-                }).join('');
-            }
-
-            function setRequestsFilter(status) {
-                _reqCurrentFilter = status;
-                const dd = document.getElementById('reqStatusFilter');
-                if (dd) dd.value = status === 'Waiting' ? 'Waiting' : status;
-                renderRequestsTable();
-            }
-
-            function toggleReqSort() {
-                _reqSortOrder = _reqSortOrder === 'desc' ? 'asc' : 'desc';
-                const lbl = document.getElementById('reqSortLabel');
-                const btn = document.getElementById('reqSortBtn');
-                if (lbl) lbl.textContent = _reqSortOrder === 'desc' ? 'Latest First' : 'Oldest First';
-                if (btn) {
-                    const svg = btn.querySelector('svg');
-                    if (svg) svg.style.transform = _reqSortOrder === 'asc' ? 'rotate(180deg)' : '';
-                }
-                renderRequestsTable();
-            }
-
-            function returnItem(reqId, itemName) {
-                if (!confirm('Confirm return of "' + itemName + '"? This will update the inventory.')) return;
-                const fd = new FormData();
-                fd.append('action', 'return_item');
-                fd.append('request_id', reqId);
-                fetch(window.location.pathname, { method: 'POST', body: fd })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Update local data
-                            const req = (window.REQUESTS_DATA || []).find(r => String(r.id) === String(reqId));
-                            if (req) req.status = 'Returned';
-                            renderRequestsTable();
-                            showToast(data.msg || 'Item returned successfully!');
-                            // Update overdue count display if needed
-                            checkOverdueState();
-                        } else {
-                            showToast('Error: ' + (data.msg || 'Could not return item.'));
-                        }
-                    })
-                    .catch(() => showToast('Network error. Please try again.'));
-            }
-
-            function checkOverdueState() {
-                const overdueCount = (window.REQUESTS_DATA || []).filter(r => r.status === 'Overdue').length;
-                // Update overdue stat value
-                const statEl = document.getElementById('statOverdueVal');
-                if (statEl) statEl.textContent = overdueCount;
-                // Show/hide overdue alert
-                const alertEl = document.getElementById('overdue-alert');
-                if (alertEl) alertEl.style.display = overdueCount > 0 ? '' : 'none';
-                // Update notification badges
-                const baseUnread = 3 + overdueCount;
-                document.querySelectorAll('.notif-badge').forEach(b => {
-                    if (overdueCount > 0) { b.style.display = ''; b.textContent = baseUnread; }
-                });
-            }
-
-            /* ── Borrow Form Init ──────────────────────────────────────────────── */
-            function initBorrowForm() {
-                const form = document.getElementById('borrowForm');
-                const borrowInp = document.getElementById('borrow_date');
-                const returnInp = document.getElementById('return_date');
-                const instrInp = document.getElementById('instructorField');
-                if (!form || !borrowInp || !returnInp) return;
-
-                borrowInp.min = todayStr;
-                returnInp.min = todayStr;
-
-                borrowInp.addEventListener('change', function() {
-                    returnInp.min = this.value;
-                    if (returnInp.value && returnInp.value < this.value) returnInp.value = this.value;
-                });
-
-                if (instrInp) {
-                    instrInp.addEventListener('input', function() {
-                        this.value = this.value.replace(/[^a-zA-Z\s.']/g, '');
-                    });
-                }
-
-                form.addEventListener('submit', function(e) {
-                    const bv = borrowInp.value;
-                    const rv = returnInp.value;
-                    if (bv < todayStr) {
-                        e.preventDefault();
-                        alert('The borrow date cannot be in the past.');
-                        return;
-                    }
-                    if (rv < bv) {
-                        e.preventDefault();
-                        alert('The return date cannot be earlier than the borrow date.');
-                        return;
-                    }
-                    e.preventDefault();
-                    document.getElementById('loading-overlay').classList.add('active');
-                    const hidden = document.createElement('input');
-                    hidden.type = 'hidden';
-                    hidden.name = 'borrow_submit';
-                    hidden.value = '1';
-                    this.appendChild(hidden);
-                    setTimeout(() => this.submit(), 2000);
-                });
-            }
-
-            /* ════════════════════════════════════════════════════════════════════
-               MASTER EVENT DELEGATION
-               All click-based interactions route through here. Each case is
-               wrapped in a try-catch so one failing action can NEVER freeze
-               the rest of the UI — this was the secondary cause of the freeze.
-            ════════════════════════════════════════════════════════════════════ */
-            document.addEventListener('click', function(e) {
-                const el = e.target.closest('[data-action]');
-                if (!el) return;
-                const action = el.dataset.action;
-                try {
-                    switch (action) {
-                        case 'open-overlay':
-                            openOverlay(el.dataset.target);
-                            break;
-                        case 'close-overlay':
-                            closeOverlay(el.dataset.target);
-                            break;
-                        case 'dismiss-alert': {
-                            const t = document.getElementById(el.dataset.target);
-                            if (t) t.style.display = 'none';
-                            break;
-                        }
-                        case 'filter-requests':
-                            // From stat card click — go to My Requests tab with filter
-                            switchTab('lending', 'requests');
-                            switchLendingSub('requests');
-                            setRequestsFilter(el.dataset.status);
-                            break;
-                        case 'filter-requests-dd':
-                            setRequestsFilter(el.value);
-                            break;
-                        case 'toggle-sort':
-                            toggleReqSort();
-                            break;
-                        case 'return-item':
-                            returnItem(el.dataset.id, el.dataset.name);
-                            break;
-                        case 'go-tab':
-                            switchTab(el.dataset.tab, el.dataset.lending || null);
-                            if (el.dataset.lending) switchLendingSub(el.dataset.lending);
-                            break;
-                        case 'open-borrow-form':
-                            openBorrowForm(el.dataset.item);
-                            break;
-                        case 'lending-back':
-                            switchLendingSub('browse');
-                            break;
-                        case 'open-room-form':
-                            openRoomForm(el.dataset.room);
-                            break;
-                        case 'close-room-form':
-                            closeRoomForm();
-                            break;
-                        case 'room-reserve-preview':
-                            showToast('Room Reservation feature coming soon!');
-                            break;
-                        case 'apply-theme':
-                            applyTheme(el.dataset.theme);
-                            break;
-                        case 'apply-accent':
-                            applyAccent(el.dataset.color, el.dataset.light);
-                            break;
-                        case 'reset-settings':
-                            resetAllSettings();
-                            break;
-                        case 'profile-edit':
-                            toggleProfileEdit();
-                            break;
-                        case 'profile-save':
-                            saveProfileEdit();
-                            break;
-                        case 'profile-cancel':
-                            cancelProfileEdit();
-                            break;
-                        case 'mark-all-read':
-                            markAllRead();
-                            break;
-                        case 'toast':
-                            showToast(el.dataset.msg || '');
-                            break;
-                        case 'logout':
-                            closeDropdown();
-                            if (confirm('Confirm Logout?')) window.location.href = 'includes/logout.php';
-                            break;
-                    }
-                } catch (err) {
-                    console.warn('Action "' + action + '" failed:', err);
-                }
-            });
-
-            /* ── Avatar button ────────────────────────────────────────────────── */
-            const avatarBtn = document.getElementById('avatarBtn');
-            if (avatarBtn) {
-                avatarBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    toggleDropdown();
-                });
-            }
-
-            /* ── Close dropdown on outside click ─────────────────────────────── */
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.header-right')) closeDropdown();
-            });
-
-            /* ── Nav tabs ─────────────────────────────────────────────────────── */
-            document.querySelectorAll('.nav-tab').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    switchTab(this.dataset.tab);
-                });
-            });
-
-            /* ── Lending sub-nav ──────────────────────────────────────────────── */
-            document.querySelectorAll('.lending-nav-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    switchLendingSub(this.dataset.lendingNav);
-                });
-            });
-
-            /* ── Account sub-nav ──────────────────────────────────────────────── */
-            document.querySelectorAll('.acc-nav-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    switchAccTab(this.dataset.accTab);
-                });
-            });
-
-            /* ── Settings sub-nav ─────────────────────────────────────────────── */
-            document.querySelectorAll('.s-nav-item').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    switchSettTab(this.dataset.settTab);
-                });
-            });
-
-            /* ── Notification filter tabs ─────────────────────────────────────── */
-            document.querySelectorAll('.notif-tab').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    filterNotifs(this.dataset.notifFilter);
-                });
-            });
-
-            /* ── Requests status filter dropdown ──────────────────────────────── */
-            const reqStatusFilter = document.getElementById('reqStatusFilter');
-            if (reqStatusFilter) reqStatusFilter.addEventListener('change', function() {
-                setRequestsFilter(this.value);
-            });
-
-            /* ── Equipment search/filter ──────────────────────────────────────── */
-            const eqSearch = document.getElementById('equipmentSearch');
-            const eqCat = document.getElementById('categoryFilter');
-            if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
-            if (eqCat) eqCat.addEventListener('change', filterEquipment);
-
-            /* ── Settings toggles — use 'change' event (reliable, no delegation conflict) */
-            const compactToggle = document.getElementById('compactToggle');
-            if (compactToggle) compactToggle.addEventListener('change', function() {
-                applyCompact(this.checked);
-            });
-
-            const fontSizeRange = document.getElementById('fontSizeRange');
-            if (fontSizeRange) fontSizeRange.addEventListener('input', function() {
-                applyFontSize(this.value);
-            });
-
-            const reduceMotionToggle = document.getElementById('reduceMotionToggle');
-            if (reduceMotionToggle) reduceMotionToggle.addEventListener('change', function() {
-                applyReduceMotion(this.checked);
-            });
-
-            const focusRingToggle = document.getElementById('focusRingToggle');
-            if (focusRingToggle) focusRingToggle.addEventListener('change', function() {
-                applyFocusRing(this.checked);
-            });
-
-            /* ── Page Init ────────────────────────────────────────────────────── */
-            function initPage() {
-                // Restore settings, account edits, and notification state from localStorage
-                // (called before URL/slug logic so themes apply before first paint)
-                restorePersistedState();
-
-                // URL slug
-                const userSlug = '<?php echo $user_slug; ?>';
-                if (!window.location.search.includes(userSlug)) {
-                    const newUrl = window.location.protocol + '//' + window.location.host +
-                        window.location.pathname + '?u=' + userSlug;
-                    window.history.replaceState({
-                        type: 'tab',
-                        value: 'home',
-                        sub: null
-                    }, '', newUrl);
-                } else {
-                    // Stamp the initial home state so popstate has something to land on
-                    window.history.replaceState({
-                        type: 'tab',
-                        value: 'home',
-                        sub: null
-                    }, '', window.location.href.split('#')[0]);
-                }
-                // Auto-hide success alert + clean URL param
-                const sa = document.getElementById('success-alert');
-                if (sa) {
-                    const url = new URL(window.location);
-                    url.searchParams.delete('success');
-                    window.history.replaceState({
-                        type: 'tab',
-                        value: 'home',
-                        sub: null
-                    }, document.title, url.pathname + (url.search || ''));
-                    setTimeout(() => {
-                        if (sa) sa.style.display = 'none';
-                    }, 5000);
-                }
-                initBorrowForm();
-                renderRequestsTable();
-                checkOverdueState();
-            }
-
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initPage);
-            } else {
-                initPage();
-            }
-
-        })();
-    </script>
 
 </body>
 
