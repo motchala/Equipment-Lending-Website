@@ -11,6 +11,55 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+// ================= AJAX CHANGE PASSWORD =================
+if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {
+    header('Content-Type: application/json');
+    $current = $_POST['current_password'] ?? '';
+    $new     = $_POST['new_password'] ?? '';
+    $confirm = $_POST['confirm_password'] ?? '';
+    $email   = $_SESSION['admin_email'] ?? '';
+
+    // 1. Basic Validation
+    if (empty($current) || empty($new) || empty($confirm)) {
+        echo json_encode(['status' => 'error', 'message' => 'All fields are required.']);
+        exit();
+    }
+    if ($new !== $confirm) {
+        echo json_encode(['status' => 'error', 'message' => 'New passwords do not match.']);
+        exit();
+    }
+    if (strlen($new) < 4) {
+        echo json_encode(['status' => 'error', 'message' => 'New password must be at least 4 characters.']);
+        exit();
+    }
+
+    // 2/3. Verify and Update in DB
+    // Special-case the local development shortcut admin stored in `tbl_accounts`.
+    if ($email === 'main@admin.edu') {
+        $stmt_acc = $conn->prepare("SELECT password FROM tbl_accounts WHERE email = ? LIMIT 1");
+        $stmt_acc->bind_param("s", $email);
+        $stmt_acc->execute();
+        $res_acc = $stmt_acc->get_result();
+        $acc_row = $res_acc->fetch_assoc();
+        $stored_acc_pw = $acc_row['password'] ?? null;
+
+        // Accept either the stored tbl_accounts password or the known dev shortcut 'admin123'
+        if ($current === $stored_acc_pw || $current === 'admin123') {
+            // Update the password in tbl_accounts (legacy table stores plain password)
+            $update_acc = $conn->prepare("UPDATE tbl_accounts SET password = ? WHERE email = ?");
+            $update_acc->bind_param("ss", $new, $email);
+            if ($update_acc->execute()) {
+                echo json_encode(['status' => 'success', 'message' => 'Password updated successfully.']);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+            }
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
+        }
+    } 
+    exit();
+}
+
 
 // ================= AUTO DECLINE EXPIRED REQUESTS =================
 
