@@ -26,9 +26,39 @@ if (isset($_POST['login'])) {
     $password = $_POST['password'];
     $login_email_val = $email;
 
+    // Admin shortcut login (local dev) — fetch display name from DB
     if ($email === 'main@admin.edu' && $password === 'admin123') {
         $_SESSION['admin'] = true;
         $_SESSION['login_time'] = time();
+
+        $admin_name_db = 'Administrator';
+
+        // Try tbl_users first (regular users table)
+        $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
+        if ($stmt_admin) {
+            $stmt_admin->bind_param("s", $email);
+            $stmt_admin->execute();
+            $res_admin = $stmt_admin->get_result();
+            if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
+                if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
+            }
+        }
+
+        // If not found, try legacy tbl_accounts (some setups store the admin there)
+        if ($admin_name_db === 'Administrator') {
+            $stmt_acc = $conn->prepare("SELECT fullName FROM tbl_accounts WHERE email = ? LIMIT 1");
+            if ($stmt_acc) {
+                $stmt_acc->bind_param("s", $email);
+                $stmt_acc->execute();
+                $res_acc = $stmt_acc->get_result();
+                if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
+                    if (!empty($row_acc['fullName'])) $admin_name_db = $row_acc['fullName'];
+                }
+            }
+        }
+
+        $_SESSION['admin_name'] = $admin_name_db;
+        $_SESSION['admin_email'] = $email;
         header("Location: admin-dashboard.php");
         exit();
     }

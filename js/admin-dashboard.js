@@ -88,14 +88,24 @@
             _setFocusRing(true);
         }
 
-        // Profile fields
+        // Profile fields — only apply stored values when server did not provide a real name
         ['admin_name', 'admin_email'].forEach(key => {
             const val = LS.get('prof_' + key);
             if (!val) return;
             const span = document.querySelector('[data-field="' + key + '"]');
             const input = document.querySelector('[data-input="' + key + '"]');
-            if (span) { span.textContent = val; span.classList.remove('empty'); }
-            if (input) input.value = val;
+            if (span) {
+                const current = (span.textContent || '').trim();
+                const isPlaceholder = !current || current === '— Not provided' || current === 'Administrator';
+                if (isPlaceholder) {
+                    span.textContent = val;
+                    span.classList.remove('empty');
+                } else {
+                    // keep server-provided value; ensure the input mirrors it for edit mode
+                    if (input) input.value = current;
+                }
+            }
+            if (input && !input.value) input.value = val;
         });
 
         // Notification read state

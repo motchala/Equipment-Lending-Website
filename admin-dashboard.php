@@ -1271,7 +1271,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Display Name</span>
-                            <span class="info-val" data-field="admin_name"><?php echo htmlspecialchars($admin_name); ?></span>
+                                <span class="info-val <?php echo empty($admin_name) ? 'empty' : '';?>" 
+                                    data-field="admin_name">
+                                    <?php 
+                                    echo htmlspecialchars($admin_name); 
+                                    ?>
+                                </span>
                             <input class="info-input-f" data-input="admin_name" value="<?php echo htmlspecialchars($admin_name); ?>" disabled style="display:none;">
                         </div>
                         <div class="info-row">
@@ -1280,8 +1285,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Email</span>
-                            <span class="info-val empty" data-field="admin_email">— Not provided</span>
-                            <input class="info-input-f" data-input="admin_email" type="email" placeholder="admin@pup.edu.ph" disabled style="display:none;">
+                                <span class="info-val 
+                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>" 
+                                    data-field="admin_email">
+                                    <?php 
+                                        echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; 
+                                    ?>
+                                </span>
+                            <input class="info-input-f" data-input="admin_email" type="email" value="<?php echo htmlspecialchars($admin_email ?? ''); ?>" placeholder="admin@pup.edu.ph" disabled style="display:none;">
                         </div>
                     </div>
                 </div>

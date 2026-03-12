@@ -418,6 +418,8 @@ $name_parts = explode(' ', trim($admin_name));
 $initials = strtoupper(substr($name_parts[0], 0, 1));
 if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 1));
 
+$admin_email = $_SESSION['admin_email'] ?? '';
+
 $init_view = $_GET['view'] ?? 'dashboard';
 
 ?>  
