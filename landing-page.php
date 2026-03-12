@@ -1,5 +1,7 @@
 <?php
 session_start();
+// Ensure server uses local timezone for login timestamps
+date_default_timezone_set('Asia/Manila');
 
 function validateStudentIDYear($student_id)
 {
@@ -26,11 +28,73 @@ if (isset($_POST['login'])) {
     $password = $_POST['password'];
     $login_email_val = $email;
 
-    if ($email === 'main@admin.edu' && $password === 'admin123') {
-        $_SESSION['admin'] = true;
-        $_SESSION['login_time'] = time();
-        header("Location: admin-dashboard.php");
-        exit();
+    // Admin shortcut login (local dev) — validate against legacy `tbl_accounts` password
+    if ($email === 'main@admin.edu') {
+        $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
+        if ($stmt_acc) {
+            $stmt_acc->bind_param("s", $email);
+            $stmt_acc->execute();
+            $res_acc = $stmt_acc->get_result();
+            if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
+                // tbl_accounts stores the legacy plain-text password; require it to match
+                if ($password === $row_acc['password']) {
+                    $_SESSION['admin'] = true;
+                    $_SESSION['login_time'] = time();
+
+                    $admin_name_db = 'Administrator';
+
+                    // Ensure `last_login` column exists and load previous value into session
+                    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
+                    if ($col_check && mysqli_num_rows($col_check) === 0) {
+                        // Add column (nullable) if it's missing
+                        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
+                    }
+
+                    // Fetch previous last_login (may be null)
+                    $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
+                    if ($stmt_last) {
+                        $stmt_last->bind_param("s", $email);
+                        $stmt_last->execute();
+                        $res_last = $stmt_last->get_result();
+                        if ($res_last && $row_last = $res_last->fetch_assoc()) {
+                            $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
+                        }
+                        $stmt_last->close();
+                    }
+
+                    // Update last_login to now
+                    $now_dt = date('Y-m-d H:i:s');
+                    $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
+                    if ($stmt_up) {
+                        $stmt_up->bind_param("ss", $now_dt, $email);
+                        $stmt_up->execute();
+                        $stmt_up->close();
+                    }
+
+                    // Try tbl_users first (regular users table)
+                    $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
+                    if ($stmt_admin) {
+                        $stmt_admin->bind_param("s", $email);
+                        $stmt_admin->execute();
+                        $res_admin = $stmt_admin->get_result();
+                        if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
+                            if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
+                        }
+                    }
+
+                    // If not found, use the legacy tbl_accounts fullName
+                    if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
+                        $admin_name_db = $row_acc['fullName'];
+                    }
+
+                    $_SESSION['admin_name'] = $admin_name_db;
+                    $_SESSION['admin_email'] = $email;
+                    header("Location: admin-dashboard.php");
+                    exit();
+                }
+            }
+        }
+        // fall through to normal user lookup/error if credentials don't match
     }
 
     $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");

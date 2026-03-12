@@ -88,14 +88,24 @@
             _setFocusRing(true);
         }
 
-        // Profile fields
+        // Profile fields — only apply stored values when server did not provide a real name
         ['admin_name', 'admin_email'].forEach(key => {
             const val = LS.get('prof_' + key);
             if (!val) return;
             const span = document.querySelector('[data-field="' + key + '"]');
             const input = document.querySelector('[data-input="' + key + '"]');
-            if (span) { span.textContent = val; span.classList.remove('empty'); }
-            if (input) input.value = val;
+            if (span) {
+                const current = (span.textContent || '').trim();
+                const isPlaceholder = !current || current === '— Not provided' || current === 'Administrator';
+                if (isPlaceholder) {
+                    span.textContent = val;
+                    span.classList.remove('empty');
+                } else {
+                    // keep server-provided value; ensure the input mirrors it for edit mode
+                    if (input) input.value = current;
+                }
+            }
+            if (input && !input.value) input.value = val;
         });
 
         // Notification read state
@@ -442,6 +452,22 @@
                     openOverlay(el.dataset.target); break;
                 case 'close-overlay':
                     closeOverlay(el.dataset.target); break;
+
+                case 'open-change-pass': {
+                    const modal = document.getElementById('changePassModal');
+                    if (modal) {
+                        modal.style.display = 'flex';
+                        document.getElementById('changePasswordForm').reset();
+                        document.getElementById('cp-alert').style.display = 'none';
+                    }
+                    break;
+                }
+                case 'close-change-pass': {
+                    const modal = document.getElementById('changePassModal');
+                    if (modal) modal.style.display = 'none';
+                    break;
+                }
+
                 case 'dismiss-alert': {
                     const t = document.getElementById(el.dataset.target);
                     if (t) t.style.display = 'none'; break;
@@ -559,6 +585,66 @@
     const fr = document.getElementById('fontSizeRange'); if (fr) fr.addEventListener('input', function () { applyFontSize(this.value); });
     const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.addEventListener('change', function () { applyReduceMotion(this.checked); });
     const frt = document.getElementById('focusRingToggle'); if (frt) frt.addEventListener('change', function () { applyFocusRing(this.checked); });
+
+    /* ── Change Password Form Handler ───────────────────────── */
+    const cpForm = document.getElementById('changePasswordForm');
+    if (cpForm) {
+        cpForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const alertBox = document.getElementById('cp-alert');
+            const submitBtn = this.querySelector('button[type="submit"]');
+            
+            const formData = new FormData(this);
+            formData.append('ajax_action', 'change_password');
+
+            // Quick Front-end check
+            if (formData.get('new_password') !== formData.get('confirm_password')) {
+                alertBox.style.display = 'block';
+                alertBox.style.backgroundColor = '#ffeaea';
+                alertBox.style.color = 'var(--danger)';
+                alertBox.innerHTML = '⚠️ Passwords do not match.';
+                return;
+            }
+
+            // UX: Disable button while processing
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Updating...';
+
+            fetch('admin-dashboard.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                alertBox.style.display = 'block';
+                if (data.status === 'success') {
+                    alertBox.style.backgroundColor = '#e3fcef';
+                    alertBox.style.color = '#00875a';
+                    alertBox.innerHTML = '✅ ' + data.message;
+                    
+                    setTimeout(() => {
+                        document.getElementById('changePassModal').style.display = 'none';
+                        showToast('Password updated successfully');
+                        cpForm.reset();
+                    }, 1500);
+                } else {
+                    alertBox.style.backgroundColor = '#ffeaea';
+                    alertBox.style.color = 'var(--danger)';
+                    alertBox.innerHTML = '⚠️ ' + data.message;
+                }
+            })
+            .catch(err => {
+                alertBox.style.display = 'block';
+                alertBox.style.backgroundColor = '#ffeaea';
+                alertBox.style.color = 'var(--danger)';
+                alertBox.innerHTML = '⚠️ Network error. Please try again.';
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update';
+            });
+        });
+    }
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
