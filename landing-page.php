@@ -1,5 +1,7 @@
 <?php
 session_start();
+// Ensure server uses local timezone for login timestamps
+date_default_timezone_set('Asia/Manila');
 
 function validateStudentIDYear($student_id)
 {
@@ -40,6 +42,34 @@ if (isset($_POST['login'])) {
                     $_SESSION['login_time'] = time();
 
                     $admin_name_db = 'Administrator';
+
+                    // Ensure `last_login` column exists and load previous value into session
+                    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
+                    if ($col_check && mysqli_num_rows($col_check) === 0) {
+                        // Add column (nullable) if it's missing
+                        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
+                    }
+
+                    // Fetch previous last_login (may be null)
+                    $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
+                    if ($stmt_last) {
+                        $stmt_last->bind_param("s", $email);
+                        $stmt_last->execute();
+                        $res_last = $stmt_last->get_result();
+                        if ($res_last && $row_last = $res_last->fetch_assoc()) {
+                            $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
+                        }
+                        $stmt_last->close();
+                    }
+
+                    // Update last_login to now
+                    $now_dt = date('Y-m-d H:i:s');
+                    $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
+                    if ($stmt_up) {
+                        $stmt_up->bind_param("ss", $now_dt, $email);
+                        $stmt_up->execute();
+                        $stmt_up->close();
+                    }
 
                     // Try tbl_users first (regular users table)
                     $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");

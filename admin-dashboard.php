@@ -1319,7 +1319,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Last Login</span>
-                            <span class="info-val"><?php echo date('M d, Y g:i A'); ?></span>
+                            <span class="info-val">
+                                <?php
+                                    $last_login_display = '— Not available';
+                                    if (!empty($_SESSION['admin_last_login'])) {
+                                        $ts = strtotime($_SESSION['admin_last_login']);
+                                        if ($ts !== false) $last_login_display = date('M d, Y g:i A', $ts);
+                                    }
+                                    echo htmlspecialchars($last_login_display);
+                                ?>
+                            </span>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Session</span>
