@@ -21,7 +21,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | Admin Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/admin-dashboard.css">
+    <link rel="stylesheet" href="CSS/admin-dashboard.css">
 </head>
 
 <body>
@@ -1904,7 +1904,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 </div>
 
-    <script src="js/admin-dashboard.js"></script>
+    <script src="JavaScript/admin-dashboard.js"></script>
 
 </body>
 
