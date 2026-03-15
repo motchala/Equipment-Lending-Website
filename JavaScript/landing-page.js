@@ -125,12 +125,15 @@
 const overlay = document.getElementById('authModal');
 let isMin = false;
 
-function openModal(tab) {
+function openModal() {
     overlay.classList.remove('minimized');
     isMin = false;
     updateMinimizeIcon();
     overlay.classList.add('open');
-    if (tab) switchTab(tab);
+
+    // Show role selector by default
+    showRoleSelector();
+
     /* Only lock scroll when NOT in mobile-preview (frame handles its own scroll) */
     const frame = document.getElementById('phoneFrameWrap');
     if (!frame.classList.contains('mobile-preview')) {
@@ -142,6 +145,9 @@ function closeModal() {
     overlay.classList.remove('open', 'minimized');
     isMin = false;
     document.body.style.overflow = '';
+
+    // Reset to role selector when closing
+    showRoleSelector();
 }
 
 function toggleMinimize() {
@@ -176,17 +182,91 @@ document.addEventListener('keydown', e => {
 
 
 /* ================================================================
-   TAB SWITCHER
+   ROLE SELECTOR & NAVIGATION
+================================================================ */
+function showRoleSelector() {
+    // Hide all auth sections
+    document.querySelectorAll('.auth-section').forEach(section => {
+        section.classList.remove('active');
+    });
+
+    // Show role selector
+    const roleSelector = document.getElementById('roleSelector');
+    if (roleSelector) {
+        roleSelector.classList.add('active');
+    }
+}
+
+function selectRole(role) {
+    // Hide role selector
+    const roleSelector = document.getElementById('roleSelector');
+    if (roleSelector) {
+        roleSelector.classList.remove('active');
+    }
+
+    // Show appropriate auth section
+    const sections = {
+        'student': 'studentSection',
+        'faculty': 'facultySection',
+        'admin': 'adminSection'
+    };
+
+    const sectionId = sections[role];
+    if (sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.add('active');
+        }
+    }
+}
+
+function backToRoleSelector() {
+    // Hide all auth sections
+    document.querySelectorAll('.auth-section').forEach(section => {
+        section.classList.remove('active');
+    });
+
+    // Show role selector
+    showRoleSelector();
+}
+
+function switchStudentTab(tab) {
+    // Remove active from all student tabs
+    document.querySelectorAll('#studentSection .auth-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    // Remove active from all student panes
+    document.querySelectorAll('#studentSection .auth-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+
+    // Activate selected tab and pane
+    if (tab === 'login') {
+        document.getElementById('student-tab-login').classList.add('active');
+        document.getElementById('studentLogin').classList.add('active');
+    } else if (tab === 'register') {
+        document.getElementById('student-tab-register').classList.add('active');
+        document.getElementById('studentRegister').classList.add('active');
+    }
+}
+
+function showContactAdminModal() {
+    alert('To request a faculty account, please contact:\n\nEmail: admin@pup.edu.ph\nOffice: PUP Biñan Admin Office\n\nPlease include:\n- Your full name\n- Department\n- Contact information');
+}
+
+
+/* ================================================================
+   TAB SWITCHER (LEGACY - kept for compatibility)
 ================================================================ */
 function switchTab(tab) {
-    document.querySelectorAll('.auth-tab-btn').forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-selected', 'false');
-    });
-    document.querySelectorAll('.auth-pane').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + tab).classList.add('active');
-    document.getElementById('tab-' + tab).setAttribute('aria-selected', 'true');
-    document.getElementById('pane-' + tab).classList.add('active');
+    // This is kept for backwards compatibility but now redirects to student section
+    selectRole('student');
+    if (tab === 'login') {
+        switchStudentTab('login');
+    } else if (tab === 'register') {
+        switchStudentTab('register');
+    }
 }
 
 
