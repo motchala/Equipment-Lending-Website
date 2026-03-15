@@ -4,7 +4,7 @@
 (function () {
     const TOTAL = 7;
     const INTERVAL = 6000; // 6 s between transitions
-    const IMG_BASE = 'images-design/';
+    const IMG_BASE = 'css/images-design/';
     const IMG_SUFFIX = '-hero-page.jpg';
 
     const track = document.getElementById('carouselTrack');

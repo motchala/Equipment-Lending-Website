@@ -2108,7 +2108,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
 
 
     <!-- Scripts -->
-    <script src="JavaScript/user-dashboard.js"></script>
+    <script src="js/user-dashboard.js"></script>
 
 
 </body>

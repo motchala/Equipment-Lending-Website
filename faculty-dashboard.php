@@ -1009,7 +1009,7 @@
         }
     </script>
 
-    <script src="JavaScript/faculty-dashboard.js"></script>
+    <script src="js/faculty-dashboard.js"></script>
 </body>
 
 </html>

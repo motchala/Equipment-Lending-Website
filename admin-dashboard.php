@@ -1904,7 +1904,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 </div>
 
-    <script src="JavaScript/admin-dashboard.js"></script>
+    <script src="js/admin-dashboard.js"></script>
 
 </body>
 
