@@ -17,6 +17,10 @@ if (isset($_SESSION['admin'])) {
     header("Location: admin-dashboard.php");
     exit();
 }
+if (isset($_SESSION['faculty_id'])) {
+    header("Location: faculty-dashboard.php");
+    exit();
+}
 
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 $login_error = $register_error = $register_success = "";
@@ -26,95 +30,147 @@ $login_email_val = $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
 if (isset($_POST['login'])) {
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
+    $user_type = $_POST['user_type'] ?? 'student'; // Default to student if not specified
     $login_email_val = $email;
 
-    // Admin shortcut login (local dev) — validate against legacy `tbl_accounts` password
-    if ($email === 'main@admin.edu') {
-        $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
-        if ($stmt_acc) {
-            $stmt_acc->bind_param("s", $email);
-            $stmt_acc->execute();
-            $res_acc = $stmt_acc->get_result();
-            if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
-                // tbl_accounts stores the legacy plain-text password; require it to match
-                if ($password === $row_acc['password']) {
-                    $_SESSION['admin'] = true;
+    // ===== ADMIN LOGIN =====
+    if ($user_type === 'admin') {
+        // Admin shortcut login (local dev) — validate against legacy `tbl_accounts` password
+        if ($email === 'main@admin.edu') {
+            $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
+            if ($stmt_acc) {
+                $stmt_acc->bind_param("s", $email);
+                $stmt_acc->execute();
+                $res_acc = $stmt_acc->get_result();
+                if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
+                    // tbl_accounts stores the legacy plain-text password; require it to match
+                    if ($password === $row_acc['password']) {
+                        $_SESSION['admin'] = true;
+                        $_SESSION['login_time'] = time();
+
+                        $admin_name_db = 'Administrator';
+
+                        // Ensure `last_login` column exists and load previous value into session
+                        $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
+                        if ($col_check && mysqli_num_rows($col_check) === 0) {
+                            // Add column (nullable) if it's missing
+                            @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
+                        }
+
+                        // Fetch previous last_login (may be null)
+                        $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
+                        if ($stmt_last) {
+                            $stmt_last->bind_param("s", $email);
+                            $stmt_last->execute();
+                            $res_last = $stmt_last->get_result();
+                            if ($res_last && $row_last = $res_last->fetch_assoc()) {
+                                $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
+                            }
+                            $stmt_last->close();
+                        }
+
+                        // Update last_login to now
+                        $now_dt = date('Y-m-d H:i:s');
+                        $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
+                        if ($stmt_up) {
+                            $stmt_up->bind_param("ss", $now_dt, $email);
+                            $stmt_up->execute();
+                            $stmt_up->close();
+                        }
+
+                        // Try tbl_users first (regular users table)
+                        $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
+                        if ($stmt_admin) {
+                            $stmt_admin->bind_param("s", $email);
+                            $stmt_admin->execute();
+                            $res_admin = $stmt_admin->get_result();
+                            if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
+                                if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
+                            }
+                        }
+
+                        // If not found, use the legacy tbl_accounts fullName
+                        if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
+                            $admin_name_db = $row_acc['fullName'];
+                        }
+
+                        $_SESSION['admin_name'] = $admin_name_db;
+                        $_SESSION['admin_email'] = $email;
+                        header("Location: admin-dashboard.php");
+                        exit();
+                    } else {
+                        $login_error = "Invalid admin credentials.";
+                    }
+                } else {
+                    $login_error = "Admin account not found.";
+                }
+            }
+        } else {
+            $login_error = "Admin account not found. Please use the correct admin email.";
+        }
+    }
+
+    // ===== FACULTY LOGIN =====
+    elseif ($user_type === 'faculty') {
+        // Check if tbl_faculty table exists
+        $table_check = mysqli_query($conn, "SHOW TABLES LIKE 'tbl_faculty'");
+        if ($table_check && mysqli_num_rows($table_check) > 0) {
+            $stmt = $conn->prepare("SELECT faculty_id, fullname, password FROM tbl_faculty WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows === 1) {
+                $faculty = $result->fetch_assoc();
+                if (password_verify($password, $faculty['password'])) {
+                    $_SESSION['faculty_id'] = $faculty['faculty_id'];
+                    $_SESSION['faculty_name'] = $faculty['fullname'];
+                    $_SESSION['faculty_email'] = $email;
                     $_SESSION['login_time'] = time();
 
-                    $admin_name_db = 'Administrator';
-
-                    // Ensure `last_login` column exists and load previous value into session
-                    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
-                    if ($col_check && mysqli_num_rows($col_check) === 0) {
-                        // Add column (nullable) if it's missing
-                        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
-                    }
-
-                    // Fetch previous last_login (may be null)
-                    $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
-                    if ($stmt_last) {
-                        $stmt_last->bind_param("s", $email);
-                        $stmt_last->execute();
-                        $res_last = $stmt_last->get_result();
-                        if ($res_last && $row_last = $res_last->fetch_assoc()) {
-                            $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
-                        }
-                        $stmt_last->close();
-                    }
-
-                    // Update last_login to now
+                    // Update last login
                     $now_dt = date('Y-m-d H:i:s');
-                    $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
+                    $stmt_up = $conn->prepare("UPDATE tbl_faculty SET last_login = ? WHERE faculty_id = ?");
                     if ($stmt_up) {
-                        $stmt_up->bind_param("ss", $now_dt, $email);
+                        $stmt_up->bind_param("si", $now_dt, $faculty['faculty_id']);
                         $stmt_up->execute();
                         $stmt_up->close();
                     }
 
-                    // Try tbl_users first (regular users table)
-                    $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
-                    if ($stmt_admin) {
-                        $stmt_admin->bind_param("s", $email);
-                        $stmt_admin->execute();
-                        $res_admin = $stmt_admin->get_result();
-                        if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
-                            if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
-                        }
-                    }
-
-                    // If not found, use the legacy tbl_accounts fullName
-                    if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
-                        $admin_name_db = $row_acc['fullName'];
-                    }
-
-                    $_SESSION['admin_name'] = $admin_name_db;
-                    $_SESSION['admin_email'] = $email;
-                    header("Location: admin-dashboard.php");
+                    header("Location: faculty-dashboard.php");
                     exit();
+                } else {
+                    $login_error = "Incorrect faculty password.";
                 }
+            } else {
+                $login_error = "Faculty account not found. Please contact admin.";
             }
+        } else {
+            $login_error = "Faculty portal is not yet set up. Please contact admin.";
         }
-        // fall through to normal user lookup/error if credentials don't match
     }
 
-    $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    // ===== STUDENT LOGIN =====
+    else {
+        $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-    if ($result->num_rows === 1) {
-        $user = $result->fetch_assoc();
-        if (password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['student_id'];
-            $_SESSION['fullname'] = $user['fullname'];
-            $_SESSION['login_time'] = time();
-            header("Location: user-dashboard.php");
-            exit();
+        if ($result->num_rows === 1) {
+            $user = $result->fetch_assoc();
+            if (password_verify($password, $user['password'])) {
+                $_SESSION['user_id'] = $user['student_id'];
+                $_SESSION['fullname'] = $user['fullname'];
+                $_SESSION['login_time'] = time();
+                header("Location: user-dashboard.php");
+                exit();
+            } else {
+                $login_error = "Incorrect student password.";
+            }
         } else {
-            $login_error = "Incorrect password.";
+            $login_error = "Student account not found. Please register first.";
         }
-    } else {
-        $login_error = "No account found with that email.";
     }
 }
 
@@ -270,13 +326,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
                 <!-- Buttons come first -->
                 <div class="hero-cta-group">
-                    <button class="btn-primary" onclick="openModal('login')" aria-label="Sign in to your account">
+                    <button class="btn-primary" onclick="openModal()" aria-label="Access the system portal">
                         <span>Access Portal</span>
                         <span class="btn-icon"><i class="fa-solid fa-arrow-right"></i></span>
-                    </button>
-                    <button class="btn-ghost" onclick="openModal('register')" aria-label="Create a new account">
-                        <i class="fa-solid fa-user-plus"></i>
-                        New here? Join free
                     </button>
                 </div>
 
@@ -503,147 +555,282 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
             <div class="modal-body" id="modalBody">
 
-                <div class="auth-tabs" role="tablist">
-                    <button class="auth-tab-btn" id="tab-login" role="tab" aria-selected="true" onclick="switchTab('login')">
-                        <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
-                    </button>
-                    <button class="auth-tab-btn" id="tab-register" role="tab" aria-selected="false" onclick="switchTab('register')">
-                        <i class="fa-solid fa-user-plus"></i> Register
-                    </button>
-                </div>
-
-                <!-- LOGIN PANE -->
-                <div class="auth-pane" id="pane-login" role="tabpanel">
-                    <p class="pane-title">Welcome back</p>
-                    <p class="pane-subtitle">Access PUP Biñan's Resource Hub</p>
-                    <?php if ($login_error): ?>
-                        <div class="auth-alert error">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                            <?= htmlspecialchars($login_error) ?>
-                        </div>
-                    <?php endif; ?>
-                    <form method="POST" action="">
-                        <div class="form-group">
-                            <label for="login-email">Email</label>
-                            <div class="input-wrap">
-                                <input class="form-field" type="email" id="login-email" name="email"
-                                    placeholder="youremail@student.edu.ph"
-                                    value="<?= htmlspecialchars($login_email_val) ?>"
-                                    autocomplete="email" required>
-                                <i class="fa-solid fa-envelope input-icon-left"></i>
+                <!-- ROLE SELECTOR -->
+                <div class="role-selector active" id="roleSelector">
+                    <div class="selector-header">
+                        <h2>Access Portal</h2>
+                        <p>Choose your role to continue</p>
+                    </div>
+                    <div class="role-cards">
+                        <button class="role-card" onclick="selectRole('student')">
+                            <div class="role-icon">
+                                <i class="fa-solid fa-graduation-cap"></i>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="login-pass">Password</label>
-                            <div class="input-wrap">
-                                <input class="form-field" type="password" id="login-pass" name="password"
-                                    placeholder="Enter your password"
-                                    autocomplete="current-password" required>
-                                <i class="fa-solid fa-lock input-icon-left"></i>
-                                <button type="button" class="eye-toggle" onclick="toggleEye('login-pass', this)" tabindex="-1" aria-label="Show password">
-                                    <i class="fa-regular fa-eye-slash"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <button type="submit" name="login" class="btn-auth">
-                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                            Sign In
+                            <h3>Student</h3>
+                            <p>Borrow equipment & reserve rooms</p>
                         </button>
-                    </form>
-                    <div class="modal-footer-link">
-                        <span>No account?</span>
-                        <button onclick="switchTab('register')">Register here</button>
+                        <button class="role-card" onclick="selectRole('faculty')">
+                            <div class="role-icon">
+                                <i class="fa-solid fa-chalkboard-teacher"></i>
+                            </div>
+                            <h3>Faculty</h3>
+                            <p>Manage & track resources</p>
+                        </button>
+                        <button class="role-card" onclick="selectRole('admin')">
+                            <div class="role-icon">
+                                <i class="fa-solid fa-user-shield"></i>
+                            </div>
+                            <h3>Admin</h3>
+                            <p>System administration</p>
+                        </button>
                     </div>
                 </div>
 
-                <!-- REGISTER PANE -->
-                <div class="auth-pane" id="pane-register" role="tabpanel">
-                    <p class="pane-title">New account</p>
-                    <p class="pane-subtitle">Join PUP Biñan's centralized resource system.</p>
-                    <?php if ($register_error): ?>
-                        <div class="auth-alert error">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                            <?= htmlspecialchars($register_error) ?>
-                        </div>
-                    <?php endif; ?>
-                    <?php if ($register_success): ?>
-                        <div class="auth-alert success">
-                            <i class="fa-solid fa-circle-check"></i>
-                            <?= htmlspecialchars($register_success) ?>
-                        </div>
-                    <?php endif; ?>
-                    <form method="POST" action="">
-                        <div class="form-group">
-                            <label for="reg-name">Full Name</label>
-                            <div class="input-wrap">
-                                <input class="form-field" type="text" id="reg-name" name="fullname"
-                                    minlength="5" maxlength="70"
-                                    placeholder="Juan Dela Cruz"
-                                    value="<?= htmlspecialchars($reg_fullname_val) ?>"
-                                    oninput="validateLettersName(this)"
-                                    autocomplete="name" required>
-                                <i class="fa-solid fa-user input-icon-left"></i>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="reg-sid">Student ID</label>
-                            <div class="input-wrap">
-                                <input class="form-field" type="text" id="reg-sid" name="student_id"
-                                    minlength="15" maxlength="15"
-                                    placeholder="20XX-00XXX-BN-X"
-                                    value="<?= htmlspecialchars($reg_studentid_val) ?>"
-                                    oninput="validateLettersStudentID(this)"
-                                    title="Format: YYYY-XXXXX-BN-X"
-                                    autocomplete="off" required>
-                                <i class="fa-solid fa-id-card input-icon-left"></i>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="reg-email">Email</label>
-                            <div class="input-wrap">
-                                <input class="form-field" type="email" id="reg-email" name="email"
-                                    minlength="15" maxlength="254"
-                                    placeholder="youremail@student.edu.ph"
-                                    value="<?= htmlspecialchars($reg_email_val) ?>"
-                                    oninput="validateLettersEmail(this)"
-                                    autocomplete="email" required>
-                                <i class="fa-solid fa-envelope input-icon-left"></i>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="reg-pass">Password</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="password" id="reg-pass" name="password"
-                                        minlength="4" placeholder="Min. 4 characters"
-                                        autocomplete="new-password" required>
-                                    <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" onclick="toggleEye('reg-pass', this)" tabindex="-1" aria-label="Show password">
-                                        <i class="fa-regular fa-eye-slash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="reg-cpass">Confirm</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="password" id="reg-cpass" name="confirm_password"
-                                        minlength="4" placeholder="Re-enter password"
-                                        autocomplete="new-password" required>
-                                    <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" onclick="toggleEye('reg-cpass', this)" tabindex="-1" aria-label="Show password">
-                                        <i class="fa-regular fa-eye-slash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" name="register" class="btn-auth btn-auth--register">
-                            <i class="fa-solid fa-user-plus"></i>
-                            Create Account
+                <!-- STUDENT LOGIN/REGISTER -->
+                <div class="auth-section" id="studentSection">
+                    <button class="back-btn" onclick="backToRoleSelector()">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+
+                    <div class="auth-tabs" role="tablist">
+                        <button class="auth-tab-btn active" id="student-tab-login" onclick="switchStudentTab('login')">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Login
                         </button>
-                    </form>
-                    <div class="modal-footer-link">
-                        <span>Have an account?</span>
-                        <button onclick="switchTab('login')">Sign in here</button>
+                        <button class="auth-tab-btn" id="student-tab-register" onclick="switchStudentTab('register')">
+                            <i class="fa-solid fa-user-plus"></i> Register
+                        </button>
+                    </div>
+
+                    <!-- Student Login -->
+                    <div class="auth-pane active" id="studentLogin">
+                        <p class="pane-title">Student Login</p>
+                        <p class="pane-subtitle">Sign in with your student account</p>
+                        <?php if ($login_error && !isset($_POST['user_type'])): ?>
+                            <div class="auth-alert error">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                                <?= htmlspecialchars($login_error) ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" action="">
+                            <div class="form-group">
+                                <label for="student-login-email">Email</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="email" id="student-login-email" name="email"
+                                        placeholder="youremail@student.edu.ph"
+                                        value="<?= htmlspecialchars($login_email_val) ?>"
+                                        autocomplete="email" required>
+                                    <i class="fa-solid fa-envelope input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="student-login-pass">Password</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="password" id="student-login-pass" name="password"
+                                        placeholder="Enter your password"
+                                        autocomplete="current-password" required>
+                                    <i class="fa-solid fa-lock input-icon-left"></i>
+                                    <button type="button" class="eye-toggle" onclick="toggleEye('student-login-pass', this)" tabindex="-1" aria-label="Show password">
+                                        <i class="fa-regular fa-eye-slash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" name="login" class="btn-auth">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                Sign In
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Student Register -->
+                    <div class="auth-pane" id="studentRegister">
+                        <p class="pane-title">Create Student Account</p>
+                        <p class="pane-subtitle">Join PUP Biñan's centralized resource system</p>
+                        <?php if ($register_error): ?>
+                            <div class="auth-alert error">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                                <?= htmlspecialchars($register_error) ?>
+                            </div>
+                        <?php endif; ?>
+                        <?php if ($register_success): ?>
+                            <div class="auth-alert success">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <?= htmlspecialchars($register_success) ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" action="">
+                            <div class="form-group">
+                                <label for="reg-name">Full Name</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="text" id="reg-name" name="fullname"
+                                        minlength="5" maxlength="70"
+                                        placeholder="Juan Dela Cruz"
+                                        value="<?= htmlspecialchars($reg_fullname_val) ?>"
+                                        oninput="validateLettersName(this)"
+                                        autocomplete="name" required>
+                                    <i class="fa-solid fa-user input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="reg-sid">Student ID</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="text" id="reg-sid" name="student_id"
+                                        minlength="15" maxlength="15"
+                                        placeholder="20XX-00XXX-BN-X"
+                                        value="<?= htmlspecialchars($reg_studentid_val) ?>"
+                                        oninput="validateLettersStudentID(this)"
+                                        title="Format: YYYY-XXXXX-BN-X"
+                                        autocomplete="off" required>
+                                    <i class="fa-solid fa-id-card input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="reg-email">Email</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="email" id="reg-email" name="email"
+                                        minlength="15" maxlength="254"
+                                        placeholder="youremail@student.edu.ph"
+                                        value="<?= htmlspecialchars($reg_email_val) ?>"
+                                        oninput="validateLettersEmail(this)"
+                                        autocomplete="email" required>
+                                    <i class="fa-solid fa-envelope input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="reg-pass">Password</label>
+                                    <div class="input-wrap">
+                                        <input class="form-field" type="password" id="reg-pass" name="password"
+                                            minlength="4" placeholder="Min. 4 characters"
+                                            autocomplete="new-password" required>
+                                        <i class="fa-solid fa-lock input-icon-left"></i>
+                                        <button type="button" class="eye-toggle" onclick="toggleEye('reg-pass', this)" tabindex="-1" aria-label="Show password">
+                                            <i class="fa-regular fa-eye-slash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="reg-cpass">Confirm</label>
+                                    <div class="input-wrap">
+                                        <input class="form-field" type="password" id="reg-cpass" name="confirm_password"
+                                            minlength="4" placeholder="Re-enter password"
+                                            autocomplete="new-password" required>
+                                        <i class="fa-solid fa-lock input-icon-left"></i>
+                                        <button type="button" class="eye-toggle" onclick="toggleEye('reg-cpass', this)" tabindex="-1" aria-label="Show password">
+                                            <i class="fa-regular fa-eye-slash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" name="register" class="btn-auth btn-auth--register">
+                                <i class="fa-solid fa-user-plus"></i>
+                                Create Account
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- FACULTY LOGIN -->
+                <div class="auth-section" id="facultySection">
+                    <button class="back-btn" onclick="backToRoleSelector()">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+
+                    <div class="auth-pane active">
+                        <p class="pane-title">Faculty Login</p>
+                        <p class="pane-subtitle">Sign in with your faculty credentials</p>
+                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'faculty'): ?>
+                            <div class="auth-alert error">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                                <?= htmlspecialchars($login_error) ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" action="">
+                            <input type="hidden" name="user_type" value="faculty">
+                            <div class="form-group">
+                                <label for="faculty-login-email">Faculty Email</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="email" id="faculty-login-email" name="email"
+                                        placeholder="faculty@pup.edu.ph"
+                                        autocomplete="email" required>
+                                    <i class="fa-solid fa-envelope input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="faculty-login-pass">Password</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="password" id="faculty-login-pass" name="password"
+                                        placeholder="Enter your password"
+                                        autocomplete="current-password" required>
+                                    <i class="fa-solid fa-lock input-icon-left"></i>
+                                    <button type="button" class="eye-toggle" onclick="toggleEye('faculty-login-pass', this)" tabindex="-1" aria-label="Show password">
+                                        <i class="fa-regular fa-eye-slash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" name="login" class="btn-auth">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                Sign In
+                            </button>
+                        </form>
+                        <div class="contact-admin-wrap">
+                            <button class="contact-admin-btn" onclick="showContactAdminModal()">
+                                Need an account? Contact Admin
+                            </button>
+                        </div>
+                        <!-- Dev Button (temporary for development) -->
+                        <div class="dev-access-wrap">
+                            <span class="dev-label">⚠️ Development Mode</span>
+                            <button class="dev-access-btn" onclick="window.location.href='faculty-dashboard.php'">
+                                <i class="fa-solid fa-code"></i>
+                                Access Faculty Dashboard (Dev)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN LOGIN -->
+                <div class="auth-section" id="adminSection">
+                    <button class="back-btn" onclick="backToRoleSelector()">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+
+                    <div class="auth-pane active">
+                        <p class="pane-title">Admin Login</p>
+                        <p class="pane-subtitle">Administrative access only</p>
+                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'admin'): ?>
+                            <div class="auth-alert error">
+                                <i class="fa-solid fa-circle-exclamation"></i>
+                                <?= htmlspecialchars($login_error) ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" action="">
+                            <input type="hidden" name="user_type" value="admin">
+                            <div class="form-group">
+                                <label for="admin-login-email">Admin Email</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="email" id="admin-login-email" name="email"
+                                        placeholder="admin@pup.edu.ph"
+                                        autocomplete="email" required>
+                                    <i class="fa-solid fa-envelope input-icon-left"></i>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="admin-login-pass">Password</label>
+                                <div class="input-wrap">
+                                    <input class="form-field" type="password" id="admin-login-pass" name="password"
+                                        placeholder="Enter your password"
+                                        autocomplete="current-password" required>
+                                    <i class="fa-solid fa-lock input-icon-left"></i>
+                                    <button type="button" class="eye-toggle" onclick="toggleEye('admin-login-pass', this)" tabindex="-1" aria-label="Show password">
+                                        <i class="fa-regular fa-eye-slash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="submit" name="login" class="btn-auth">
+                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                                Sign In
+                            </button>
+                        </form>
                     </div>
                 </div>
 
@@ -657,14 +844,34 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
         /* ================================================================
            INIT — PHP-generated values injected here
         ================================================================ */
-        switchTab('<?= $open_tab ?>');
         <?php if ($auto_open_modal): ?>
-            window.addEventListener('DOMContentLoaded', () => openModal('<?= $open_tab ?>'));
+            window.addEventListener('DOMContentLoaded', () => openModal());
         <?php endif; ?>
         <?php if (!empty($register_success)): ?>
-            setTimeout(() => switchTab('login'), 2200);
+            setTimeout(() => {
+                selectRole('student');
+                switchStudentTab('login');
+            }, 2200);
         <?php endif; ?>
     </script>
+
+
+</body>
+
+</html>
+</script>
+<script>
+    /* ================================================================
+           INIT — PHP-generated values injected here
+        ================================================================ */
+    switchTab('<?= $open_tab ?>');
+    <?php if ($auto_open_modal): ?>
+        window.addEventListener('DOMContentLoaded', () => openModal('<?= $open_tab ?>'));
+    <?php endif; ?>
+    <?php if (!empty($register_success)): ?>
+        setTimeout(() => switchTab('login'), 2200);
+    <?php endif; ?>
+</script>
 
 
 </body>
