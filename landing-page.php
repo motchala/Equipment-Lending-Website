@@ -233,7 +233,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>PUPSYNC — Faculty Equipment Lending</title>
+    <title>PUPSYNC — Student Equipment Lending</title>
     <!-- Performance: preconnect to font origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -314,14 +314,14 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
             <div class="hero-content">
                 <div class="hero-pill">
                     <span class="dot"></span>
-                    Faculty Resource Portal &nbsp;·&nbsp; PUP Biñan
+                    Student Resource Portal &nbsp;·&nbsp; PUP Biñan
                 </div>
                 <h1 class="hero-h1">
                     <em>Borrow smart,</em><br>
                     <span class="line-accent">return proud.</span>
                 </h1>
                 <p class="hero-sub">
-                    A secure, centralized platform that puts essential school equipment right at your fingertips — tracked, trusted, and always ready.
+                    A secure, student-built platform that puts essential school equipment right at your fingertips — tracked, trusted, and always ready.
                 </p>
 
                 <!-- Buttons come first -->
@@ -360,7 +360,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             </div>
                         </div>
                         <p class="footer-brand-desc">
-                            A centralized platform designed for the responsible borrowing and tracking of school equipment at PUP Biñan Campus — free, secure, and always available.
+                            A student-built platform designed for the responsible borrowing and tracking of school equipment at PUP Biñan Campus — free, secure, and always available.
                         </p>
                         <div class="footer-socials">
                             <a class="social-btn" href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
@@ -427,7 +427,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
                 <div class="footer-bottom">
                     <p class="footer-copy">
-                        &copy; 2026 <strong>PUPSYNC</strong> — For Faculty, By PUP Biñan.<br>
+                        &copy; 2026 <strong>PUPSYNC</strong> — For Students, By Students.<br>
                         Part of <a href="https://www.pup.edu.ph/binan/" target="_blank" rel="noopener">Polytechnic University of the Philippines — Biñan Campus</a>.
                     </p>
                     <div class="footer-badges">
@@ -506,7 +506,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     <!-- Bottom rule + copyright + desktop toggle -->
                     <div class="fmb-bottom">
                         <p class="footer-copy">
-                            &copy; 2026 <strong>PUPSYNC</strong> — For Faculty, By PUP Biñan.<br>
+                            &copy; 2026 <strong>PUPSYNC</strong> — For Students, By Students.<br>
                             <a href="https://www.pup.edu.ph/binan/" target="_blank" rel="noopener">PUP Biñan Campus</a>
                         </p>
                         <button class="fmb-desktop-btn" onclick="toggleMobileView()" aria-label="Switch to desktop layout">
@@ -536,7 +536,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                 onkeydown="if(event.key==='Enter'||event.key===' ')toggleMinimize()">
                 <div class="modal-handle-bar">
                     <div class="modal-handle-pill"></div>
-                    <span class="modal-handle-label">Faculty Portal</span>
+                    <span class="modal-handle-label">Student Portal</span>
                     <span class="modal-minimized-hint">Tap to expand</span>
                 </div>
                 <div class="modal-handle-actions" onclick="event.stopPropagation()">
@@ -567,14 +567,14 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                 <i class="fa-solid fa-graduation-cap"></i>
                             </div>
                             <h3>Student</h3>
-                            <p>View equipment & room availability</p>
+                            <p>Borrow equipment & reserve rooms</p>
                         </button>
                         <button class="role-card" onclick="selectRole('faculty')">
                             <div class="role-icon">
                                 <i class="fa-solid fa-chalkboard-teacher"></i>
                             </div>
                             <h3>Faculty</h3>
-                            <p>Borrow equipment & reserve rooms</p>
+                            <p>Manage & track resources</p>
                         </button>
                         <button class="role-card" onclick="selectRole('admin')">
                             <div class="role-icon">

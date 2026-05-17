@@ -137,14 +137,18 @@ while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
 // ── Fetch extended user profile ─────────────────────────────────────────────
 $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
-    "SELECT email, backup_email, profile_picture,
-     program, year_level, phone, present_address, permanent_address, landline
+    "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
+     program, year_level, phone, present_address, permanent_address, landline,
+     emergency_name, emergency_relationship, emergency_phone 
      FROM tbl_users WHERE student_id='$uid_safe' LIMIT 1"
 )) ?: [];
 $db_email         = $profile_row['email']         ?? '';
 $db_backup_email  = $profile_row['backup_email']  ?? '';
 $db_profile_pic   = $profile_row['profile_picture'] ?? '';
-// Department
+$db_dob           = $profile_row['dob']           ?? '';
+$db_gender        = $profile_row['gender']        ?? '';
+$db_nationality   = $profile_row['nationality']   ?? '';
+// Academic
 $db_program       = $profile_row['program']       ?? '';
 $db_year_level    = $profile_row['year_level']    ?? '';
 // Contact
@@ -152,11 +156,20 @@ $db_phone            = $profile_row['phone']            ?? '';
 $db_present_address  = $profile_row['present_address']  ?? '';
 $db_permanent_address = $profile_row['permanent_address'] ?? '';
 $db_landline         = $profile_row['landline']         ?? '';
+// Emergency
+$db_emergency_name   = $profile_row['emergency_name']        ?? '';
+$db_emergency_rel    = $profile_row['emergency_relationship'] ?? '';
+$db_emergency_phone  = $profile_row['emergency_phone']       ?? '';
 
 $masked_email     = maskEmail($db_email);
 $masked_backup    = maskEmail($db_backup_email);
-$backup_locked    = !empty($db_backup_email);
-$program_locked   = !empty($db_program);
+$dob_display      = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
+// Locked = value already exists in DB (one-time fields)
+$dob_locked         = !empty($db_dob);
+$gender_locked      = !empty($db_gender);
+$nationality_locked = !empty($db_nationality);
+$backup_locked      = !empty($db_backup_email);
+$program_locked     = !empty($db_program);
 // Profile picture path
 $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 ?>
@@ -168,7 +181,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUP Sync | Faculty Portal</title>
+    <title>PUP Sync | User Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
@@ -193,7 +206,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <span style="white-space: nowrap; line-height: 1.1;">
                         <strong style="font-size: 25px;">PUP</strong><span style="font-weight: 500; letter-spacing: -0.3px; font-size: 21px; vertical-align: baseline; margin-left: 1px;">SYNC</span>
                     </span>
-                    <small>Faculty Portal</small>
+                    <small>User Portal</small>
                 </div>
             </div>
         </div>
@@ -239,7 +252,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <div>
                         <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
                         <span class="dd-sub">ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                        <span class="dd-sub" style="margin-top:2px;">Faculty</span>
+                        <span class="dd-sub" style="margin-top:2px;">Student</span>
                     </div>
                 </div>
                 <div class="dd-menu">
@@ -432,7 +445,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                        </svg> Faculty Requests
+                        </svg> My Requests
                     </button>
                     <button class="qa-btn" data-action="go-tab" data-tab="rooms">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
@@ -469,7 +482,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                         <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                    </svg> Faculty Requests
+                    </svg> My Requests
                 </button>
             </div>
 
@@ -480,7 +493,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <circle cx="11" cy="11" r="8" />
                             <line x1="21" y1="21" x2="16.65" y2="16.65" />
                         </svg>Browse Equipment</h2>
-                    <p>Search and select equipment to submit a borrow request for your class or activity.</p>
+                    <p>Search and request available school equipment for academic use.</p>
                 </div>
 
                 <div class="eq-card">
@@ -589,7 +602,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
             <div class="lending-sub" id="lending-form">
                 <div class="page-header">
                     <h2>Borrow Request</h2>
-                    <p>Fill in the details below to submit a borrowing request.</p>
+                    <p>Fill in the details below to submit your borrowing request.</p>
                 </div>
 
                 <div class="eq-card form-card">
@@ -614,9 +627,12 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
 
                         <form id="borrowForm" method="POST" action="">
                             <input type="hidden" name="equipment_name" id="selectedItem">
-                            <!-- Faculty is the requester — auto-fill instructor from session -->
-                            <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
 
+                            <div class="form-group">
+                                <label>Instructor</label>
+                                <input type="text" name="instructor" id="instructorField"
+                                    class="form-control-custom" placeholder="e.g. Sir. Migs" required>
+                            </div>
                             <div class="form-group">
                                 <label>Room / Laboratory</label>
                                 <input type="text" name="room" class="form-control-custom"
@@ -649,8 +665,8 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Requests" aria-hidden="true">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                        </svg>Faculty Borrow Requests</h2>
-                    <p>Track and manage all submitted borrow requests.</p>
+                        </svg>My Borrow Requests</h2>
+                    <p>Track the status of all your submitted borrow requests.</p>
                 </div>
 
                 <div class="eq-card">
@@ -693,7 +709,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                     <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
                                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                             <circle cx="12" cy="7" r="4" />
-                                        </svg>Requested By</th>
+                                        </svg>Instructor</th>
                                     <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
                                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                                             <line x1="9" y1="3" x2="9" y2="21" />
@@ -975,8 +991,8 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <input type="text" class="form-control-custom" placeholder="e.g. BSIT Capstone Defense">
                         </div>
                         <div class="form-group">
-                            <label>Purpose / Activity</label>
-                            <input type="text" class="form-control-custom" placeholder="e.g. Lecture, Lab Session, Meeting">
+                            <label>Instructor / Adviser</label>
+                            <input type="text" class="form-control-custom" placeholder="e.g. Sir. Migs">
                         </div>
                         <div class="form-group">
                             <label>Number of Attendees</label>
@@ -1059,13 +1075,19 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                         <path d="M22 10v6" />
                         <path d="M2 10l10-5 10 5-10 5z" />
                         <path d="M6 12v5c3 3 9 3 12 0v-5" />
-                    </svg> Department Info
+                    </svg> Academic Info
                 </button>
                 <button class="acc-nav-btn" data-acc-tab="acc-contact">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Contact" aria-hidden="true">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
                         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
                     </svg> Contact Details
+                </button>
+                <span class="account-sidebar-label" style="margin-top:0.5rem;">Emergency</span>
+                <button class="acc-nav-btn" data-acc-tab="acc-emergency">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Emergency" aria-hidden="true">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg> Emergency Contact
                 </button>
             </div>
 
@@ -1121,8 +1143,29 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" style="vertical-align:middle;margin-right:6px;">
                                     <circle cx="12" cy="12" r="7" fill="#22c55e" stroke="none" />
                                 </svg>
-                                Active Faculty
+                                Active Student
                             </span>
+
+                            <!-- Subtle Progress Bar (hidden when 100%) -->
+                            <div class="account-progress-inline" id="inlineProgressContainer">
+                                <div class="progress-bar-wrapper">
+                                    <div class="progress-bar-small">
+                                        <div class="progress-bar-fill-small" id="completionBar" style="width: 0%;"></div>
+                                    </div>
+                                    <span class="progress-percentage-small" id="completionPercentage">0%</span>
+                                </div>
+                                <div class="progress-info-icon" id="progressInfoIcon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                    <div class="progress-tooltip" id="progressTooltip">
+                                        <strong>Account Completion</strong>
+                                        <p id="tooltipHint">Complete your profile to access all features</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="acc-action-wrap">
                             <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
@@ -1149,8 +1192,34 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <input class="info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-lbl">Student ID</span>
                             <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Date of Birth</span>
+                            <span class="info-val <?php echo $dob_locked ? '' : 'empty'; ?>" data-field="dob"><?php echo $dob_locked ? htmlspecialchars($dob_display) : '— Not provided'; ?></span>
+                            <?php if (!$dob_locked): ?>
+                                <input class="info-input-f" type="date" data-input="dob" disabled style="display:none;" max="<?php echo date('Y-m-d'); ?>">
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Gender</span>
+                            <span class="info-val <?php echo $gender_locked ? '' : 'empty'; ?>" data-field="gender"><?php echo $gender_locked ? htmlspecialchars($db_gender) : '— Not provided'; ?></span>
+                            <?php if (!$gender_locked): ?>
+                                <select class="info-input-f" data-input="gender" disabled style="display:none;">
+                                    <option value="">Select...</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                    <option>Prefer not to say</option>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Nationality</span>
+                            <span class="info-val <?php echo $nationality_locked ? '' : 'empty'; ?>" data-field="nationality"><?php echo $nationality_locked ? htmlspecialchars($db_nationality) : '— Not provided'; ?></span>
+                            <?php if (!$nationality_locked): ?>
+                                <input class="info-input-f" data-input="nationality" placeholder="e.g. Filipino" disabled style="display:none;">
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -1190,13 +1259,13 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                 <!-- Academic -->
                 <div id="acc-academic" class="overlay-sub-panel">
                     <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Department</span>
-                        <h2>Department Information</h2>
-                        <p>Your faculty department and assignment details.</p>
+                        <span class="section-eyebrow">My Account › Academic</span>
+                        <h2>Academic Information</h2>
+                        <p>Your enrollment and program details.</p>
                     </div>
                     <div class="info-card">
                         <div class="info-card-head">
-                            <h3>Department Assignment</h3>
+                            <h3>Enrollment</h3>
                             <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">
                                 Edit
                             </button>
@@ -1208,7 +1277,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             </button>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-lbl">Student ID</span>
                             <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
                         </div>
                         <div class="info-row">
@@ -1216,7 +1285,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Department</span>
+                            <span class="info-lbl">Program</span>
                             <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program">
                                 <?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?>
                             </span>
@@ -1236,23 +1305,17 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <?php endif; ?>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Position / Rank</span>
+                            <span class="info-lbl">Year Level</span>
                             <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level">
                                 <?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?>
                             </span>
                             <select class="info-input-f" data-input="year_level" disabled style="display:none;">
-                                <option value="">Select Position...</option>
-                                <option value="Instructor I">Instructor I</option>
-                                <option value="Instructor II">Instructor II</option>
-                                <option value="Instructor III">Instructor III</option>
-                                <option value="Assistant Professor I">Assistant Professor I</option>
-                                <option value="Assistant Professor II">Assistant Professor II</option>
-                                <option value="Assistant Professor III">Assistant Professor III</option>
-                                <option value="Associate Professor I">Associate Professor I</option>
-                                <option value="Associate Professor II">Associate Professor II</option>
-                                <option value="Professor I">Professor I</option>
-                                <option value="Professor II">Professor II</option>
-                                <option value="Part-time Faculty">Part-time Faculty</option>
+                                <option value="">Select Year Level...</option>
+                                <option value="1st Year">1st Year</option>
+                                <option value="2nd Year">2nd Year</option>
+                                <option value="3rd Year">3rd Year</option>
+                                <option value="4th Year">4th Year</option>
+                                <option value="Ladderized">Ladderized</option>
                             </select>
                         </div>
                         <div class="info-row">
@@ -1318,6 +1381,49 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     </div>
                 </div>
 
+                <!-- Emergency -->
+                <div id="acc-emergency" class="overlay-sub-panel">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Emergency</span>
+                        <h2>Emergency Contact</h2>
+                        <p>Person to contact in an emergency.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Primary Contact</h3>
+                            <button class="btn-edit-acc" id="editEmergencyBtn" data-action="emergency-edit" style="display:inline-flex;">
+                                Edit
+                            </button>
+                            <button class="btn-save-acc" id="saveEmergencyBtn" style="display:none;" data-action="emergency-save">
+                                Save Changes
+                            </button>
+                            <button class="btn-cancel-acc" id="cancelEmergencyBtn" style="display:none;" data-action="emergency-cancel">
+                                Cancel
+                            </button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Name</span>
+                            <span class="info-val <?php echo $db_emergency_name ? '' : 'empty'; ?>" data-field="emergency_name">
+                                <?php echo $db_emergency_name ? htmlspecialchars($db_emergency_name) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_name" placeholder="Full name" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Relationship</span>
+                            <span class="info-val <?php echo $db_emergency_rel ? '' : 'empty'; ?>" data-field="emergency_relationship">
+                                <?php echo $db_emergency_rel ? htmlspecialchars($db_emergency_rel) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_relationship" placeholder="e.g. Mother, Father, Guardian" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Mobile Number</span>
+                            <span class="info-val <?php echo $db_emergency_phone ? '' : 'empty'; ?>" data-field="emergency_phone">
+                                <?php echo $db_emergency_phone ? htmlspecialchars($db_emergency_phone) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="emergency_phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div><!-- /accountOverlay -->
@@ -1981,6 +2087,15 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
             </div>
         </div>
     </div>
+
+    <!-- Profile Config for JS -->
+    <script>
+        window.USER_PROFILE_LOCKS = {
+            dob: <?php echo $dob_locked         ? 'true' : 'false'; ?>,
+            gender: <?php echo $gender_locked      ? 'true' : 'false'; ?>,
+            nationality: <?php echo $nationality_locked ? 'true' : 'false'; ?>
+        };
+    </script>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay">
