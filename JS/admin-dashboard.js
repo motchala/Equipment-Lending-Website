@@ -153,12 +153,34 @@
         closeDropdown();
         document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
         const el = document.getElementById(id);
-        if (el) el.classList.add('active');
+        if (el) {
+            el.classList.add('active');
+            // Reset to default tab when opening overlay
+            if (id === 'accountOverlay') {
+                switchAccTab('acc-overview');
+            } else if (id === 'settingsOverlay') {
+                switchSettTab('st-appearance');
+            } else if (id === 'notifOverlay') {
+                filterNotifs('all');
+            }
+        }
     }
 
     function closeOverlay(id) {
         const el = document.getElementById(id);
-        if (el) el.classList.remove('active');
+        if (el) {
+            el.classList.remove('active');
+            // Clear active states from overlay sub-navigation buttons
+            if (id === 'accountOverlay') {
+                document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
+            } else if (id === 'settingsOverlay') {
+                document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
+            } else if (id === 'notifOverlay') {
+                document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+            }
+        }
     }
 
     /* ── Edit mode helpers ───────────────────────────────────── */

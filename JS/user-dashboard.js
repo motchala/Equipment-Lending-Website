@@ -46,18 +46,20 @@
         // 1. Theme
         const theme = LS.get('theme');
         if (theme && theme !== 'light') _applyThemeDOM(theme);
+        // Sync unified theme dropdown
+        const tsu = document.getElementById('themeSelectUnified');
+        if (tsu && theme) tsu.value = theme;
 
-        // 2. Accent color
-        const ac = LS.get('accentColor'),
-            al = LS.get('accentLight');
-        if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
+        // 2. Accent color — removed from new settings design; kept for backwards compat
+        // const ac = LS.get('accentColor'), al = LS.get('accentLight');
+        // if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        // 3. Compact mode
-        if (LS.get('compact') === 'true') {
-            const ct = document.getElementById('compactToggle');
-            if (ct) ct.checked = true;
-            document.documentElement.style.setProperty('--radius', '9px');
-        }
+        // 3. Compact mode — removed from new settings design
+        // if (LS.get('compact') === 'true') {
+        //     const ct = document.getElementById('compactToggle');
+        //     if (ct) ct.checked = true;
+        //     document.documentElement.style.setProperty('--radius', '9px');
+        // }
 
         // 4. Font size
         const fs = LS.get('fontSize');
@@ -67,33 +69,17 @@
             const lbl = document.getElementById('fontSizeLbl');
             if (lbl) lbl.textContent = fs + '%';
             document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
+            // Sync font scale buttons
+            document.querySelectorAll('.u-font-btn').forEach(b => {
+                b.classList.toggle('u-font-btn-active', b.dataset.scale === fs);
+            });
         }
 
-        // 5. Reduce motion
-        if (LS.get('reduceMotion') === 'true') {
-            const rmt = document.getElementById('reduceMotionToggle');
-            if (rmt) rmt.checked = true;
-            let s = document.getElementById('reduceMotionStyle');
-            if (!s) {
-                s = document.createElement('style');
-                s.id = 'reduceMotionStyle';
-                document.head.appendChild(s);
-            }
-            s.textContent = '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }';
-        }
+        // 5. Reduce motion — removed from new settings design
+        // if (LS.get('reduceMotion') === 'true') { ... }
 
-        // 6. Focus ring
-        if (LS.get('focusRing') === 'true') {
-            const frt = document.getElementById('focusRingToggle');
-            if (frt) frt.checked = true;
-            let s = document.getElementById('focusRingStyle');
-            if (!s) {
-                s = document.createElement('style');
-                s.id = 'focusRingStyle';
-                document.head.appendChild(s);
-            }
-            s.textContent = '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }';
-        }
+        // 6. Focus ring — removed from new settings design
+        // if (LS.get('focusRing') === 'true') { ... }
 
         // 7. Account profile fields — now driven by DB on page load, NOT localStorage.
         //    (localStorage profile keys are intentionally skipped here so stale cached
@@ -169,10 +155,18 @@
     /* ── Toast ─────────────────────────────────────────────────────────── */
     let toastTimer;
 
-    function showToast(msg) {
+    function showToast(msg, type) {
         const t = document.getElementById('app-toast');
         if (!t) return;
-        t.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg> ' + msg;
+        // Colour the toast based on type
+        if (type === 'error') {
+            t.style.background = 'var(--color-error, #ba1a1a)';
+        } else if (type === 'success') {
+            t.style.background = 'var(--color-primary-container, #570000)';
+        } else {
+            t.style.background = '';
+        }
+        t.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px;">check_circle</span> ' + msg;
         t.classList.add('show');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
@@ -212,17 +206,23 @@
 
     /* ── Profile Dropdown ──────────────────────────────────────────────── */
     function openDropdown() {
-        document.getElementById('profileDropdown').classList.add('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'true');
+        const dd = document.getElementById('profileDropdown');
+        const btn = document.getElementById('avatarBtn');
+        if (dd) dd.classList.add('open');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
     }
 
     function closeDropdown() {
-        document.getElementById('profileDropdown').classList.remove('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'false');
+        const dd = document.getElementById('profileDropdown');
+        const btn = document.getElementById('avatarBtn');
+        if (dd) dd.classList.remove('open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
     }
 
     function toggleDropdown() {
-        document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
+        const dd = document.getElementById('profileDropdown');
+        if (dd && dd.classList.contains('open')) closeDropdown();
+        else openDropdown();
     }
 
     /* ── Overlays ──────────────────────────────────────────────────────── */
@@ -235,6 +235,12 @@
         document.querySelectorAll('.overlay-page.active').forEach(o => {
             if (o !== el) o.classList.remove('active');
         });
+        // Highlight the Settings sidebar item when settings overlay is open
+        if (id === 'settingsOverlay') {
+            document.querySelectorAll('.side-nav-item[data-tab]').forEach(b => b.classList.remove('active'));
+            const settingsNavItem = document.getElementById('nav-settings');
+            if (settingsNavItem) settingsNavItem.classList.add('active');
+        }
     }
 
     function openOverlay(id) {
@@ -250,6 +256,11 @@
         // We also immediately remove the class for instant visual feedback.
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
+        // Remove active state from settings nav item when closing settings overlay
+        if (id === 'settingsOverlay') {
+            const settingsNavItem = document.getElementById('nav-settings');
+            if (settingsNavItem) settingsNavItem.classList.remove('active');
+        }
         history.back();
     }
 
@@ -257,9 +268,14 @@
     function _switchTabDOM(tabName) {
         const panel = document.getElementById('panel-' + tabName);
         if (panel) panel.classList.add('active');
+        // Legacy nav-tab support (kept for compatibility)
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
+        // New side-nav-item support
+        document.querySelectorAll('.side-nav-item[data-tab]').forEach(b => b.classList.remove('active'));
+        const sideBtn = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
+        if (sideBtn) sideBtn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach(p => {
             if (p !== panel) p.classList.remove('active');
         });
@@ -286,29 +302,29 @@
         });
     }
 
-    /* ── Account Sub-Tabs ──────────────────────────────────────────────── */
-    function switchAccTab(panelId) {
-        const panel = document.getElementById(panelId);
-        if (panel) panel.classList.add('active');
-        document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => {
-            if (p !== panel) p.classList.remove('active');
-        });
-    }
+    /* ── Account Sub-Tabs — not used in unified settings card layout ───── */
+    // function switchAccTab(panelId) {
+    //     const panel = document.getElementById(panelId);
+    //     if (panel) panel.classList.add('active');
+    //     document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
+    //     const btn = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
+    //     if (btn) btn.classList.add('active');
+    //     document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => {
+    //         if (p !== panel) p.classList.remove('active');
+    //     });
+    // }
 
-    /* ── Settings Sub-Tabs ─────────────────────────────────────────────── */
-    function switchSettTab(panelId) {
-        const panel = document.getElementById(panelId);
-        if (panel) panel.classList.add('active');
-        document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => {
-            if (p !== panel) p.classList.remove('active');
-        });
-    }
+    /* ── Settings Sub-Tabs — not used in unified settings card layout ──── */
+    // function switchSettTab(panelId) {
+    //     const panel = document.getElementById(panelId);
+    //     if (panel) panel.classList.add('active');
+    //     document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
+    //     const btn = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
+    //     if (btn) btn.classList.add('active');
+    //     document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => {
+    //         if (p !== panel) p.classList.remove('active');
+    //     });
+    // }
 
     /* ── Equipment Search/Filter ───────────────────────────────────────── */
     function filterEquipment() {
@@ -1107,6 +1123,9 @@
     document.addEventListener('click', function (e) {
         const el = e.target.closest('[data-action]');
         if (!el) return;
+        if (el.tagName.toLowerCase() === 'a') {
+            e.preventDefault();
+        }
         const action = el.dataset.action;
         try {
             switch (action) {
@@ -1158,12 +1177,12 @@
                 case 'apply-theme':
                     applyTheme(el.dataset.theme);
                     break;
-                case 'apply-accent':
-                    applyAccent(el.dataset.color, el.dataset.light);
-                    break;
-                case 'reset-settings':
-                    resetAllSettings();
-                    break;
+                // case 'apply-accent': — accent color picker removed from new settings design
+                //     applyAccent(el.dataset.color, el.dataset.light);
+                //     break;
+                // case 'reset-settings': — reset button removed from new settings design
+                //     resetAllSettings();
+                //     break;
                 case 'profile-edit':
                     toggleProfileEdit();
                     break;
@@ -1236,7 +1255,43 @@
 
     /* ── Close dropdown on outside click ─────────────────────────────── */
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.header-right')) closeDropdown();
+        if (!e.target.closest('.top-bar-profile-wrap') && !e.target.closest('.header-right')) closeDropdown();
+    });
+
+    /* ── Notification bell popover ────────────────────────────────────── */
+    const notifBellBtn = document.getElementById('notifBellBtn');
+    const notifPopover = document.getElementById('notifPopover');
+    if (notifBellBtn && notifPopover) {
+        notifBellBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isOpen = notifPopover.classList.contains('open');
+            notifPopover.classList.toggle('open', !isOpen);
+            notifBellBtn.setAttribute('aria-expanded', String(!isOpen));
+        });
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.top-bar-notif-wrap')) {
+                notifPopover.classList.remove('open');
+                notifBellBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    /* ── Side nav clicks ──────────────────────────────────────────────── */
+    document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            // Close any open overlay when navigating to a tab
+            document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+            switchTab(this.dataset.tab);
+        });
+    });
+
+    /* ── Audit log link ───────────────────────────────────────────────── */
+    document.querySelectorAll('.audit-view-all[data-tab]').forEach(a => {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            switchTab(this.dataset.tab);
+        });
     });
 
     /* ── Nav tabs ─────────────────────────────────────────────────────── */
@@ -1253,19 +1308,15 @@
         });
     });
 
-    /* ── Account sub-nav ──────────────────────────────────────────────── */
-    document.querySelectorAll('.acc-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            switchAccTab(this.dataset.accTab);
-        });
-    });
+    /* ── Account sub-nav — removed in unified settings card layout ──────── */
+    // document.querySelectorAll('.acc-nav-btn').forEach(btn => {
+    //     btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
+    // });
 
-    /* ── Settings sub-nav ─────────────────────────────────────────────── */
-    document.querySelectorAll('.s-nav-item').forEach(btn => {
-        btn.addEventListener('click', function () {
-            switchSettTab(this.dataset.settTab);
-        });
-    });
+    /* ── Settings sub-nav — removed in unified settings card layout ──────── */
+    // document.querySelectorAll('.s-nav-item').forEach(btn => {
+    //     btn.addEventListener('click', function () { switchSettTab(this.dataset.settTab); });
+    // });
 
     /* ── Notification filter tabs ─────────────────────────────────────── */
     document.querySelectorAll('.notif-tab').forEach(btn => {
@@ -1286,25 +1337,163 @@
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
-    /* ── Settings toggles — use 'change' event (reliable, no delegation conflict) */
-    const compactToggle = document.getElementById('compactToggle');
-    if (compactToggle) compactToggle.addEventListener('change', function () {
-        applyCompact(this.checked);
-    });
+    /* ── Global Live Search ───────────────────────────────────────────── */
+    (function initLiveSearch() {
+        const input = document.getElementById('globalSearch');
+        const dropdown = document.getElementById('liveSearchDropdown');
+        if (!input || !dropdown) return;
+
+        let debounceTimer = null;
+
+        function getEquipmentItems() {
+            const items = [];
+            document.querySelectorAll('.item-node').forEach(el => {
+                items.push({ type: 'equipment', name: el.dataset.name || '', category: el.dataset.category || '', el });
+            });
+            return items;
+        }
+
+        function buildDropdown(q) {
+            q = q.trim().toLowerCase();
+            if (!q) { dropdown.style.display = 'none'; return; }
+
+            const results = [];
+
+            // Search equipment catalog
+            getEquipmentItems().forEach(item => {
+                if (item.name.includes(q) || item.category.includes(q)) {
+                    results.push({ type: 'equipment', label: toTitleCase(item.name), sub: toTitleCase(item.category), item });
+                }
+            });
+
+            // Search requests from pre-loaded data
+            const requests = window.REQUESTS_DATA || [];
+            requests.forEach(r => {
+                const haystack = (r.equipment_name + ' ' + r.status + ' ' + r.room).toLowerCase();
+                if (haystack.includes(q)) {
+                    results.push({ type: 'request', label: r.equipment_name, sub: r.status + ' · ' + r.borrow_date, req: r });
+                }
+            });
+
+            if (!results.length) {
+                dropdown.innerHTML = '<div class="ls-empty"><span class="material-symbols-outlined">search_off</span> No results for "<strong>' + escHtml(q) + '</strong>"</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            const eqResults = results.filter(r => r.type === 'equipment').slice(0, 4);
+            const rqResults = results.filter(r => r.type === 'request').slice(0, 4);
+            let html = '';
+
+            if (eqResults.length) {
+                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">inventory_2</span> Equipment</div>';
+                eqResults.forEach(r => {
+                    html += '<div class="ls-item" data-ls-type="equipment" data-ls-name="' + escHtml(r.label) + '">' +
+                        '<span class="material-symbols-outlined ls-item-icon">inventory_2</span>' +
+                        '<div><div class="ls-item-title">' + escHtml(r.label) + '</div>' +
+                        '<div class="ls-item-sub">' + escHtml(r.sub) + '</div></div>' +
+                        '</div>';
+                });
+            }
+
+            if (rqResults.length) {
+                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> Requests</div>';
+                rqResults.forEach(r => {
+                    const chipClass = r.req.status === 'Approved' ? 'chip-success' : r.req.status === 'Overdue' ? 'chip-error' : r.req.status === 'Waiting' ? 'chip-warning' : 'chip-muted';
+                    html += '<div class="ls-item" data-ls-type="request" data-ls-status="' + escHtml(r.req.status) + '">' +
+                        '<span class="material-symbols-outlined ls-item-icon">receipt_long</span>' +
+                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(r.label) + '</div>' +
+                        '<div class="ls-item-sub">' + escHtml(r.req.borrow_date) + ' → ' + escHtml(r.req.return_date) + '</div></div>' +
+                        '<span class="status-chip ' + chipClass + '" style="font-size:11px;padding:2px 8px;"><span class="chip-dot"></span>' + escHtml(r.req.status) + '</span>' +
+                        '</div>';
+                });
+            }
+
+            dropdown.innerHTML = html;
+            dropdown.style.display = 'block';
+
+            // Click handlers on results
+            dropdown.querySelectorAll('.ls-item').forEach(item => {
+                item.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    if (this.dataset.lsType === 'equipment') {
+                        // Navigate to equipment tab, search for this item
+                        switchTab('lending');
+                        switchLendingSub('browse');
+                        const es = document.getElementById('equipmentSearch');
+                        if (es) { es.value = this.dataset.lsName; filterEquipment(); }
+                    } else {
+                        // Navigate to My Requests filtered by status
+                        switchTab('lending');
+                        switchLendingSub('requests');
+                        const sf = document.getElementById('reqStatusFilter');
+                        if (sf) { sf.value = this.dataset.lsStatus || 'All'; setRequestsFilter(sf.value); }
+                    }
+                    input.value = '';
+                    dropdown.style.display = 'none';
+                });
+            });
+        }
+
+        function toTitleCase(str) {
+            return str.replace(/\b\w/g, c => c.toUpperCase());
+        }
+        function escHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        input.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => buildDropdown(this.value), 180);
+        });
+
+        input.addEventListener('focus', function () {
+            if (this.value.trim()) buildDropdown(this.value);
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { dropdown.style.display = 'none'; this.blur(); }
+        });
+    })();
+
+    /* ── Settings toggles — compact/reduceMotion/focusRing removed from new design */
+    // const compactToggle = document.getElementById('compactToggle');
+    // if (compactToggle) compactToggle.addEventListener('change', function () { applyCompact(this.checked); });
 
     const fontSizeRange = document.getElementById('fontSizeRange');
     if (fontSizeRange) fontSizeRange.addEventListener('input', function () {
         applyFontSize(this.value);
     });
 
-    const reduceMotionToggle = document.getElementById('reduceMotionToggle');
-    if (reduceMotionToggle) reduceMotionToggle.addEventListener('change', function () {
-        applyReduceMotion(this.checked);
-    });
+    // const reduceMotionToggle = document.getElementById('reduceMotionToggle');
+    // if (reduceMotionToggle) reduceMotionToggle.addEventListener('change', function () { applyReduceMotion(this.checked); });
 
-    const focusRingToggle = document.getElementById('focusRingToggle');
-    if (focusRingToggle) focusRingToggle.addEventListener('change', function () {
-        applyFocusRing(this.checked);
+    // const focusRingToggle = document.getElementById('focusRingToggle');
+    // if (focusRingToggle) focusRingToggle.addEventListener('change', function () { applyFocusRing(this.checked); });
+
+    /* ── Unified theme dropdown ───────────────────────────────────────── */
+    const themeSelectUnified = document.getElementById('themeSelectUnified');
+    if (themeSelectUnified) {
+        themeSelectUnified.addEventListener('change', function () {
+            applyTheme(this.value);
+        });
+    }
+
+    /* ── Unified font-scale 3-button toggle ──────────────────────────── */
+    document.querySelectorAll('.u-font-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.u-font-btn').forEach(b => b.classList.remove('u-font-btn-active'));
+            this.classList.add('u-font-btn-active');
+            applyFontSize(this.dataset.scale);
+            const range = document.getElementById('fontSizeRange');
+            if (range) range.value = this.dataset.scale;
+        });
     });
 
     /* ── Page Init ────────────────────────────────────────────────────── */
@@ -1313,8 +1502,13 @@
         // (called before URL/slug logic so themes apply before first paint)
         restorePersistedState();
 
+        // Ensure no overlay is visible by default on initial page load
+        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+
         // URL slug
-        const userSlug = '<?php echo $user_slug; ?>';
+        // USER_SLUG is injected by PHP into window.USER_SLUG via the inline <script>
+        // tag in user-dashboard.php — never embed PHP directly in a .js file.
+        const userSlug = window.USER_SLUG || '';
         if (!window.location.search.includes(userSlug)) {
             const newUrl = window.location.protocol + '//' + window.location.host +
                 window.location.pathname + '?u=' + userSlug;
@@ -1777,56 +1971,51 @@
             });
         });
 
-        // Handle file selection
-        if (profilePicInput) {
-            profilePicInput.addEventListener('change', function (e) {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                // Validate file type
-                const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-                if (!allowedTypes.includes(file.type)) {
-                    showToast('Invalid file type. Please upload JPG, PNG, or WEBP.', 'error');
-                    return;
-                }
-
-                // Validate file size (5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    showToast('File too large. Maximum size is 5MB.', 'error');
-                    return;
-                }
-
-                // Upload file
-                const formData = new FormData();
-                formData.append('action', 'upload_profile_picture');
-                formData.append('profile_picture', file);
-
-                fetch('includes/update-profile.php', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(r => r.json())
-                    .then(data => {
-                        if (data.success) {
-                            showToast(data.msg, 'success');
-                            // Update all avatar displays
-                            const newPicUrl = data.profile_picture + '?t=' + Date.now();
-                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
-                                el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
-                            });
-                        } else {
-                            showToast(data.msg, 'error');
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        showToast('Failed to upload profile picture', 'error');
-                    });
-
-                // Reset input
-                profilePicInput.value = '';
-            });
-        }
+        // ── DUPLICATE HANDLER COMMENTED OUT ────────────────────────────────
+        // The profilePicInput 'change' listener below duplicates the one already
+        // attached at lines ~900-944 (the picInput block outside DOMContentLoaded).
+        // Keeping both caused double upload requests on every file selection.
+        // The canonical handler at ~900-944 uses updateAvatarsToImage() which is
+        // the correct approach; this alternate version used innerHTML directly.
+        // Left here as a comment so no code is lost per project conventions.
+        //
+        // if (profilePicInput) {
+        //     profilePicInput.addEventListener('change', function (e) {
+        //         const file = e.target.files[0];
+        //         if (!file) return;
+        //         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+        //         if (!allowedTypes.includes(file.type)) {
+        //             showToast('Invalid file type. Please upload JPG, PNG, or WEBP.', 'error');
+        //             return;
+        //         }
+        //         if (file.size > 5 * 1024 * 1024) {
+        //             showToast('File too large. Maximum size is 5MB.', 'error');
+        //             return;
+        //         }
+        //         const formData = new FormData();
+        //         formData.append('action', 'upload_profile_picture');
+        //         formData.append('profile_picture', file);
+        //         fetch('includes/update-profile.php', { method: 'POST', body: formData })
+        //             .then(r => r.json())
+        //             .then(data => {
+        //                 if (data.success) {
+        //                     showToast(data.msg, 'success');
+        //                     const newPicUrl = data.profile_picture + '?t=' + Date.now();
+        //                     document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
+        //                         el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
+        //                     });
+        //                 } else {
+        //                     showToast(data.msg, 'error');
+        //                 }
+        //             })
+        //             .catch(err => {
+        //                 console.error(err);
+        //                 showToast('Failed to upload profile picture', 'error');
+        //             });
+        //         profilePicInput.value = '';
+        //     });
+        // }
+        // ── END DUPLICATE HANDLER ───────────────────────────────────────────
 
         // Handle remove picture
         document.querySelectorAll('[data-action="remove-picture"]').forEach(btn => {
@@ -1873,49 +2062,8 @@
 
     /* ══════════════════════════════════════════════════════════════════
        HELPER FUNCTION - TOAST NOTIFICATIONS
+       (second definition removed — using the #app-toast element above)
     ══════════════════════════════════════════════════════════════════ */
-    function showToast(message, type = 'info') {
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.style.cssText = `
-        position: fixed;
-        bottom: 2rem;
-        right: 2rem;
-        background: ${type === 'success' ? 'var(--success)' : type === 'error' ? 'var(--danger)' : 'var(--accent-maroon)'};
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: var(--radius);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10000;
-        max-width: 400px;
-        animation: slideIn 0.3s ease;
-    `;
-        toast.textContent = message;
-
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
-    }
-
-    // Add animation styles
-    if (!document.getElementById('toastAnimations')) {
-        const style = document.createElement('style');
-        style.id = 'toastAnimations';
-        style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(100%); opacity: 0; }
-        }
-    `;
-        document.head.appendChild(style);
-    }
+    // showToast is already defined above using #app-toast
 
 })();
