@@ -483,6 +483,10 @@
     }
 
     /* ── Profile Edit ──────────────────────────────────────────────────── */
+    // Locked fields: dob, gender, nationality cannot be changed once set.
+    // The PHP template only renders their <input>/<select> elements when the
+    // value is empty, so we simply skip any [data-input] that has no matching
+    // element in the DOM.
     function toggleProfileEdit() {
         const editBtn = document.getElementById('editProfileBtn');
         const saveBtn = document.getElementById('saveProfileBtn');
@@ -545,7 +549,10 @@
                 if (data.success) {
                     // Update each span from the server-confirmed values
                     const serverVals = {
-                        fullname: data.fullname || ''
+                        fullname: data.fullname || '',
+                        dob: data.dob || '',
+                        gender: data.gender || '',
+                        nationality: data.nationality || ''
                     };
 
                     document.querySelectorAll('[data-input]').forEach(input => {
@@ -555,9 +562,21 @@
 
                         let displayVal = serverVals[key] || '';
 
+                        // Format date of birth for display
+                        if (key === 'dob' && displayVal) {
+                            const d = new Date(displayVal + 'T00:00:00');
+                            displayVal = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                        }
+
                         if (displayVal) {
                             span.textContent = displayVal;
                             span.classList.remove('empty');
+                            // If this field is now permanently locked, remove the input from DOM
+                            const locks = window.USER_PROFILE_LOCKS || {};
+                            if ((key === 'dob' || key === 'gender' || key === 'nationality') && !locks[key]) {
+                                // Mark as locked for this session without full reload
+                                input.parentElement.removeChild(input);
+                            }
                         } else {
                             span.textContent = '— Not provided';
                             span.classList.add('empty');
@@ -1080,6 +1099,7 @@
         const form = document.getElementById('borrowForm');
         const borrowInp = document.getElementById('borrow_date');
         const returnInp = document.getElementById('return_date');
+        const instrInp = document.getElementById('instructorField');
         if (!form || !borrowInp || !returnInp) return;
 
         borrowInp.min = todayStr;
@@ -1089,6 +1109,12 @@
             returnInp.min = this.value;
             if (returnInp.value && returnInp.value < this.value) returnInp.value = this.value;
         });
+
+        if (instrInp) {
+            instrInp.addEventListener('input', function () {
+                this.value = this.value.replace(/[^a-zA-Z\s.']/g, '');
+            });
+        }
 
         form.addEventListener('submit', function (e) {
             const bv = borrowInp.value;
@@ -1586,6 +1612,54 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
+       ACCOUNT COMPLETION PROGRESS BAR - INLINE VERSION
+    ══════════════════════════════════════════════════════════════════ */
+    function updateCompletionProgress() {
+        fetch('includes/update-profile.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=get_completion_status'
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    const percentage = data.percentage;
+                    const bar = document.getElementById('completionBar');
+                    const label = document.getElementById('completionPercentage');
+                    const container = document.getElementById('inlineProgressContainer');
+                    const tooltipHint = document.getElementById('tooltipHint');
+
+                    if (bar) bar.style.width = percentage + '%';
+                    if (label) label.textContent = percentage + '%';
+
+                    // Hide entire progress bar when 100% complete
+                    if (container) {
+                        if (percentage === 100) {
+                            container.classList.add('hidden');
+                        } else {
+                            container.classList.remove('hidden');
+                        }
+                    }
+
+                    if (tooltipHint) {
+                        if (percentage === 100) {
+                            tooltipHint.textContent = '✓ Profile complete! You have access to all features.';
+                        } else {
+                            const remaining = Math.ceil((100 - percentage) / 7.7);
+                            tooltipHint.textContent = `${remaining} field${remaining > 1 ? 's' : ''} remaining to complete your profile`;
+                        }
+                    }
+                }
+            })
+            .catch(err => console.error('Failed to fetch completion status:', err));
+    }
+
+    // Update progress on page load and after saves
+    if (document.getElementById('inlineProgressContainer')) {
+        updateCompletionProgress();
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
        ACADEMIC INFO - EDIT/SAVE/CANCEL
     ══════════════════════════════════════════════════════════════════ */
     let academicOriginalValues = {};
@@ -1663,6 +1737,7 @@
                         showConfirmationModal(data.changes, 'academic', data.data);
                     } else if (data.success) {
                         showToast(data.msg, 'success');
+                        updateCompletionProgress();
                     } else {
                         showToast(data.msg, 'error');
                     }
@@ -1748,6 +1823,7 @@
                         showConfirmationModal(data.changes, 'contact', data.data);
                     } else if (data.success) {
                         showToast(data.msg, 'success');
+                        updateCompletionProgress();
                     } else {
                         showToast(data.msg, 'error');
                     }
@@ -1755,6 +1831,90 @@
                 .catch(err => {
                     console.error(err);
                     showToast('Failed to save contact details', 'error');
+                });
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       EMERGENCY CONTACT - EDIT/SAVE/CANCEL
+    ══════════════════════════════════════════════════════════════════ */
+    let emergencyOriginalValues = {};
+
+    function initEmergencySection() {
+        const editBtn = document.getElementById('editEmergencyBtn');
+        const saveBtn = document.getElementById('saveEmergencyBtn');
+        const cancelBtn = document.getElementById('cancelEmergencyBtn');
+
+        if (!editBtn) return;
+
+        editBtn.addEventListener('click', function () {
+            // Store original values
+            emergencyOriginalValues = {
+                emergency_name: document.querySelector('[data-input="emergency_name"]')?.value || '',
+                emergency_relationship: document.querySelector('[data-input="emergency_relationship"]')?.value || '',
+                emergency_phone: document.querySelector('[data-input="emergency_phone"]')?.value || ''
+            };
+
+            // Show inputs, hide displays
+            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
+                const field = inp.getAttribute('data-input');
+                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
+                if (display) {
+                    const currentText = display.textContent.trim();
+                    if (currentText !== '— Not provided') {
+                        inp.value = currentText;
+                    }
+                    display.style.display = 'none';
+                }
+                inp.style.display = 'block';
+                inp.disabled = false;
+            });
+
+            editBtn.style.display = 'none';
+            saveBtn.style.display = 'inline-flex';
+            cancelBtn.style.display = 'inline-flex';
+        });
+
+        cancelBtn.addEventListener('click', function () {
+            document.querySelectorAll('#acc-emergency .info-input-f').forEach(inp => {
+                const field = inp.getAttribute('data-input');
+                inp.value = emergencyOriginalValues[field] || '';
+                inp.style.display = 'none';
+                inp.disabled = true;
+                const display = document.querySelector(`#acc-emergency [data-field="${field}"]`);
+                if (display) display.style.display = 'block';
+            });
+
+            editBtn.style.display = 'inline-flex';
+            saveBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+        });
+
+        saveBtn.addEventListener('click', function () {
+            const formData = new FormData();
+            formData.append('action', 'save_emergency');
+            formData.append('emergency_name', document.querySelector('[data-input="emergency_name"]')?.value || '');
+            formData.append('emergency_relationship', document.querySelector('[data-input="emergency_relationship"]')?.value || '');
+            formData.append('emergency_phone', document.querySelector('[data-input="emergency_phone"]')?.value || '');
+
+            fetch('includes/update-profile.php', {
+                method: 'POST',
+                body: formData
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.needsConfirmation) {
+                        showConfirmationModal(data.changes, 'emergency', data.data);
+                    } else if (data.success) {
+                        showToast(data.msg, 'success');
+                        updateCompletionProgress();
+                    } else {
+                        showToast(data.msg, 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showToast('Failed to save emergency contact', 'error');
                 });
         });
     }
@@ -1852,7 +2012,7 @@
                     // Reset edit mode
                     const sectionId = section === 'profile' ? 'acc-overview' :
                         section === 'academic' ? 'acc-academic' :
-                            section === 'contact' ? 'acc-contact' : 'acc-overview';
+                            section === 'contact' ? 'acc-contact' : 'acc-emergency';
 
                     document.querySelectorAll(`#${sectionId} .info-input-f`).forEach(inp => {
                         inp.style.display = 'none';
@@ -1867,6 +2027,7 @@
                     if (saveBtn) saveBtn.style.display = 'none';
                     if (cancelBtn) cancelBtn.style.display = 'none';
 
+                    updateCompletionProgress();
                 } else {
                     showToast(data.msg, 'error');
                 }
@@ -1892,10 +2053,16 @@
 
         newSaveBtn.addEventListener('click', function () {
             const fullname = (document.querySelector('[data-input="fullname"]')?.value || '').trim();
+            const dob = document.querySelector('[data-input="dob"]')?.value || '';
+            const gender = document.querySelector('[data-input="gender"]')?.value || '';
+            const nationality = document.querySelector('[data-input="nationality"]')?.value || '';
 
             const formData = new FormData();
             formData.append('action', 'save_profile');
             formData.append('fullname', fullname);
+            formData.append('dob', dob);
+            formData.append('gender', gender);
+            formData.append('nationality', nationality);
 
             fetch('includes/update-profile.php', {
                 method: 'POST',
@@ -1904,9 +2071,10 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.needsConfirmation) {
-                        showConfirmationModal(data.changes, 'profile', { fullname });
+                        showConfirmationModal(data.changes, 'profile', { fullname, dob, gender, nationality });
                     } else if (data.success) {
                         showToast(data.msg, 'success');
+                        updateCompletionProgress();
                     } else {
                         showToast(data.msg, 'error');
                     }
@@ -1925,6 +2093,7 @@
         // Initialize sections
         initAcademicSection();
         initContactSection();
+        initEmergencySection();
         handleProfileSaveWithConfirmation();
 
         // Confirmation modal buttons
@@ -1937,6 +2106,21 @@
         document.querySelectorAll('[data-action="close-confirmation-modal"]').forEach(btn => {
             btn.addEventListener('click', closeConfirmationModal);
         });
+
+        // Update progress when account overlay opens
+        const accountOverlay = document.getElementById('accountOverlay');
+        if (accountOverlay) {
+            const observer = new MutationObserver(mutations => {
+                mutations.forEach(mutation => {
+                    if (mutation.attributeName === 'class') {
+                        if (accountOverlay.classList.contains('active')) {
+                            updateCompletionProgress();
+                        }
+                    }
+                });
+            });
+            observer.observe(accountOverlay, { attributes: true });
+        }
 
         // ═══════════════════════════════════════════════════════════════
         // CHANGE PROFILE BUTTON FUNCTIONALITY
@@ -1971,51 +2155,57 @@
             });
         });
 
-        // ── DUPLICATE HANDLER COMMENTED OUT ────────────────────────────────
-        // The profilePicInput 'change' listener below duplicates the one already
-        // attached at lines ~900-944 (the picInput block outside DOMContentLoaded).
-        // Keeping both caused double upload requests on every file selection.
-        // The canonical handler at ~900-944 uses updateAvatarsToImage() which is
-        // the correct approach; this alternate version used innerHTML directly.
-        // Left here as a comment so no code is lost per project conventions.
-        //
-        // if (profilePicInput) {
-        //     profilePicInput.addEventListener('change', function (e) {
-        //         const file = e.target.files[0];
-        //         if (!file) return;
-        //         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-        //         if (!allowedTypes.includes(file.type)) {
-        //             showToast('Invalid file type. Please upload JPG, PNG, or WEBP.', 'error');
-        //             return;
-        //         }
-        //         if (file.size > 5 * 1024 * 1024) {
-        //             showToast('File too large. Maximum size is 5MB.', 'error');
-        //             return;
-        //         }
-        //         const formData = new FormData();
-        //         formData.append('action', 'upload_profile_picture');
-        //         formData.append('profile_picture', file);
-        //         fetch('includes/update-profile.php', { method: 'POST', body: formData })
-        //             .then(r => r.json())
-        //             .then(data => {
-        //                 if (data.success) {
-        //                     showToast(data.msg, 'success');
-        //                     const newPicUrl = data.profile_picture + '?t=' + Date.now();
-        //                     document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
-        //                         el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
-        //                     });
-        //                 } else {
-        //                     showToast(data.msg, 'error');
-        //                 }
-        //             })
-        //             .catch(err => {
-        //                 console.error(err);
-        //                 showToast('Failed to upload profile picture', 'error');
-        //             });
-        //         profilePicInput.value = '';
-        //     });
-        // }
-        // ── END DUPLICATE HANDLER ───────────────────────────────────────────
+        // Handle file selection
+        if (profilePicInput) {
+            profilePicInput.addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // Validate file type
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    showToast('Invalid file type. Please upload JPG, PNG, or WEBP.', 'error');
+                    return;
+                }
+
+                // Validate file size (5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    showToast('File too large. Maximum size is 5MB.', 'error');
+                    return;
+                }
+
+                // Upload file
+                const formData = new FormData();
+                formData.append('action', 'upload_profile_picture');
+                formData.append('profile_picture', file);
+
+                fetch('includes/update-profile.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            showToast(data.msg, 'success');
+                            // Update all avatar displays
+                            const newPicUrl = data.profile_picture + '?t=' + Date.now();
+                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
+                                el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
+                            });
+                            updateCompletionProgress();
+                        } else {
+                            showToast(data.msg, 'error');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        showToast('Failed to upload profile picture', 'error');
+                    });
+
+                // Reset input
+                profilePicInput.value = '';
+            });
+        }
 
         // Handle remove picture
         document.querySelectorAll('[data-action="remove-picture"]').forEach(btn => {

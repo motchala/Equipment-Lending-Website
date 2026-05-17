@@ -110,10 +110,23 @@ if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 
 // ── Profile ────────────────────────────────────────────────────────────────
 $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
-    "SELECT email, backup_email, profile_picture,
-     program, year_level, phone, present_address, permanent_address, landline
+    "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
+     program, year_level, phone, present_address, permanent_address, landline,
+     emergency_name, emergency_relationship, emergency_phone 
      FROM tbl_users WHERE student_id='$uid_safe' LIMIT 1"
 )) ?: [];
+$db_email         = $profile_row['email']         ?? '';
+$db_backup_email  = $profile_row['backup_email']  ?? '';
+$db_profile_pic   = $profile_row['profile_picture'] ?? '';
+$db_dob           = $profile_row['dob']           ?? '';
+$db_gender        = $profile_row['gender']        ?? '';
+$db_nationality   = $profile_row['nationality']   ?? '';
+// Academic
+$db_program       = $profile_row['program']       ?? '';
+$db_year_level    = $profile_row['year_level']    ?? '';
+// Contact
+$db_phone            = $profile_row['phone']            ?? '';
+$db_present_address  = $profile_row['present_address']  ?? '';
 $db_email             = $profile_row['email']             ?? '';
 $db_backup_email      = $profile_row['backup_email']      ?? '';
 $db_profile_pic       = $profile_row['profile_picture']   ?? '';
@@ -122,6 +135,23 @@ $db_year_level        = $profile_row['year_level']        ?? '';
 $db_phone             = $profile_row['phone']             ?? '';
 $db_present_address   = $profile_row['present_address']   ?? '';
 $db_permanent_address = $profile_row['permanent_address'] ?? '';
+$db_landline         = $profile_row['landline']         ?? '';
+// Emergency
+$db_emergency_name   = $profile_row['emergency_name']        ?? '';
+$db_emergency_rel    = $profile_row['emergency_relationship'] ?? '';
+$db_emergency_phone  = $profile_row['emergency_phone']       ?? '';
+
+$masked_email     = maskEmail($db_email);
+$masked_backup    = maskEmail($db_backup_email);
+$dob_display      = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
+// Locked = value already exists in DB (one-time fields)
+$dob_locked         = !empty($db_dob);
+$gender_locked      = !empty($db_gender);
+$nationality_locked = !empty($db_nationality);
+$backup_locked      = !empty($db_backup_email);
+$program_locked     = !empty($db_program);
+// Profile picture path
+$profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 $db_landline          = $profile_row['landline']          ?? '';
 $masked_email         = maskEmail($db_email);
 $masked_backup        = maskEmail($db_backup_email);
@@ -135,6 +165,8 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUP Sync | User Portal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <title>PUPSync | Faculty Dashboard</title>
     <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -160,6 +192,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
+                <div class="app-logo-text" style="display: flex; flex-direction: column;">
+                    <span style="white-space: nowrap; line-height: 1.1;">
+                        <strong style="font-size: 25px;">PUP</strong><span style="font-weight: 500; letter-spacing: -0.3px; font-size: 21px; vertical-align: baseline; margin-left: 1px;">SYNC</span>
+                    </span>
+                    <small>User Portal</small>
+                </div>
             </div>
             <div>
                 <div class="side-nav-title"><strong>PUP</strong>SYNC</div>
@@ -429,6 +467,40 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div>
 
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Quick" aria-hidden="true">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>Quick Actions</h3>
+                    <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Search" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg> Browse Equipment
+                    </button>
+                    <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                        </svg> My Requests
+                    </button>
+                    <button class="qa-btn" data-action="go-tab" data-tab="rooms">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                        </svg> Reserve a Room
+                    </button>
+                    <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Notifications" aria-hidden="true">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;"><?php echo (3 + count($overdue_notifs)); ?></span>
+                    </button>
+                </div>
+            </div>
+        </div><!-- /panel-home -->
+
                 <!-- Active Now Section -->
                 <?php
                 $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
@@ -466,6 +538,21 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
     ============================================================ -->
             <div class="tab-panel" id="panel-lending">
 
+            <!-- Lending Sub-Nav -->
+            <div class="lending-nav">
+                <button class="lending-nav-btn active" data-lending-nav="browse">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Browse" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg> Browse Equipment
+                </button>
+                <button class="lending-nav-btn" data-lending-nav="requests">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
+                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    </svg> My Requests
+                </button>
+            </div>
                 <!-- Lending Sub-Nav -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-lending-nav="browse">
@@ -476,6 +563,25 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </button>
                 </div>
 
+            <!-- ── Sub: Browse Equipment ─────────────────────────── -->
+            <div class="lending-sub active" id="lending-browse">
+                <div class="page-header">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Browse equipment" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>Browse Equipment</h2>
+                    <p>Search and request available school equipment for academic use.</p>
+                </div>
+
+                <div class="eq-card">
+                    <div class="eq-card-body">
+                        <div class="filter-row">
+                            <div class="search-wrap">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon" aria-label="Search" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name...">
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
@@ -549,6 +655,21 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div><!-- /lending-browse -->
 
+            <!-- ── Sub: Borrow Form ──────────────────────────────── -->
+            <div class="lending-sub" id="lending-form">
+                <div class="page-header">
+                    <h2>Borrow Request</h2>
+                    <p>Fill in the details below to submit your borrowing request.</p>
+                </div>
+
+                <div class="eq-card form-card">
+                    <div class="form-card-header">
+                        <h2>Borrowing Form</h2>
+                        <button class="btn-close-custom" data-action="lending-back" title="Go back">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
                 <!-- ── Sub: Borrow Form ────────────────────────────────── -->
                 <div class="lending-sub" id="lending-form">
                     <div class="page-header-block" style="display:flex;align-items:center;gap:12px;">
@@ -567,6 +688,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <form id="borrowForm" method="POST" action="">
                             <input type="hidden" name="equipment_name" id="selectedItem">
+
+                            <div class="form-group">
+                                <label>Instructor</label>
+                                <input type="text" name="instructor" id="instructorField"
+                                    class="form-control-custom" placeholder="e.g. Sir. Migs" required>
+                            </div>
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <div class="form-group">
                                 <label class="form-label">Room / Laboratory</label>
@@ -1580,6 +1707,15 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
             </div>
         </div>
     </div>
+
+    <!-- Profile Config for JS -->
+    <script>
+        window.USER_PROFILE_LOCKS = {
+            dob: <?php echo $dob_locked         ? 'true' : 'false'; ?>,
+            gender: <?php echo $gender_locked      ? 'true' : 'false'; ?>,
+            nationality: <?php echo $nationality_locked ? 'true' : 'false'; ?>
+        };
+    </script>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;">
