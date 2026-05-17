@@ -192,12 +192,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <div class="app-logo-text" style="display: flex; flex-direction: column;">
-                    <span style="white-space: nowrap; line-height: 1.1;">
-                        <strong style="font-size: 25px;">PUP</strong><span style="font-weight: 500; letter-spacing: -0.3px; font-size: 21px; vertical-align: baseline; margin-left: 1px;">SYNC</span>
-                    </span>
-                    <small>User Portal</small>
-                </div>
             </div>
             <div>
                 <div class="side-nav-title"><strong>PUP</strong>SYNC</div>
@@ -445,6 +439,37 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             <?php endif; ?>
                             <a class="audit-view-all" data-tab="activity" href="#">View Full Activity Log</a>
                         </div>
+                        <!-- Quick Actions -->
+                        <div class="quick-actions">
+                            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Quick" aria-hidden="true">
+                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                </svg>Quick Actions</h3>
+                            <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Search" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg> Browse Equipment
+                            </button>
+                            <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                                </svg> My Requests
+                            </button>
+                            <button class="qa-btn" data-action="go-tab" data-tab="rooms">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                    <line x1="9" y1="3" x2="9" y2="21" />
+                                    <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                                </svg> Reserve a Room
+                            </button>
+                            <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Notifications" aria-hidden="true">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                                </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;"><?php echo (3 + count($overdue_notifs)); ?></span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Right: Quick Access Bento -->
@@ -467,39 +492,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div>
 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Quick" aria-hidden="true">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                        </svg>Quick Actions</h3>
-                    <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Search" aria-hidden="true">
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg> Browse Equipment
-                    </button>
-                    <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
-                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                        </svg> My Requests
-                    </button>
-                    <button class="qa-btn" data-action="go-tab" data-tab="rooms">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                            <line x1="9" y1="3" x2="9" y2="21" />
-                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                        </svg> Reserve a Room
-                    </button>
-                    <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Notifications" aria-hidden="true">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                        </svg> Notifications <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;"><?php echo (3 + count($overdue_notifs)); ?></span>
-                    </button>
-                </div>
-            </div>
-        </div><!-- /panel-home -->
 
                 <!-- Active Now Section -->
                 <?php
@@ -538,21 +530,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
     ============================================================ -->
             <div class="tab-panel" id="panel-lending">
 
-            <!-- Lending Sub-Nav -->
-            <div class="lending-nav">
-                <button class="lending-nav-btn active" data-lending-nav="browse">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Browse" aria-hidden="true">
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg> Browse Equipment
-                </button>
-                <button class="lending-nav-btn" data-lending-nav="requests">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
-                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                    </svg> My Requests
-                </button>
-            </div>
                 <!-- Lending Sub-Nav -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-lending-nav="browse">
@@ -563,25 +540,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </button>
                 </div>
 
-            <!-- ── Sub: Browse Equipment ─────────────────────────── -->
-            <div class="lending-sub active" id="lending-browse">
-                <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Browse equipment" aria-hidden="true">
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>Browse Equipment</h2>
-                    <p>Search and request available school equipment for academic use.</p>
-                </div>
-
-                <div class="eq-card">
-                    <div class="eq-card-body">
-                        <div class="filter-row">
-                            <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon" aria-label="Search" aria-hidden="true">
-                                    <circle cx="11" cy="11" r="8" />
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                </svg>
-                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name...">
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
@@ -655,21 +613,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div><!-- /lending-browse -->
 
-            <!-- ── Sub: Borrow Form ──────────────────────────────── -->
-            <div class="lending-sub" id="lending-form">
-                <div class="page-header">
-                    <h2>Borrow Request</h2>
-                    <p>Fill in the details below to submit your borrowing request.</p>
-                </div>
-
-                <div class="eq-card form-card">
-                    <div class="form-card-header">
-                        <h2>Borrowing Form</h2>
-                        <button class="btn-close-custom" data-action="lending-back" title="Go back">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
                 <!-- ── Sub: Borrow Form ────────────────────────────────── -->
                 <div class="lending-sub" id="lending-form">
                     <div class="page-header-block" style="display:flex;align-items:center;gap:12px;">
@@ -981,203 +924,203 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
             <button class="overlay-back-btn" data-action="close-overlay" data-target="accountOverlay">
                 <span class="material-symbols-outlined">arrow_back</span> Back
             </button>
-        <span class="overlay-topbar-title">My Account</span>
-        <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
-    </div>
-    <div class="account-layout">
-        <div class="account-sidebar">
-            <span class="account-sidebar-label">My Account</span>
-            <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                <span class="material-symbols-outlined">badge</span> Overview
-            </button>
-            <button class="acc-nav-btn" data-acc-tab="acc-academic">
-                <span class="material-symbols-outlined">school</span> Department Info
-            </button>
-            <button class="acc-nav-btn" data-acc-tab="acc-contact">
-                <span class="material-symbols-outlined">contacts</span> Contact Details
-            </button>
+            <span class="overlay-topbar-title">My Account</span>
+            <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
         </div>
-        <div class="account-content">
+        <div class="account-layout">
+            <div class="account-sidebar">
+                <span class="account-sidebar-label">My Account</span>
+                <button class="acc-nav-btn active" data-acc-tab="acc-overview">
+                    <span class="material-symbols-outlined">badge</span> Overview
+                </button>
+                <button class="acc-nav-btn" data-acc-tab="acc-academic">
+                    <span class="material-symbols-outlined">school</span> Department Info
+                </button>
+                <button class="acc-nav-btn" data-acc-tab="acc-contact">
+                    <span class="material-symbols-outlined">contacts</span> Contact Details
+                </button>
+            </div>
+            <div class="account-content">
 
-            <!-- Overview -->
-            <div id="acc-overview" class="overlay-sub-panel active">
-                <div class="overlay-section-header">
-                    <span class="section-eyebrow">My Account › Overview</span>
-                    <h2>Profile &amp; Identity</h2>
-                    <p>Your personal details and login information.</p>
-                </div>
-                <div class="account-hero-card">
-                    <div class="acc-avatar-section">
-                        <div class="acc-avatar-large" id="profileAvatarLarge">
-                            <?php if ($profile_pic_url): ?>
-                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
-                            <?php else: ?>
-                                <?php echo htmlspecialchars($initials); ?>
-                            <?php endif; ?>
-                        </div>
-                        <div style="position:relative;">
-                            <button class="btn-change-profile" id="changeProfileBtn" data-action="open-picture-menu">Change Photo</button>
-                            <div class="picture-menu" id="pictureMenu" style="display:none;">
-                                <button class="pic-menu-item" data-action="upload-picture">
-                                    <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
-                                </button>
+                <!-- Overview -->
+                <div id="acc-overview" class="overlay-sub-panel active">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Overview</span>
+                        <h2>Profile &amp; Identity</h2>
+                        <p>Your personal details and login information.</p>
+                    </div>
+                    <div class="account-hero-card">
+                        <div class="acc-avatar-section">
+                            <div class="acc-avatar-large" id="profileAvatarLarge">
                                 <?php if ($profile_pic_url): ?>
-                                    <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
-                                        <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
-                                    </button>
+                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($initials); ?>
                                 <?php endif; ?>
                             </div>
+                            <div style="position:relative;">
+                                <button class="btn-change-profile" id="changeProfileBtn" data-action="open-picture-menu">Change Photo</button>
+                                <div class="picture-menu" id="pictureMenu" style="display:none;">
+                                    <button class="pic-menu-item" data-action="upload-picture">
+                                        <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
+                                    </button>
+                                    <?php if ($profile_pic_url): ?>
+                                        <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                            <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                         </div>
-                        <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
+                        <div class="acc-hero-info">
+                            <h2><?php echo htmlspecialchars($fullname); ?></h2>
+                            <p>ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></p>
+                            <span class="acc-badge">
+                                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
+                                Active Faculty
+                            </span>
+                        </div>
+                        <div class="acc-action-wrap">
+                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit Profile</button>
+                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
+                                <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
+                            </button>
+                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">Cancel</button>
+                        </div>
                     </div>
-                    <div class="acc-hero-info">
-                        <h2><?php echo htmlspecialchars($fullname); ?></h2>
-                        <p>ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></p>
-                        <span class="acc-badge">
-                            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
-                            Active Faculty
-                        </span>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Personal Information</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Full Name</span>
+                            <span class="info-val" data-field="fullname"><?php echo htmlspecialchars($fullname); ?></span>
+                            <input class="info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                        </div>
                     </div>
-                    <div class="acc-action-wrap">
-                        <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit Profile</button>
-                        <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
-                            <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
-                        </button>
-                        <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">Cancel</button>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Login &amp; Security</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Primary Email</span>
+                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Backup Email</span>
+                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email"><?php echo $masked_backup ?: '— Not provided'; ?></span>
+                            <?php if (!$backup_locked): ?>
+                                <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Password</span>
+                            <span class="info-val">••••••••••</span>
+                            <button class="btn-inline-action" data-action="open-email-verify-modal">Change</button>
+                        </div>
                     </div>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Personal Information</h3>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Full Name</span>
-                        <span class="info-val" data-field="fullname"><?php echo htmlspecialchars($fullname); ?></span>
-                        <input class="info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Faculty ID</span>
-                        <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                    </div>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Login &amp; Security</h3>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Primary Email</span>
-                        <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Backup Email</span>
-                        <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email"><?php echo $masked_backup ?: '— Not provided'; ?></span>
-                        <?php if (!$backup_locked): ?>
-                            <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
-                        <?php endif; ?>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Password</span>
-                        <span class="info-val">••••••••••</span>
-                        <button class="btn-inline-action" data-action="open-email-verify-modal">Change</button>
-                    </div>
-                </div>
-            </div><!-- /acc-overview -->
+                </div><!-- /acc-overview -->
 
-            <!-- Department -->
-            <div id="acc-academic" class="overlay-sub-panel">
-                <div class="overlay-section-header">
-                    <span class="section-eyebrow">My Account › Department</span>
-                    <h2>Department Information</h2>
-                    <p>Your faculty department and assignment details.</p>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Department Assignment</h3>
-                        <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">Edit</button>
-                        <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;" data-action="academic-save">Save Changes</button>
-                        <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;" data-action="academic-cancel">Cancel</button>
+                <!-- Department -->
+                <div id="acc-academic" class="overlay-sub-panel">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Department</span>
+                        <h2>Department Information</h2>
+                        <p>Your faculty department and assignment details.</p>
                     </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Faculty ID</span>
-                        <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Full Name</span>
-                        <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Department</span>
-                        <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
-                        <?php if (!$program_locked): ?>
-                            <select class="info-input-f" data-input="program" disabled style="display:none;">
-                                <option value="">Select Program...</option>
-                                <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
-                                    <option value="<?php echo $p; ?>"><?php echo $p; ?></option>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Department Assignment</h3>
+                            <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">Edit</button>
+                            <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;" data-action="academic-save">Save Changes</button>
+                            <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;" data-action="academic-cancel">Cancel</button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Full Name</span>
+                            <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Department</span>
+                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
+                            <?php if (!$program_locked): ?>
+                                <select class="info-input-f" data-input="program" disabled style="display:none;">
+                                    <option value="">Select Program...</option>
+                                    <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                        <option value="<?php echo $p; ?>"><?php echo $p; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Position / Rank</span>
+                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level"><?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?></span>
+                            <select class="info-input-f" data-input="year_level" disabled style="display:none;">
+                                <option value="">Select Position...</option>
+                                <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
+                                    <option value="<?php echo $rank; ?>"><?php echo $rank; ?></option>
                                 <?php endforeach; ?>
                             </select>
-                        <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Status</span>
+                            <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
+                        </div>
                     </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Position / Rank</span>
-                        <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level"><?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?></span>
-                        <select class="info-input-f" data-input="year_level" disabled style="display:none;">
-                            <option value="">Select Position...</option>
-                            <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
-                                <option value="<?php echo $rank; ?>"><?php echo $rank; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Status</span>
-                        <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
-                    </div>
-                </div>
-            </div><!-- /acc-academic -->
+                </div><!-- /acc-academic -->
 
-            <!-- Contact -->
-            <div id="acc-contact" class="overlay-sub-panel">
-                <div class="overlay-section-header">
-                    <span class="section-eyebrow">My Account › Contact</span>
-                    <h2>Contact Details</h2>
-                    <p>How we can reach you.</p>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Address</h3>
-                        <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit" style="display:inline-flex;">Edit</button>
-                        <button class="btn-save-acc" id="saveContactBtn" style="display:none;" data-action="contact-save">Save Changes</button>
-                        <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;" data-action="contact-cancel">Cancel</button>
+                <!-- Contact -->
+                <div id="acc-contact" class="overlay-sub-panel">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account › Contact</span>
+                        <h2>Contact Details</h2>
+                        <p>How we can reach you.</p>
                     </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Present Address</span>
-                        <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address"><?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?></span>
-                        <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none;min-height:60px;"></textarea>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Address</h3>
+                            <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit" style="display:inline-flex;">Edit</button>
+                            <button class="btn-save-acc" id="saveContactBtn" style="display:none;" data-action="contact-save">Save Changes</button>
+                            <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;" data-action="contact-cancel">Cancel</button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Present Address</span>
+                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address"><?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?></span>
+                            <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none;min-height:60px;"></textarea>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Permanent Address</span>
+                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address"><?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?></span>
+                            <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none;min-height:60px;"></textarea>
+                        </div>
                     </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Permanent Address</span>
-                        <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address"><?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?></span>
-                        <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none;min-height:60px;"></textarea>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Phone</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Mobile Number</span>
+                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone"><?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?></span>
+                            <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Landline</span>
+                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline"><?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?></span>
+                            <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
+                        </div>
                     </div>
-                </div>
-                <div class="info-card">
-                    <div class="info-card-head">
-                        <h3>Phone</h3>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Mobile Number</span>
-                        <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone"><?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?></span>
-                        <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
-                    </div>
-                    <div class="info-row">
-                        <span class="info-lbl">Landline</span>
-                        <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline"><?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?></span>
-                        <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
-                    </div>
-                </div>
-            </div><!-- /acc-contact -->
+                </div><!-- /acc-contact -->
 
+            </div>
         </div>
-    </div>
     </div><!-- /accountOverlay -->
 
     <!-- ================================================================
