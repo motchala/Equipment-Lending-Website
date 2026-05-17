@@ -79,7 +79,7 @@ switch ($section) {
                 <td>{$row['student_id']}</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['student_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
-                <td><span class='badge " . ($status==='Approved'?'bg-success':'bg-danger') . "'>{$row['status']}</span></td>
+                <td><span class='badge " . ($status === 'Approved' ? 'bg-success' : 'bg-danger') . "'>{$row['status']}</span></td>
             </tr>";
         }
         break;
@@ -106,7 +106,7 @@ switch ($section) {
                 <td class='fw-bold text-maroon'>" . htmlspecialchars($item['item_name']) . "</td>
                 <td>" . htmlspecialchars($item['category']) . "</td>
                 <td><span class='badge bg-info text-dark'>{$item['quantity']} units</span></td>
-                <td>" . ($item['quantity']>0? "<span class='badge bg-success'>Available</span>":"<span class='badge bg-danger'>No Stock</span>") . "</td>
+                <td>" . ($item['quantity'] > 0 ? "<span class='badge bg-success'>Available</span>" : "<span class='badge bg-danger'>No Stock</span>") . "</td>
                 <td>
                     <a href='admin-dashboard.php?edit_item={$item['item_id']}#sec-inventory' class='btn btn-sm btn-outline-primary'>
                         <i class='bi bi-pencil'></i>
@@ -146,6 +146,32 @@ switch ($section) {
                 <td><small class='text-muted'>" . date('M d, Y g:i A', strtotime($row['request_date'])) . "</small></td>
             </tr>";
         }
+        break;
+
+    // ── User-facing inventory search — returns JSON for user-dashboard live search ──
+    case 'user_inventory':
+        header('Content-Type: application/json');
+        $sql = "SELECT item_id, item_name, category, quantity, image_path
+                FROM tbl_inventory
+                WHERE is_archived = 0
+                  AND (item_name LIKE ? OR category LIKE ?)
+                ORDER BY item_name ASC LIMIT 20";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ss", $search, $search);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $items = [];
+        while ($row = $result->fetch_assoc()) {
+            $items[] = [
+                'id'        => $row['item_id'],
+                'name'      => $row['item_name'],
+                'category'  => $row['category'],
+                'quantity'  => (int)$row['quantity'],
+                'available' => (int)$row['quantity'] > 0,
+                'image'     => $row['image_path'] ?? ''
+            ];
+        }
+        echo json_encode($items);
         break;
 
     default:

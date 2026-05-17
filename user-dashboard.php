@@ -8,21 +8,15 @@ $fullname = $_SESSION['fullname'];
 $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
-if (!$conn) {
-    die("Connection failed: " . mysqli_connect_error());
-}
+if (!$conn) die("Connection failed: " . mysqli_connect_error());
 
-// ── Email masking helper ────────────────────────────────────────────────────
 function maskEmail($email)
 {
     if (!$email) return null;
     $parts = explode('@', $email);
     if (count($parts) !== 2) return htmlspecialchars($email);
-    $local  = $parts[0];
-    $domain = $parts[1];
-    // Always show first 4 chars + fixed "***" + @ + full domain
-    $visible = htmlspecialchars(mb_substr($local, 0, 4));
-    return $visible . '***@' . htmlspecialchars($domain);
+    $visible = htmlspecialchars(mb_substr($parts[0], 0, 4));
+    return $visible . '***@' . htmlspecialchars($parts[1]);
 }
 
 // ── Handle Return Item (AJAX) ──────────────────────────────────────────────
@@ -34,7 +28,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'return_item') {
     }
     $req_id = intval($_POST['request_id'] ?? 0);
     $uid_r  = mysqli_real_escape_string($conn, $_SESSION['user_id']);
-    // Fetch the request (verify ownership)
     $rq = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM tbl_requests WHERE id=$req_id AND student_id='$uid_r' LIMIT 1"));
     if (!$rq) {
         echo json_encode(['success' => false, 'msg' => 'Request not found']);
@@ -44,34 +37,28 @@ if (isset($_POST['action']) && $_POST['action'] === 'return_item') {
         echo json_encode(['success' => false, 'msg' => 'Cannot return this item']);
         exit;
     }
-    // Mark as Returned
     mysqli_query($conn, "UPDATE tbl_requests SET status='Returned' WHERE id=$req_id");
-    // Increment inventory quantity
     $eq_name = mysqli_real_escape_string($conn, $rq['equipment_name']);
     mysqli_query($conn, "UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name='$eq_name' LIMIT 1");
     echo json_encode(['success' => true, 'msg' => 'Item returned successfully!']);
     exit;
 }
 
-// ── Auto-decline expired requests ──────────────────────────────────────────
+// ── Auto-decline expired & mark overdue ───────────────────────────────────
 $today = date('Y-m-d');
 $reason_expired = "Request expired – borrow date has already passed";
 $stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
 $stmt_expired->bind_param("ss", $reason_expired, $today);
 $stmt_expired->execute();
-
-// ── Auto-mark overdue approved requests ────────────────────────────────────
 mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['user_id'])) die("Unauthorized access");
-
     $user_id = $_SESSION['user_id'];
     $user_query = mysqli_query($conn, "SELECT fullname, student_id FROM tbl_users WHERE student_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
     $user = mysqli_fetch_assoc($user_query);
     if (!$user) die("User profile not found.");
-
     $student_name   = $user['fullname'];
     $student_id     = $user['student_id'];
     $borrow_date    = mysqli_real_escape_string($conn, $_POST['borrow_date']);
@@ -81,29 +68,38 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $instructor     = preg_replace("/[^a-zA-Z\s.']/", "", $_POST['instructor']);
     $instructor     = mysqli_real_escape_string($conn, trim($instructor));
     $current_date   = date('Y-m-d');
-
     if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
     if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
-
     $insert = "INSERT INTO tbl_requests (student_name,student_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
                VALUES ('$student_name','$student_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
     if (mysqli_query($conn, $insert)) {
         header("Location: user-dashboard.php?success=1");
         exit();
-    } else {
-        die("Error processing request: " . mysqli_error($conn));
-    }
+    } else die("Error processing request: " . mysqli_error($conn));
 }
 
 // ── Inventory & Requests ───────────────────────────────────────────────────
-// only show non-archived rows to regular users so they cannot borrow retired items
 $category_result  = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory WHERE is_archived = 0 ORDER BY category ASC");
 $inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
-$my_requests_result = null;
-if (isset($_SESSION['user_id'])) {
-    $uid = $_SESSION['user_id'];
-    $my_requests_result = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid' ORDER BY request_date DESC");
-}
+$uid_safe = mysqli_real_escape_string($conn, $_SESSION['user_id']);
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe'"))['c'];
+$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Waiting'"))['c'];
+$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Approved'"))['c'];
+$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Declined'"))['c'];
+$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue'"))['c'];
+
+// ── Requests JSON for JS ───────────────────────────────────────────────────
+$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC");
+$requests_js = [];
+while ($row = mysqli_fetch_assoc($requests_raw)) $requests_js[] = $row;
+$requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+
+// ── Overdue for notifications ──────────────────────────────────────────────
+$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
+$overdue_notifs = [];
+while ($row = mysqli_fetch_assoc($overdue_items_raw)) $overdue_notifs[] = $row;
 
 // ── Avatar initials ────────────────────────────────────────────────────────
 $name_parts = explode(' ', trim($fullname));
@@ -111,30 +107,7 @@ $firstname  = $name_parts[0];
 $initials   = strtoupper(substr($name_parts[0], 0, 1));
 if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 1));
 
-// ── Stats for Home tab ─────────────────────────────────────────────────────
-$uid_safe = mysqli_real_escape_string($conn, $_SESSION['user_id']);
-$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe'"))['c'];
-$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Waiting'"))['c'];
-$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Approved'"))['c'];
-$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Declined'"))['c'];
-$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue'"))['c'];
-
-// Build requests array for JS
-$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC");
-$requests_js = [];
-while ($row = mysqli_fetch_assoc($requests_raw)) {
-    $requests_js[] = $row;
-}
-$requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
-
-// Overdue items for notifications
-$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
-$overdue_notifs = [];
-while ($row = mysqli_fetch_assoc($overdue_items_raw)) {
-    $overdue_notifs[] = $row;
-}
-
-// ── Fetch extended user profile ─────────────────────────────────────────────
+// ── Profile ────────────────────────────────────────────────────────────────
 $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
     "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
@@ -154,6 +127,13 @@ $db_year_level    = $profile_row['year_level']    ?? '';
 // Contact
 $db_phone            = $profile_row['phone']            ?? '';
 $db_present_address  = $profile_row['present_address']  ?? '';
+$db_email             = $profile_row['email']             ?? '';
+$db_backup_email      = $profile_row['backup_email']      ?? '';
+$db_profile_pic       = $profile_row['profile_picture']   ?? '';
+$db_program           = $profile_row['program']           ?? '';
+$db_year_level        = $profile_row['year_level']        ?? '';
+$db_phone             = $profile_row['phone']             ?? '';
+$db_present_address   = $profile_row['present_address']   ?? '';
 $db_permanent_address = $profile_row['permanent_address'] ?? '';
 $db_landline         = $profile_row['landline']         ?? '';
 // Emergency
@@ -172,9 +152,13 @@ $backup_locked      = !empty($db_backup_email);
 $program_locked     = !empty($db_program);
 // Profile picture path
 $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
+$db_landline          = $profile_row['landline']          ?? '';
+$masked_email         = maskEmail($db_email);
+$masked_backup        = maskEmail($db_backup_email);
+$backup_locked        = !empty($db_backup_email);
+$program_locked       = !empty($db_program);
+$profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 
@@ -183,21 +167,27 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | User Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>PUPSync | Faculty Dashboard</title>
+    <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Material Symbols -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <!-- Font Awesome (kept for existing icon references in JS) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
     <link rel="stylesheet" href="CSS/user-dashboard.css">
-
 </head>
 
 <body>
 
     <!-- ================================================================
-     HEADER
+     SIDE NAVIGATION
 ================================================================ -->
-    <header class="app-header">
-        <div class="header-left">
-            <div class="app-logo">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon" style="color: var(--accent-maroon)" aria-label="PUPSYNC" aria-hidden="true">
+    <nav class="side-nav" id="sideNav">
+        <div class="side-nav-brand">
+            <div class="side-nav-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
@@ -209,223 +199,270 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <small>User Portal</small>
                 </div>
             </div>
+            <div>
+                <div class="side-nav-title"><strong>PUP</strong>SYNC</div>
+                <div class="side-nav-sub">Faculty Platform</div>
+            </div>
         </div>
 
-        <!-- Center: Top Navigation Tabs -->
-        <nav class="nav-tabs-wrap" role="navigation" aria-label="Main Navigation">
-            <button class="nav-tab active" id="tab-home" data-tab="home">
-                Home
-            </button>
-            <button class="nav-tab" id="tab-lending" data-tab="lending">
-                Lending
-            </button>
-            <button class="nav-tab" id="tab-rooms" data-tab="rooms">
-                Rooms
-            </button>
-        </nav>
+        <div class="side-nav-links">
+            <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
+                <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+                <span>Dashboard</span>
+            </a>
+            <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
+                <span class="material-symbols-outlined">inventory_2</span>
+                <span>Equipment</span>
+            </a>
+            <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
+                <span class="material-symbols-outlined">apartment</span>
+                <span>Facilities</span>
+            </a>
+            <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
+                <span class="material-symbols-outlined">history_edu</span>
+                <span>My Activity</span>
+            </a>
+        </div>
 
-        <div class="header-right">
-            <div class="header-user-info">
-                <span class="u-name"><?php echo htmlspecialchars($fullname); ?></span>
-                <span class="u-id">ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+        <div class="side-nav-footer">
+            <a class="side-nav-item" id="nav-settings" data-action="open-overlay" data-target="settingsOverlay" href="#">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Settings</span>
+            </a>
+            <a class="side-nav-item" href="#" data-action="open-overlay" data-target="helpOverlay">
+                <span class="material-symbols-outlined">help</span>
+                <span>Help Center</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- ================================================================
+     MAIN WRAPPER (right of sidebar)
+================================================================ -->
+    <div class="main-wrapper">
+
+        <!-- ================================================================
+     TOP APP BAR
+================================================================ -->
+        <header class="top-bar" id="topBar">
+            <div class="top-bar-search" style="position:relative;">
+                <span class="material-symbols-outlined">search</span>
+                <input type="text" id="globalSearch" placeholder="Search equipment, requests, facilities…" autocomplete="off">
+                <div class="live-search-dropdown" id="liveSearchDropdown" style="display:none;"></div>
             </div>
+            <div class="top-bar-actions">
+                <!-- Notifications -->
+                <div class="top-bar-notif-wrap">
+                    <button class="top-bar-icon-btn" id="notifBellBtn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <?php if ((3 + count($overdue_notifs)) > 0): ?>
+                            <span class="top-bar-badge" id="notifBadgeTop"><?php echo (3 + count($overdue_notifs)); ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <!-- Notification Popover -->
+                    <div class="notif-popover" id="notifPopover" role="dialog" aria-label="Notifications">
+                        <div class="notif-popover-head">
+                            <span>Notifications</span>
+                            <button class="notif-mark-read-btn" data-action="mark-all-read">Mark all as read</button>
+                        </div>
+                        <div class="notif-popover-list">
+                            <?php if (!empty($overdue_notifs)): foreach ($overdue_notifs as $on): ?>
+                                    <div class="notif-pop-item unread" data-cat="overdue">
+                                        <div class="notif-pop-dot notif-dot-error"></div>
+                                        <div class="notif-pop-body">
+                                            <div class="notif-pop-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
+                                            <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> — return immediately</div>
+                                            <div class="notif-pop-time">Overdue</div>
+                                        </div>
+                                    </div>
+                            <?php endforeach;
+                            endif; ?>
+                            <div class="notif-pop-item unread" data-cat="borrow">
+                                <div class="notif-pop-dot notif-dot-primary"></div>
+                                <div class="notif-pop-body">
+                                    <div class="notif-pop-title">Borrow Request Approved</div>
+                                    <div class="notif-pop-sub">Pick up at Admin Office before 5:00 PM</div>
+                                    <div class="notif-pop-time">9:42 AM</div>
+                                </div>
+                            </div>
+                            <div class="notif-pop-item unread" data-cat="system">
+                                <div class="notif-pop-dot notif-dot-secondary"></div>
+                                <div class="notif-pop-body">
+                                    <div class="notif-pop-title">System Maintenance Tonight</div>
+                                    <div class="notif-pop-sub">PUPSYNC offline 11 PM – 1 AM</div>
+                                    <div class="notif-pop-time">8:00 AM</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="notif-popover-footer" data-action="open-overlay" data-target="notifOverlay">View all notifications</button>
+                    </div>
+                </div>
 
-            <div class="avatar-btn" id="avatarBtn" title="Account menu"
-                role="button" aria-haspopup="true" aria-expanded="false">
-                <?php if ($profile_pic_url): ?>
-                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
-                <?php else: ?>
-                    <?php echo htmlspecialchars($initials); ?>
-                <?php endif; ?>
-            </div>
+                <div class="top-bar-divider"></div>
 
-            <!-- Profile Dropdown -->
-            <div class="profile-dropdown" id="profileDropdown" role="menu">
-                <div class="dd-header">
-                    <div class="dd-avatar">
+                <!-- Profile -->
+                <div class="top-bar-profile-wrap">
+                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
                         <?php if ($profile_pic_url): ?>
                             <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
                         <?php else: ?>
                             <?php echo htmlspecialchars($initials); ?>
                         <?php endif; ?>
+                    </button>
+                    <!-- Profile Dropdown -->
+                    <div class="profile-dropdown" id="profileDropdown" role="menu">
+                        <div class="dd-header">
+                            <div class="dd-avatar">
+                                <?php if ($profile_pic_url): ?>
+                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($initials); ?>
+                                <?php endif; ?>
+                            </div>
+                            <div>
+                                <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
+                                <span class="dd-sub">Faculty</span>
+                                <span class="dd-sub">ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                            </div>
+                        </div>
+                        <div class="dd-menu">
+                            <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
+                                <span class="material-symbols-outlined dd-item-icon">notifications</span> Notifications
+                                <span class="notif-badge" id="notifBadge"><?php echo (3 + count($overdue_notifs)); ?></span>
+                            </button>
+                            <div class="dd-divider"></div>
+                            <button class="dd-item dd-logout" data-action="logout">
+                                <span class="material-symbols-outlined dd-item-icon">logout</span> Sign Out
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                        <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
-                        <span class="dd-sub">ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                        <span class="dd-sub" style="margin-top:2px;">Student</span>
-                    </div>
-                </div>
-                <div class="dd-menu">
-                    <button class="dd-item" data-action="open-overlay" data-target="accountOverlay">
-                        Account
-                    </button>
-                    <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
-                        Notifications
-                        <span class="notif-badge" id="notifBadge"><?php echo (3 + count($overdue_notifs)); ?></span>
-                    </button>
-                    <button class="dd-item" data-action="open-overlay" data-target="settingsOverlay">
-                        Settings
-                    </button>
-                    <div class="dd-divider"></div>
-                    <button class="dd-item dd-logout" data-action="logout">
-                        <div class="dd-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Logout" aria-hidden="true">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg></div> Logout
-                    </button>
                 </div>
             </div>
-        </div>
-    </header>
+        </header>
 
-
-    <!-- ================================================================
-     MAIN CONTENT
+        <!-- ================================================================
+     MAIN CANVAS
 ================================================================ -->
-    <main id="app-main">
+        <main class="app-main" id="appMain">
 
-        <!-- Success Alert -->
-        <?php if (isset($_GET['success'])): ?>
-            <div class="alert-banner alert-success" id="success-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Success" aria-hidden="true">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Success!</strong> Your borrow request has been submitted for approval.
-                <button class="alert-close" data-action="dismiss-alert" data-target="success-alert">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+            <!-- Success Alert -->
+            <?php if (isset($_GET['success'])): ?>
+                <div class="alert-banner alert-success" id="success-alert">
+                    <span class="material-symbols-outlined">check_circle</span>
+                    <strong>Success!</strong> Your borrow request has been submitted for approval.
+                    <button class="alert-close" data-action="dismiss-alert" data-target="success-alert" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
+            <!-- Overdue Alert -->
+            <div class="alert-banner alert-danger hidden" id="overdue-alert">
+                <span class="material-symbols-outlined">warning</span>
+                <strong>Overdue Alert:</strong> You have overdue equipment — please return it immediately!
+                <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-        <?php endif; ?>
 
-        <!-- Overdue Alert -->
-        <div class="alert-banner alert-danger hidden" id="overdue-alert">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Alert" aria-hidden="true">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <strong>Overdue Alert:</strong> You have overdue equipment — please return it immediately!
-            <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-            </button>
-        </div>
-
-        <!-- ============================================================
-         TAB: HOME
+            <!-- ============================================================
+         TAB: DASHBOARD (HOME)
     ============================================================ -->
-        <div class="tab-panel active" id="panel-home">
-            <div class="section-header">
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Home" aria-hidden="true">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>Welcome back, <?php echo htmlspecialchars($firstname); ?>! 👋</h2>
-                <p><?php echo date('l, F j, Y'); ?> &mdash; Here's a summary of your activity.</p>
-            </div>
+            <div class="tab-panel active" id="panel-home">
 
-            <!-- Hero Card -->
-            <div class="hero-card">
-                <h1>Equipment Lending Portal</h1>
-                <p>Browse available equipment, submit borrow requests, and track your approvals — all in one place.</p>
-            </div>
+                <!-- Page Header -->
+                <div class="page-header-block">
+                    <h1 class="page-title">Good <?php
+                                                $h = (int)date('H');
+                                                echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
+                                                ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                    <p class="page-subtitle"><?php echo date('l, F j, Y'); ?> &mdash; Here is an overview of your active equipment and requests.</p>
+                </div>
 
-            <!-- Stats -->
-            <p style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-light); margin-bottom:0.8rem;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Activity" aria-hidden="true">
-                    <line x1="18" y1="20" x2="18" y2="10" />
-                    <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="14" />
-                    <line x1="2" y1="20" x2="22" y2="20" />
-                </svg>Your Activity
-            </p>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Total" aria-hidden="true">
-                            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                            <polyline points="2 17 12 22 22 17" />
-                            <polyline points="2 12 12 17 22 12" />
-                        </svg></div>
-                    <div class="stat-label">Total Requests</div>
-                    <div class="stat-value"><?php echo $stat_total; ?></div>
-                    <div class="stat-sub">All time</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting" title="View Pending requests">
-                    <div class="stat-icon" style="background:#fff8e1; color:#c67c00;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Pending" aria-hidden="true">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg></div>
-                    <div class="stat-label">Pending</div>
-                    <div class="stat-value" style="color:var(--warning);"><?php echo $stat_waiting; ?></div>
-                    <div class="stat-sub stat-sub-link">Awaiting approval →</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved" title="View Approved requests">
-                    <div class="stat-icon" style="background:#e3fcef; color:#00875a;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Approved" aria-hidden="true">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg></div>
-                    <div class="stat-label">Approved</div>
-                    <div class="stat-value" style="color:var(--success);"><?php echo $stat_approved; ?></div>
-                    <div class="stat-sub stat-sub-link">Ready to pick up →</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Declined" title="View Declined requests">
-                    <div class="stat-icon" style="background:#ffeaea; color:var(--danger);"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Declined" aria-hidden="true">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg></div>
-                    <div class="stat-label">Declined</div>
-                    <div class="stat-value" style="color:var(--danger);"><?php echo $stat_declined; ?></div>
-                    <div class="stat-sub stat-sub-link">Review reasons →</div>
-                </div>
-                <div class="stat-card stat-card-clickable<?php echo $stat_overdue > 0 ? ' stat-card-overdue' : ''; ?>" data-action="filter-requests" data-status="Overdue" title="View Overdue items">
-                    <div class="stat-icon" style="background:#fff3e0; color:#e65100;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" style="width:20px;height:20px;" aria-label="Overdue" aria-hidden="true">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg></div>
-                    <div class="stat-label">Overdue</div>
-                    <div class="stat-value" style="color:#e65100;" id="statOverdueVal"><?php echo $stat_overdue; ?></div>
-                    <div class="stat-sub stat-sub-link">Items past due →</div>
-                </div>
-            </div>
-
-            <div class="home-grid">
-                <!-- Events -->
-                <div class="event-container">
-                    <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Calendar" aria-hidden="true">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                            <line x1="16" y1="2" x2="16" y2="6" />
-                            <line x1="8" y1="2" x2="8" y2="6" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>Upcoming Events</h3>
-                    <div class="event-item">
-                        <div class="date-badge"><span>17</span><small>Feb</small></div>
-                        <div class="event-info">
-                            <h4>Lab Equipment Audit</h4>
-                            <p>Annual inventory check &mdash; Admin Office, 8 AM</p>
-                            <span class="status-tag tag-ongoing">Ongoing</span>
+                <!-- Overdue Urgent Card (shown only when overdue > 0) -->
+                <?php if ($stat_overdue > 0): ?>
+                    <div class="urgent-card">
+                        <div class="urgent-card-icon">
+                            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">warning</span>
+                        </div>
+                        <div class="urgent-card-body">
+                            <h3>Overdue Equipment Return</h3>
+                            <p>You have <strong><?php echo $stat_overdue; ?></strong> overdue item<?php echo $stat_overdue > 1 ? 's' : ''; ?>. Please return <?php echo $stat_overdue > 1 ? 'them' : 'it'; ?> to the Admin Office as soon as possible to avoid late penalties.</p>
+                            <div class="urgent-card-actions">
+                                <button class="btn-urgent-primary" data-action="filter-requests" data-status="Overdue">View Overdue Items</button>
+                            </div>
                         </div>
                     </div>
-                    <div class="event-item">
-                        <div class="date-badge"><span>21</span><small>Feb</small></div>
-                        <div class="event-info">
-                            <h4>BSIT Capstone Defense</h4>
-                            <p>Room 301 &mdash; All equipment must be returned by 7 AM</p>
-                            <span class="status-tag tag-upcoming">Upcoming</span>
+                <?php endif; ?>
+
+                <!-- Stats + Quick Access Grid -->
+                <div class="dashboard-grid">
+
+                    <!-- Left: Stats Column -->
+                    <div class="dashboard-stats-col">
+                        <div class="stat-card">
+                            <div class="stat-card-label">Active Borrowings</div>
+                            <div class="stat-card-value"><?php echo $stat_approved; ?></div>
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
+                        </div>
+                        <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
+                            <div class="stat-card-label">Pending Requests</div>
+                            <div class="stat-card-value" style="color:var(--color-warning)"><?php echo $stat_waiting; ?></div>
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
+                        </div>
+                        <?php if ($stat_overdue > 0): ?>
+                            <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests" data-status="Overdue">
+                                <div class="stat-card-label">Overdue</div>
+                                <div class="stat-card-value" style="color:var(--color-error)" id="statOverdueVal"><?php echo $stat_overdue; ?></div>
+                                <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
+                            </div>
+                        <?php else: ?>
+                            <div class="stat-card">
+                                <div class="stat-card-label">Total Requests</div>
+                                <div class="stat-card-value"><?php echo $stat_total; ?></div>
+                                <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span></div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Recent Audit Log -->
+                        <div class="audit-card">
+                            <div class="audit-card-head">
+                                <span class="material-symbols-outlined">history</span>
+                                <span>Recent Activity</span>
+                            </div>
+                            <?php
+                            $recent_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
+                            if ($recent_raw && mysqli_num_rows($recent_raw) > 0):
+                                while ($rr = mysqli_fetch_assoc($recent_raw)):
+                            ?>
+                                    <div class="audit-row">
+                                        <span class="audit-row-label"><?php echo htmlspecialchars($rr['equipment_name']); ?></span>
+                                        <span class="audit-row-time"><?php echo date('M j', strtotime($rr['request_date'])); ?></span>
+                                    </div>
+                                <?php endwhile;
+                            else: ?>
+                                <div class="audit-row"><span class="audit-row-label" style="color:var(--color-on-surface-variant)">No recent activity</span></div>
+                            <?php endif; ?>
+                            <a class="audit-view-all" data-tab="activity" href="#">View Full Activity Log</a>
                         </div>
                     </div>
-                    <div class="event-item">
-                        <div class="date-badge"><span>28</span><small>Feb</small></div>
-                        <div class="event-info">
-                            <h4>System Maintenance</h4>
-                            <p>Portal offline 11 PM – 1 AM for updates</p>
-                            <span class="status-tag tag-upcoming">Upcoming</span>
+
+                    <!-- Right: Quick Access Bento -->
+                    <div class="bento-grid">
+                        <div class="bento-item" data-action="go-tab" data-tab="lending" data-lending="browse">
+                            <div class="bento-icon"><span class="material-symbols-outlined">add_shopping_cart</span></div>
+                            <div class="bento-title">Borrow Equipment</div>
+                            <div class="bento-sub">Browse the equipment catalog</div>
+                        </div>
+                        <div class="bento-item" data-action="go-tab" data-tab="rooms">
+                            <div class="bento-icon"><span class="material-symbols-outlined">meeting_room</span></div>
+                            <div class="bento-title">Reserve Room</div>
+                            <div class="bento-sub">Book lecture halls and labs</div>
+                        </div>
+                        <div class="bento-item bento-item-wide" data-action="go-tab" data-tab="activity">
+                            <div class="bento-icon"><span class="material-symbols-outlined">history_edu</span></div>
+                            <div class="bento-title">My Activity</div>
+                            <div class="bento-sub">Track all your requests and reservations in one place</div>
                         </div>
                     </div>
                 </div>
@@ -464,11 +501,42 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
             </div>
         </div><!-- /panel-home -->
 
+                <!-- Active Now Section -->
+                <?php
+                $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
+                $active_items = [];
+                if ($active_raw) while ($ar = mysqli_fetch_assoc($active_raw)) $active_items[] = $ar;
+                ?>
+                <?php if (!empty($active_items)): ?>
+                    <div class="section-label">Active Now</div>
+                    <div class="active-cards-grid">
+                        <?php foreach ($active_items as $ai): ?>
+                            <div class="active-card <?php echo $ai['status'] === 'Overdue' ? 'active-card-overdue' : ''; ?>">
+                                <div class="active-card-thumb">
+                                    <span class="material-symbols-outlined">inventory_2</span>
+                                </div>
+                                <div class="active-card-body">
+                                    <div class="active-card-meta">Equipment</div>
+                                    <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
+                                    <div class="active-card-sub">Room: <?php echo htmlspecialchars($ai['room']); ?></div>
+                                    <div class="active-card-footer">
+                                        <span class="active-card-due">Due: <?php echo htmlspecialchars($ai['return_date']); ?></span>
+                                        <span class="status-chip <?php echo $ai['status'] === 'Overdue' ? 'chip-error' : 'chip-success'; ?>">
+                                            <span class="chip-dot"></span><?php echo $ai['status']; ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
 
-        <!-- ============================================================
-         TAB: LENDING
+            </div><!-- /panel-home -->
+
+            <!-- ============================================================
+         TAB: EQUIPMENT (LENDING)
     ============================================================ -->
-        <div class="tab-panel" id="panel-lending">
+            <div class="tab-panel" id="panel-lending">
 
             <!-- Lending Sub-Nav -->
             <div class="lending-nav">
@@ -485,6 +553,15 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     </svg> My Requests
                 </button>
             </div>
+                <!-- Lending Sub-Nav -->
+                <div class="lending-subnav">
+                    <button class="lending-nav-btn active" data-lending-nav="browse">
+                        <span class="material-symbols-outlined">search</span> Browse Equipment
+                    </button>
+                    <button class="lending-nav-btn" data-lending-nav="requests">
+                        <span class="material-symbols-outlined">receipt_long</span> My Requests
+                    </button>
+                </div>
 
             <!-- ── Sub: Browse Equipment ─────────────────────────── -->
             <div class="lending-sub active" id="lending-browse">
@@ -505,8 +582,19 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
                                 <input type="text" id="equipmentSearch" placeholder="Search by equipment name...">
+                <!-- ── Sub: Browse ─────────────────────────────────────── -->
+                <div class="lending-sub active" id="lending-browse">
+                    <div class="page-header-block">
+                        <h2 class="page-title-sm">Browse Equipment</h2>
+                        <p class="page-subtitle">Search and select equipment to submit a borrow request.</p>
+                    </div>
+                    <div class="catalog-card">
+                        <div class="catalog-filters">
+                            <div class="catalog-search-wrap">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name…">
                             </div>
-                            <select id="categoryFilter" class="filter-select">
+                            <select id="categoryFilter" class="catalog-filter-select">
                                 <option value="">All Categories</option>
                                 <?php
                                 mysqli_data_seek($category_result, 0);
@@ -518,75 +606,45 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                 <option value="Others">Others</option>
                             </select>
                         </div>
-
                         <div class="eq-grid" id="equipmentList">
                             <?php if (mysqli_num_rows($inventory_result) == 0): ?>
-                                <div style="grid-column:1/-1; text-align:center; padding:3rem; color:var(--text-light);">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;color:var(--khaki-border);display:block;margin-bottom:0.8rem;opacity:0.7;" aria-label="No items" aria-hidden="true">
-                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                        <line x1="12" y1="22.08" x2="12" y2="12" />
-                                    </svg>
-                                    No equipment available at the moment.
+                                <div class="eq-empty">
+                                    <span class="material-symbols-outlined">inventory_2</span>
+                                    <p>No equipment available at the moment.</p>
                                 </div>
                             <?php else: ?>
                                 <?php while ($item = mysqli_fetch_assoc($inventory_result)): ?>
                                     <div class="eq-item-card item-node"
                                         data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
                                         data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>">
-
                                         <?php if (!empty($item['image_path'])): ?>
-                                            <img class="eq-item-img"
-                                                src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
-                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>">
+                                            <img class="eq-item-img" src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>" alt="<?php echo htmlspecialchars($item['item_name']); ?>">
                                         <?php else: ?>
                                             <div class="eq-item-img-placeholder">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;" aria-label="Item" aria-hidden="true">
-                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                                    <line x1="12" y1="22.08" x2="12" y2="12" />
-                                                </svg>
+                                                <span class="material-symbols-outlined">inventory_2</span>
                                             </div>
                                         <?php endif; ?>
-
                                         <div class="eq-item-body">
                                             <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                            <div class="eq-item-meta">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Category" aria-hidden="true">
-                                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-                                                    <line x1="7" y1="7" x2="7.01" y2="7" />
-                                                </svg>
+                                            <div class="eq-item-cat">
+                                                <span class="material-symbols-outlined" style="font-size:13px;">label</span>
                                                 <?php echo htmlspecialchars($item['category']); ?>
                                             </div>
-                                            <div style="margin-bottom:6px;">
-                                                <?php if ($item['quantity'] > 0): ?>
-                                                    <span class="stock-badge stock-avail">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="width:12px;height:12px;" aria-label="Available" aria-hidden="true">
-                                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                                                            <polyline points="22 4 12 14.01 9 11.01" />
-                                                        </svg>
-                                                        <?php echo (int)$item['quantity']; ?> available
-                                                    </span>
-                                                <?php else: ?>
-                                                    <span class="stock-badge stock-unavail">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="width:12px;height:12px;" aria-label="Unavailable" aria-hidden="true">
-                                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                                        </svg>
-                                                        Out of stock
-                                                    </span>
-                                                <?php endif; ?>
-                                            </div>
+                                            <?php if ($item['quantity'] > 0): ?>
+                                                <span class="stock-badge stock-avail">
+                                                    <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
+                                                    <?php echo (int)$item['quantity']; ?> available
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="stock-badge stock-unavail">
+                                                    <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
+                                                    Out of stock
+                                                </span>
+                                            <?php endif; ?>
                                             <button class="btn-borrow"
                                                 <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
                                                 data-action="open-borrow-form"
                                                 data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-label="Borrow" aria-hidden="true">
-                                                    <path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" />
-                                                    <path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" />
-                                                    <path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" />
-                                                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-                                                </svg>
                                                 <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
                                             </button>
                                         </div>
@@ -595,8 +653,7 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                             <?php endif; ?>
                         </div>
                     </div>
-                </div>
-            </div><!-- /lending-browse -->
+                </div><!-- /lending-browse -->
 
             <!-- ── Sub: Borrow Form ──────────────────────────────── -->
             <div class="lending-sub" id="lending-form">
@@ -613,18 +670,22 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                 <line x1="18" y1="6" x2="6" y2="18" />
                                 <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
+                <!-- ── Sub: Borrow Form ────────────────────────────────── -->
+                <div class="lending-sub" id="lending-form">
+                    <div class="page-header-block" style="display:flex;align-items:center;gap:12px;">
+                        <button class="btn-back" data-action="lending-back" aria-label="Back">
+                            <span class="material-symbols-outlined">arrow_back</span>
                         </button>
+                        <div>
+                            <h2 class="page-title-sm">Borrow Request</h2>
+                            <p class="page-subtitle">Fill in the details to submit your request.</p>
+                        </div>
                     </div>
-                    <div class="form-card-body">
+                    <div class="form-surface">
                         <div class="selected-item-banner" id="selectedItemBanner">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="width:18px;height:18px;" aria-label="Selected" aria-hidden="true">
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                <line x1="12" y1="22.08" x2="12" y2="12" />
-                            </svg>
+                            <span class="material-symbols-outlined">inventory_2</span>
                             <span id="selectedItemLabel">No item selected</span>
                         </div>
-
                         <form id="borrowForm" method="POST" action="">
                             <input type="hidden" name="equipment_name" id="selectedItem">
 
@@ -633,1170 +694,735 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                                 <input type="text" name="instructor" id="instructorField"
                                     class="form-control-custom" placeholder="e.g. Sir. Migs" required>
                             </div>
+                            <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <div class="form-group">
-                                <label>Room / Laboratory</label>
-                                <input type="text" name="room" class="form-control-custom"
-                                    placeholder="e.g. Lab 301" required>
+                                <label class="form-label">Room / Laboratory</label>
+                                <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
                             </div>
-                            <div class="form-row">
+                            <div class="form-row-2">
                                 <div class="form-group">
-                                    <label>Borrow Date</label>
-                                    <input type="date" name="borrow_date" id="borrow_date" class="form-control-custom" required>
+                                    <label class="form-label">Borrow Date</label>
+                                    <input type="date" name="borrow_date" id="borrow_date" class="form-input" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>Return Date</label>
-                                    <input type="date" name="return_date" id="return_date" class="form-control-custom" required>
+                                    <label class="form-label">Return Date</label>
+                                    <input type="date" name="return_date" id="return_date" class="form-input" required>
                                 </div>
                             </div>
                             <button type="submit" class="btn-submit-form">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Send" aria-hidden="true">
-                                    <line x1="22" y1="2" x2="11" y2="13" />
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                                </svg> Submit Borrow Request
+                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
                             </button>
                         </form>
                     </div>
-                </div>
-            </div><!-- /lending-form -->
+                </div><!-- /lending-form -->
 
-            <!-- ── Sub: My Requests ──────────────────────────────── -->
-            <div class="lending-sub" id="lending-requests">
-                <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Requests" aria-hidden="true">
-                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                        </svg>My Borrow Requests</h2>
-                    <p>Track the status of all your submitted borrow requests.</p>
-                </div>
-
-                <div class="eq-card">
-                    <div class="eq-card-header" style="flex-wrap:wrap; gap:10px;">
-                        <h2>Request History</h2>
-                        <div class="requests-toolbar">
-                            <!-- Status Filter -->
-                            <div class="req-filter-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;color:var(--text-light);" aria-hidden="true">
-                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                                </svg>
-                                <select id="reqStatusFilter" class="req-filter-select" data-action="filter-requests-dd">
-                                    <option value="All">All Statuses</option>
-                                    <option value="Waiting">Pending</option>
-                                    <option value="Approved">Approved</option>
-                                    <option value="Declined">Declined</option>
-                                    <option value="Overdue">Overdue</option>
-                                    <option value="Returned">Returned</option>
-                                </select>
+                <!-- ── Sub: My Requests ────────────────────────────────── -->
+                <div class="lending-sub" id="lending-requests">
+                    <div class="page-header-block">
+                        <h2 class="page-title-sm">My Requests</h2>
+                        <p class="page-subtitle">Track and manage all submitted borrow requests.</p>
+                    </div>
+                    <div class="table-surface">
+                        <div class="table-toolbar">
+                            <h3 class="table-toolbar-title">Request History</h3>
+                            <div class="table-toolbar-actions">
+                                <div class="req-filter-wrap">
+                                    <span class="material-symbols-outlined" style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
+                                    <select id="reqStatusFilter" class="req-filter-select" data-action="filter-requests-dd">
+                                        <option value="All">All Statuses</option>
+                                        <option value="Waiting">Pending</option>
+                                        <option value="Approved">Approved</option>
+                                        <option value="Declined">Declined</option>
+                                        <option value="Overdue">Overdue</option>
+                                        <option value="Returned">Returned</option>
+                                    </select>
+                                </div>
+                                <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort">
+                                    <span class="material-symbols-outlined" style="font-size:16px">sort</span>
+                                    <span id="reqSortLabel">Latest First</span>
+                                </button>
                             </div>
-                            <!-- Sort Order -->
-                            <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort" title="Toggle sort order">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;" aria-hidden="true">
-                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                    <polyline points="5 12 12 5 19 12" />
-                                </svg>
-                                <span id="reqSortLabel">Latest First</span>
-                            </button>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="requests-table" id="requestsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Equipment</th>
+                                        <th>Requested By</th>
+                                        <th>Room</th>
+                                        <th>Borrow Date</th>
+                                        <th>Return Date</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="requestsTbody"></tbody>
+                            </table>
                         </div>
                     </div>
-                    <div style="overflow-x:auto;">
-                        <table class="requests-table" id="requestsTable">
-                            <thead>
-                                <tr>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                                        </svg>Equipment</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                            <circle cx="12" cy="7" r="4" />
-                                        </svg>Instructor</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="9" y1="3" x2="9" y2="21" />
-                                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                                        </svg>Room</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="16" y1="2" x2="16" y2="6" />
-                                            <line x1="8" y1="2" x2="8" y2="6" />
-                                            <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>Borrow Date</th>
-                                    <th><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                            <line x1="16" y1="2" x2="16" y2="6" />
-                                            <line x1="8" y1="2" x2="8" y2="6" />
-                                            <line x1="3" y1="10" x2="21" y2="10" />
-                                        </svg>Return Date</th>
-                                    <th>Status</th>
-                                    <th>Reason / Notes</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="requestsTbody">
-                                <!-- Populated by JS from PHP JSON -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div><!-- /lending-requests -->
+                    <script>
+                        window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+                    </script>
+                </div><!-- /lending-requests -->
 
-            <!-- Embed requests data for JS -->
-            <script>
-                window.REQUESTS_DATA = <?php echo $requests_json; ?>;
-            </script>
+            </div><!-- /panel-lending -->
 
-        </div><!-- /panel-lending -->
-
-
-        <!-- ============================================================
-         TAB: ROOMS
+            <!-- ============================================================
+         TAB: FACILITIES (ROOMS)
     ============================================================ -->
-        <div class="tab-panel" id="panel-rooms">
-            <div class="section-header">
-                <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon" aria-label="Rooms" aria-hidden="true">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <line x1="9" y1="3" x2="9" y2="21" />
-                        <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                    </svg>Room Reservation</h2>
-                <p>Browse available rooms and make a reservation for your class or event.</p>
-            </div>
-
-            <!-- Coming Soon Banner -->
-            <div class="coming-soon-banner">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Coming soon" aria-hidden="true">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <h3>Room Reservation — Coming Soon</h3>
-                <p>This feature is under development. You can preview available rooms below and fill a reservation form when it launches.</p>
-            </div>
-
-            <!-- Room Cards (Pseudo Design) -->
-            <div class="room-list" id="roomList">
-                <!-- Room 1 -->
-                <div class="room-card">
-                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Lab" aria-hidden="true">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                        </svg></div>
-                    <div class="room-info">
-                        <div>
-                            <div class="room-header">
+            <div class="tab-panel" id="panel-rooms">
+                <div class="page-header-block">
+                    <h2 class="page-title-sm">Facilities</h2>
+                    <p class="page-subtitle">Browse available rooms and make a reservation for your class or event.</p>
+                </div>
+                <div class="coming-soon-banner">
+                    <span class="material-symbols-outlined">schedule</span>
+                    <div>
+                        <h3>Room Reservation — Coming Soon</h3>
+                        <p>This feature is under development. Preview available rooms below.</p>
+                    </div>
+                </div>
+                <div class="room-list" id="roomList">
+                    <!-- Room 1 -->
+                    <div class="room-card">
+                        <div class="room-card-thumb">
+                            <span class="material-symbols-outlined">computer</span>
+                        </div>
+                        <div class="room-card-body">
+                            <div class="room-card-header">
                                 <div>
-                                    <h3>Computer Laboratory 301</h3>
-                                    <p>3rd Floor, Main Building</p>
+                                    <h3 class="room-card-title">Computer Laboratory 301</h3>
+                                    <p class="room-card-loc">3rd Floor, Main Building</p>
                                 </div>
-                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                    </svg>40 seats</span>
+                                <span class="capacity-badge">40 seats</span>
                             </div>
-                            <div class="amenities" style="margin-top:10px;">
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="WiFi" aria-hidden="true">
-                                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                                        <line x1="12" y1="20" x2="12.01" y2="20" />
-                                    </svg> WiFi</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
-                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
-                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
-                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
-                                    </svg> A/C</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Projector" aria-hidden="true">
-                                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
-                                        <polyline points="17 2 12 7 7 2" />
-                                    </svg> Projector</span>
+                            <div class="room-amenities">
+                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span> WiFi</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span> A/C</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">videocam</span> Projector</span>
                             </div>
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-avail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
-                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
-                                </svg> Available</span>
-                            <button class="btn-borrow" style="width:auto; padding:9px 24px;"
-                                data-action="open-room-form" data-room="Computer Laboratory 301">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                    <line x1="12" y1="15" x2="12" y2="19" />
-                                    <line x1="10" y1="17" x2="14" y2="17" />
-                                </svg> Reserve
-                            </button>
+                            <div class="room-card-footer">
+                                <span class="room-avail"><span class="room-avail-dot"></span> Available</span>
+                                <button class="btn-borrow" style="width:auto;padding:8px 20px;" data-action="room-reserve-preview" data-room="Computer Laboratory 301">Reserve</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Room 2 -->
-                <div class="room-card">
-                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Lab" aria-hidden="true">
-                            <path d="M9 3h6" />
-                            <path d="M10 3v7l-5 11h14L14 10V3" />
-                        </svg></div>
-                    <div class="room-info">
-                        <div>
-                            <div class="room-header">
+                    <!-- Room 2 -->
+                    <div class="room-card">
+                        <div class="room-card-thumb">
+                            <span class="material-symbols-outlined">science</span>
+                        </div>
+                        <div class="room-card-body">
+                            <div class="room-card-header">
                                 <div>
-                                    <h3>Science Laboratory</h3>
-                                    <p>2nd Floor, Science Wing</p>
+                                    <h3 class="room-card-title">Science Laboratory</h3>
+                                    <p class="room-card-loc">2nd Floor, Science Wing</p>
                                 </div>
-                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                    </svg>30 seats</span>
+                                <span class="capacity-badge">30 seats</span>
                             </div>
-                            <div class="amenities" style="margin-top:10px;">
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
-                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
-                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
-                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
-                                    </svg> A/C</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Water" aria-hidden="true">
-                                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
-                                    </svg> Running Water</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Safety" aria-hidden="true">
-                                        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
-                                    </svg> Safety Kit</span>
+                            <div class="room-amenities">
+                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span> WiFi</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span> A/C</span>
                             </div>
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-occupied"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
-                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
-                                </svg> Occupied until 3 PM</span>
-                            <button class="btn-borrow" style="width:auto; padding:9px 24px;"
-                                data-action="open-room-form" data-room="Science Laboratory">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                    <line x1="12" y1="15" x2="12" y2="19" />
-                                    <line x1="10" y1="17" x2="14" y2="17" />
-                                </svg> Reserve
-                            </button>
+                            <div class="room-card-footer">
+                                <span class="room-avail"><span class="room-avail-dot"></span> Available</span>
+                                <button class="btn-borrow" style="width:auto;padding:8px 20px;" data-action="room-reserve-preview" data-room="Science Laboratory">Reserve</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Room 3 -->
-                <div class="room-card">
-                    <div class="room-img"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="48" height="48" style="width:48px;height:48px;" aria-label="Hall" aria-hidden="true">
-                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                            <path d="M9 10l2 2 4-4" />
-                        </svg></div>
-                    <div class="room-info">
-                        <div>
-                            <div class="room-header">
+                    <!-- Room 3 -->
+                    <div class="room-card">
+                        <div class="room-card-thumb">
+                            <span class="material-symbols-outlined">meeting_room</span>
+                        </div>
+                        <div class="room-card-body">
+                            <div class="room-card-header">
                                 <div>
-                                    <h3>Lecture Hall A</h3>
-                                    <p>Ground Floor, Academic Building</p>
+                                    <h3 class="room-card-title">Lecture Hall A</h3>
+                                    <p class="room-card-loc">Ground Floor, Academic Building</p>
                                 </div>
-                                <span class="capacity-badge"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Seats" aria-hidden="true">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                    </svg>80 seats</span>
+                                <span class="capacity-badge">80 seats</span>
                             </div>
-                            <div class="amenities" style="margin-top:10px;">
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="WiFi" aria-hidden="true">
-                                        <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                                        <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                                        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                                        <line x1="12" y1="20" x2="12.01" y2="20" />
-                                    </svg> WiFi</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="A/C" aria-hidden="true">
-                                        <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
-                                        <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
-                                        <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
-                                    </svg> A/C</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="PA" aria-hidden="true">
-                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                                        <line x1="12" y1="19" x2="12" y2="23" />
-                                        <line x1="8" y1="23" x2="16" y2="23" />
-                                    </svg> PA System</span>
-                                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Projector" aria-hidden="true">
-                                        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
-                                        <polyline points="17 2 12 7 7 2" />
-                                    </svg> Projector</span>
+                            <div class="room-amenities">
+                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span> WiFi</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span> A/C</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">videocam</span> Projector</span>
+                                <span><span class="material-symbols-outlined" style="font-size:14px">mic</span> Sound System</span>
                             </div>
-                        </div>
-                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-                            <span class="room-avail"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="6" height="6" aria-hidden="true" style="vertical-align:middle;margin-right:6px;opacity:0.85;">
-                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
-                                </svg> Available</span>
-                            <button class="btn-borrow" style="width:auto; padding:9px 24px;"
-                                data-action="open-room-form" data-room="Lecture Hall A">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Reserve" aria-hidden="true">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                    <line x1="12" y1="15" x2="12" y2="19" />
-                                    <line x1="10" y1="17" x2="14" y2="17" />
-                                </svg> Reserve
-                            </button>
+                            <div class="room-card-footer">
+                                <span class="room-occupied"><span class="room-occupied-dot"></span> In Use</span>
+                                <button class="btn-borrow" style="width:auto;padding:8px 20px;" disabled>Unavailable</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div><!-- /roomList -->
+            </div><!-- /panel-rooms -->
 
-            <!-- Room Reservation Form (hidden until Reserve clicked) -->
-            <div id="room-form-section" class="hidden" style="margin-top:2rem;">
-                <div class="eq-card room-form-card">
-                    <div class="form-card-header">
-                        <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon); margin-right:8px" aria-label="Room Form" aria-hidden="true">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <line x1="9" y1="3" x2="9" y2="21" />
-                                <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                            </svg>Room Reservation Form</h2>
-                        <button class="btn-close-custom" data-action="close-room-form" title="Close">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;" aria-label="Close" aria-hidden="true">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                        </button>
+            <!-- ============================================================
+         TAB: MY ACTIVITY (Timeline)
+    ============================================================ -->
+            <div class="tab-panel" id="panel-activity">
+                <div class="page-header-block" style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <h2 class="page-title-sm">My Activity Tracker</h2>
+                        <p class="page-subtitle">Track your current requests, upcoming borrowings, and facility access.</p>
                     </div>
-                    <div class="form-card-body">
-                        <div class="selected-item-banner" id="selectedRoomBanner">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="width:18px;height:18px;" aria-label="Room" aria-hidden="true">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                <line x1="9" y1="3" x2="9" y2="21" />
-                                <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                            </svg>
-                            <span id="selectedRoomLabel">No room selected</span>
-                        </div>
+                    <button class="btn-download-report" onclick="window.print()">
+                        <span class="material-symbols-outlined">download</span> Download Report
+                    </button>
+                </div>
 
-                        <div class="coming-soon-banner" style="margin-bottom:1.5rem;">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Info" aria-hidden="true">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <h3>Preview Mode</h3>
-                            <p>Reservations are not yet processed. This form shows the planned layout.</p>
+                <div class="timeline-container" id="activityTimeline">
+                    <?php
+                    // Group requests by date proximity
+                    $all_req = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY borrow_date DESC, request_date DESC LIMIT 20");
+                    $grouped = [];
+                    if ($all_req) {
+                        while ($r = mysqli_fetch_assoc($all_req)) {
+                            $bd = $r['borrow_date'];
+                            $grouped[$bd][] = $r;
+                        }
+                    }
+                    if (empty($grouped)):
+                    ?>
+                        <div class="timeline-empty">
+                            <span class="material-symbols-outlined">history_edu</span>
+                            <p>No activity yet. Start by borrowing equipment or reserving a room.</p>
+                            <button class="btn-borrow" style="width:auto;padding:10px 24px;margin-top:12px;" data-action="go-tab" data-tab="lending" data-lending="browse">Browse Equipment</button>
                         </div>
-
-                        <div class="form-group">
-                            <label>Purpose / Event Name</label>
-                            <input type="text" class="form-control-custom" placeholder="e.g. BSIT Capstone Defense">
-                        </div>
-                        <div class="form-group">
-                            <label>Instructor / Adviser</label>
-                            <input type="text" class="form-control-custom" placeholder="e.g. Sir. Migs">
-                        </div>
-                        <div class="form-group">
-                            <label>Number of Attendees</label>
-                            <input type="number" class="form-control-custom" placeholder="e.g. 25" min="1">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Reservation Date</label>
-                                <input type="date" class="form-control-custom">
+                        <?php else: foreach ($grouped as $date => $items):
+                            $label = '';
+                            $d = strtotime($date);
+                            $todayTs = strtotime($today);
+                            $diff = (int)(($d - $todayTs) / 86400);
+                            if ($diff === 0) $label = 'Today';
+                            elseif ($diff === 1) $label = 'Tomorrow';
+                            elseif ($diff === -1) $label = 'Yesterday';
+                            else $label = date('M j, Y', $d);
+                        ?>
+                            <div class="timeline-group">
+                                <div class="timeline-group-label">
+                                    <span><?php echo htmlspecialchars($label); ?></span>
+                                    <span class="timeline-date-chip"><?php echo date('M j', $d); ?></span>
+                                </div>
+                                <div class="timeline-items">
+                                    <?php foreach ($items as $ti):
+                                        $isActive = in_array($ti['status'], ['Approved', 'Overdue']);
+                                        $isOverdue = $ti['status'] === 'Overdue';
+                                        $isPending = $ti['status'] === 'Waiting';
+                                    ?>
+                                        <div class="timeline-card <?php echo $isOverdue ? 'timeline-card-overdue' : ($isActive ? 'timeline-card-active' : ''); ?>">
+                                            <div class="timeline-indicator <?php echo $isOverdue ? 'ti-error' : ($isActive ? 'ti-primary' : ($isPending ? 'ti-warning' : 'ti-muted')); ?>">
+                                                <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">
+                                                    <?php echo $isOverdue ? 'alarm' : ($isActive ? 'inventory_2' : ($isPending ? 'hourglass_empty' : 'check_circle')); ?>
+                                                </span>
+                                            </div>
+                                            <div class="timeline-card-content">
+                                                <div class="timeline-card-top">
+                                                    <div>
+                                                        <h3 class="timeline-card-title"><?php echo htmlspecialchars($ti['equipment_name']); ?></h3>
+                                                        <p class="timeline-card-sub">
+                                                            <span class="material-symbols-outlined" style="font-size:14px">schedule</span>
+                                                            <?php echo htmlspecialchars($ti['borrow_date']); ?> &rarr; <?php echo htmlspecialchars($ti['return_date']); ?>
+                                                            <?php if ($isActive): ?>
+                                                                <span class="timeline-time-left" id="timeleft-<?php echo $ti['id']; ?>"></span>
+                                                            <?php endif; ?>
+                                                        </p>
+                                                    </div>
+                                                    <span class="status-chip <?php
+                                                                                $chipClass = 'chip-muted';
+                                                                                if ($ti['status'] === 'Approved') $chipClass = 'chip-success';
+                                                                                elseif ($ti['status'] === 'Overdue')  $chipClass = 'chip-error';
+                                                                                elseif ($ti['status'] === 'Waiting')  $chipClass = 'chip-warning';
+                                                                                echo $chipClass;
+                                                                                ?>">
+                                                        <span class="chip-dot"></span><?php echo htmlspecialchars($ti['status']); ?>
+                                                    </span>
+                                                </div>
+                                                <p class="timeline-card-detail">Room: <?php echo htmlspecialchars($ti['room']); ?></p>
+                                                <?php if ($ti['status'] === 'Declined' && !empty($ti['reason'])): ?>
+                                                    <p class="timeline-card-reason">Reason: <?php echo htmlspecialchars($ti['reason']); ?></p>
+                                                <?php endif; ?>
+                                                <?php if ($isActive): ?>
+                                                    <div class="timeline-card-actions">
+                                                        <button class="btn-return-item timeline-btn-return"
+                                                            data-action="return-item"
+                                                            data-id="<?php echo $ti['id']; ?>"
+                                                            data-name="<?php echo htmlspecialchars($ti['equipment_name'], ENT_QUOTES); ?>">
+                                                            <span class="material-symbols-outlined" style="font-size:15px">undo</span> Return Item
+                                                        </button>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Time Slot</label>
-                                <select class="form-control-custom">
-                                    <option value="">Select time slot</option>
-                                    <option>7:00 AM – 9:00 AM</option>
-                                    <option>9:00 AM – 11:00 AM</option>
-                                    <option>11:00 AM – 1:00 PM</option>
-                                    <option>1:00 PM – 3:00 PM</option>
-                                    <option>3:00 PM – 5:00 PM</option>
-                                    <option>Full Day (7 AM – 5 PM)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Additional Notes</label>
-                            <textarea class="form-control-custom" rows="3" placeholder="Any special requirements or notes..."></textarea>
-                        </div>
-                        <button type="button" class="btn-submit-form" data-action="room-reserve-preview">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="width:16px;height:16px;margin-right:8px;" aria-label="Submit" aria-hidden="true">
-                                <line x1="22" y1="2" x2="11" y2="13" />
-                                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                            </svg> Submit Reservation (Preview)
-                        </button>
+                    <?php endforeach;
+                    endif; ?>
+                    <div class="timeline-end">
+                        <div class="timeline-end-line"></div>
+                        <span>End of Activity Log</span>
+                        <div class="timeline-end-line"></div>
                     </div>
                 </div>
-            </div>
-        </div><!-- /panel-rooms -->
+            </div><!-- /panel-activity -->
 
-    </main>
+        </main><!-- /app-main -->
+    </div><!-- /main-wrapper -->
 
     <!-- ================================================================
-     OVERLAY: ACCOUNT PAGE
+     OVERLAY: ACCOUNT — merged into settingsOverlay below
+     (kept as hidden anchor for legacy data-target references)
 ================================================================ -->
     <div class="overlay-page" id="accountOverlay">
-
-        <!-- Own top bar — replaces the hidden app header while overlay is open -->
         <div class="overlay-topbar">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="accountOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg> Back to Dashboard
+            <button class="overlay-back-btn" data-action="close-overlay" data-target="accountOverlay">
+                <span class="material-symbols-outlined">arrow_back</span> Back
             </button>
-            <div class="overlay-topbar-sep"></div>
-            <span class="overlay-topbar-title">My Account</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
+        <span class="overlay-topbar-title">My Account</span>
+        <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
+    </div>
+    <div class="account-layout">
+        <div class="account-sidebar">
+            <span class="account-sidebar-label">My Account</span>
+            <button class="acc-nav-btn active" data-acc-tab="acc-overview">
+                <span class="material-symbols-outlined">badge</span> Overview
+            </button>
+            <button class="acc-nav-btn" data-acc-tab="acc-academic">
+                <span class="material-symbols-outlined">school</span> Department Info
+            </button>
+            <button class="acc-nav-btn" data-acc-tab="acc-contact">
+                <span class="material-symbols-outlined">contacts</span> Contact Details
+            </button>
         </div>
+        <div class="account-content">
 
-        <div class="account-layout">
-            <div class="account-sidebar">
-                <span class="account-sidebar-label">My Account</span>
-                <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Overview" aria-hidden="true">
-                        <rect x="2" y="5" width="20" height="14" rx="2" />
-                        <circle cx="8" cy="12" r="2" />
-                        <path d="M14 9h4" />
-                        <path d="M14 12h4" />
-                        <path d="M14 15h2" />
-                    </svg> Overview
-                </button>
-                <button class="acc-nav-btn" data-acc-tab="acc-academic">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Academic" aria-hidden="true">
-                        <path d="M22 10v6" />
-                        <path d="M2 10l10-5 10 5-10 5z" />
-                        <path d="M6 12v5c3 3 9 3 12 0v-5" />
-                    </svg> Academic Info
-                </button>
-                <button class="acc-nav-btn" data-acc-tab="acc-contact">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Contact" aria-hidden="true">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                    </svg> Contact Details
-                </button>
-                <span class="account-sidebar-label" style="margin-top:0.5rem;">Emergency</span>
-                <button class="acc-nav-btn" data-acc-tab="acc-emergency">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-label="Emergency" aria-hidden="true">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                    </svg> Emergency Contact
-                </button>
-            </div>
-
-            <div class="account-content">
-                <!-- Overview -->
-                <div id="acc-overview" class="overlay-sub-panel active">
-                    <div class="overlay-section-header" style="margin-bottom:1.4rem;">
-                        <span class="section-eyebrow">My Account › Overview</span>
-                        <h2>Profile &amp; Identity</h2>
-                        <p>Your personal details and login information.</p>
-                    </div>
-                    <div class="account-hero-card">
-                        <div class="acc-avatar-section">
-                            <div class="acc-avatar-large" id="profileAvatarLarge">
+            <!-- Overview -->
+            <div id="acc-overview" class="overlay-sub-panel active">
+                <div class="overlay-section-header">
+                    <span class="section-eyebrow">My Account › Overview</span>
+                    <h2>Profile &amp; Identity</h2>
+                    <p>Your personal details and login information.</p>
+                </div>
+                <div class="account-hero-card">
+                    <div class="acc-avatar-section">
+                        <div class="acc-avatar-large" id="profileAvatarLarge">
+                            <?php if ($profile_pic_url): ?>
+                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                            <?php else: ?>
+                                <?php echo htmlspecialchars($initials); ?>
+                            <?php endif; ?>
+                        </div>
+                        <div style="position:relative;">
+                            <button class="btn-change-profile" id="changeProfileBtn" data-action="open-picture-menu">Change Photo</button>
+                            <div class="picture-menu" id="pictureMenu" style="display:none;">
+                                <button class="pic-menu-item" data-action="upload-picture">
+                                    <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
+                                </button>
                                 <?php if ($profile_pic_url): ?>
-                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
-                                <?php else: ?>
-                                    <?php echo htmlspecialchars($initials); ?>
+                                    <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                        <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
+                                    </button>
                                 <?php endif; ?>
                             </div>
-                            <div style="position: relative;">
-                                <button class="btn-change-profile" id="changeProfileBtn">
-                                    Change Profile
-                                </button>
-                                <!-- Picture menu -->
-                                <div class="picture-menu" id="pictureMenu" style="display:none;">
-                                    <button class="pic-menu-item" data-action="upload-picture">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:8px;">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                            <polyline points="17 8 12 3 7 8" />
-                                            <line x1="12" y1="3" x2="12" y2="15" />
-                                        </svg>
-                                        Upload Photo
-                                    </button>
-                                    <?php if ($profile_pic_url): ?>
-                                        <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="margin-right:8px;">
-                                                <polyline points="3 6 5 6 21 6" />
-                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                            </svg>
-                                            Remove Photo
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            <!-- Hidden file input -->
-                            <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                         </div>
-                        <div class="acc-hero-info">
-                            <h2><?php echo htmlspecialchars($fullname); ?></h2>
-                            <p>ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></p>
-                            <span class="acc-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" style="vertical-align:middle;margin-right:6px;">
-                                    <circle cx="12" cy="12" r="7" fill="#22c55e" stroke="none" />
-                                </svg>
-                                Active Student
-                            </span>
-
-                            <!-- Subtle Progress Bar (hidden when 100%) -->
-                            <div class="account-progress-inline" id="inlineProgressContainer">
-                                <div class="progress-bar-wrapper">
-                                    <div class="progress-bar-small">
-                                        <div class="progress-bar-fill-small" id="completionBar" style="width: 0%;"></div>
-                                    </div>
-                                    <span class="progress-percentage-small" id="completionPercentage">0%</span>
-                                </div>
-                                <div class="progress-info-icon" id="progressInfoIcon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="12" y1="16" x2="12" y2="12" />
-                                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                                    </svg>
-                                    <div class="progress-tooltip" id="progressTooltip">
-                                        <strong>Account Completion</strong>
-                                        <p id="tooltipHint">Complete your profile to access all features</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="acc-action-wrap">
-                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
-                                Edit Profile
-                            </button>
-                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;" aria-label="Save" aria-hidden="true">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg> Save
-                            </button>
-                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">
-                                Cancel
-                            </button>
-                        </div>
+                        <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                     </div>
-
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Personal Information</h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Full Name</span>
-                            <span class="info-val" data-field="fullname"><?php echo htmlspecialchars($fullname); ?></span>
-                            <input class="info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Student ID</span>
-                            <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Date of Birth</span>
-                            <span class="info-val <?php echo $dob_locked ? '' : 'empty'; ?>" data-field="dob"><?php echo $dob_locked ? htmlspecialchars($dob_display) : '— Not provided'; ?></span>
-                            <?php if (!$dob_locked): ?>
-                                <input class="info-input-f" type="date" data-input="dob" disabled style="display:none;" max="<?php echo date('Y-m-d'); ?>">
-                            <?php endif; ?>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Gender</span>
-                            <span class="info-val <?php echo $gender_locked ? '' : 'empty'; ?>" data-field="gender"><?php echo $gender_locked ? htmlspecialchars($db_gender) : '— Not provided'; ?></span>
-                            <?php if (!$gender_locked): ?>
-                                <select class="info-input-f" data-input="gender" disabled style="display:none;">
-                                    <option value="">Select...</option>
-                                    <option>Male</option>
-                                    <option>Female</option>
-                                    <option>Prefer not to say</option>
-                                </select>
-                            <?php endif; ?>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Nationality</span>
-                            <span class="info-val <?php echo $nationality_locked ? '' : 'empty'; ?>" data-field="nationality"><?php echo $nationality_locked ? htmlspecialchars($db_nationality) : '— Not provided'; ?></span>
-                            <?php if (!$nationality_locked): ?>
-                                <input class="info-input-f" data-input="nationality" placeholder="e.g. Filipino" disabled style="display:none;">
-                            <?php endif; ?>
-                        </div>
+                    <div class="acc-hero-info">
+                        <h2><?php echo htmlspecialchars($fullname); ?></h2>
+                        <p>ID: <?php echo htmlspecialchars($_SESSION['user_id']); ?></p>
+                        <span class="acc-badge">
+                            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
+                            Active Faculty
+                        </span>
                     </div>
-
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Login &amp; Security</h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Primary Email</span>
-                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>">
-                                <?php echo $masked_email ?: '— Not provided'; ?>
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Backup Email</span>
-                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email">
-                                <?php echo $masked_backup ?: '— Not provided'; ?>
-                            </span>
-                            <?php if (!$backup_locked): ?>
-                                <button class="btn-borrow" style="width:auto; padding:6px 16px; font-size:0.75rem; margin-left:auto;"
-                                    data-action="open-backup-email-modal">
-                                    Add
-                                </button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Password</span>
-                            <span class="info-val">••••••••••</span>
-                            <button class="btn-borrow" style="width:auto; padding:6px 16px; font-size:0.75rem; margin-left:auto;"
-                                data-action="open-email-verify-modal">
-                                Change
-                            </button>
-                        </div>
+                    <div class="acc-action-wrap">
+                        <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit Profile</button>
+                        <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
+                            <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
+                        </button>
+                        <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">Cancel</button>
                     </div>
-                </div><!-- /acc-overview -->
-
-                <!-- Academic -->
-                <div id="acc-academic" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Academic</span>
-                        <h2>Academic Information</h2>
-                        <p>Your enrollment and program details.</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-head">
+                        <h3>Personal Information</h3>
                     </div>
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Enrollment</h3>
-                            <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">
-                                Edit
-                            </button>
-                            <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;" data-action="academic-save">
-                                Save Changes
-                            </button>
-                            <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;" data-action="academic-cancel">
-                                Cancel
-                            </button>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Student ID</span>
-                            <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Full Name</span>
-                            <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Program</span>
-                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program">
-                                <?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?>
-                            </span>
-                            <?php if (!$program_locked): ?>
-                                <select class="info-input-f" data-input="program" disabled style="display:none;">
-                                    <option value="">Select Program...</option>
-                                    <option value="BEED">BEED</option>
-                                    <option value="BSBA-HRM">BSBA-HRM</option>
-                                    <option value="BSCpE">BSCpE</option>
-                                    <option value="BSED">BSED</option>
-                                    <option value="BSIE">BSIE</option>
-                                    <option value="BSIT">BSIT</option>
-                                    <option value="BSPSY">BSPSY</option>
-                                    <option value="DCET">DCET</option>
-                                    <option value="DIT">DIT</option>
-                                </select>
-                            <?php endif; ?>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Year Level</span>
-                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level">
-                                <?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?>
-                            </span>
-                            <select class="info-input-f" data-input="year_level" disabled style="display:none;">
-                                <option value="">Select Year Level...</option>
-                                <option value="1st Year">1st Year</option>
-                                <option value="2nd Year">2nd Year</option>
-                                <option value="3rd Year">3rd Year</option>
-                                <option value="4th Year">4th Year</option>
-                                <option value="Ladderized">Ladderized</option>
+                    <div class="info-row">
+                        <span class="info-lbl">Full Name</span>
+                        <span class="info-val" data-field="fullname"><?php echo htmlspecialchars($fullname); ?></span>
+                        <input class="info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Faculty ID</span>
+                        <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-head">
+                        <h3>Login &amp; Security</h3>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Primary Email</span>
+                        <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Backup Email</span>
+                        <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email"><?php echo $masked_backup ?: '— Not provided'; ?></span>
+                        <?php if (!$backup_locked): ?>
+                            <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Password</span>
+                        <span class="info-val">••••••••••</span>
+                        <button class="btn-inline-action" data-action="open-email-verify-modal">Change</button>
+                    </div>
+                </div>
+            </div><!-- /acc-overview -->
+
+            <!-- Department -->
+            <div id="acc-academic" class="overlay-sub-panel">
+                <div class="overlay-section-header">
+                    <span class="section-eyebrow">My Account › Department</span>
+                    <h2>Department Information</h2>
+                    <p>Your faculty department and assignment details.</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-head">
+                        <h3>Department Assignment</h3>
+                        <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit" style="display:inline-flex;">Edit</button>
+                        <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;" data-action="academic-save">Save Changes</button>
+                        <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;" data-action="academic-cancel">Cancel</button>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Faculty ID</span>
+                        <span class="info-val"><?php echo htmlspecialchars($_SESSION['user_id']); ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Full Name</span>
+                        <span class="info-val"><?php echo htmlspecialchars($fullname); ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Department</span>
+                        <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
+                        <?php if (!$program_locked): ?>
+                            <select class="info-input-f" data-input="program" disabled style="display:none;">
+                                <option value="">Select Program...</option>
+                                <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                    <option value="<?php echo $p; ?>"><?php echo $p; ?></option>
+                                <?php endforeach; ?>
                             </select>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Status</span>
-                            <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
-                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Position / Rank</span>
+                        <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level"><?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?></span>
+                        <select class="info-input-f" data-input="year_level" disabled style="display:none;">
+                            <option value="">Select Position...</option>
+                            <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
+                                <option value="<?php echo $rank; ?>"><?php echo $rank; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Status</span>
+                        <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
                     </div>
                 </div>
+            </div><!-- /acc-academic -->
 
-                <!-- Contact -->
-                <div id="acc-contact" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Contact</span>
-                        <h2>Contact Details</h2>
-                        <p>How we can reach you.</p>
+            <!-- Contact -->
+            <div id="acc-contact" class="overlay-sub-panel">
+                <div class="overlay-section-header">
+                    <span class="section-eyebrow">My Account › Contact</span>
+                    <h2>Contact Details</h2>
+                    <p>How we can reach you.</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-head">
+                        <h3>Address</h3>
+                        <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit" style="display:inline-flex;">Edit</button>
+                        <button class="btn-save-acc" id="saveContactBtn" style="display:none;" data-action="contact-save">Save Changes</button>
+                        <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;" data-action="contact-cancel">Cancel</button>
                     </div>
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Address</h3>
-                            <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit" style="display:inline-flex;">
-                                Edit
-                            </button>
-                            <button class="btn-save-acc" id="saveContactBtn" style="display:none;" data-action="contact-save">
-                                Save Changes
-                            </button>
-                            <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;" data-action="contact-cancel">
-                                Cancel
-                            </button>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Present Address</span>
-                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address">
-                                <?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?>
-                            </span>
-                            <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none; min-height:60px;"></textarea>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Permanent Address</span>
-                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address">
-                                <?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?>
-                            </span>
-                            <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none; min-height:60px;"></textarea>
-                        </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Present Address</span>
+                        <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address"><?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?></span>
+                        <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none;min-height:60px;"></textarea>
                     </div>
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Phone</h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Mobile Number</span>
-                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone">
-                                <?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Landline</span>
-                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline">
-                                <?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
-                        </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Permanent Address</span>
+                        <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address"><?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?></span>
+                        <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none;min-height:60px;"></textarea>
                     </div>
                 </div>
+                <div class="info-card">
+                    <div class="info-card-head">
+                        <h3>Phone</h3>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Mobile Number</span>
+                        <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone"><?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?></span>
+                        <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
+                    </div>
+                    <div class="info-row">
+                        <span class="info-lbl">Landline</span>
+                        <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline"><?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?></span>
+                        <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
+                    </div>
+                </div>
+            </div><!-- /acc-contact -->
 
-                <!-- Emergency -->
-                <div id="acc-emergency" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Emergency</span>
-                        <h2>Emergency Contact</h2>
-                        <p>Person to contact in an emergency.</p>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Primary Contact</h3>
-                            <button class="btn-edit-acc" id="editEmergencyBtn" data-action="emergency-edit" style="display:inline-flex;">
-                                Edit
-                            </button>
-                            <button class="btn-save-acc" id="saveEmergencyBtn" style="display:none;" data-action="emergency-save">
-                                Save Changes
-                            </button>
-                            <button class="btn-cancel-acc" id="cancelEmergencyBtn" style="display:none;" data-action="emergency-cancel">
-                                Cancel
-                            </button>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Name</span>
-                            <span class="info-val <?php echo $db_emergency_name ? '' : 'empty'; ?>" data-field="emergency_name">
-                                <?php echo $db_emergency_name ? htmlspecialchars($db_emergency_name) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="emergency_name" placeholder="Full name" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Relationship</span>
-                            <span class="info-val <?php echo $db_emergency_rel ? '' : 'empty'; ?>" data-field="emergency_relationship">
-                                <?php echo $db_emergency_rel ? htmlspecialchars($db_emergency_rel) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="emergency_relationship" placeholder="e.g. Mother, Father, Guardian" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Mobile Number</span>
-                            <span class="info-val <?php echo $db_emergency_phone ? '' : 'empty'; ?>" data-field="emergency_phone">
-                                <?php echo $db_emergency_phone ? htmlspecialchars($db_emergency_phone) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="emergency_phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
+    </div>
     </div><!-- /accountOverlay -->
 
     <!-- ================================================================
-     OVERLAY: SETTINGS PAGE
+     OVERLAY: SETTINGS (unified — Account + System Settings)
 ================================================================ -->
     <div class="overlay-page" id="settingsOverlay">
-
-        <!-- Own top bar -->
         <div class="overlay-topbar">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="settingsOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg> Back to Dashboard
-            </button>
-            <div class="overlay-topbar-sep"></div>
-            <span class="overlay-topbar-title">Settings</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
+            <span class="overlay-topbar-title">Account &amp; System Settings</span>
         </div>
 
-        <div class="settings-layout">
-            <div class="settings-sidebar">
-                <span class="s-cat-label">Appearance</span>
-                <button class="s-nav-item active" data-sett-tab="st-appearance"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
-                        <circle cx="13.5" cy="6.5" r="0.5" fill="currentColor" />
-                        <circle cx="17.5" cy="10.5" r="0.5" fill="currentColor" />
-                        <circle cx="8.5" cy="7.5" r="0.5" fill="currentColor" />
-                        <circle cx="6.5" cy="12.5" r="0.5" fill="currentColor" />
-                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
-                    </svg> Appearance</button>
-                <button class="s-nav-item" data-sett-tab="st-accessibility"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
-                        <circle cx="12" cy="6" r="2" />
-                        <path d="m4 14 8-2 8 2" />
-                        <path d="M8 12v1.5l-3 5" />
-                        <path d="M16 12v1.5l3 5" />
-                        <path d="m9 22 3-6 3 6" />
-                    </svg> Accessibility</button>
-                <span class="s-cat-label">Account</span>
-                <button class="s-nav-item" data-sett-tab="st-privacy"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                        <polyline points="9 12 11 14 15 10" />
-                    </svg> Privacy &amp; Security</button>
-                <button class="s-nav-item" data-sett-tab="st-notif-prefs"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                    </svg> Notifications</button>
-                <!-- <button class="s-nav-item" data-sett-tab="st-language"><i class="fa-solid fa-language"></i> Language & Region</button> -->
-                <div class="s-divider"></div>
-                <span class="s-cat-label">System</span>
-                <button class="s-nav-item" data-sett-tab="st-advanced"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
-                        <line x1="4" y1="21" x2="4" y2="14" />
-                        <line x1="4" y1="10" x2="4" y2="3" />
-                        <line x1="12" y1="21" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12" y2="3" />
-                        <line x1="20" y1="21" x2="20" y2="16" />
-                        <line x1="20" y1="12" x2="20" y2="3" />
-                        <line x1="1" y1="14" x2="7" y2="14" />
-                        <line x1="9" y1="8" x2="15" y2="8" />
-                        <line x1="17" y1="16" x2="23" y2="16" />
-                    </svg> Advanced</button>
+        <div class="unified-settings-wrap">
+
+            <!-- Page Header -->
+            <div class="unified-settings-header">
+                <h1>Account &amp; System Settings</h1>
+                <p>Manage your profile, preferences, and security settings.</p>
             </div>
 
-            <div class="settings-content">
+            <div class="unified-settings-grid">
 
-                <!-- Appearance -->
-                <div id="st-appearance" class="overlay-sub-panel active">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">Settings › Appearance</span>
-                        <h2>Appearance</h2>
-                        <p>Customize how the portal looks and feels.</p>
+                <!-- ── Profile Information Card (full-width) ───────────────── -->
+                <div class="u-card u-card-full">
+                    <div class="u-card-head">
+                        <h2>Profile Information</h2>
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Theme</h3>
-                            <p>Choose between light, dark, or high-contrast mode.</p>
+                    <!-- Profile photo row -->
+                    <div class="u-profile-photo-row">
+                        <div class="acc-avatar-large" id="profileAvatarLarge" style="width:80px;height:80px;font-size:1.6rem;">
+                            <?php if ($profile_pic_url): ?>
+                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                            <?php else: ?>
+                                <?php echo htmlspecialchars($initials); ?>
+                            <?php endif; ?>
                         </div>
-                        <div class="theme-grid">
-                            <div class="theme-opt selected" id="tp-light" data-action="apply-theme" data-theme="light">
-                                <div class="theme-prev tp-light">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">Light <svg id="tc-light" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg></div>
-                            </div>
-                            <div class="theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
-                                <div class="theme-prev tp-dark">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">Dark <svg id="tc-dark" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg></div>
-                            </div>
-                            <div class="theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
-                                <div class="theme-prev tp-hc">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">High Contrast <svg id="tc-hc" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg></div>
+                        <div style="position:relative;">
+                            <button class="btn-change-profile" id="changeProfileBtn" data-action="open-picture-menu">Change Photo</button>
+                            <div class="picture-menu" id="pictureMenu" style="display:none;">
+                                <button class="pic-menu-item" data-action="upload-picture">
+                                    <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
+                                </button>
+                                <?php if ($profile_pic_url): ?>
+                                    <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                        <span class="material-symbols-outlined" style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
+                        <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Accent Color</h3>
-                            <p>Pick a highlight color for buttons and active elements.</p>
+                    <div class="u-form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Full Name</label>
+                            <span class="info-val" data-field="fullname" id="profileNameDisplay"><?php echo htmlspecialchars($fullname); ?></span>
+                            <input class="form-input info-input-f" data-input="fullname" value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;" placeholder="Your full name">
                         </div>
-                        <div class="color-dots">
-                            <div class="c-dot selected" style="background:#600302;" data-action="apply-accent" data-color="#600302" data-light="#f3e5e6" title="Maroon (Default)"></div>
-                            <div class="c-dot" style="background:#1a5276;" data-action="apply-accent" data-color="#1a5276" data-light="#d6eaf8" title="Navy Blue"></div>
-                            <div class="c-dot" style="background:#1e8449;" data-action="apply-accent" data-color="#1e8449" data-light="#d5f5e3" title="Forest Green"></div>
-                            <div class="c-dot" style="background:#7d3c98;" data-action="apply-accent" data-color="#7d3c98" data-light="#f0e6fa" title="Purple"></div>
-                            <div class="c-dot" style="background:#d35400;" data-action="apply-accent" data-color="#d35400" data-light="#fde8d8" title="Burnt Orange"></div>
-                            <div class="c-dot" style="background:#2e86c1;" data-action="apply-accent" data-color="#2e86c1" data-light="#d6eaf8" title="Sky Blue"></div>
+                        <div class="form-group">
+                            <label class="form-label">Faculty ID</label>
+                            <input class="form-input" type="text" value="<?php echo htmlspecialchars($_SESSION['user_id']); ?>" readonly style="background:var(--color-surface-container);color:var(--color-secondary);cursor:not-allowed;">
+                        </div>
+                        <div class="form-group u-form-col-span">
+                            <label class="form-label">Department / College</label>
+                            <?php if ($program_locked): ?>
+                                <input class="form-input" type="text" value="<?php echo htmlspecialchars($db_program); ?>" readonly style="background:var(--color-surface-container);color:var(--color-secondary);cursor:not-allowed;">
+                            <?php else: ?>
+                                <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
+                                <select class="form-input info-input-f" data-input="program" disabled style="display:none;">
+                                    <option value="">Select Department...</option>
+                                    <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                        <option value="<?php echo $p; ?>"><?php echo $p; ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
                         </div>
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Compact Mode</h3>
-                            <p>Reduce spacing for a denser layout.</p>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Enable Compact Mode</h4>
-                                <p>Makes cards and list items smaller.</p>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="compactToggle" data-action="apply-compact">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
+                    <div class="u-card-actions">
+                        <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit Profile</button>
+                        <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
+                            <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Update Profile
+                        </button>
+                        <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">Cancel</button>
                     </div>
                 </div>
 
-                <!-- Accessibility -->
-                <div id="st-accessibility" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">Settings › Accessibility</span>
-                        <h2>Accessibility</h2>
-                        <p>Make the portal easier to use.</p>
+                <!-- ── Appearance & Accessibility Card ─────────────────────── -->
+                <div class="u-card">
+                    <div class="u-card-head">
+                        <h2>Appearance &amp; Accessibility</h2>
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Text Size</h3>
+                    <!-- Theme -->
+                    <div class="u-field-group">
+                        <div class="u-field-label">
+                            <h4>Theme</h4>
+                            <p>Choose how PUPSync looks to you.</p>
                         </div>
-                        <div class="range-wrap">
-                            <h4>Font Size <span id="fontSizeLbl" style="color:var(--accent-maroon);">100%</span></h4>
-                            <div class="range-labels"><span>Small</span><span>Default</span><span>Large</span></div>
-                            <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" data-action="apply-fontsize">
+                        <select class="form-input" id="themeSelectUnified" style="appearance:none;background-image:url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235e5e67%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');background-repeat:no-repeat;background-position:right 0.75rem center;background-size:1.2em;padding-right:2.5rem;">
+                            <option value="light" id="themeOptLight">Light (Default)</option>
+                            <option value="dark" id="themeOptDark">Dark</option>
+                            <option value="high-contrast" id="themeOptHC">High Contrast</option>
+                        </select>
+                        <!-- Hidden theme opt divs kept for JS compatibility -->
+                        <div style="display:none;">
+                            <div id="tp-light" data-action="apply-theme" data-theme="light"></div>
+                            <div id="tp-dark" data-action="apply-theme" data-theme="dark"></div>
+                            <div id="tp-hc" data-action="apply-theme" data-theme="high-contrast"></div>
+                            <svg id="tc-light" style="display:none;">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <svg id="tc-dark" style="display:none;">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <svg id="tc-hc" style="display:none;">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
                         </div>
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Motion & Animations</h3>
+                    <!-- Font Scaling (3-button toggle) -->
+                    <div class="u-field-group" style="margin-top:20px;">
+                        <div class="u-field-label">
+                            <h4>Font Scaling</h4>
+                            <p>Adjust the text size for readability. <span id="fontSizeLbl" style="color:var(--color-primary);font-weight:600;"></span></p>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Reduce Motion</h4>
-                                <p>Disables fade-in and slide animations.</p>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
-                                <span class="toggle-track"></span>
-                            </label>
+                        <div class="u-font-toggle" id="fontScaleToggle">
+                            <button class="u-font-btn" data-scale="80">Small</button>
+                            <button class="u-font-btn u-font-btn-active" data-scale="100">Standard</button>
+                            <button class="u-font-btn" data-scale="120">Large</button>
                         </div>
+                        <!-- Hidden range kept for JS compatibility -->
+                        <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" style="display:none;">
                     </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Focus Indicators</h3>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Enhanced Focus Ring</h4>
-                                <p>Makes keyboard focus outlines more visible.</p>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                    </div>
+                    <!-- Hidden toggles kept for JS restore compatibility -->
+                    <!-- <label class="toggle-sw"><input type="checkbox" id="compactToggle"><span class="toggle-track"></span></label> -->
+                    <!-- <label class="toggle-sw"><input type="checkbox" id="reduceMotionToggle"><span class="toggle-track"></span></label> -->
+                    <!-- <label class="toggle-sw"><input type="checkbox" id="focusRingToggle"><span class="toggle-track"></span></label> -->
                 </div>
 
-                <!-- Privacy -->
-                <div id="st-privacy" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">Settings › Privacy</span>
-                        <h2>Privacy &amp; Security</h2>
-                        <p>Control your data and account security.</p>
-                    </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Login Sessions</h3>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Remember Me</h4>
-                                <p>Stay logged in for 30 days.</p>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Two-Factor Authentication</h4>
-                                <p>Add an extra layer of security.</p>
-                            </div>
-                            <button class="btn-borrow" style="width:auto;padding:7px 16px;font-size:0.78rem;"
-                                data-action="toast" data-msg="2FA setup coming soon!">Enable 2FA</button>
-                        </div>
-                    </div>
-                    <div class="settings-card danger-card">
-                        <div class="settings-card-head">
-                            <h3 style="color:var(--danger);">Danger Zone</h3>
-                            <p>Irreversible actions.</p>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Clear All Activity Data</h4>
-                                <p>Permanently wipes your history.</p>
-                            </div>
-                            <button class="btn-danger-sm" data-action="toast" data-msg="This action is admin-restricted.">Clear Data</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notification Prefs -->
-                <div id="st-notif-prefs" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">Settings › Notifications</span>
+                <!-- ── Notification Preferences Card ───────────────────────── -->
+                <div class="u-card">
+                    <div class="u-card-head">
                         <h2>Notification Preferences</h2>
-                        <p>Control which notifications you receive.</p>
                     </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Borrow & Return Alerts</h3>
+
+                    <div class="u-notif-row u-notif-row-bordered">
+                        <div class="u-notif-label">
+                            <h4>Email Alerts for Overdue Items</h4>
+                            <p>Receive daily summaries of late equipment returns.</p>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Borrow Approved</h4>
-                                <p>Notify when my request is approved.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Due Date Reminder</h4>
-                                <p>Remind me 1 day before equipment is due.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Overdue Warning</h4>
-                                <p>Alert when I have an overdue item.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
+                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
                     </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>General</h3>
+                    <div class="u-notif-row u-notif-row-bordered">
+                        <div class="u-notif-label">
+                            <h4>Upcoming Reservation Reminders</h4>
+                            <p>Get notified 24h before a facility booking.</p>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>School Announcements</h4>
-                                <p>Upcoming events.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                    </div>
+                    <div class="u-notif-row">
+                        <div class="u-notif-label">
+                            <h4>Account Activity Alerts</h4>
+                            <p>Get notified about new logins and security-related changes.</p>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>System Updates</h4>
-                                <p>Maintenance alerts.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
+                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
                     </div>
                 </div>
 
-                <!-- Advanced -->
-                <div id="st-advanced" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">Settings › Advanced</span>
-                        <h2>Advanced</h2>
-                        <p>Power user settings. Be careful.</p>
+                <!-- ── Privacy & Security Card ─────────────────────────────── -->
+                <div class="u-card">
+                    <div class="u-card-head">
+                        <h2>Privacy &amp; Security</h2>
                     </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Display</h3>
+
+                    <!-- Change Password -->
+                    <button class="u-security-row" data-action="open-email-verify-modal">
+                        <div class="u-security-row-text">
+                            <span class="u-security-row-title">Change Password</span>
+                            <span class="u-security-row-sub">Verify your email to get started</span>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Show Asset IDs</h4>
-                                <p>Display equipment asset IDs.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                        <span class="material-symbols-outlined" style="color:var(--color-secondary);font-size:20px;">chevron_right</span>
+                    </button>
+
+                    <!-- Backup Email -->
+                    <div class="u-security-row" style="cursor:default;">
+                        <div class="u-security-row-text">
+                            <span class="u-security-row-title">Backup Email</span>
+                            <span class="u-security-row-sub"><?php echo $masked_backup ?: '— Not provided'; ?></span>
                         </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Verbose Error Messages</h4>
-                                <p>Show detailed error info.</p>
-                            </div><label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                        <?php if (!$backup_locked): ?>
+                            <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- 2FA -->
+                    <div class="u-security-row" style="cursor:default;">
+                        <div class="u-security-row-text">
+                            <span class="u-security-row-title">
+                                Two-Factor Authentication
+                                <span style="display:inline-block;margin-left:8px;padding:2px 8px;background:var(--color-primary);color:var(--color-on-primary);border-radius:4px;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;vertical-align:middle;">Enabled</span>
+                            </span>
+                            <span class="u-security-row-sub">Secured via Authenticator App</span>
+                        </div>
+                        <button class="btn-inline-action" data-action="toast" data-msg="2FA management coming soon!">Manage</button>
+                    </div>
+
+                    <!-- Primary Email (read-only info) -->
+                    <div class="u-security-row" style="cursor:default;">
+                        <div class="u-security-row-text">
+                            <span class="u-security-row-title">Primary Email</span>
+                            <span class="u-security-row-sub <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
                         </div>
                     </div>
-                    <div class="settings-card">
-                        <div class="settings-card-head">
-                            <h3>Reset</h3>
-                        </div>
-                        <div class="s-row">
-                            <div class="s-row-label">
-                                <h4>Reset All Settings</h4>
-                                <p>Restore defaults.</p>
-                            </div>
-                            <button class="btn-danger-sm" data-action="reset-settings">Reset</button>
-                        </div>
-                    </div>
+
+                    <!-- Login & Sessions info -->
+                    <!-- Remember Me / session management not applicable in current design — commented out -->
+                    <!-- <div class="s-row"><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label></div> -->
                 </div>
 
-            </div>
-        </div>
+            </div><!-- /unified-settings-grid -->
+        </div><!-- /unified-settings-wrap -->
     </div><!-- /settingsOverlay -->
 
     <!-- ================================================================
      OVERLAY: NOTIFICATIONS
 ================================================================ -->
-    <div class="overlay-page" id="notifOverlay" style="display:flex; flex-direction:column; overflow-y:auto;">
-
-        <!-- Own top bar -->
-        <div class="overlay-topbar" style="flex-shrink:0;">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="notifOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg> Back to Dashboard
+    <div class="overlay-page" id="notifOverlay">
+        <div class="overlay-topbar">
+            <button class="overlay-back-btn" data-action="close-overlay" data-target="notifOverlay">
+                <span class="material-symbols-outlined">arrow_back</span> Back
             </button>
-            <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">Notifications</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="PUPSYNC" aria-hidden="true">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
+            <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
         </div>
-
         <div class="notif-wrapper">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.2rem; flex-wrap:wrap; gap:10px;">
-                <div class="overlay-section-header" style="flex:1; margin-bottom:0;">
+            <div class="notif-header-row">
+                <div class="overlay-section-header" style="margin-bottom:0;flex:1;">
                     <span class="section-eyebrow">Inbox › All Notifications</span>
                     <h2>Notifications</h2>
-                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount"><?php echo (3 + count($overdue_notifs)); ?> unread</strong> notifications.</p>
+                    <p>You have <strong id="unreadCount"><?php echo (3 + count($overdue_notifs)); ?> unread</strong> notifications.</p>
                 </div>
-                <button class="mark-read-btn" data-action="mark-all-read" style="margin-top:0.5rem;">Mark all as read</button>
+                <button class="mark-read-btn" data-action="mark-all-read">Mark all as read</button>
             </div>
-
             <div class="notif-filter-tabs">
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
@@ -1804,45 +1430,34 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                 <button class="notif-tab" data-notif-filter="overdue">Overdue</button>
                 <button class="notif-tab" data-notif-filter="system">System</button>
             </div>
-
             <?php if (!empty($overdue_notifs)): ?>
                 <div class="notif-group overdue-notif-group">⚠️ Overdue — Action Required</div>
                 <?php foreach ($overdue_notifs as $on): ?>
                     <div class="notif-item unread notif-overdue" data-cat="overdue">
-                        <div class="notif-icon ni-overdue"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                            </svg></div>
+                        <div class="notif-icon ni-overdue"><span class="material-symbols-outlined" style="font-size:16px">alarm</span></div>
                         <div class="notif-body-wrap">
                             <h4>Overdue Item: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                            <p>This item was due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong>. Please return it to the admin immediately to avoid penalties.</p>
+                            <p>Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong>. Return immediately to avoid penalties.</p>
                         </div>
                         <div class="notif-meta"><span class="notif-time">Overdue since <?php echo htmlspecialchars($on['return_date']); ?></span>
                             <div class="unread-dot"></div>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
-
+            <?php endforeach;
+            endif; ?>
             <div class="notif-group">Today</div>
             <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg></div>
+                <div class="notif-icon ni-success"><span class="material-symbols-outlined" style="font-size:16px">check_circle</span></div>
                 <div class="notif-body-wrap">
                     <h4>Borrow Request Approved</h4>
-                    <p>Your latest borrow request has been approved. Please pick up the item at the Admin Office before 5:00 PM.</p>
+                    <p>Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</p>
                 </div>
                 <div class="notif-meta"><span class="notif-time">9:42 AM</span>
                     <div class="unread-dot"></div>
                 </div>
             </div>
             <div class="notif-item unread" data-cat="system">
-                <div class="notif-icon ni-alert"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                    </svg></div>
+                <div class="notif-icon ni-alert"><span class="material-symbols-outlined" style="font-size:16px">settings</span></div>
                 <div class="notif-body-wrap">
                     <h4>System Maintenance Tonight</h4>
                     <p>PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</p>
@@ -1851,14 +1466,9 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <div class="unread-dot"></div>
                 </div>
             </div>
-
             <div class="notif-group">Yesterday</div>
             <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-warn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                        <line x1="12" y1="9" x2="12" y2="13" />
-                        <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg></div>
+                <div class="notif-icon ni-warn"><span class="material-symbols-outlined" style="font-size:16px">warning</span></div>
                 <div class="notif-body-wrap">
                     <h4>Return Reminder</h4>
                     <p>You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</p>
@@ -1868,14 +1478,10 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                 </div>
             </div>
             <div class="notif-item" data-cat="borrow">
-                <div class="notif-icon ni-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                        <line x1="12" y1="22.08" x2="12" y2="12" />
-                    </svg></div>
+                <div class="notif-icon ni-success"><span class="material-symbols-outlined" style="font-size:16px">inventory_2</span></div>
                 <div class="notif-body-wrap">
                     <h4>Request Submitted</h4>
-                    <p>Your borrow request for Lab Equipment was successfully submitted and is under review.</p>
+                    <p>Your borrow request was successfully submitted and is under review.</p>
                 </div>
                 <div class="notif-meta"><span class="notif-time">Yesterday, 2:00 PM</span></div>
             </div>
@@ -1883,178 +1489,198 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
     </div><!-- /notifOverlay -->
 
     <!-- ================================================================
-     CONFIRMATION MODAL (shows changes before saving)
+     OVERLAY: HELP CENTER
 ================================================================ -->
-    <div class="pw-modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle">
-        <div class="pw-modal-box" style="max-width: 600px;">
-            <div class="pw-modal-header">
-                <h3 id="confirmationTitle">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
-                        <path d="M9 11l3 3L22 4" />
-                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-                    </svg>Confirm Changes
-                </h3>
-                <button class="pw-modal-close" data-action="close-confirmation-modal" aria-label="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+    <div class="overlay-page" id="helpOverlay">
+        <div class="overlay-topbar">
+            <button class="overlay-back-btn" data-action="close-overlay" data-target="helpOverlay">
+                <span class="material-symbols-outlined">arrow_back</span> Back
+            </button>
+            <span class="overlay-topbar-title">Help Center</span>
+            <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
+        </div>
+        <div class="notif-wrapper">
+            <div class="overlay-section-header">
+                <span class="section-eyebrow">Support › Help Center</span>
+                <h2>How can we help?</h2>
+                <p>Browse common topics or contact the system administrator for further assistance.</p>
             </div>
-            <div class="pw-modal-body">
-                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">Please review the changes you're about to make:</p>
 
-                <div class="changes-summary" id="changesSummary" style="background: var(--bg-secondary); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; max-height: 300px; overflow-y: auto;">
-                    <!-- Changes will be populated here -->
-                </div>
+            <!-- FAQ Items -->
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
 
-                <div class="warning-box" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: var(--radius); padding: 0.875rem; margin-bottom: 1rem;">
-                    <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#856404" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        <div>
-                            <strong style="color: #856404; display: block; margin-bottom: 0.25rem;">Important Notice</strong>
-                            <p style="color: #856404; margin: 0; font-size: 0.875rem;" id="warningMessage">
-                                Some changes cannot be reversed once saved. Please verify all information before confirming.
-                            </p>
-                        </div>
+                <details class="help-item">
+                    <summary class="help-item-q">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        How do I borrow equipment?
+                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                    </summary>
+                    <div class="help-item-a">
+                        Go to the <strong>Equipment</strong> tab on the sidebar, browse the catalog, and click <em>Borrow</em> on any available item. Fill in the borrow date, return date, room, and instructor, then submit. Your request will be reviewed by the admin.
+                    </div>
+                </details>
+
+                <details class="help-item">
+                    <summary class="help-item-q">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        How do I return a borrowed item?
+                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                    </summary>
+                    <div class="help-item-a">
+                        Go to <strong>Equipment › My Requests</strong> or the <strong>My Activity</strong> tab. Find the approved item and click <em>Return Item</em>. Physically return the item to the Admin Office to complete the process.
+                    </div>
+                </details>
+
+                <details class="help-item">
+                    <summary class="help-item-q">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        Why is my request showing as Overdue?
+                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                    </summary>
+                    <div class="help-item-a">
+                        Your item's return date has passed without it being marked as returned. Please return the item to the Admin Office immediately. Contact the system administrator if you believe this is an error.
+                    </div>
+                </details>
+
+                <details class="help-item">
+                    <summary class="help-item-q">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        How do I reserve a facility or room?
+                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                    </summary>
+                    <div class="help-item-a">
+                        Go to the <strong>Facilities</strong> tab on the sidebar. Browse available rooms, check their availability, and submit a reservation request. Approvals are handled by the facilities coordinator.
+                    </div>
+                </details>
+
+                <details class="help-item">
+                    <summary class="help-item-q">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        How do I update my profile or change my password?
+                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                    </summary>
+                    <div class="help-item-a">
+                        Click your profile avatar in the top-right corner and select <em>View Profile</em>. From there you can update your contact details, profile picture, and change your password securely.
+                    </div>
+                </details>
+
+            </div>
+
+            <!-- Contact Block -->
+            <div class="help-contact-card" style="margin-top:28px;">
+                <span class="material-symbols-outlined" style="font-size:32px;color:var(--color-primary);margin-bottom:8px;">support_agent</span>
+                <h4>Still need help?</h4>
+                <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
+                <a href="mailto:admin@pupsync.edu.ph" class="btn-urgent-primary" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:12px;">
+                    <span class="material-symbols-outlined" style="font-size:16px">mail</span>
+                    Email Administrator
+                </a>
+            </div>
+
+        </div>
+    </div><!-- /helpOverlay -->
+
+    <!-- ================================================================
+     MODALS
+================================================================ -->
+
+    <!-- Confirmation Modal -->
+    <div class="modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">task_alt</span>Confirm Changes</h3>
+                <button class="modal-close-btn" data-action="close-confirmation-modal" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:1rem;color:var(--color-on-surface-variant);font-size:0.9rem;">Please review the changes you're about to make:</p>
+                <div class="changes-summary" id="changesSummary"></div>
+                <div class="warning-box">
+                    <span class="material-symbols-outlined" style="color:#856404;flex-shrink:0;">warning</span>
+                    <div><strong style="color:#856404;display:block;margin-bottom:4px;">Important Notice</strong>
+                        <p style="color:#856404;margin:0;font-size:0.875rem;" id="warningMessage">Some changes cannot be reversed once saved.</p>
                     </div>
                 </div>
             </div>
-            <div class="pw-modal-footer">
+            <div class="modal-footer">
                 <button class="btn-cancel-acc" data-action="close-confirmation-modal">Cancel</button>
                 <button class="btn-save-acc" id="confirmChangesBtn" data-action="confirm-changes">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Confirm & Save
+                    <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Confirm &amp; Save
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ================================================================
-     EMAIL VERIFICATION MODAL (before password change)
-================================================================ -->
-    <div class="pw-modal-backdrop" id="emailVerifyModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="emailVerifyTitle">
-        <div class="pw-modal-box">
-            <div class="pw-modal-header">
-                <h3 id="emailVerifyTitle">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                        <polyline points="22,6 12,13 2,6" />
-                    </svg>Verify Your Email
-                </h3>
-                <button class="pw-modal-close" data-action="close-email-verify-modal" aria-label="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+    <!-- Email Verify Modal -->
+    <div class="modal-backdrop" id="emailVerifyModal" style="display:none;" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">mail</span>Verify Your Email</h3>
+                <button class="modal-close-btn" data-action="close-email-verify-modal" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <div class="pw-modal-body">
-                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">For security, please verify your email address before changing your password.</p>
+            <div class="modal-body">
+                <p style="margin-bottom:1rem;color:var(--color-on-surface-variant);font-size:0.9rem;">For security, verify your email address before changing your password.</p>
                 <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" id="verifyEmailInput" class="form-control-custom" placeholder="Enter your registered email" autocomplete="email">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="verifyEmailInput" class="form-input" placeholder="Enter your registered email" autocomplete="email">
                 </div>
-                <p class="pw-modal-error" id="emailVerifyError" style="display:none;"></p>
+                <p class="modal-error" id="emailVerifyError" style="display:none;"></p>
             </div>
-            <div class="pw-modal-footer">
+            <div class="modal-footer">
                 <button class="btn-cancel-acc" data-action="close-email-verify-modal">Cancel</button>
                 <button class="btn-save-acc" id="emailVerifyBtn" data-action="submit-email-verify">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Verify & Continue
+                    <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Verify &amp; Continue
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ================================================================
-     BACKUP EMAIL MODAL
-================================================================ -->
-    <div class="pw-modal-backdrop" id="backupEmailModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="backupEmailTitle">
-        <div class="pw-modal-box">
-            <div class="pw-modal-header">
-                <h3 id="backupEmailTitle">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                        <polyline points="22,6 12,13 2,6" />
-                    </svg>Backup Email
-                </h3>
-                <button class="pw-modal-close" data-action="close-backup-email-modal" aria-label="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+    <!-- Backup Email Modal -->
+    <div class="modal-backdrop" id="backupEmailModal" style="display:none;" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">alternate_email</span>Backup Email</h3>
+                <button class="modal-close-btn" data-action="close-backup-email-modal" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <div class="pw-modal-body">
-                <p style="margin-bottom:1rem; color:var(--text-secondary); font-size:0.9rem;">Add a backup email for account recovery and important notifications.</p>
+            <div class="modal-body">
+                <p style="margin-bottom:1rem;color:var(--color-on-surface-variant);font-size:0.9rem;">Add a backup email for account recovery and important notifications.</p>
                 <div class="form-group">
-                    <label>Backup Email Address</label>
-                    <input type="email" id="backupEmailInput" class="form-control-custom" placeholder="Enter backup email" autocomplete="email" value="<?php echo htmlspecialchars($db_backup_email); ?>">
+                    <label class="form-label">Backup Email Address</label>
+                    <input type="email" id="backupEmailInput" class="form-input" placeholder="Enter backup email" autocomplete="email" value="<?php echo htmlspecialchars($db_backup_email); ?>">
                 </div>
-                <p class="pw-modal-error" id="backupEmailError" style="display:none;"></p>
+                <p class="modal-error" id="backupEmailError" style="display:none;"></p>
             </div>
-            <div class="pw-modal-footer">
+            <div class="modal-footer">
                 <button class="btn-cancel-acc" data-action="close-backup-email-modal">Cancel</button>
                 <button class="btn-save-acc" id="backupEmailSaveBtn" data-action="save-backup-email">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Save Backup Email
+                    <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save Backup Email
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ================================================================
-     CHANGE PASSWORD MODAL
-================================================================ -->
-    <div class="pw-modal-backdrop" id="pwModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pwModalTitle">
-        <div class="pw-modal-box">
-            <div class="pw-modal-header">
-                <h3 id="pwModalTitle">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px;">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>Change Password
-                </h3>
-                <button class="pw-modal-close" data-action="close-pw-modal" aria-label="Close">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+    <!-- Change Password Modal -->
+    <div class="modal-backdrop" id="pwModal" style="display:none;" role="dialog" aria-modal="true">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3><span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">lock</span>Change Password</h3>
+                <button class="modal-close-btn" data-action="close-pw-modal" aria-label="Close"><span class="material-symbols-outlined">close</span></button>
             </div>
-            <div class="pw-modal-body">
+            <div class="modal-body">
                 <div class="form-group">
-                    <label>Current Password</label>
+                    <label class="form-label">Current Password</label>
                     <div class="pw-input-wrap">
-                        <input type="password" id="pwCurrent" class="form-control-custom" placeholder="Enter your current password" autocomplete="current-password">
-                        <button type="button" class="pw-toggle-btn" data-pw-target="pwCurrent" tabindex="-1" aria-label="Toggle visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
+                        <input type="password" id="pwCurrent" class="form-input" placeholder="Enter your current password" autocomplete="current-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwCurrent" aria-label="Toggle visibility">
+                            <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
                         </button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>New Password</label>
+                    <label class="form-label">New Password</label>
                     <div class="pw-input-wrap">
-                        <input type="password" id="pwNew" class="form-control-custom" placeholder="At least 6 characters" autocomplete="new-password">
-                        <button type="button" class="pw-toggle-btn" data-pw-target="pwNew" tabindex="-1" aria-label="Toggle visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
+                        <input type="password" id="pwNew" class="form-input" placeholder="At least 6 characters" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwNew" aria-label="Toggle visibility">
+                            <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
                         </button>
                     </div>
                     <div class="pw-strength-bar" id="pwStrengthBar" style="display:none;">
@@ -2063,26 +1689,20 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
                     <span class="pw-strength-label" id="pwStrengthLabel"></span>
                 </div>
                 <div class="form-group">
-                    <label>Confirm New Password</label>
+                    <label class="form-label">Confirm New Password</label>
                     <div class="pw-input-wrap">
-                        <input type="password" id="pwConfirm" class="form-control-custom" placeholder="Repeat your new password" autocomplete="new-password">
-                        <button type="button" class="pw-toggle-btn" data-pw-target="pwConfirm" tabindex="-1" aria-label="Toggle visibility">
-                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                            </svg>
+                        <input type="password" id="pwConfirm" class="form-input" placeholder="Repeat your new password" autocomplete="new-password">
+                        <button type="button" class="pw-toggle-btn" data-pw-target="pwConfirm" aria-label="Toggle visibility">
+                            <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
                         </button>
                     </div>
                 </div>
-                <p class="pw-modal-error" id="pwModalError" style="display:none;"></p>
+                <p class="modal-error" id="pwModalError" style="display:none;"></p>
             </div>
-            <div class="pw-modal-footer">
+            <div class="modal-footer">
                 <button class="btn-cancel-acc" data-action="close-pw-modal">Cancel</button>
                 <button class="btn-save-acc" id="pwSubmitBtn" data-action="submit-pw-change">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="width:14px;height:14px;margin-right:6px;vertical-align:middle;">
-                        <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Update Password
+                    <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Update Password
                 </button>
             </div>
         </div>
@@ -2098,19 +1718,22 @@ $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_p
     </script>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay">
-        <div class="spinner"></div>
-        <p style="margin-top:1rem; font-weight:600; color:var(--text-dark); font-size:0.9rem;">Processing your request...</p>
+    <div id="loading-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;">
+        <div style="background:var(--color-surface);border-radius:16px;padding:2rem 2.5rem;display:flex;flex-direction:column;align-items:center;gap:12px;">
+            <div class="spinner"></div>
+            <p style="font-weight:600;color:var(--color-on-surface);font-size:0.9rem;">Processing your request…</p>
+        </div>
     </div>
 
     <!-- Toast -->
     <div id="app-toast"></div>
 
-
-    <!-- Scripts -->
-    <script src="js/user-dashboard.js"></script>
-
-
+    <script>
+        window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+        window.USER_SLUG = '<?php echo $user_slug; ?>';
+        window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
+    </script>
+    <script src="JS/user-dashboard.js"></script>
 </body>
 
 </html>
