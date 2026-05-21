@@ -73,7 +73,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $insert = "INSERT INTO tbl_requests (student_name,student_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
                VALUES ('$student_name','$student_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
     if (mysqli_query($conn, $insert)) {
-        header("Location: user-dashboard.php?success=1");
+        header("Location: faculty-dashboard.php?success=1");
         exit();
     } else die("Error processing request: " . mysqli_error($conn));
 }
