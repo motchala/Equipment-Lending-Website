@@ -9,7 +9,7 @@
 session_start();
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['faculty_id'])) {
     echo json_encode(['success' => false, 'msg' => 'Unauthorized. Please log in again.']);
     exit;
 }
@@ -20,7 +20,7 @@ if (!$conn) {
     exit;
 }
 
-$uid = mysqli_real_escape_string($conn, $_SESSION['user_id']);
+$uid = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 $action = trim($_POST['action'] ?? '');
 
 /* ══════════════════════════════════════════════════════════════════
@@ -173,7 +173,7 @@ if ($action === 'confirm_save_profile') {
     $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE student_id='$uid'";
 
     if (mysqli_query($conn, $sql)) {
-        $_SESSION['fullname'] = $fullname;
+        $_SESSION['faculty_name'] = $fullname;
         $updated = mysqli_fetch_assoc(mysqli_query(
             $conn,
             "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE student_id='$uid' LIMIT 1"
