@@ -23,7 +23,8 @@ if (!$conn) {
  * @return int           1 if auto-approve is ON, 0 if OFF or row absent
  */
 
-function getAutoApproveEnabled(mysqli $conn): int {
+function getAutoApproveEnabled(mysqli $conn): int
+{
     $config_path = __DIR__ . '/auto_approve_config.json';
     if (!file_exists($config_path)) return 0;
     $config = json_decode(file_get_contents($config_path), true);
@@ -37,7 +38,8 @@ function getAutoApproveEnabled(mysqli $conn): int {
  * @param  mysqli   $conn  Active DB connection
  * @return string[]        Flat array of item name strings; empty array if none
  */
-function getAutoApproveItems(mysqli $conn): array {
+function getAutoApproveItems(mysqli $conn): array
+{
     $config_path = __DIR__ . '/auto_approve_config.json';
     if (!file_exists($config_path)) return [];
     $config = json_decode(file_get_contents($config_path), true);
@@ -65,7 +67,8 @@ function getAutoApproveItems(mysqli $conn): array {
  * @param mysqli $conn        Active DB connection
  * @param int    $request_id  The id of the newly inserted tbl_requests row
  */
-function processAutoApprove(mysqli $conn, int $request_id): void {
+function processAutoApprove(mysqli $conn, int $request_id): void
+{
 
     // ── Step 1: Fetch the request row ────────────────────────────────────────
     $stmt = $conn->prepare("SELECT equipment_name, status FROM tbl_requests WHERE id = ?");
@@ -226,7 +229,7 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
         } else {
             echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
         }
-    } 
+    }
     exit();
 }
 
@@ -386,7 +389,6 @@ if (isset($_GET['action'], $_GET['id'])) {
                 $stmt_auto_decline->bind_param("ss", $reason, $equipment_name);
                 $stmt_auto_decline->execute();
             }
-
         } else {
 
             // No stock left → decline this request
@@ -403,7 +405,6 @@ if (isset($_GET['action'], $_GET['id'])) {
 
         header("Location: admin-dashboard.php#lending-waiting");
         exit();
-
     } elseif ($action === 'decline') {
         $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined' WHERE id = ?");
         $stmt->bind_param("i", $request_id);
@@ -578,7 +579,7 @@ if (!empty($_GET['waiting_search'])) {
 }
 
 
-$approved_sql = "SELECT * FROM tbl_requests WHERE status='Approved'";
+$approved_sql = "SELECT * FROM tbl_requests WHERE status IN ('Approved','Overdue')";
 if (!empty($_GET['approved_search'])) {
     $search = "%" . $_GET['approved_search'] . "%";
     $approved_sql .= " AND (
@@ -710,6 +711,3 @@ if (empty($_SESSION['admin_last_login']) && $admin_email === 'main@admin.edu') {
 }
 
 $init_view = $_GET['view'] ?? 'dashboard';
-
-?>  
-

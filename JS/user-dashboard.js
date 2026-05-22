@@ -1010,17 +1010,11 @@
         });
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
             return;
         }
 
         tbody.innerHTML = filtered.map(r => {
-            const canReturn = r.status === 'Approved' || r.status === 'Overdue';
-            const returnBtn = canReturn
-                ? `<button class="btn-return-item" data-action="return-item" data-id="${_escHtml(r.id)}" data-name="${_escHtml(r.equipment_name)}" title="Return this item">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>Return
-                           </button>`
-                : '—';
             const noteCol = r.status === 'Declined' ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
                 : r.status === 'Overdue' ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
                     : '—';
@@ -1032,7 +1026,6 @@
                         <td>${_escHtml(r.return_date)}</td>
                         <td>${_statusPill(r.status)}</td>
                         <td>${noteCol}</td>
-                        <td>${returnBtn}</td>
                     </tr>`;
         }).join('');
     }
@@ -1056,29 +1049,6 @@
         renderRequestsTable();
     }
 
-    function returnItem(reqId, itemName) {
-        if (!confirm('Confirm return of "' + itemName + '"? This will update the inventory.')) return;
-        const fd = new FormData();
-        fd.append('action', 'return_item');
-        fd.append('request_id', reqId);
-        fetch(window.location.pathname, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update local data
-                    const req = (window.REQUESTS_DATA || []).find(r => String(r.id) === String(reqId));
-                    if (req) req.status = 'Returned';
-                    renderRequestsTable();
-                    showToast(data.msg || 'Item returned successfully!');
-                    // Update overdue count display if needed
-                    checkOverdueState();
-                } else {
-                    showToast('Error: ' + (data.msg || 'Could not return item.'));
-                }
-            })
-            .catch(() => showToast('Network error. Please try again.'));
-    }
-
     function checkOverdueState() {
         const overdueCount = (window.REQUESTS_DATA || []).filter(r => r.status === 'Overdue').length;
         // Update overdue stat value
@@ -1099,7 +1069,6 @@
         const form = document.getElementById('borrowForm');
         const borrowInp = document.getElementById('borrow_date');
         const returnInp = document.getElementById('return_date');
-        const instrInp = document.getElementById('instructorField');
         if (!form || !borrowInp || !returnInp) return;
 
         borrowInp.min = todayStr;
@@ -1109,12 +1078,6 @@
             returnInp.min = this.value;
             if (returnInp.value && returnInp.value < this.value) returnInp.value = this.value;
         });
-
-        if (instrInp) {
-            instrInp.addEventListener('input', function () {
-                this.value = this.value.replace(/[^a-zA-Z\s.']/g, '');
-            });
-        }
 
         form.addEventListener('submit', function (e) {
             const bv = borrowInp.value;
@@ -1177,9 +1140,6 @@
                     break;
                 case 'toggle-sort':
                     toggleReqSort();
-                    break;
-                case 'return-item':
-                    returnItem(el.dataset.id, el.dataset.name);
                     break;
                 case 'go-tab':
                     switchTab(el.dataset.tab, el.dataset.lending || null);
@@ -1370,86 +1330,108 @@
         if (!input || !dropdown) return;
 
         let debounceTimer = null;
+        let currentXhr = null; // cancel in-flight fetch when user keeps typing
 
-        function getEquipmentItems() {
-            const items = [];
-            document.querySelectorAll('.item-node').forEach(el => {
-                items.push({ type: 'equipment', name: el.dataset.name || '', category: el.dataset.category || '', el });
-            });
-            return items;
+        function toTitleCase(str) {
+            return str.replace(/\b\w/g, c => c.toUpperCase());
+        }
+        function escHtml(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        function buildDropdown(q) {
-            q = q.trim().toLowerCase();
-            if (!q) { dropdown.style.display = 'none'; return; }
+        /* Build and render dropdown from combined results */
+        function renderDropdown(q, inventoryItems) {
+            const ql = q.trim().toLowerCase();
 
-            const results = [];
+            // Equipment results — from live-search.php JSON (always fresh, works on any tab)
+            const eqResults = (inventoryItems || []).slice(0, 5);
 
-            // Search equipment catalog
-            getEquipmentItems().forEach(item => {
-                if (item.name.includes(q) || item.category.includes(q)) {
-                    results.push({ type: 'equipment', label: toTitleCase(item.name), sub: toTitleCase(item.category), item });
+            // Also search DOM .item-node elements as a fallback / supplement
+            // (these are rendered when the user visits the Equipment tab)
+            const domItemNames = new Set(eqResults.map(i => (i.name || '').toLowerCase()));
+            document.querySelectorAll('.item-node').forEach(el => {
+                const name = (el.dataset.name || '').toLowerCase();
+                const cat = (el.dataset.category || '').toLowerCase();
+                if ((name.includes(ql) || cat.includes(ql)) && !domItemNames.has(name)) {
+                    eqResults.push({
+                        id: null,
+                        name: el.dataset.name || '',
+                        category: el.dataset.category || '',
+                        quantity: null,
+                        available: true,
+                        image: ''
+                    });
+                    domItemNames.add(name);
                 }
             });
 
-            // Search requests from pre-loaded data
+            // Requests — from pre-loaded window.REQUESTS_DATA (user's own requests)
             const requests = window.REQUESTS_DATA || [];
+            const rqResults = [];
             requests.forEach(r => {
-                const haystack = (r.equipment_name + ' ' + r.status + ' ' + r.room).toLowerCase();
-                if (haystack.includes(q)) {
-                    results.push({ type: 'request', label: r.equipment_name, sub: r.status + ' · ' + r.borrow_date, req: r });
-                }
+                const haystack = ((r.equipment_name || '') + ' ' + (r.status || '') + ' ' + (r.room || '')).toLowerCase();
+                if (haystack.includes(ql)) rqResults.push(r);
             });
+            const rqSlice = rqResults.slice(0, 4);
 
-            if (!results.length) {
+            if (!eqResults.length && !rqSlice.length) {
                 dropdown.innerHTML = '<div class="ls-empty"><span class="material-symbols-outlined">search_off</span> No results for "<strong>' + escHtml(q) + '</strong>"</div>';
                 dropdown.style.display = 'block';
+                attachClickHandlers();
                 return;
             }
 
-            const eqResults = results.filter(r => r.type === 'equipment').slice(0, 4);
-            const rqResults = results.filter(r => r.type === 'request').slice(0, 4);
             let html = '';
 
             if (eqResults.length) {
                 html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">inventory_2</span> Equipment</div>';
-                eqResults.forEach(r => {
-                    html += '<div class="ls-item" data-ls-type="equipment" data-ls-name="' + escHtml(r.label) + '">' +
+                eqResults.forEach(item => {
+                    const availBadge = item.quantity !== null
+                        ? (item.available
+                            ? '<span class="status-chip chip-success" style="font-size:11px;padding:2px 8px;margin-left:auto"><span class="chip-dot"></span>Available</span>'
+                            : '<span class="status-chip chip-error"   style="font-size:11px;padding:2px 8px;margin-left:auto"><span class="chip-dot"></span>No Stock</span>')
+                        : '';
+                    html += '<div class="ls-item" data-ls-type="equipment" data-ls-name="' + escHtml(item.name) + '">' +
                         '<span class="material-symbols-outlined ls-item-icon">inventory_2</span>' +
-                        '<div><div class="ls-item-title">' + escHtml(r.label) + '</div>' +
-                        '<div class="ls-item-sub">' + escHtml(r.sub) + '</div></div>' +
+                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(toTitleCase(item.name)) + '</div>' +
+                        '<div class="ls-item-sub">' + escHtml(toTitleCase(item.category)) + '</div></div>' +
+                        availBadge +
                         '</div>';
                 });
             }
 
-            if (rqResults.length) {
-                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> Requests</div>';
-                rqResults.forEach(r => {
-                    const chipClass = r.req.status === 'Approved' ? 'chip-success' : r.req.status === 'Overdue' ? 'chip-error' : r.req.status === 'Waiting' ? 'chip-warning' : 'chip-muted';
-                    html += '<div class="ls-item" data-ls-type="request" data-ls-status="' + escHtml(r.req.status) + '">' +
+            if (rqSlice.length) {
+                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> My Requests</div>';
+                rqSlice.forEach(r => {
+                    const chipClass = r.status === 'Approved' ? 'chip-success'
+                        : r.status === 'Overdue' ? 'chip-error'
+                            : r.status === 'Waiting' ? 'chip-warning'
+                                : 'chip-muted';
+                    html += '<div class="ls-item" data-ls-type="request" data-ls-status="' + escHtml(r.status) + '">' +
                         '<span class="material-symbols-outlined ls-item-icon">receipt_long</span>' +
-                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(r.label) + '</div>' +
-                        '<div class="ls-item-sub">' + escHtml(r.req.borrow_date) + ' → ' + escHtml(r.req.return_date) + '</div></div>' +
-                        '<span class="status-chip ' + chipClass + '" style="font-size:11px;padding:2px 8px;"><span class="chip-dot"></span>' + escHtml(r.req.status) + '</span>' +
+                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(r.equipment_name) + '</div>' +
+                        '<div class="ls-item-sub">' + escHtml(r.borrow_date) + ' → ' + escHtml(r.return_date) + '</div></div>' +
+                        '<span class="status-chip ' + chipClass + '" style="font-size:11px;padding:2px 8px;"><span class="chip-dot"></span>' + escHtml(r.status) + '</span>' +
                         '</div>';
                 });
             }
 
             dropdown.innerHTML = html;
             dropdown.style.display = 'block';
+            attachClickHandlers();
+        }
 
-            // Click handlers on results
+        /* Wire up click/mousedown on rendered results */
+        function attachClickHandlers() {
             dropdown.querySelectorAll('.ls-item').forEach(item => {
                 item.addEventListener('mousedown', function (e) {
                     e.preventDefault();
                     if (this.dataset.lsType === 'equipment') {
-                        // Navigate to equipment tab, search for this item
                         switchTab('lending');
                         switchLendingSub('browse');
                         const es = document.getElementById('equipmentSearch');
                         if (es) { es.value = this.dataset.lsName; filterEquipment(); }
                     } else {
-                        // Navigate to My Requests filtered by status
                         switchTab('lending');
                         switchLendingSub('requests');
                         const sf = document.getElementById('reqStatusFilter');
@@ -1461,16 +1443,47 @@
             });
         }
 
-        function toTitleCase(str) {
-            return str.replace(/\b\w/g, c => c.toUpperCase());
-        }
-        function escHtml(s) {
-            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        /* Main entry: show spinner, fetch from PHP, then render */
+        function buildDropdown(q) {
+            q = (q || '').trim();
+            if (!q) { dropdown.style.display = 'none'; return; }
+
+            // Show loading state immediately so the search feels responsive
+            dropdown.innerHTML = '<div class="ls-empty" style="padding:10px 14px;">' +
+                '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;display:inline-block;font-size:18px;vertical-align:middle;margin-right:6px">progress_activity</span>' +
+                'Searching…</div>';
+            dropdown.style.display = 'block';
+
+            // Cancel any in-flight request
+            if (currentXhr) { currentXhr.abort(); currentXhr = null; }
+
+            const ctrl = new AbortController();
+            currentXhr = ctrl;
+
+            fetch('live-search.php?section=user_inventory&q=' + encodeURIComponent(q), {
+                signal: ctrl.signal
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error('Network error ' + res.status);
+                    return res.json();
+                })
+                .then(items => {
+                    currentXhr = null;
+                    renderDropdown(q, items);
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') return; // user typed again — ignore
+                    currentXhr = null;
+                    // Fall back to DOM-only search if PHP is unreachable
+                    renderDropdown(q, []);
+                });
         }
 
         input.addEventListener('input', function () {
             clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => buildDropdown(this.value), 180);
+            const val = this.value;
+            if (!val.trim()) { dropdown.style.display = 'none'; return; }
+            debounceTimer = setTimeout(() => buildDropdown(val), 220);
         });
 
         input.addEventListener('focus', function () {
@@ -1484,7 +1497,7 @@
         });
 
         input.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') { dropdown.style.display = 'none'; this.blur(); }
+            if (e.key === 'Escape') { dropdown.style.display = 'none'; input.blur(); }
         });
     })();
 
