@@ -47,37 +47,21 @@ if (!function_exists('processAutoApprove')) {
 
         $equipment_name = $request['equipment_name'];
 
-        // ── Step 2: Read is_enabled from settings row (id=1) ─────────────────
-        $stmt = $conn->prepare("SELECT is_enabled FROM tbl_auto_approve_settings WHERE id = 1");
-        if (!$stmt) {
-            return;
-        }
-        $stmt->execute();
-        $result   = $stmt->get_result();
-        $settings = $result->fetch_assoc();
-        $stmt->close();
+        // ── Step 2 & 3: Read config from JSON file ───────────────────────────
+        $config_path = __DIR__ . '/auto_approve_config.json';
+        $config      = file_exists($config_path)
+            ? json_decode(file_get_contents($config_path), true)
+            : [];
 
-        if (!$settings || (int) $settings['is_enabled'] === 0) {
+        if (empty($config) || (int)($config['is_enabled'] ?? 0) === 0) {
             return;
         }
 
-        // ── Step 3: Read auto-approved item set; bail if item not in set ──────
-        $stmt = $conn->prepare("SELECT item_name FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
-        if (!$stmt) {
-            return;
-        }
-        $stmt->execute();
-        $result             = $stmt->get_result();
-        $auto_approve_items = [];
-        while ($row = $result->fetch_assoc()) {
-            $auto_approve_items[] = $row['item_name'];
-        }
-        $stmt->close();
+        $auto_approve_items = $config['items'] ?? [];
 
         if (!in_array($equipment_name, $auto_approve_items, true)) {
             return;
         }
-
         // ── Step 4: Check is_archived on tbl_inventory ───────────────────────
         $stmt = $conn->prepare("SELECT is_archived, quantity FROM tbl_inventory WHERE item_name = ?");
         if (!$stmt) {

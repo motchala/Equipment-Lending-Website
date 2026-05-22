@@ -22,16 +22,12 @@ if (!$conn) {
  * @param  mysqli $conn  Active DB connection
  * @return int           1 if auto-approve is ON, 0 if OFF or row absent
  */
+
 function getAutoApproveEnabled(mysqli $conn): int {
-    $stmt = $conn->prepare("SELECT is_enabled FROM tbl_auto_approve_settings WHERE id = 1");
-    if (!$stmt) {
-        return 0;
-    }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $stmt->close();
-    return $row ? (int) $row['is_enabled'] : 0;
+    $config_path = __DIR__ . '/auto_approve_config.json';
+    if (!file_exists($config_path)) return 0;
+    $config = json_decode(file_get_contents($config_path), true);
+    return (int)($config['is_enabled'] ?? 0);
 }
 
 /**
@@ -42,18 +38,10 @@ function getAutoApproveEnabled(mysqli $conn): int {
  * @return string[]        Flat array of item name strings; empty array if none
  */
 function getAutoApproveItems(mysqli $conn): array {
-    $stmt = $conn->prepare("SELECT item_name FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
-    if (!$stmt) {
-        return [];
-    }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $items = [];
-    while ($row = $result->fetch_assoc()) {
-        $items[] = $row['item_name'];
-    }
-    $stmt->close();
-    return $items;
+    $config_path = __DIR__ . '/auto_approve_config.json';
+    if (!file_exists($config_path)) return [];
+    $config = json_decode(file_get_contents($config_path), true);
+    return $config['items'] ?? [];
 }
 
 
@@ -249,12 +237,17 @@ if (isset($_POST['action']) && $_POST['action'] === 'toggle_auto_approve') {
     $enabled = isset($_POST['enabled']) ? intval($_POST['enabled']) : 0;
     $enabled = ($enabled >= 1) ? 1 : 0;
 
-    $stmt = $conn->prepare("UPDATE tbl_auto_approve_settings SET is_enabled = ? WHERE id = 1");
-    $stmt->bind_param("i", $enabled);
-    if ($stmt->execute()) {
+    $config_path = __DIR__ . '/auto_approve_config.json';
+    $config = file_exists($config_path)
+        ? json_decode(file_get_contents($config_path), true)
+        : ['is_enabled' => 0, 'items' => []];
+
+    $config['is_enabled'] = $enabled;
+
+    if (file_put_contents($config_path, json_encode($config)) !== false) {
         echo json_encode(['status' => 'success', 'enabled' => $enabled]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+        echo json_encode(['status' => 'error', 'message' => 'Could not write config file.']);
     }
     exit();
 }
@@ -264,37 +257,28 @@ if (isset($_POST['action']) && $_POST['action'] === 'toggle_auto_approve') {
 if (isset($_POST['action']) && $_POST['action'] === 'update_auto_approve_items') {
     header('Content-Type: application/json');
 
-    // Clear the existing auto-approved item set
-    $stmt_del = $conn->prepare("DELETE FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
-    if (!$stmt_del->execute()) {
-        echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
-        exit();
-    }
-    $stmt_del->close();
+    $config_path = __DIR__ . '/auto_approve_config.json';
+    $config = file_exists($config_path)
+        ? json_decode(file_get_contents($config_path), true)
+        : ['is_enabled' => 0, 'items' => []];
 
     $saved_items = [];
-
-    // Insert each submitted item name
     if (!empty($_POST['items']) && is_array($_POST['items'])) {
-        $stmt_ins = $conn->prepare(
-            "INSERT INTO tbl_auto_approve_settings (is_enabled, item_name, is_auto_approved) VALUES (0, ?, 1)"
-        );
         foreach ($_POST['items'] as $raw_item) {
             $item_name = trim($raw_item);
-            if ($item_name === '') {
-                continue;
+            if ($item_name !== '') {
+                $saved_items[] = $item_name;
             }
-            $stmt_ins->bind_param("s", $item_name);
-            if (!$stmt_ins->execute()) {
-                echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
-                exit();
-            }
-            $saved_items[] = $item_name;
         }
-        $stmt_ins->close();
     }
 
-    echo json_encode(['status' => 'success', 'items' => $saved_items]);
+    $config['items'] = $saved_items;
+
+    if (file_put_contents($config_path, json_encode($config)) !== false) {
+        echo json_encode(['status' => 'success', 'items' => $saved_items]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Could not write config file.']);
+    }
     exit();
 }
 

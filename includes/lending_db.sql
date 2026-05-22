@@ -235,21 +235,6 @@ ALTER TABLE `tbl_room_reservations`
 -- Table structure for table `tbl_auto_approve_settings`
 --
 
-CREATE TABLE `tbl_auto_approve_settings` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `is_enabled` tinyint(1) NOT NULL DEFAULT 0,
-  `item_name` varchar(255) NOT NULL DEFAULT '',
-  `is_auto_approved` tinyint(1) NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbl_auto_approve_settings`
---
-
-INSERT INTO `tbl_auto_approve_settings` (`id`, `is_enabled`, `item_name`, `is_auto_approved`) VALUES
-(1, 0, '', 0);
-
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
