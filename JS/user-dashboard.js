@@ -1010,17 +1010,11 @@
         });
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
             return;
         }
 
         tbody.innerHTML = filtered.map(r => {
-            const canReturn = r.status === 'Approved' || r.status === 'Overdue';
-            const returnBtn = canReturn
-                ? `<button class="btn-return-item" data-action="return-item" data-id="${_escHtml(r.id)}" data-name="${_escHtml(r.equipment_name)}" title="Return this item">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="width:13px;height:13px;margin-right:4px;vertical-align:middle;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>Return
-                           </button>`
-                : '—';
             const noteCol = r.status === 'Declined' ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
                 : r.status === 'Overdue' ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
                     : '—';
@@ -1032,7 +1026,6 @@
                         <td>${_escHtml(r.return_date)}</td>
                         <td>${_statusPill(r.status)}</td>
                         <td>${noteCol}</td>
-                        <td>${returnBtn}</td>
                     </tr>`;
         }).join('');
     }
@@ -1056,29 +1049,6 @@
         renderRequestsTable();
     }
 
-    function returnItem(reqId, itemName) {
-        if (!confirm('Confirm return of "' + itemName + '"? This will update the inventory.')) return;
-        const fd = new FormData();
-        fd.append('action', 'return_item');
-        fd.append('request_id', reqId);
-        fetch(window.location.pathname, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // Update local data
-                    const req = (window.REQUESTS_DATA || []).find(r => String(r.id) === String(reqId));
-                    if (req) req.status = 'Returned';
-                    renderRequestsTable();
-                    showToast(data.msg || 'Item returned successfully!');
-                    // Update overdue count display if needed
-                    checkOverdueState();
-                } else {
-                    showToast('Error: ' + (data.msg || 'Could not return item.'));
-                }
-            })
-            .catch(() => showToast('Network error. Please try again.'));
-    }
-
     function checkOverdueState() {
         const overdueCount = (window.REQUESTS_DATA || []).filter(r => r.status === 'Overdue').length;
         // Update overdue stat value
@@ -1099,7 +1069,6 @@
         const form = document.getElementById('borrowForm');
         const borrowInp = document.getElementById('borrow_date');
         const returnInp = document.getElementById('return_date');
-        const instrInp = document.getElementById('instructorField');
         if (!form || !borrowInp || !returnInp) return;
 
         borrowInp.min = todayStr;
@@ -1109,12 +1078,6 @@
             returnInp.min = this.value;
             if (returnInp.value && returnInp.value < this.value) returnInp.value = this.value;
         });
-
-        if (instrInp) {
-            instrInp.addEventListener('input', function () {
-                this.value = this.value.replace(/[^a-zA-Z\s.']/g, '');
-            });
-        }
 
         form.addEventListener('submit', function (e) {
             const bv = borrowInp.value;
@@ -1177,9 +1140,6 @@
                     break;
                 case 'toggle-sort':
                     toggleReqSort();
-                    break;
-                case 'return-item':
-                    returnItem(el.dataset.id, el.dataset.name);
                     break;
                 case 'go-tab':
                     switchTab(el.dataset.tab, el.dataset.lending || null);

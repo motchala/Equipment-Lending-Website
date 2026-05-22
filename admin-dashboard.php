@@ -9,7 +9,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         $eq = $conn->real_escape_string($row_rc['equipment_name']);
         $conn->query("UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name = '$eq'");
     }
-    header("Location: admin-dashboard.php?view=waiting");
+    header("Location: admin-dashboard.php?view=return-confirmation");
     exit();
 }
 
@@ -409,32 +409,31 @@ $auto_approve_items   = getAutoApproveItems($conn);
                 </div>
 
                 <!-- Borrow Requests sub-tabs toggle -->
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                <div class="history-toggle-wrap" style="margin-bottom:0;">
-                    <button class="history-toggle-btn active" data-history-tab="pending-loans">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        Pending Approval
-                        <span class="history-toggle-count"><?php echo $stat_waiting; ?></span>
-                    </button>
-                    <button class="history-toggle-btn" data-history-tab="return-confirmation">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                            <polyline points="1 4 1 10 7 10" />
-                            <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                        </svg>
-                        Return Confirmation
-                        <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
-                    </button>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div class="history-toggle-wrap" style="margin-bottom:0;">
+                        <button class="history-toggle-btn active" data-history-tab="pending-loans">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            Pending Approval
+                            <span class="history-toggle-count"><?php echo $stat_waiting; ?></span>
+                        </button>
+                        <button class="history-toggle-btn" data-history-tab="return-confirmation">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                            </svg>
+                            Return Confirmation
+                            <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
+                        </button>
+                    </div>
+                    <button
+                        class="auto-approve-toggle auto-approve-<?= $auto_approve_enabled ? 'on' : 'off' ?>"
+                        data-action="toggle-auto-approve"
+                        data-enabled="<?= $auto_approve_enabled ? '1' : '0' ?>"
+                        aria-pressed="<?= $auto_approve_enabled ? 'true' : 'false' ?>">Auto-Approve: <?= $auto_approve_enabled ? 'ON' : 'OFF' ?></button>
                 </div>
-                <button
-                    class="auto-approve-toggle auto-approve-<?= $auto_approve_enabled ? 'on' : 'off' ?>"
-                    data-action="toggle-auto-approve"
-                    data-enabled="<?= $auto_approve_enabled ? '1' : '0' ?>"
-                    aria-pressed="<?= $auto_approve_enabled ? 'true' : 'false' ?>"
-                >Auto-Approve: <?= $auto_approve_enabled ? 'ON' : 'OFF' ?></button>
-            </div>     
                 <?php
                 $checklist_result = $conn->query("SELECT item_name FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
                 $inventory_items_for_checklist = [];
@@ -443,20 +442,19 @@ $auto_approve_items   = getAutoApproveItems($conn);
                 }
                 ?>
                 <div id="auto-approve-checklist" <?= $auto_approve_enabled ? '' : 'style="display:none"' ?>>
-                  <?php foreach ($inventory_items_for_checklist as $item): ?>
-                    <label>
-                      <input
-                        type="checkbox"
-                        data-action="toggle-auto-approve-item"
-                        data-item="<?= htmlspecialchars($item['item_name']) ?>"
-                        <?= in_array($item['item_name'], $auto_approve_items) ? 'checked' : '' ?>
-                      >
-                      <?= htmlspecialchars($item['item_name']) ?>
-                    </label>
-                  <?php endforeach; ?>
-                  <p class="auto-approve-empty-msg" <?= !empty($auto_approve_items) ? 'style="display:none"' : '' ?>>
-                    No items selected for auto-approval. Check items above to enable automatic approval.
-                  </p>
+                    <?php foreach ($inventory_items_for_checklist as $item): ?>
+                        <label>
+                            <input
+                                type="checkbox"
+                                data-action="toggle-auto-approve-item"
+                                data-item="<?= htmlspecialchars($item['item_name']) ?>"
+                                <?= in_array($item['item_name'], $auto_approve_items) ? 'checked' : '' ?>>
+                            <?= htmlspecialchars($item['item_name']) ?>
+                        </label>
+                    <?php endforeach; ?>
+                    <p class="auto-approve-empty-msg" <?= !empty($auto_approve_items) ? 'style="display:none"' : '' ?>>
+                        No items selected for auto-approval. Check items above to enable automatic approval.
+                    </p>
                 </div>
 
                 <!-- Pending Approval sub-panel -->
@@ -582,7 +580,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                                     <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
                                                     <?php if ($isOverdue): ?><br><small style="font-size:0.68rem;">(Overdue)</small><?php endif; ?>
                                                 </td>
-                                                <td><span class="status-pill pill-approved">Out on Loan</span></td>
+                                                <td><span class="status-pill <?php echo $isOverdue ? 'pill-overdue' : 'pill-approved'; ?>"><?php echo $isOverdue ? 'Overdue' : 'Out on Loan'; ?></span></td>
                                                 <td class="action-cell">
                                                     <div class="action-btns">
                                                         <a href="admin-dashboard.php?action=return_confirm&id=<?php echo $r['id']; ?>"
@@ -1305,12 +1303,12 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Display Name</span>
-                                <span class="info-val <?php echo empty($admin_name) ? 'empty' : '';?>" 
-                                    data-field="admin_name">
-                                    <?php 
-                                    echo htmlspecialchars($admin_name); 
-                                    ?>
-                                </span>
+                            <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
+                                data-field="admin_name">
+                                <?php
+                                echo htmlspecialchars($admin_name);
+                                ?>
+                            </span>
                             <input class="info-input-f" data-input="admin_name" value="<?php echo htmlspecialchars($admin_name); ?>" disabled style="display:none;">
                         </div>
                         <div class="info-row">
@@ -1319,13 +1317,13 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Email</span>
-                                <span class="info-val 
-                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>" 
-                                    data-field="admin_email">
-                                    <?php 
-                                        echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; 
-                                    ?>
-                                </span>
+                            <span class="info-val 
+                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>"
+                                data-field="admin_email">
+                                <?php
+                                echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided';
+                                ?>
+                            </span>
                             <input class="info-input-f" data-input="admin_email" type="email" value="<?php echo htmlspecialchars($admin_email ?? ''); ?>" placeholder="admin@pup.edu.ph" disabled style="display:none;">
                         </div>
                     </div>
@@ -1345,22 +1343,22 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         <div class="info-row">
                             <span class="info-lbl">Password</span>
                             <span class="info-val">••••••••••</span>
-                            <button class="btn-borrow" 
-                                    style="width:auto;padding:6px 16px;font-size:0.75rem;margin-left:auto;" 
-                                    data-action="open-change-pass">
-                                    Change
+                            <button class="btn-borrow"
+                                style="width:auto;padding:6px 16px;font-size:0.75rem;margin-left:auto;"
+                                data-action="open-change-pass">
+                                Change
                             </button>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Last Login</span>
                             <span class="info-val">
                                 <?php
-                                    $last_login_display = '— Not available';
-                                    if (!empty($_SESSION['admin_last_login'])) {
-                                        $ts = strtotime($_SESSION['admin_last_login']);
-                                        if ($ts !== false) $last_login_display = date('M d, Y g:i A', $ts);
-                                    }
-                                    echo htmlspecialchars($last_login_display);
+                                $last_login_display = '— Not available';
+                                if (!empty($_SESSION['admin_last_login'])) {
+                                    $ts = strtotime($_SESSION['admin_last_login']);
+                                    if ($ts !== false) $last_login_display = date('M d, Y g:i A', $ts);
+                                }
+                                echo htmlspecialchars($last_login_display);
                                 ?>
                             </span>
                         </div>
@@ -1884,8 +1882,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
     <div id="app-toast"></div>
 
 
-    <div class="modal-overlay" id="changePassModal" 
-    style="display: none; 
+    <div class="modal-overlay" id="changePassModal"
+        style="display: none; 
             position: fixed; 
             top: 0; 
             left: 0; 
@@ -1895,48 +1893,48 @@ $auto_approve_items   = getAutoApproveItems($conn);
             z-index: 99999; 
             align-items: center; 
             justify-content: center;">
-    <div class="modal-backdrop" data-action="close-change-pass" style="position: absolute; inset: 0;"></div>
-    <div class="eq-card form-card" style="position: relative; width: 100%; max-width: 400px; margin: 20px; z-index: 100000;">
-        <div class="form-card-header">
-            <h2>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                Change Password
-            </h2>
-            <button type="button" class="btn-close-custom" data-action="close-change-pass">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-            </button>
-        </div>
-        <div class="form-card-body">
-            <div id="cp-alert" style="display:none; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; font-weight: 500;"></div>
-            
-            <form id="changePasswordForm">
-                <div class="form-group">
-                    <label>Current Password</label>
-                    <input type="password" name="current_password" class="form-control-custom" required>
-                </div>
-                <div class="form-group">
-                    <label>New Password</label>
-                    <input type="password" name="new_password" class="form-control-custom" minlength="4" required>
-                </div>
-                <div class="form-group">
-                    <label>Confirm New Password</label>
-                    <input type="password" name="confirm_password" class="form-control-custom" minlength="4" required>
-                </div>
-                
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="btn-cancel-acc" data-action="close-change-pass" style="padding: 8px 16px; width: auto;">Cancel</button>
-                    <button type="submit" class="btn-submit-form" style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
-                </div>
-            </form>
+        <div class="modal-backdrop" data-action="close-change-pass" style="position: absolute; inset: 0;"></div>
+        <div class="eq-card form-card" style="position: relative; width: 100%; max-width: 400px; margin: 20px; z-index: 100000;">
+            <div class="form-card-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    Change Password
+                </h2>
+                <button type="button" class="btn-close-custom" data-action="close-change-pass">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="form-card-body">
+                <div id="cp-alert" style="display:none; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; font-weight: 500;"></div>
+
+                <form id="changePasswordForm">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input type="password" name="current_password" class="form-control-custom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" name="new_password" class="form-control-custom" minlength="4" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="form-control-custom" minlength="4" required>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                        <button type="button" class="btn-cancel-acc" data-action="close-change-pass" style="padding: 8px 16px; width: auto;">Cancel</button>
+                        <button type="submit" class="btn-submit-form" style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
     <script src="js/admin-dashboard.js"></script>
 

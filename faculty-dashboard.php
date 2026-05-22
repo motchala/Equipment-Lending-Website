@@ -21,31 +21,6 @@ function maskEmail($email)
     return $visible . '***@' . htmlspecialchars($parts[1]);
 }
 
-// ΓöÇΓöÇ Handle Return Item (AJAX) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-if (isset($_POST['action']) && $_POST['action'] === 'return_item') {
-    header('Content-Type: application/json');
-    if (!isset($_SESSION['faculty_id'])) {
-        echo json_encode(['success' => false, 'msg' => 'Unauthorized']);
-        exit;
-    }
-    $req_id = intval($_POST['request_id'] ?? 0);
-    $uid_r  = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
-    $rq = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM tbl_requests WHERE id=$req_id AND student_id='$uid_r' LIMIT 1"));
-    if (!$rq) {
-        echo json_encode(['success' => false, 'msg' => 'Request not found']);
-        exit;
-    }
-    if (!in_array($rq['status'], ['Approved', 'Overdue'])) {
-        echo json_encode(['success' => false, 'msg' => 'Cannot return this item']);
-        exit;
-    }
-    mysqli_query($conn, "UPDATE tbl_requests SET status='Returned' WHERE id=$req_id");
-    $eq_name = mysqli_real_escape_string($conn, $rq['equipment_name']);
-    mysqli_query($conn, "UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name='$eq_name' LIMIT 1");
-    echo json_encode(['success' => true, 'msg' => 'Item returned successfully!']);
-    exit;
-}
-
 // ΓöÇΓöÇ Auto-decline expired & mark overdue ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 $today = date('Y-m-d');
 $reason_expired = "Request expired ΓÇô borrow date has already passed";
@@ -67,8 +42,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $return_date    = mysqli_real_escape_string($conn, $_POST['return_date']);
     $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
     $room           = mysqli_real_escape_string($conn, $_POST['room']);
-    $instructor     = preg_replace("/[^a-zA-Z\s.']/", "", $_POST['instructor']);
-    $instructor     = mysqli_real_escape_string($conn, trim($instructor));
+    $instructor     = mysqli_real_escape_string($conn, $student_name); // auto-filled from account name
     $current_date   = date('Y-m-d');
     if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
     if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
@@ -635,12 +609,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <form id="borrowForm" method="POST" action="">
                             <input type="hidden" name="equipment_name" id="selectedItem">
-
-                            <div class="form-group">
-                                <label>Instructor</label>
-                                <input type="text" name="instructor" id="instructorField"
-                                    class="form-control-custom" placeholder="e.g. Sir. Migs" required>
-                            </div>
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <div class="form-group">
                                 <label class="form-label">Room / Laboratory</label>
@@ -701,7 +669,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                         <th>Return Date</th>
                                         <th>Status</th>
                                         <th>Notes</th>
-                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody id="requestsTbody"></tbody>
@@ -890,16 +857,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                                 <p class="timeline-card-detail">Room: <?php echo htmlspecialchars($ti['room']); ?></p>
                                                 <?php if ($ti['status'] === 'Declined' && !empty($ti['reason'])): ?>
                                                     <p class="timeline-card-reason">Reason: <?php echo htmlspecialchars($ti['reason']); ?></p>
-                                                <?php endif; ?>
-                                                <?php if ($isActive): ?>
-                                                    <div class="timeline-card-actions">
-                                                        <button class="btn-return-item timeline-btn-return"
-                                                            data-action="return-item"
-                                                            data-id="<?php echo $ti['id']; ?>"
-                                                            data-name="<?php echo htmlspecialchars($ti['equipment_name'], ENT_QUOTES); ?>">
-                                                            <span class="material-symbols-outlined" style="font-size:15px">undo</span> Return Item
-                                                        </button>
-                                                    </div>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1474,7 +1431,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                     </summary>
                     <div class="help-item-a">
-                        Go to <strong>Equipment ΓÇ║ My Requests</strong> or the <strong>My Activity</strong> tab. Find the approved item and click <em>Return Item</em>. Physically return the item to the Admin Office to complete the process.
+                        Physically return the borrowed item to the Admin Office. The administrator will then confirm and mark your item as returned in the system. You can track the status update in <strong>Equipment &mdash; My Requests</strong> or the <strong>My Activity</strong> tab.
                     </div>
                 </details>
 
