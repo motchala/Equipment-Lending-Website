@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: landing-page.php");
@@ -21,15 +21,15 @@ function maskEmail($email)
     return $visible . '***@' . htmlspecialchars($parts[1]);
 }
 
-// ΓöÇΓöÇ Auto-decline expired & mark overdue ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Auto-decline expired & mark overdue ───────────────────────────────────
 $today = date('Y-m-d');
-$reason_expired = "Request expired ΓÇô borrow date has already passed";
+$reason_expired = "Request expired – borrow date has already passed";
 $stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
 $stmt_expired->bind_param("ss", $reason_expired, $today);
 $stmt_expired->execute();
 mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
 
-// ΓöÇΓöÇ Handle Borrow Request ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['faculty_id'])) die("Unauthorized access");
     $user_id = $_SESSION['faculty_id'];
@@ -56,36 +56,36 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     } else die("Error processing request: " . mysqli_error($conn));
 }
 
-// ΓöÇΓöÇ Inventory & Requests ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Inventory & Requests ───────────────────────────────────────────────────
 $category_result  = mysqli_query($conn, "SELECT DISTINCT category FROM tbl_inventory WHERE is_archived = 0 ORDER BY category ASC");
 $inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
 $uid_safe = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 
-// ΓöÇΓöÇ Stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Stats ──────────────────────────────────────────────────────────────────
 $stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe'"))['c'];
 $stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Waiting'"))['c'];
 $stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Approved'"))['c'];
 $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Declined'"))['c'];
 $stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue'"))['c'];
 
-// ΓöÇΓöÇ Requests JSON for JS ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Requests JSON for JS ───────────────────────────────────────────────────
 $requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC");
 $requests_js = [];
 while ($row = mysqli_fetch_assoc($requests_raw)) $requests_js[] = $row;
 $requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
-// ΓöÇΓöÇ Overdue for notifications ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Overdue for notifications ──────────────────────────────────────────────
 $overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
 $overdue_notifs = [];
 while ($row = mysqli_fetch_assoc($overdue_items_raw)) $overdue_notifs[] = $row;
 
-// ΓöÇΓöÇ Avatar initials ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Avatar initials ────────────────────────────────────────────────────────
 $name_parts = explode(' ', trim($fullname));
 $firstname  = $name_parts[0];
 $initials   = strtoupper(substr($name_parts[0], 0, 1));
 if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 1));
 
-// ΓöÇΓöÇ Profile ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Profile ────────────────────────────────────────────────────────────────
 $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
     "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
@@ -219,7 +219,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
         <header class="top-bar" id="topBar">
             <div class="top-bar-search" style="position:relative;">
                 <span class="material-symbols-outlined">search</span>
-                <input type="text" id="globalSearch" placeholder="Search equipment, requests, facilitiesΓÇª" autocomplete="off">
+                <input type="text" id="globalSearch" placeholder="Search equipment, requests, facilities…" autocomplete="off">
                 <div class="live-search-dropdown" id="liveSearchDropdown" style="display:none;"></div>
             </div>
             <div class="top-bar-actions">
@@ -243,7 +243,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                         <div class="notif-pop-dot notif-dot-error"></div>
                                         <div class="notif-pop-body">
                                             <div class="notif-pop-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                            <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> ΓÇö return immediately</div>
+                                            <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> — return immediately</div>
                                             <div class="notif-pop-time">Overdue</div>
                                         </div>
                                     </div>
@@ -261,7 +261,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                 <div class="notif-pop-dot notif-dot-secondary"></div>
                                 <div class="notif-pop-body">
                                     <div class="notif-pop-title">System Maintenance Tonight</div>
-                                    <div class="notif-pop-sub">PUPSYNC offline 11 PM ΓÇô 1 AM</div>
+                                    <div class="notif-pop-sub">PUPSYNC offline 11 PM – 1 AM</div>
                                     <div class="notif-pop-time">8:00 AM</div>
                                 </div>
                             </div>
@@ -331,7 +331,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
             <!-- Overdue Alert -->
             <div class="alert-banner alert-danger hidden" id="overdue-alert">
                 <span class="material-symbols-outlined">warning</span>
-                <strong>Overdue Alert:</strong> You have overdue equipment ΓÇö please return it immediately!
+                <strong>Overdue Alert:</strong> You have overdue equipment — please return it immediately!
                 <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
@@ -372,7 +372,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
 
                     <!-- Left: Stats Column -->
                     <div class="dashboard-stats-col">
-                        <div class="stat-card">
+                        <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
                             <div class="stat-card-label">Active Borrowings</div>
                             <div class="stat-card-value"><?php echo $stat_approved; ?></div>
                             <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
@@ -518,7 +518,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </button>
                 </div>
 
-                <!-- ΓöÇΓöÇ Sub: Browse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Equipment</h2>
@@ -528,7 +528,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         <div class="catalog-filters">
                             <div class="catalog-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="equipmentSearch" placeholder="Search by equipment nameΓÇª">
+                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name…">
                             </div>
                             <select id="categoryFilter" class="catalog-filter-select">
                                 <option value="">All Categories</option>
@@ -591,7 +591,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div><!-- /lending-browse -->
 
-                <!-- ΓöÇΓöÇ Sub: Borrow Form ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Sub: Borrow Form ────────────────────────────────── -->
                 <div class="lending-sub" id="lending-form">
                     <div class="page-header-block" style="display:flex;align-items:center;gap:12px;">
                         <button class="btn-back" data-action="lending-back" aria-label="Back">
@@ -631,7 +631,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div><!-- /lending-form -->
 
-                <!-- ΓöÇΓöÇ Sub: My Requests ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Sub: My Requests ────────────────────────────────── -->
                 <div class="lending-sub" id="lending-requests">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">My Requests</h2>
@@ -693,7 +693,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <div class="coming-soon-banner">
                     <span class="material-symbols-outlined">schedule</span>
                     <div>
-                        <h3>Room Reservation ΓÇö Coming Soon</h3>
+                        <h3>Room Reservation — Coming Soon</h3>
                         <p>This feature is under development. Preview available rooms below.</p>
                     </div>
                 </div>
@@ -877,7 +877,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
     </div><!-- /main-wrapper -->
 
     <!-- ================================================================
-     OVERLAY: ACCOUNT ΓÇö merged into settingsOverlay below
+     OVERLAY: ACCOUNT — merged into settingsOverlay below
      (kept as hidden anchor for legacy data-target references)
 ================================================================ -->
     <div class="overlay-page" id="accountOverlay">
@@ -906,7 +906,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <!-- Overview -->
                 <div id="acc-overview" class="overlay-sub-panel active">
                     <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account ΓÇ║ Overview</span>
+                        <span class="section-eyebrow">My Account ║ Overview</span>
                         <h2>Profile &amp; Identity</h2>
                         <p>Your personal details and login information.</p>
                     </div>
@@ -970,18 +970,18 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Primary Email</span>
-                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Backup Email</span>
-                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email"><?php echo $masked_backup ?: 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>" data-field="backup_email"><?php echo $masked_backup ?: '— Not provided'; ?></span>
                             <?php if (!$backup_locked): ?>
                                 <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
                             <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Password</span>
-                            <span class="info-val">ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó</span>
+                            <span class="info-val">••••••••••</span>
                             <button class="btn-inline-action" data-action="open-email-verify-modal">Change</button>
                         </div>
                     </div>
@@ -990,7 +990,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <!-- Department -->
                 <div id="acc-academic" class="overlay-sub-panel">
                     <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account ΓÇ║ Department</span>
+                        <span class="section-eyebrow">My Account ║ Department</span>
                         <h2>Department Information</h2>
                         <p>Your faculty department and assignment details.</p>
                     </div>
@@ -1011,7 +1011,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Department</span>
-                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
                             <?php if (!$program_locked): ?>
                                 <select class="info-input-f" data-input="program" disabled style="display:none;">
                                     <option value="">Select Program...</option>
@@ -1023,7 +1023,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Position / Rank</span>
-                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level"><?php echo $db_year_level ? htmlspecialchars($db_year_level) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level"><?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?></span>
                             <select class="info-input-f" data-input="year_level" disabled style="display:none;">
                                 <option value="">Select Position...</option>
                                 <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
@@ -1041,7 +1041,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <!-- Contact -->
                 <div id="acc-contact" class="overlay-sub-panel">
                     <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account ΓÇ║ Contact</span>
+                        <span class="section-eyebrow">My Account ║ Contact</span>
                         <h2>Contact Details</h2>
                         <p>How we can reach you.</p>
                     </div>
@@ -1054,12 +1054,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Present Address</span>
-                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address"><?php echo $db_present_address ? htmlspecialchars($db_present_address) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>" data-field="present_address"><?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?></span>
                             <textarea class="info-input-f" data-input="present_address" placeholder="Enter your current address" disabled style="display:none;min-height:60px;"></textarea>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Permanent Address</span>
-                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address"><?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>" data-field="permanent_address"><?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?></span>
                             <textarea class="info-input-f" data-input="permanent_address" placeholder="Enter your permanent address" disabled style="display:none;min-height:60px;"></textarea>
                         </div>
                     </div>
@@ -1069,12 +1069,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Mobile Number</span>
-                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone"><?php echo $db_phone ? htmlspecialchars($db_phone) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone"><?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?></span>
                             <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled style="display:none;">
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Landline</span>
-                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline"><?php echo $db_landline ? htmlspecialchars($db_landline) : 'ΓÇö Not provided'; ?></span>
+                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline"><?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?></span>
                             <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled style="display:none;">
                         </div>
                     </div>
@@ -1085,7 +1085,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
     </div><!-- /accountOverlay -->
 
     <!-- ================================================================
-     OVERLAY: SETTINGS (unified ΓÇö Account + System Settings)
+     OVERLAY: SETTINGS (unified — Account + System Settings)
 ================================================================ -->
     <div class="overlay-page" id="settingsOverlay">
         <div class="overlay-topbar">
@@ -1102,7 +1102,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
 
             <div class="unified-settings-grid">
 
-                <!-- ΓöÇΓöÇ Profile Information Card (full-width) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Profile Information Card (full-width) ───────────────── -->
                 <div class="u-card u-card-full">
                     <div class="u-card-head">
                         <h2>Profile Information</h2>
@@ -1148,7 +1148,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             <?php if ($program_locked): ?>
                                 <input class="form-input" type="text" value="<?php echo htmlspecialchars($db_program); ?>" readonly style="background:var(--color-surface-container);color:var(--color-secondary);cursor:not-allowed;">
                             <?php else: ?>
-                                <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : 'ΓÇö Not provided'; ?></span>
+                                <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program"><?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?></span>
                                 <select class="form-input info-input-f" data-input="program" disabled style="display:none;">
                                     <option value="">Select Department...</option>
                                     <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
@@ -1168,7 +1168,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div>
 
-                <!-- ΓöÇΓöÇ Appearance & Accessibility Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Appearance & Accessibility Card ─────────────────────── -->
                 <div class="u-card">
                     <div class="u-card-head">
                         <h2>Appearance &amp; Accessibility</h2>
@@ -1223,7 +1223,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     <!-- <label class="toggle-sw"><input type="checkbox" id="focusRingToggle"><span class="toggle-track"></span></label> -->
                 </div>
 
-                <!-- ΓöÇΓöÇ Notification Preferences Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Notification Preferences Card ───────────────────────── -->
                 <div class="u-card">
                     <div class="u-card-head">
                         <h2>Notification Preferences</h2>
@@ -1252,7 +1252,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                 </div>
 
-                <!-- ΓöÇΓöÇ Privacy & Security Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ -->
+                <!-- ── Privacy & Security Card ─────────────────────────────── -->
                 <div class="u-card">
                     <div class="u-card-head">
                         <h2>Privacy &amp; Security</h2>
@@ -1271,7 +1271,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     <div class="u-security-row" style="cursor:default;">
                         <div class="u-security-row-text">
                             <span class="u-security-row-title">Backup Email</span>
-                            <span class="u-security-row-sub"><?php echo $masked_backup ?: 'ΓÇö Not provided'; ?></span>
+                            <span class="u-security-row-sub"><?php echo $masked_backup ?: '— Not provided'; ?></span>
                         </div>
                         <?php if (!$backup_locked): ?>
                             <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
@@ -1294,12 +1294,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     <div class="u-security-row" style="cursor:default;">
                         <div class="u-security-row-text">
                             <span class="u-security-row-title">Primary Email</span>
-                            <span class="u-security-row-sub <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: 'ΓÇö Not provided'; ?></span>
+                            <span class="u-security-row-sub <?php echo $masked_email ? '' : 'empty'; ?>"><?php echo $masked_email ?: '— Not provided'; ?></span>
                         </div>
                     </div>
 
                     <!-- Login & Sessions info -->
-                    <!-- Remember Me / session management not applicable in current design ΓÇö commented out -->
+                    <!-- Remember Me / session management not applicable in current design — commented out -->
                     <!-- <div class="s-row"><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label></div> -->
                 </div>
 
@@ -1321,7 +1321,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
         <div class="notif-wrapper">
             <div class="notif-header-row">
                 <div class="overlay-section-header" style="margin-bottom:0;flex:1;">
-                    <span class="section-eyebrow">Inbox ΓÇ║ All Notifications</span>
+                    <span class="section-eyebrow">Inbox ║ All Notifications</span>
                     <h2>Notifications</h2>
                     <p>You have <strong id="unreadCount"><?php echo (3 + count($overdue_notifs)); ?> unread</strong> notifications.</p>
                 </div>
@@ -1335,7 +1335,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <button class="notif-tab" data-notif-filter="system">System</button>
             </div>
             <?php if (!empty($overdue_notifs)): ?>
-                <div class="notif-group overdue-notif-group">ΓÜá∩╕Å Overdue ΓÇö Action Required</div>
+                <div class="notif-group overdue-notif-group">ΓÜá∩╕Å Overdue — Action Required</div>
                 <?php foreach ($overdue_notifs as $on): ?>
                     <div class="notif-item unread notif-overdue" data-cat="overdue">
                         <div class="notif-icon ni-overdue"><span class="material-symbols-outlined" style="font-size:16px">alarm</span></div>
@@ -1405,7 +1405,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
         </div>
         <div class="notif-wrapper">
             <div class="overlay-section-header">
-                <span class="section-eyebrow">Support ΓÇ║ Help Center</span>
+                <span class="section-eyebrow">Support ║ Help Center</span>
                 <h2>How can we help?</h2>
                 <p>Browse common topics or contact the system administrator for further assistance.</p>
             </div>
@@ -1625,7 +1625,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
     <div id="loading-overlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.35);display:none;align-items:center;justify-content:center;">
         <div style="background:var(--color-surface);border-radius:16px;padding:2rem 2.5rem;display:flex;flex-direction:column;align-items:center;gap:12px;">
             <div class="spinner"></div>
-            <p style="font-weight:600;color:var(--color-on-surface);font-size:0.9rem;">Processing your requestΓÇª</p>
+            <p style="font-weight:600;color:var(--color-on-surface);font-size:0.9rem;">Processing your request…</p>
         </div>
     </div>
 
