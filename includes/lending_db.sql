@@ -228,6 +228,13 @@ ALTER TABLE `tbl_requests`
 --
 ALTER TABLE `tbl_room_reservations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_auto_approve_settings`
+--
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

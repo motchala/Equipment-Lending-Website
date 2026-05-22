@@ -9,17 +9,17 @@ function validateStudentIDYear($student_id)
     return $year >= 2000 && $year <= 2030;
 }
 
-if (isset($_SESSION['user_id'])) {
-    header("Location: user-dashboard.php");
+if (isset($_SESSION['faculty_id'])) {
+    header("Location: faculty-dashboard.php");
     exit();
 }
 if (isset($_SESSION['admin'])) {
     header("Location: admin-dashboard.php");
     exit();
 }
-if (isset($_SESSION['faculty_id'])) {
-    header("Location: faculty-dashboard.php");
-    exit();
+if (isset($_SESSION['user_id'])) {
+    // Students have no dashboard yet — keep them on the landing page
+    // (fall through to show the page normally)
 }
 
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
@@ -110,48 +110,8 @@ if (isset($_POST['login'])) {
         }
     }
 
-    // ===== FACULTY LOGIN =====
-    elseif ($user_type === 'faculty') {
-        // Check if tbl_faculty table exists
-        $table_check = mysqli_query($conn, "SHOW TABLES LIKE 'tbl_faculty'");
-        if ($table_check && mysqli_num_rows($table_check) > 0) {
-            $stmt = $conn->prepare("SELECT faculty_id, fullname, password FROM tbl_faculty WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
-
-            if ($result->num_rows === 1) {
-                $faculty = $result->fetch_assoc();
-                if (password_verify($password, $faculty['password'])) {
-                    $_SESSION['faculty_id'] = $faculty['faculty_id'];
-                    $_SESSION['faculty_name'] = $faculty['fullname'];
-                    $_SESSION['faculty_email'] = $email;
-                    $_SESSION['login_time'] = time();
-
-                    // Update last login
-                    $now_dt = date('Y-m-d H:i:s');
-                    $stmt_up = $conn->prepare("UPDATE tbl_faculty SET last_login = ? WHERE faculty_id = ?");
-                    if ($stmt_up) {
-                        $stmt_up->bind_param("si", $now_dt, $faculty['faculty_id']);
-                        $stmt_up->execute();
-                        $stmt_up->close();
-                    }
-
-                    header("Location: faculty-dashboard.php");
-                    exit();
-                } else {
-                    $login_error = "Incorrect faculty password.";
-                }
-            } else {
-                $login_error = "Faculty account not found. Please contact admin.";
-            }
-        } else {
-            $login_error = "Faculty portal is not yet set up. Please contact admin.";
-        }
-    }
-
-    // ===== STUDENT LOGIN =====
-    else {
+    // ===== FACULTY LOGIN (borrower — uses tbl_users, goes to faculty-dashboard) =====
+    elseif ($user_type === 'student') {
         $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -160,17 +120,23 @@ if (isset($_POST['login'])) {
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['student_id'];
-                $_SESSION['fullname'] = $user['fullname'];
+                $_SESSION['faculty_id'] = $user['student_id'];
+                $_SESSION['faculty_name'] = $user['fullname'];
+                $_SESSION['faculty_email'] = $email;
                 $_SESSION['login_time'] = time();
-                header("Location: user-dashboard.php");
+                header("Location: faculty-dashboard.php");
                 exit();
             } else {
-                $login_error = "Incorrect student password.";
+                $login_error = "Incorrect password.";
             }
         } else {
-            $login_error = "Student account not found. Please register first.";
+            $login_error = "Account not found. Please register first.";
         }
+    }
+
+    // ===== FACULTY LOGIN (view-only — uses tbl_faculty, no dashboard yet) =====
+    else {
+        $login_error = "Faculty portal is not yet available. Please contact admin.";
     }
 }
 
@@ -376,9 +342,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         <ul class="footer-links">
                             <li><a href="#" onclick="openModal('login'); return false;"><i class="fa-solid fa-chevron-right"></i> Sign In</a></li>
                             <li><a href="#" onclick="openModal('register'); return false;"><i class="fa-solid fa-chevron-right"></i> Create Account</a></li>
-                            <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
-                            <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
-                            <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
                         </ul>
                     </div>
 
@@ -463,9 +429,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         <div class="fmb-col">
                             <p class="footer-col-title">Portal</p>
                             <ul class="footer-links">
-                                <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
-                                <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
-                                <li><a href="user-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
                             </ul>
                         </div>
                         <div class="fmb-col">
@@ -564,17 +530,17 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     <div class="role-cards">
                         <button class="role-card" onclick="selectRole('student')">
                             <div class="role-icon">
-                                <i class="fa-solid fa-graduation-cap"></i>
-                            </div>
-                            <h3>Student</h3>
-                            <p>View equipment & room availability</p>
-                        </button>
-                        <button class="role-card" onclick="selectRole('faculty')">
-                            <div class="role-icon">
                                 <i class="fa-solid fa-chalkboard-teacher"></i>
                             </div>
                             <h3>Faculty</h3>
                             <p>Borrow equipment & reserve rooms</p>
+                        </button>
+                        <button class="role-card" onclick="selectRole('faculty')">
+                            <div class="role-icon">
+                                <i class="fa-solid fa-graduation-cap"></i>
+                            </div>
+                            <h3>Student</h3>
+                            <p>View equipment & room availability</p>
                         </button>
                         <button class="role-card" onclick="selectRole('admin')">
                             <div class="role-icon">
@@ -586,7 +552,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     </div>
                 </div>
 
-                <!-- STUDENT LOGIN/REGISTER -->
+                <!-- FACULTY LOGIN/REGISTER -->
                 <div class="auth-section" id="studentSection">
                     <button class="back-btn" onclick="backToRoleSelector()">
                         <i class="fa-solid fa-arrow-left"></i> Back
@@ -601,22 +567,23 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         </button>
                     </div>
 
-                    <!-- Student Login -->
+                    <!-- Faculty Login -->
                     <div class="auth-pane active" id="studentLogin">
-                        <p class="pane-title">Student Login</p>
-                        <p class="pane-subtitle">Sign in with your student account</p>
-                        <?php if ($login_error && !isset($_POST['user_type'])): ?>
+                        <p class="pane-title">Faculty Login</p>
+                        <p class="pane-subtitle">Sign in with your faculty account</p>
+                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'student'): ?>
                             <div class="auth-alert error">
                                 <i class="fa-solid fa-circle-exclamation"></i>
                                 <?= htmlspecialchars($login_error) ?>
                             </div>
                         <?php endif; ?>
                         <form method="POST" action="">
+                            <input type="hidden" name="user_type" value="student">
                             <div class="form-group">
-                                <label for="student-login-email">Email</label>
+                                <label for="student-login-email">Faculty Email</label>
                                 <div class="input-wrap">
                                     <input class="form-field" type="email" id="student-login-email" name="email"
-                                        placeholder="youremail@student.edu.ph"
+                                        placeholder="faculty@pup.edu.ph"
                                         value="<?= htmlspecialchars($login_email_val) ?>"
                                         autocomplete="email" required>
                                     <i class="fa-solid fa-envelope input-icon-left"></i>
@@ -641,9 +608,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         </form>
                     </div>
 
-                    <!-- Student Register -->
+                    <!-- Faculty Register -->
                     <div class="auth-pane" id="studentRegister">
-                        <p class="pane-title">Create Student Account</p>
+                        <p class="pane-title">Create Faculty Account</p>
                         <p class="pane-subtitle">Join PUP Biñan's centralized resource system</p>
                         <?php if ($register_error): ?>
                             <div class="auth-alert error">
@@ -688,7 +655,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                 <div class="input-wrap">
                                     <input class="form-field" type="email" id="reg-email" name="email"
                                         minlength="15" maxlength="254"
-                                        placeholder="youremail@student.edu.ph"
+                                        placeholder="faculty@pup.edu.ph"
                                         value="<?= htmlspecialchars($reg_email_val) ?>"
                                         oninput="validateLettersEmail(this)"
                                         autocomplete="email" required>
@@ -729,15 +696,15 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     </div>
                 </div>
 
-                <!-- FACULTY LOGIN -->
+                <!-- STUDENT LOGIN (view-only — portal not yet available) -->
                 <div class="auth-section" id="facultySection">
                     <button class="back-btn" onclick="backToRoleSelector()">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </button>
 
                     <div class="auth-pane active">
-                        <p class="pane-title">Faculty Login</p>
-                        <p class="pane-subtitle">Sign in with your faculty credentials</p>
+                        <p class="pane-title">Student Login</p>
+                        <p class="pane-subtitle">Student portal is not yet available</p>
                         <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'faculty'): ?>
                             <div class="auth-alert error">
                                 <i class="fa-solid fa-circle-exclamation"></i>
