@@ -13,6 +13,186 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
+// ================= AUTO-APPROVE HELPER FUNCTIONS =================
+
+/**
+ * Returns the current auto-approve toggle state from the database.
+ * Queries the settings row (id=1) and returns 1 if enabled, 0 otherwise.
+ *
+ * @param  mysqli $conn  Active DB connection
+ * @return int           1 if auto-approve is ON, 0 if OFF or row absent
+ */
+function getAutoApproveEnabled(mysqli $conn): int {
+    $stmt = $conn->prepare("SELECT is_enabled FROM tbl_auto_approve_settings WHERE id = 1");
+    if (!$stmt) {
+        return 0;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    return $row ? (int) $row['is_enabled'] : 0;
+}
+
+/**
+ * Returns the list of item names currently marked for auto-approval.
+ * Queries all rows where is_auto_approved = 1 and returns their item_name values.
+ *
+ * @param  mysqli   $conn  Active DB connection
+ * @return string[]        Flat array of item name strings; empty array if none
+ */
+function getAutoApproveItems(mysqli $conn): array {
+    $stmt = $conn->prepare("SELECT item_name FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = [];
+    while ($row = $result->fetch_assoc()) {
+        $items[] = $row['item_name'];
+    }
+    $stmt->close();
+    return $items;
+}
+
+
+// ================= AUTO-APPROVAL ENGINE =================
+
+/**
+ * Evaluates a newly inserted borrow request for auto-approval.
+ * Approves, declines, or leaves as Waiting based on toggle state,
+ * item set membership, and current stock.
+ *
+ * Logic flow:
+ *  1. Fetch request row — bail if not found or status !== 'Waiting'
+ *  2. Read is_enabled from settings (id=1) — bail if OFF or row absent
+ *  3. Read auto-approved item set — bail if equipment_name not in set
+ *  4. Check is_archived on tbl_inventory — bail if archived or not found
+ *  5. Read quantity — if 0, decline with out-of-stock reason and return
+ *  6. Approve: UPDATE tbl_requests SET status='Approved', reason=NULL
+ *  7. Decrement: UPDATE tbl_inventory SET quantity=quantity-1
+ *  8. If new quantity = 0, cascade-decline all remaining Waiting requests for that item
+ *
+ * @param mysqli $conn        Active DB connection
+ * @param int    $request_id  The id of the newly inserted tbl_requests row
+ */
+function processAutoApprove(mysqli $conn, int $request_id): void {
+
+    // ── Step 1: Fetch the request row ────────────────────────────────────────
+    $stmt = $conn->prepare("SELECT equipment_name, status FROM tbl_requests WHERE id = ?");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$request || $request['status'] !== 'Waiting') {
+        return;
+    }
+
+    $equipment_name = $request['equipment_name'];
+
+    // ── Step 2: Read is_enabled from settings row (id=1) ─────────────────────
+    $stmt = $conn->prepare("SELECT is_enabled FROM tbl_auto_approve_settings WHERE id = 1");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $settings = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$settings || (int) $settings['is_enabled'] === 0) {
+        return;
+    }
+
+    // ── Step 3: Read auto-approved item set; bail if item not in set ──────────
+    $stmt = $conn->prepare("SELECT item_name FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $auto_approve_items = [];
+    while ($row = $result->fetch_assoc()) {
+        $auto_approve_items[] = $row['item_name'];
+    }
+    $stmt->close();
+
+    if (!in_array($equipment_name, $auto_approve_items, true)) {
+        return;
+    }
+
+    // ── Step 4: Check is_archived on tbl_inventory ────────────────────────────
+    $stmt = $conn->prepare("SELECT is_archived, quantity FROM tbl_inventory WHERE item_name = ?");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("s", $equipment_name);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $inventory = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$inventory || (int) $inventory['is_archived'] === 1) {
+        return;
+    }
+
+    // ── Step 5: Check quantity; decline if out of stock ───────────────────────
+    $quantity = (int) $inventory['quantity'];
+
+    if ($quantity === 0) {
+        $reason = 'Out of stock – maximum approved requests reached';
+        $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined', reason = ? WHERE id = ?");
+        if (!$stmt) {
+            return;
+        }
+        $stmt->bind_param("si", $reason, $request_id);
+        $stmt->execute();
+        $stmt->close();
+        return;
+    }
+
+    // ── Step 6: Approve the request ───────────────────────────────────────────
+    $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Approved', reason = NULL WHERE id = ?");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $stmt->close();
+
+    // ── Step 7: Decrement inventory quantity ──────────────────────────────────
+    $stmt = $conn->prepare("UPDATE tbl_inventory SET quantity = quantity - 1 WHERE item_name = ?");
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param("s", $equipment_name);
+    $stmt->execute();
+    $stmt->close();
+
+    // ── Step 8: Cascade-decline remaining Waiting requests if stock is now 0 ──
+    $new_quantity = $quantity - 1;
+
+    if ($new_quantity === 0) {
+        $reason = 'Out of stock – maximum approved requests reached';
+        $stmt = $conn->prepare(
+            "UPDATE tbl_requests SET status = 'Declined', reason = ? WHERE equipment_name = ? AND status = 'Waiting'"
+        );
+        if (!$stmt) {
+            return;
+        }
+        $stmt->bind_param("ss", $reason, $equipment_name);
+        $stmt->execute();
+        $stmt->close();
+    }
+}
+
+
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {
     header('Content-Type: application/json');
@@ -59,6 +239,62 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
             echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
         }
     } 
+    exit();
+}
+
+
+// ================= AJAX TOGGLE AUTO APPROVE =================
+if (isset($_POST['action']) && $_POST['action'] === 'toggle_auto_approve') {
+    header('Content-Type: application/json');
+    $enabled = isset($_POST['enabled']) ? intval($_POST['enabled']) : 0;
+    $enabled = ($enabled >= 1) ? 1 : 0;
+
+    $stmt = $conn->prepare("UPDATE tbl_auto_approve_settings SET is_enabled = ? WHERE id = 1");
+    $stmt->bind_param("i", $enabled);
+    if ($stmt->execute()) {
+        echo json_encode(['status' => 'success', 'enabled' => $enabled]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+    }
+    exit();
+}
+
+
+// ================= AJAX: UPDATE AUTO-APPROVE ITEMS =================
+if (isset($_POST['action']) && $_POST['action'] === 'update_auto_approve_items') {
+    header('Content-Type: application/json');
+
+    // Clear the existing auto-approved item set
+    $stmt_del = $conn->prepare("DELETE FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
+    if (!$stmt_del->execute()) {
+        echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+        exit();
+    }
+    $stmt_del->close();
+
+    $saved_items = [];
+
+    // Insert each submitted item name
+    if (!empty($_POST['items']) && is_array($_POST['items'])) {
+        $stmt_ins = $conn->prepare(
+            "INSERT INTO tbl_auto_approve_settings (is_enabled, item_name, is_auto_approved) VALUES (0, ?, 1)"
+        );
+        foreach ($_POST['items'] as $raw_item) {
+            $item_name = trim($raw_item);
+            if ($item_name === '') {
+                continue;
+            }
+            $stmt_ins->bind_param("s", $item_name);
+            if (!$stmt_ins->execute()) {
+                echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+                exit();
+            }
+            $saved_items[] = $item_name;
+        }
+        $stmt_ins->close();
+    }
+
+    echo json_encode(['status' => 'success', 'items' => $saved_items]);
     exit();
 }
 

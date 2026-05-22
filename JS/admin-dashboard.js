@@ -10,6 +10,9 @@
         setJ: (k, v) => { try { localStorage.setItem('adm_' + k, JSON.stringify(v)); } catch (e) { } }
     };
 
+    /* ── Auto-approve in-flight guard ───────────────────────── */
+    let _autoApproveInFlight = false;
+
     /* ── Toast ───────────────────────────────────────────────── */
     let toastTimer;
     function showToast(msg) {
@@ -563,8 +566,162 @@
                     closeDropdown();
                     if (confirm('Confirm Logout?')) window.location.href = 'includes/logout.php';
                     break;
+
+                case 'toggle-auto-approve': {
+                    if (_autoApproveInFlight) return;
+
+                    const currentEnabled = el.dataset.enabled;
+                    const newEnabled = currentEnabled === '1' ? '0' : '1';
+
+                    _autoApproveInFlight = true;
+
+                    // Save pre-click state of all toggle buttons for rollback
+                    const toggleBtns = document.querySelectorAll('[data-action="toggle-auto-approve"]');
+                    const preClickStates = Array.from(toggleBtns).map(btn => ({
+                        el: btn,
+                        className: btn.className,
+                        text: btn.textContent,
+                        dataEnabled: btn.dataset.enabled,
+                        ariaPressed: btn.getAttribute('aria-pressed')
+                    }));
+
+                    // Save checklist visibility for rollback
+                    const checklist = document.getElementById('auto-approve-checklist');
+                    const preClickChecklistDisplay = checklist ? checklist.style.display : null;
+
+                    // Optimistic update — all toggle buttons
+                    toggleBtns.forEach(btn => {
+                        if (newEnabled === '1') {
+                            btn.classList.remove('auto-approve-off');
+                            btn.classList.add('auto-approve-on');
+                            btn.textContent = 'Auto-Approve: ON';
+                            btn.dataset.enabled = '1';
+                            btn.setAttribute('aria-pressed', 'true');
+                        } else {
+                            btn.classList.remove('auto-approve-on');
+                            btn.classList.add('auto-approve-off');
+                            btn.textContent = 'Auto-Approve: OFF';
+                            btn.dataset.enabled = '0';
+                            btn.setAttribute('aria-pressed', 'false');
+                        }
+                    });
+
+                    // Show/hide checklist
+                    if (checklist) {
+                        if (newEnabled === '1') {
+                            checklist.style.display = '';
+                        } else {
+                            checklist.style.display = 'none';
+                        }
+                    }
+
+                    // Revert helper
+                    function _revertToggle() {
+                        preClickStates.forEach(state => {
+                            state.el.className = state.className;
+                            state.el.textContent = state.text;
+                            state.el.dataset.enabled = state.dataEnabled;
+                            state.el.setAttribute('aria-pressed', state.ariaPressed);
+                        });
+                        if (checklist && preClickChecklistDisplay !== null) {
+                            checklist.style.display = preClickChecklistDisplay;
+                        }
+                    }
+
+                    const controller = new AbortController();
+                    const abortTimer = setTimeout(() => controller.abort(), 10000);
+
+                    fetch('admin-dashboard.php', {
+                        method: 'POST',
+                        body: new URLSearchParams({ action: 'toggle_auto_approve', enabled: newEnabled }),
+                        signal: controller.signal
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Apply server-confirmed state to all toggle buttons
+                            const confirmedEnabled = String(data.enabled) === '1' ? '1' : '0';
+                            document.querySelectorAll('[data-action="toggle-auto-approve"]').forEach(btn => {
+                                if (confirmedEnabled === '1') {
+                                    btn.classList.remove('auto-approve-off');
+                                    btn.classList.add('auto-approve-on');
+                                    btn.textContent = 'Auto-Approve: ON';
+                                    btn.dataset.enabled = '1';
+                                    btn.setAttribute('aria-pressed', 'true');
+                                } else {
+                                    btn.classList.remove('auto-approve-on');
+                                    btn.classList.add('auto-approve-off');
+                                    btn.textContent = 'Auto-Approve: OFF';
+                                    btn.dataset.enabled = '0';
+                                    btn.setAttribute('aria-pressed', 'false');
+                                }
+                            });
+                            if (checklist) {
+                                checklist.style.display = confirmedEnabled === '1' ? '' : 'none';
+                            }
+                        } else {
+                            _revertToggle();
+                            showToast('Failed to update auto-approve setting. Please try again.');
+                        }
+                    })
+                    .catch(() => {
+                        _revertToggle();
+                        showToast('Failed to update auto-approve setting. Please try again.');
+                    })
+                    .finally(() => {
+                        clearTimeout(abortTimer);
+                        _autoApproveInFlight = false;
+                    });
+
+                    break;
+                }
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
+    });
+
+    /* ── Auto-approve item checkbox handler ──────────────────── */
+    document.addEventListener('change', function(e) {
+        const cb = e.target.closest('[data-action="toggle-auto-approve-item"]');
+        if (!cb) return;
+
+        // Store pre-change state for rollback
+        const preChecked = !cb.checked; // before this change event, it was the opposite
+
+        // Update empty-message visibility
+        function updateEmptyMsg() {
+            const anyChecked = document.querySelectorAll('[data-action="toggle-auto-approve-item"]:checked').length > 0;
+            const emptyMsg = document.querySelector('.auto-approve-empty-msg');
+            if (emptyMsg) emptyMsg.style.display = anyChecked ? 'none' : '';
+        }
+        updateEmptyMsg();
+
+        // Collect all currently checked item names
+        const checkedItems = Array.from(
+            document.querySelectorAll('[data-action="toggle-auto-approve-item"]:checked')
+        ).map(c => c.dataset.item);
+
+        // POST full item set to server
+        const formData = new FormData();
+        formData.append('action', 'update_auto_approve_items');
+        checkedItems.forEach(item => formData.append('items[]', item));
+
+        fetch('admin-dashboard.php', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    LS.setJ('autoApproveSet', data.items);
+                } else {
+                    // Revert checkbox
+                    cb.checked = preChecked;
+                    updateEmptyMsg();
+                    showToast('Failed to save auto-approve selection. Please try again.');
+                }
+            })
+            .catch(() => {
+                cb.checked = preChecked;
+                updateEmptyMsg();
+                showToast('Failed to save auto-approve selection. Please try again.');
+            });
     });
 
     /* ── Avatar button ───────────────────────────────────────── */
@@ -728,6 +885,21 @@
     /* ── Init ────────────────────────────────────────────────── */
     function init() {
         restoreState();
+
+        // ── Auto-approve initialization ───────────────────────────────
+        const firstToggle = document.querySelector('[data-action="toggle-auto-approve"]');
+        if (firstToggle) {
+            const isEnabled = firstToggle.dataset.enabled === '1';
+            const checklist = document.getElementById('auto-approve-checklist');
+            if (checklist) {
+                checklist.style.display = isEnabled ? '' : 'none';
+            }
+            const checkedItems = Array.from(
+                document.querySelectorAll('[data-action="toggle-auto-approve-item"]:checked')
+            ).map(cb => cb.dataset.item);
+            LS.setJ('autoApproveSet', checkedItems);
+        }
+
         initView();
         initImageUpload();
         initNotifCards();

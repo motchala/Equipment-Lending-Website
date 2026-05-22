@@ -10,6 +10,8 @@ $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) die("Connection failed: " . mysqli_connect_error());
 
+require_once __DIR__ . '/includes/auto-approve-functions.php';
+
 function maskEmail($email)
 {
     if (!$email) return null;
@@ -73,6 +75,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $insert = "INSERT INTO tbl_requests (student_name,student_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
                VALUES ('$student_name','$student_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
     if (mysqli_query($conn, $insert)) {
+        $new_request_id = mysqli_insert_id($conn);
+        processAutoApprove($conn, $new_request_id);
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else die("Error processing request: " . mysqli_error($conn));

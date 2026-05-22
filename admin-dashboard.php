@@ -12,6 +12,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     header("Location: admin-dashboard.php?view=waiting");
     exit();
 }
+
+$auto_approve_enabled = getAutoApproveEnabled($conn);
+$auto_approve_items   = getAutoApproveItems($conn);
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -423,6 +426,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         Return Confirmation
                         <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
                     </button>
+                    <button
+                        class="auto-approve-toggle auto-approve-<?= $auto_approve_enabled ? 'on' : 'off' ?>"
+                        data-action="toggle-auto-approve"
+                        data-enabled="<?= $auto_approve_enabled ? '1' : '0' ?>"
+                        aria-pressed="<?= $auto_approve_enabled ? 'true' : 'false' ?>"
+                        style="margin-left:auto"
+                    >Auto-Approve: <?= $auto_approve_enabled ? 'ON' : 'OFF' ?></button>
+                </div>
+
+                <?php
+                $checklist_result = $conn->query("SELECT item_name FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
+                $inventory_items_for_checklist = [];
+                while ($row = $checklist_result->fetch_assoc()) {
+                    $inventory_items_for_checklist[] = $row;
+                }
+                ?>
+                <div id="auto-approve-checklist" <?= $auto_approve_enabled ? '' : 'style="display:none"' ?>>
+                  <?php foreach ($inventory_items_for_checklist as $item): ?>
+                    <label>
+                      <input
+                        type="checkbox"
+                        data-action="toggle-auto-approve-item"
+                        data-item="<?= htmlspecialchars($item['item_name']) ?>"
+                        <?= in_array($item['item_name'], $auto_approve_items) ? 'checked' : '' ?>
+                      >
+                      <?= htmlspecialchars($item['item_name']) ?>
+                    </label>
+                  <?php endforeach; ?>
+                  <p class="auto-approve-empty-msg" <?= !empty($auto_approve_items) ? 'style="display:none"' : '' ?>>
+                    No items selected for auto-approval. Check items above to enable automatic approval.
+                  </p>
                 </div>
 
                 <!-- Pending Approval sub-panel -->
@@ -509,6 +543,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </svg>
                                 <input type="text" id="returnSearch" placeholder="Search by ID, name, or equipment...">
                             </div>
+                            <button
+                                class="auto-approve-toggle auto-approve-<?= $auto_approve_enabled ? 'on' : 'off' ?>"
+                                data-action="toggle-auto-approve"
+                                data-enabled="<?= $auto_approve_enabled ? '1' : '0' ?>"
+                                aria-pressed="<?= $auto_approve_enabled ? 'true' : 'false' ?>"
+                                style="margin-left:auto"
+                            >Auto-Approve: <?= $auto_approve_enabled ? 'ON' : 'OFF' ?></button>
                         </div>
                         <div class="tbl-wrap">
                             <table class="admin-table">
