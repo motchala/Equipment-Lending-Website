@@ -74,12 +74,12 @@ class ArbitrationEngine
                 return;
             }
 
-            $student_id     = (string)$request['student_id'];
+            $faculty_id     = (string)$request['faculty_id'];
             $equipment_name = (string)$request['equipment_name'];
 
             // ── Step 3: Overdue block check ──────────────────────────────────
             if (($config['rule_overdue_block_enabled'] ?? '0') === '1') {
-                if (self::checkOverdueBlock($conn, $student_id)) {
+                if (self::checkOverdueBlock($conn, $faculty_id)) {
                     self::writeDecision(
                         $conn,
                         $request_id,
@@ -93,7 +93,7 @@ class ArbitrationEngine
 
             // ── Step 4: Duplicate block check ────────────────────────────────
             if (($config['rule_duplicate_block_enabled'] ?? '0') === '1') {
-                if (self::checkDuplicateBlock($conn, $student_id, $equipment_name, $request_id)) {
+                if (self::checkDuplicateBlock($conn, $faculty_id, $equipment_name, $request_id)) {
                     self::writeDecision(
                         $conn,
                         $request_id,
@@ -156,7 +156,7 @@ class ArbitrationEngine
             $stmt = $conn->prepare(
                 "SELECT r.*, u.role
                    FROM tbl_requests r
-                   LEFT JOIN tbl_users u ON r.student_id = u.student_id
+                   LEFT JOIN tbl_users u ON r.faculty_id = u.faculty_id
                   WHERE r.equipment_name = ?
                     AND r.status = 'Waiting'
                   ORDER BY r.request_date ASC, r.id ASC"
@@ -188,7 +188,7 @@ class ArbitrationEngine
 
             // Enrich each competing request with has_overdue and priority score.
             foreach ($competing as &$req) {
-                $req['has_overdue']      = self::checkOverdueBlock($conn, (string)$req['student_id']);
+                $req['has_overdue']      = self::checkOverdueBlock($conn, (string)$req['faculty_id']);
                 $doc_path                = (string)($req['document_path'] ?? '');
                 $signatory_level         = ($doc_path !== '') ? self::validateDocument($doc_path) : 0;
                 $req['_score']           = self::computePriorityScore($req, $config, $signatory_level);
@@ -363,9 +363,9 @@ class ArbitrationEngine
                 // to avoid prepared-statement issues when the connection may be in a bad state.
                 $safe_id       = $conn->real_escape_string((string)$request_id);
                 $log_result    = $conn->query(
-                    "SELECT r.student_id, r.equipment_name, u.fullname AS borrower_name
+                    "SELECT r.faculty_id, r.equipment_name, u.fullname AS borrower_name
                        FROM tbl_requests r
-                       LEFT JOIN tbl_users u ON r.student_id = u.student_id
+                       LEFT JOIN tbl_users u ON r.faculty_id = u.faculty_id
                       WHERE r.id = {$safe_id}
                       LIMIT 1"
                 );
@@ -378,7 +378,7 @@ class ArbitrationEngine
                     $log_row = $log_result->fetch_assoc();
 
                     if ($log_row !== null && $log_row !== false) {
-                        $borrower_id   = (string)($log_row['student_id']    ?? '');
+                        $borrower_id   = (string)($log_row['faculty_id']    ?? '');
                         $borrower_name = (string)($log_row['borrower_name'] ?? '');
                         $equipment     = (string)($log_row['equipment_name'] ?? '');
                     }
@@ -460,7 +460,7 @@ class ArbitrationEngine
                     tbl_inventory.quantity
              FROM tbl_requests
              LEFT JOIN tbl_users
-                    ON tbl_requests.student_id = tbl_users.student_id
+                    ON tbl_requests.faculty_id = tbl_users.faculty_id
              LEFT JOIN tbl_inventory
                     ON tbl_requests.equipment_name = tbl_inventory.item_name
              WHERE tbl_requests.id = ?'
@@ -483,14 +483,14 @@ class ArbitrationEngine
      * Return true if the borrower has one or more unresolved Overdue records.
      *
      * @param  mysqli $conn       Active DB connection
-     * @param  string $student_id Borrower's student_id
+     * @param  string $faculty_id Borrower's faculty_id
      * @return bool
      */
-    private static function checkOverdueBlock(mysqli $conn, string $student_id): bool
+    private static function checkOverdueBlock(mysqli $conn, string $faculty_id): bool
     {
         $stmt = $conn->prepare(
             'SELECT 1 FROM tbl_requests
-              WHERE student_id = ? AND status = \'Overdue\'
+              WHERE faculty_id = ? AND status = \'Overdue\'
               LIMIT 1'
         );
 
@@ -498,7 +498,7 @@ class ArbitrationEngine
             return false;
         }
 
-        $stmt->bind_param('s', $student_id);
+        $stmt->bind_param('s', $faculty_id);
 
         if (!$stmt->execute()) {
             $stmt->close();
@@ -517,19 +517,19 @@ class ArbitrationEngine
      * for the same equipment_name.
      *
      * @param  mysqli $conn           Active DB connection
-     * @param  string $student_id     Borrower's student_id
+     * @param  string $faculty_id     Borrower's faculty_id
      * @param  string $equipment_name Name of the requested item
      * @return bool
      */
     private static function checkDuplicateBlock(
         mysqli $conn,
-        string $student_id,
+        string $faculty_id,
         string $equipment_name,
         int $request_id
     ): bool {
         $stmt = $conn->prepare(
             "SELECT 1 FROM tbl_requests
-                WHERE student_id = ?
+                WHERE faculty_id = ?
                     AND equipment_name = ?
                     AND status IN ('Approved', 'Waiting')
                     AND id != ?
@@ -540,7 +540,7 @@ class ArbitrationEngine
             return false;
         }
 
-        $stmt->bind_param('ssi', $student_id, $equipment_name, $request_id);
+        $stmt->bind_param('ssi', $faculty_id, $equipment_name, $request_id);
 
         if (!$stmt->execute()) {
             $stmt->close();
@@ -814,9 +814,9 @@ class ArbitrationEngine
         // Join tbl_requests with tbl_users to get borrower_id, borrower_name,
         // and equipment_name. tbl_users.fullname is the name column.
         $stmt = $conn->prepare(
-            'SELECT r.student_id, r.equipment_name, u.fullname AS borrower_name
+            'SELECT r.faculty_id, r.equipment_name, u.fullname AS borrower_name
                FROM tbl_requests r
-               LEFT JOIN tbl_users u ON r.student_id = u.student_id
+               LEFT JOIN tbl_users u ON r.faculty_id = u.faculty_id
               WHERE r.id = ?'
         );
 
@@ -850,7 +850,7 @@ class ArbitrationEngine
             return;
         }
 
-        $borrower_id   = (string)$row['student_id'];
+        $borrower_id   = (string)$row['faculty_id'];
         $borrower_name = (string)($row['borrower_name'] ?? '');
         $equipment     = (string)$row['equipment_name'];
 
@@ -911,7 +911,7 @@ class ArbitrationEngine
             "SELECT tbl_requests.id
                FROM tbl_requests
                LEFT JOIN tbl_users
-                      ON tbl_requests.student_id = tbl_users.student_id
+                      ON tbl_requests.faculty_id = tbl_users.faculty_id
               WHERE tbl_requests.equipment_name = ?
                 AND tbl_requests.status = 'Waiting'"
         );

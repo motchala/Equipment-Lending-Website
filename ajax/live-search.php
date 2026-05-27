@@ -10,8 +10,8 @@ switch ($section) {
     case 'waiting':
         $sql = "SELECT * FROM tbl_requests 
                 WHERE status='Waiting' AND (
-                    student_id LIKE ? OR
-                    student_name LIKE ? OR
+                    faculty_id LIKE ? OR
+                    faculty_name LIKE ? OR
                     equipment_name LIKE ?
                 ) ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
@@ -32,8 +32,8 @@ switch ($section) {
         while ($row = $result->fetch_assoc()) {
             $isPast = strtotime($row['borrow_date']) < strtotime(date('Y-m-d'));
             echo "<tr>
-                <td>{$row['student_id']}</td>
-                <td class='fw-bold'>" . htmlspecialchars($row['student_name']) . "</td>
+                <td>{$row['faculty_id']}</td>
+                <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td class='" . ($isPast ? "text-danger fw-bold" : "") . "'>
                     " . date('M d, Y', strtotime($row['borrow_date'])) . "
@@ -52,8 +52,8 @@ switch ($section) {
         $status = ($section === 'approved') ? 'Approved' : 'Declined';
         $sql = "SELECT * FROM tbl_requests 
                 WHERE status=? AND (
-                    student_id LIKE ? OR
-                    student_name LIKE ? OR
+                    faculty_id LIKE ? OR
+                    faculty_name LIKE ? OR
                     equipment_name LIKE ?
                 ) ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
@@ -68,8 +68,8 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['student_id']}</td>
-                <td class='fw-bold'>" . htmlspecialchars($row['student_name']) . "</td>
+                <td>{$row['faculty_id']}</td>
+                <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td><span class='badge " . ($status === 'Approved' ? 'bg-success' : 'bg-danger') . "'>{$row['status']}</span></td>
             </tr>";
@@ -112,9 +112,9 @@ switch ($section) {
         break;
 
     case 'raw':
-        $sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date 
+        $sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date 
                 FROM tbl_requests 
-                WHERE student_id LIKE ? OR student_name LIKE ? OR equipment_name LIKE ? 
+                WHERE faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ? 
                 ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sss", $search, $search, $search);
@@ -128,8 +128,8 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['student_id']}</td>
-                <td class='fw-bold'>" . htmlspecialchars($row['student_name']) . "</td>
+                <td>{$row['faculty_id']}</td>
+                <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td>" . htmlspecialchars($row['instructor']) . "</td>
                 <td>" . htmlspecialchars($row['room']) . "</td>

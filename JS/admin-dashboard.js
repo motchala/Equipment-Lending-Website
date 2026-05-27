@@ -813,9 +813,14 @@
         reasonInput.value = '';
         alertBox.style.display = 'none';
         desc.textContent = 'Override for: ' + borrower + ' — ' + equipment;
-        // Show status selector only for Waiting requests
-        if (currentStatus === 'Waiting') {
+        // Show status selector for Waiting AND Declined (admin override can approve either)
+        if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
             statusGroup.style.display = '';
+            // Pre-select Approved for Declined overrides (most common case)
+            const statusSelect = document.getElementById('overrideNewStatus');
+            if (statusSelect) {
+                statusSelect.value = currentStatus === 'Declined' ? 'Approved' : 'Approved';
+            }
         } else {
             statusGroup.style.display = 'none';
         }
@@ -855,10 +860,10 @@
             const reason = document.getElementById('overrideReason').value.trim();
             const alertBox = document.getElementById('override-alert');
             let newStatus;
-            if (currentStatus === 'Waiting') {
+            if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
                 newStatus = document.getElementById('overrideNewStatus').value;
             } else {
-                newStatus = 'Approved'; // For Declined log entries, override to Approved
+                newStatus = 'Approved'; // For Approved/Overdue entries shown in arb log, default to Approved
             }
             if (!reason) {
                 alertBox.style.display = 'block';

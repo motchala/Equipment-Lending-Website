@@ -33,16 +33,16 @@ mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Appr
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['faculty_id'])) die("Unauthorized access");
     $user_id = $_SESSION['faculty_id'];
-    $user_query = mysqli_query($conn, "SELECT fullname, student_id FROM tbl_users WHERE student_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
+    $user_query = mysqli_query($conn, "SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
     $user = mysqli_fetch_assoc($user_query);
     if (!$user) die("User profile not found.");
-    $student_name   = $user['fullname'];
-    $student_id     = $user['student_id'];
+    $faculty_name   = $user['fullname'];
+    $faculty_id     = $user['faculty_id'];
     $borrow_date    = mysqli_real_escape_string($conn, $_POST['borrow_date']);
     $return_date    = mysqli_real_escape_string($conn, $_POST['return_date']);
     $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
     $room           = mysqli_real_escape_string($conn, $_POST['room']);
-    $instructor     = mysqli_real_escape_string($conn, $student_name); // auto-filled from account name
+    $instructor     = mysqli_real_escape_string($conn, $faculty_name); // auto-filled from account name
     $current_date   = date('Y-m-d');
     if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
     if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
@@ -64,8 +64,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         }
         // $document_path will be set in the next step after successful INSERT
     }
-    $insert = "INSERT INTO tbl_requests (student_name,student_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
-               VALUES ('$student_name','$student_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
+    $insert = "INSERT INTO tbl_requests (faculty_name,faculty_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
+               VALUES ('$faculty_name','$faculty_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
     if (mysqli_query($conn, $insert)) {
         $new_request_id = mysqli_insert_id($conn);
 
@@ -73,7 +73,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] === UPLOAD_ERR_OK) {
             $orig_name   = basename($_FILES['request_document']['name']);
             $safe_name   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
-            $dest_name   = time() . '_' . $student_id . '_' . $safe_name;
+            $dest_name   = time() . '_' . $faculty_id . '_' . $safe_name;
             $dest_dir    = __DIR__ . '/uploads/request_letters/';
             $dest_path   = $dest_dir . $dest_name;
             $rel_path    = 'uploads/request_letters/' . $dest_name;
@@ -100,21 +100,21 @@ $inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_ar
 $uid_safe = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 
 // ── Stats ──────────────────────────────────────────────────────────────────
-$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe'"))['c'];
-$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Waiting'"))['c'];
-$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Approved'"))['c'];
-$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Declined'"))['c'];
-$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue'"))['c'];
+$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe'"))['c'];
+$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Waiting'"))['c'];
+$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Approved'"))['c'];
+$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Declined'"))['c'];
+$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue'"))['c'];
 
 $has_overdue_block = $stat_overdue > 0;
 // ── Requests JSON for JS ───────────────────────────────────────────────────
-$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC");
+$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC");
 $requests_js = [];
 while ($row = mysqli_fetch_assoc($requests_raw)) $requests_js[] = $row;
 $requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
 // ── Overdue for notifications ──────────────────────────────────────────────
-$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
+$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
 $overdue_notifs = [];
 while ($row = mysqli_fetch_assoc($overdue_items_raw)) $overdue_notifs[] = $row;
 
@@ -128,9 +128,9 @@ if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 
 $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
     "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
-     program, year_level, phone, present_address, permanent_address, landline,
+     department, faculty_rank, phone, present_address, permanent_address, landline,
      emergency_name, emergency_relationship, emergency_phone 
-     FROM tbl_users WHERE student_id='$uid_safe' LIMIT 1"
+     FROM tbl_users WHERE faculty_id='$uid_safe' LIMIT 1"
 )) ?: [];
 $db_email         = $profile_row['email']         ?? '';
 $db_backup_email  = $profile_row['backup_email']  ?? '';
@@ -139,16 +139,16 @@ $db_dob           = $profile_row['dob']           ?? '';
 $db_gender        = $profile_row['gender']        ?? '';
 $db_nationality   = $profile_row['nationality']   ?? '';
 // Academic
-$db_program       = $profile_row['program']       ?? '';
-$db_year_level    = $profile_row['year_level']    ?? '';
+$db_department      = $profile_row['department']      ?? '';
+$db_faculty_rank    = $profile_row['faculty_rank']    ?? '';
 // Contact
 $db_phone            = $profile_row['phone']            ?? '';
 $db_present_address  = $profile_row['present_address']  ?? '';
 $db_email             = $profile_row['email']             ?? '';
 $db_backup_email      = $profile_row['backup_email']      ?? '';
 $db_profile_pic       = $profile_row['profile_picture']   ?? '';
-$db_program           = $profile_row['program']           ?? '';
-$db_year_level        = $profile_row['year_level']        ?? '';
+$db_department        = $profile_row['department']        ?? '';
+$db_faculty_rank      = $profile_row['faculty_rank']      ?? '';
 $db_phone             = $profile_row['phone']             ?? '';
 $db_present_address   = $profile_row['present_address']   ?? '';
 $db_permanent_address = $profile_row['permanent_address'] ?? '';
@@ -166,14 +166,14 @@ $dob_locked         = !empty($db_dob);
 $gender_locked      = !empty($db_gender);
 $nationality_locked = !empty($db_nationality);
 $backup_locked      = !empty($db_backup_email);
-$program_locked     = !empty($db_program);
+$department_locked     = !empty($db_department);
 // Profile picture path
 $profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 $db_landline          = $profile_row['landline']          ?? '';
 $masked_email         = maskEmail($db_email);
 $masked_backup        = maskEmail($db_backup_email);
 $backup_locked        = !empty($db_backup_email);
-$program_locked       = !empty($db_program);
+$department_locked       = !empty($db_department);
 $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 ?>
 <!DOCTYPE html>
@@ -489,7 +489,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                 <span>Recent Activity</span>
                             </div>
                             <?php
-                            $recent_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
+                            $recent_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
                             if ($recent_raw && mysqli_num_rows($recent_raw) > 0):
                                 while ($rr = mysqli_fetch_assoc($recent_raw)):
                             ?>
@@ -582,7 +582,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
 
                 <!-- Active Now Section -->
                 <?php
-                $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
+                $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
                 $active_items = [];
                 if ($active_raw) while ($ar = mysqli_fetch_assoc($active_raw)) $active_items[] = $ar;
                 ?>
@@ -946,7 +946,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <div class="timeline-container" id="activityTimeline">
                     <?php
                     // Group requests by date proximity
-                    $all_req = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE student_id='$uid_safe' ORDER BY borrow_date DESC, request_date DESC LIMIT 20");
+                    $all_req = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY borrow_date DESC, request_date DESC LIMIT 20");
                     $grouped = [];
                     if ($all_req) {
                         while ($r = mysqli_fetch_assoc($all_req)) {
@@ -1216,12 +1216,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Department</span>
-                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program">
-                                <?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?>
+                            <span class="info-val <?php echo $department_locked ? '' : 'empty'; ?>" data-field="department">
+                                <?php echo $department_locked ? htmlspecialchars($db_department) : '— Not provided'; ?>
                             </span>
-                            <?php if (!$program_locked): ?>
-                            <select class="info-input-f" data-input="program" disabled style="display:none;">
-                                <option value="">Select Program...</option>
+                            <?php if (!$department_locked): ?>
+                            <select class="info-input-f" data-input="department" disabled style="display:none;">
+                                <option value="">Select Department...</option>
                                 <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
                                 <option value="<?php echo $p; ?>">
                                     <?php echo $p; ?>
@@ -1232,10 +1232,10 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Position / Rank</span>
-                            <span class="info-val <?php echo $db_year_level ? '' : 'empty'; ?>" data-field="year_level">
-                                <?php echo $db_year_level ? htmlspecialchars($db_year_level) : '— Not provided'; ?>
+                            <span class="info-val <?php echo $db_faculty_rank ? '' : 'empty'; ?>" data-field="faculty_rank">
+                                <?php echo $db_faculty_rank ? htmlspecialchars($db_faculty_rank) : '— Not provided'; ?>
                             </span>
-                            <select class="info-input-f" data-input="year_level" disabled style="display:none;">
+                            <select class="info-input-f" data-input="faculty_rank" disabled style="display:none;">
                                 <option value="">Select Position...</option>
                                 <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
                                 <option value="<?php echo $rank; ?>">
@@ -1389,15 +1389,15 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         </div>
                         <div class="form-group u-form-col-span">
                             <label class="form-label">Department / College</label>
-                            <?php if ($program_locked): ?>
-                            <input class="form-input" type="text" value="<?php echo htmlspecialchars($db_program); ?>"
+                            <?php if ($department_locked): ?>
+                            <input class="form-input" type="text" value="<?php echo htmlspecialchars($db_department); ?>"
                                 readonly
                                 style="background:var(--color-surface-container);color:var(--color-secondary);cursor:not-allowed;">
                             <?php else: ?>
-                            <span class="info-val <?php echo $program_locked ? '' : 'empty'; ?>" data-field="program">
-                                <?php echo $program_locked ? htmlspecialchars($db_program) : '— Not provided'; ?>
+                            <span class="info-val <?php echo $department_locked ? '' : 'empty'; ?>" data-field="department">
+                                <?php echo $department_locked ? htmlspecialchars($db_department) : '— Not provided'; ?>
                             </span>
-                            <select class="form-input info-input-f" data-input="program" disabled style="display:none;">
+                            <select class="form-input info-input-f" data-input="department" disabled style="display:none;">
                                 <option value="">Select Department...</option>
                                 <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
                                 <option value="<?php echo $p; ?>">

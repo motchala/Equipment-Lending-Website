@@ -286,7 +286,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="activity-item">
                                 <div class="activity-dot <?php echo $dotClass; ?>"></div>
                                 <div class="activity-info">
-                                    <h4><?php echo htmlspecialchars($r['student_name']); ?></h4>
+                                    <h4><?php echo htmlspecialchars($r['faculty_name']); ?></h4>
                                     <p><?php echo htmlspecialchars($r['equipment_name']); ?> &mdash; <?php echo htmlspecialchars($r['status']); ?></p>
                                 </div>
                                 <span class="activity-time"><?php echo date('M d', strtotime($r['request_date'])); ?></span>
@@ -484,8 +484,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             $isPast = strtotime($r['borrow_date']) < strtotime($today);
                                         ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td style="<?php echo $isPast ? 'color:var(--danger);font-weight:600;' : '' ?>">
                                                     <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
@@ -499,7 +499,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                         data-request-id="<?php echo $r['id']; ?>"
                                                         data-request-status="Waiting"
                                                         data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                        data-borrower="<?php echo htmlspecialchars($r['student_name']); ?>"
+                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
                                                         title="Override this request">
                                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -558,8 +558,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
                                         ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td style="<?php echo $isOverdue ? 'color:var(--danger);font-weight:600;' : '' ?>">
@@ -572,7 +572,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                         <a href="admin-dashboard.php?action=return_confirm&id=<?php echo $r['id']; ?>"
                                                             class="btn-return-confirm"
                                                             title="Confirm item has been returned"
-                                                            onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['student_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
+                                                            onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['faculty_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
                                                                 <polyline points="1 4 1 10 7 10" />
                                                                 <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
@@ -658,8 +658,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($approved_result)): ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
@@ -706,8 +706,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($declined_result)): ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
@@ -1012,8 +1012,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </tr>
                                     <?php else: while ($r = mysqli_fetch_assoc($raw_data_result)): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                            <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                            <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                             <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                             <td><?php echo htmlspecialchars($r['instructor']); ?></td>
                                             <td><?php echo htmlspecialchars($r['room']); ?></td>
@@ -1635,7 +1635,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                             <div class="notif-body-wrap">
                                 <h4>Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                                <p><strong><?php echo htmlspecialchars($on['student_name']); ?></strong> has not returned this item. <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
+                                <p><strong><?php echo htmlspecialchars($on['faculty_name']); ?></strong> has not returned this item. <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
                             </div>
                             <div class="notif-meta">
                                 <span class="notif-time">Due <?php echo date('M d', strtotime($on['return_date'])); ?></span>
@@ -1647,7 +1647,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="notif-card-detail">
                             <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($on['student_name']); ?> (<?php echo htmlspecialchars($on['student_id']); ?>)</span></div>
+                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($on['faculty_name']); ?> (<?php echo htmlspecialchars($on['faculty_id']); ?>)</span></div>
                                 <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($on['equipment_name']); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Due Date</span><span class="ndv" style="color:#e65100;font-weight:600;"><?php echo date('M d, Y', strtotime($on['return_date'])); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Days Overdue</span><span class="ndv" style="color:#e65100;font-weight:700;"><?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?></span></div>
@@ -1685,7 +1685,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                             <div class="notif-body-wrap">
                                 <h4>New Borrow Request</h4>
-                                <p><strong><?php echo htmlspecialchars($wn['student_name']); ?></strong> requested <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> — awaiting approval.</p>
+                                <p><strong><?php echo htmlspecialchars($wn['faculty_name']); ?></strong> requested <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> — awaiting approval.</p>
                             </div>
                             <div class="notif-meta">
                                 <span class="notif-time"><?php echo date('M d', strtotime($wn['request_date'])); ?></span>
@@ -1697,7 +1697,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="notif-card-detail">
                             <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($wn['student_name']); ?> (<?php echo htmlspecialchars($wn['student_id']); ?>)</span></div>
+                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($wn['faculty_name']); ?> (<?php echo htmlspecialchars($wn['faculty_id']); ?>)</span></div>
                                 <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($wn['equipment_name']); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['borrow_date'])); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Return Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['return_date'])); ?></span></div>

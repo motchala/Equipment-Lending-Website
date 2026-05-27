@@ -50,7 +50,7 @@ if ($action === 'save_profile') {
     // Fetch current locked-field values
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = [];
@@ -123,7 +123,7 @@ if ($action === 'save_profile') {
         exit;
     }
 
-    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE student_id='$uid'";
+    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE faculty_id='$uid'";
 
     // Return changes for confirmation modal (don't execute yet)
     echo json_encode([
@@ -150,7 +150,7 @@ if ($action === 'confirm_save_profile') {
 
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT dob, gender, nationality FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = ["fullname='$fn_esc'"];
@@ -170,13 +170,13 @@ if ($action === 'confirm_save_profile') {
         $updates[] = "nationality='$nat_esc'";
     }
 
-    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE student_id='$uid'";
+    $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE faculty_id='$uid'";
 
     if (mysqli_query($conn, $sql)) {
         $_SESSION['faculty_name'] = $fullname;
         $updated = mysqli_fetch_assoc(mysqli_query(
             $conn,
-            "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+            "SELECT fullname, dob, gender, nationality FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
         ));
         echo json_encode([
             'success' => true,
@@ -216,7 +216,7 @@ if ($action === 'save_academic') {
 
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT program, year_level FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT program, year_level FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = [];
@@ -274,7 +274,7 @@ if ($action === 'confirm_save_academic') {
 
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT program FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT program FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = [];
@@ -290,11 +290,11 @@ if ($action === 'confirm_save_academic') {
     }
 
     if (!empty($updates)) {
-        $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE student_id='$uid'";
+        $sql = "UPDATE tbl_users SET " . implode(', ', $updates) . " WHERE faculty_id='$uid'";
         if (mysqli_query($conn, $sql)) {
             $updated = mysqli_fetch_assoc(mysqli_query(
                 $conn,
-                "SELECT program, year_level FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+                "SELECT program, year_level FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
             ));
             echo json_encode([
                 'success' => true,
@@ -333,7 +333,7 @@ if ($action === 'save_contact') {
 
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = [];
@@ -422,12 +422,12 @@ if ($action === 'confirm_save_contact') {
     $landline_esc = mysqli_real_escape_string($conn, $landline);
 
     $sql = "UPDATE tbl_users SET phone='$phone_esc', present_address='$present_esc', 
-            permanent_address='$perm_esc', landline='$landline_esc' WHERE student_id='$uid'";
+            permanent_address='$perm_esc', landline='$landline_esc' WHERE faculty_id='$uid'";
 
     if (mysqli_query($conn, $sql)) {
         $updated = mysqli_fetch_assoc(mysqli_query(
             $conn,
-            "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+            "SELECT phone, present_address, permanent_address, landline FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
         ));
         echo json_encode([
             'success' => true,
@@ -459,7 +459,7 @@ if ($action === 'save_emergency') {
 
     $cur_row = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $updates = [];
@@ -534,12 +534,12 @@ if ($action === 'confirm_save_emergency') {
     $phone_esc = mysqli_real_escape_string($conn, $phone);
 
     $sql = "UPDATE tbl_users SET emergency_name='$name_esc', emergency_relationship='$rel_esc', 
-            emergency_phone='$phone_esc' WHERE student_id='$uid'";
+            emergency_phone='$phone_esc' WHERE faculty_id='$uid'";
 
     if (mysqli_query($conn, $sql)) {
         $updated = mysqli_fetch_assoc(mysqli_query(
             $conn,
-            "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+            "SELECT emergency_name, emergency_relationship, emergency_phone FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
         ));
         echo json_encode([
             'success' => true,
@@ -569,7 +569,7 @@ if ($action === 'verify_email_for_password') {
     // Fetch user's actual email
     $user = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT email FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT email FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     if (!$user || empty($user['email'])) {
@@ -614,7 +614,7 @@ if ($action === 'change_password') {
 
     $user = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT password, last_password_change FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT password, last_password_change FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
     if (!$user) {
         echo json_encode(['success' => false, 'msg' => 'User not found.']);
@@ -658,7 +658,7 @@ if ($action === 'change_password') {
     $hashed = mysqli_real_escape_string($conn, password_hash($new_pw, PASSWORD_DEFAULT));
     $now_timestamp = date('Y-m-d H:i:s');
 
-    if (mysqli_query($conn, "UPDATE tbl_users SET password='$hashed', last_password_change='$now_timestamp' WHERE student_id='$uid'")) {
+    if (mysqli_query($conn, "UPDATE tbl_users SET password='$hashed', last_password_change='$now_timestamp' WHERE faculty_id='$uid'")) {
         echo json_encode(['success' => true, 'msg' => 'Password changed successfully! Keep it safe.']);
     } else {
         echo json_encode(['success' => false, 'msg' => 'Failed to update password.']);
@@ -676,7 +676,7 @@ if ($action === 'update_backup_email') {
     // Check if backup email already exists
     $existing = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT backup_email FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT backup_email FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     if (!empty($existing['backup_email'])) {
@@ -699,7 +699,7 @@ if ($action === 'update_backup_email') {
 
     $backup_esc = mysqli_real_escape_string($conn, $backup_email);
 
-    if (mysqli_query($conn, "UPDATE tbl_users SET backup_email='$backup_esc' WHERE student_id='$uid'")) {
+    if (mysqli_query($conn, "UPDATE tbl_users SET backup_email='$backup_esc' WHERE faculty_id='$uid'")) {
         echo json_encode([
             'success' => true,
             'msg' => 'Backup email added successfully! This cannot be changed later.',
@@ -755,7 +755,7 @@ if ($action === 'upload_profile_picture') {
     // Delete old profile picture if exists
     $old_pic = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT profile_picture FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT profile_picture FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ))['profile_picture'] ?? '';
 
     if (!empty($old_pic) && file_exists($upload_dir . $old_pic)) {
@@ -766,7 +766,7 @@ if ($action === 'upload_profile_picture') {
     if (move_uploaded_file($file['tmp_name'], $upload_path)) {
         $filename_esc = mysqli_real_escape_string($conn, $new_filename);
 
-        if (mysqli_query($conn, "UPDATE tbl_users SET profile_picture='$filename_esc' WHERE student_id='$uid'")) {
+        if (mysqli_query($conn, "UPDATE tbl_users SET profile_picture='$filename_esc' WHERE faculty_id='$uid'")) {
             echo json_encode([
                 'success' => true,
                 'msg' => 'Profile picture updated successfully!',
@@ -790,7 +790,7 @@ if ($action === 'upload_profile_picture') {
 if ($action === 'remove_profile_picture') {
     $user = mysqli_fetch_assoc(mysqli_query(
         $conn,
-        "SELECT profile_picture FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+        "SELECT profile_picture FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     if (!empty($user['profile_picture'])) {
@@ -800,7 +800,7 @@ if ($action === 'remove_profile_picture') {
         }
     }
 
-    if (mysqli_query($conn, "UPDATE tbl_users SET profile_picture=NULL WHERE student_id='$uid'")) {
+    if (mysqli_query($conn, "UPDATE tbl_users SET profile_picture=NULL WHERE faculty_id='$uid'")) {
         echo json_encode([
             'success' => true,
             'msg' => 'Profile picture removed successfully!',
@@ -821,7 +821,7 @@ if ($action === 'get_completion_status') {
         $conn,
         "SELECT fullname, dob, gender, nationality, email, backup_email, program, year_level, 
          phone, present_address, permanent_address, emergency_name, emergency_relationship, emergency_phone 
-         FROM tbl_users WHERE student_id='$uid' LIMIT 1"
+         FROM tbl_users WHERE faculty_id='$uid' LIMIT 1"
     ));
 
     $total_fields = 13;

@@ -237,8 +237,8 @@ $waiting_sql = "SELECT * FROM tbl_requests WHERE status='Waiting'";
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";
     $waiting_sql .= " AND (
-        student_id LIKE ?
-        OR student_name LIKE ?
+        faculty_id LIKE ?
+        OR faculty_name LIKE ?
         OR equipment_name LIKE ?
     ) ORDER BY request_date DESC";
 
@@ -256,8 +256,8 @@ $approved_sql = "SELECT * FROM tbl_requests WHERE status IN ('Approved','Overdue
 if (!empty($_GET['approved_search'])) {
     $search = "%" . $_GET['approved_search'] . "%";
     $approved_sql .= " AND (
-        student_id LIKE ?
-        OR student_name LIKE ?
+        faculty_id LIKE ?
+        OR faculty_name LIKE ?
         OR equipment_name LIKE ?
     ) ORDER BY request_date DESC";
     $stmt = $conn->prepare($approved_sql);
@@ -274,8 +274,8 @@ $declined_sql = "SELECT * FROM tbl_requests WHERE status='Declined'";
 if (!empty($_GET['declined_search'])) {
     $search = "%" . $_GET['declined_search'] . "%";
     $declined_sql .= " AND (
-        student_id LIKE ?
-        OR student_name LIKE ?
+        faculty_id LIKE ?
+        OR faculty_name LIKE ?
         OR equipment_name LIKE ?
     ) ORDER BY request_date DESC";
     $stmt = $conn->prepare($declined_sql);
@@ -319,11 +319,11 @@ $archive_sql = "
 $archive_result = mysqli_query($conn, $archive_sql);
 
 
-$raw_data_sql = "SELECT student_id, student_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
+$raw_data_sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
 
 if (!empty($_GET['raw_search'])) {
     $search = "%" . $_GET['raw_search'] . "%";
-    $raw_data_sql .= " WHERE student_name LIKE ? OR equipment_name LIKE ? OR student_id LIKE ? ORDER BY request_date DESC";
+    $raw_data_sql .= " WHERE faculty_name LIKE ? OR equipment_name LIKE ? OR faculty_id LIKE ? ORDER BY request_date DESC";
     $stmt = $conn->prepare($raw_data_sql);
     $stmt->bind_param("sss", $search, $search, $search);
     $stmt->execute();

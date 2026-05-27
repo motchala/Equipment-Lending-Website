@@ -354,6 +354,22 @@ INSERT IGNORE INTO `tbl_arbitration_config` (`config_key`, `config_value`) VALUE
   ('rule_duplicate_block_enabled',  '1'),
   ('rule_missing_doc_block_enabled','1');
 
+  -- ── tbl_users ──────────────────────────────────────────────────
+ALTER TABLE tbl_users
+  CHANGE COLUMN student_id  faculty_id    VARCHAR(255) NOT NULL,
+  CHANGE COLUMN year_level  faculty_rank  VARCHAR(20)  DEFAULT NULL,
+  CHANGE COLUMN program     department    VARCHAR(50)  DEFAULT NULL;
+
+-- ── tbl_requests ───────────────────────────────────────────────
+ALTER TABLE tbl_requests
+  CHANGE COLUMN student_id    faculty_id    VARCHAR(50)  NOT NULL,
+  CHANGE COLUMN student_name  faculty_name  VARCHAR(255) NOT NULL;
+
+-- ── tbl_room_reservations ──────────────────────────────────────
+ALTER TABLE tbl_room_reservations
+  CHANGE COLUMN student_id    faculty_id    VARCHAR(50)  NOT NULL,
+  CHANGE COLUMN student_name  faculty_name  VARCHAR(100) NOT NULL;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

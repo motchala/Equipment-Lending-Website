@@ -1,4 +1,8 @@
 <?php
+declare(strict_types=1);
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+ob_start();
 /**
  * ajax/admin-override.php
  *
@@ -19,16 +23,14 @@
  *   13.6 — Reject override if item quantity = 0 with "Cannot override: item is out of stock."
  */
 
-declare(strict_types=1);
 
 date_default_timezone_set('Asia/Manila');
 
 // ── Output buffering + JSON header ───────────────────────────────────────────
-ob_start();
 header('Content-Type: application/json');
 
 // ── Helper: send a JSON response and exit ────────────────────────────────────
-function send_json(int $http_status, string $status, string $message): never
+function send_json(int $http_status, string $status, string $message): void
 {
     ob_end_clean();
     http_response_code($http_status);
@@ -83,12 +85,11 @@ $conn->set_charset('utf8mb4');
 // ── Task 7.2d: Verify request exists and fetch its data ──────────────────────
 $fetch_stmt = $conn->prepare(
     "SELECT r.id,
-            r.student_id,
-            r.equipment_name,
-            r.status,
-            u.fullname AS borrower_name
+            r.faculty_id,
+            faculty_name,
+            equipment_name,
+            status
        FROM tbl_requests r
-  LEFT JOIN tbl_users u ON u.student_id = r.student_id
       WHERE r.id = ?
       LIMIT 1"
 );
@@ -112,8 +113,8 @@ if ($request === null || $request === false) {
     send_json(404, 'error', 'Request not found.');
 }
 
-$borrower_id    = (string)$request['student_id'];
-$borrower_name  = (string)($request['borrower_name'] ?? '');
+$borrower_id    = (string)$request['faculty_id'];
+$borrower_name  = (string)($request['faculty_name'] ?? '');
 $equipment_name = (string)$request['equipment_name'];
 
 // ── Begin transaction — wraps status UPDATE, inventory decrement, and log INSERT
