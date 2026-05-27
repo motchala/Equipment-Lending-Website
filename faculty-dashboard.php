@@ -10,7 +10,7 @@ $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 $conn = mysqli_connect("localhost", "root", "", "lending_db");
 if (!$conn) die("Connection failed: " . mysqli_connect_error());
 
-require_once __DIR__ . '/includes/auto-approve-functions.php';
+require_once __DIR__ . '/includes/arbitration-engine.php';
 
 function maskEmail($email)
 {
@@ -46,11 +46,49 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $current_date   = date('Y-m-d');
     if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
     if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+    // ── Document upload validation ─────────────────────────────────────────────
+    $document_path = null;
+    if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
+        if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
+            die("File upload error. Please try again.");
+        }
+        if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
+            die("File too large. Maximum size is 5 MB.");
+        }
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
+        finfo_close($finfo);
+        $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!in_array($mime, $allowed_mimes, true)) {
+            die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
+        }
+        // $document_path will be set in the next step after successful INSERT
+    }
     $insert = "INSERT INTO tbl_requests (student_name,student_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
                VALUES ('$student_name','$student_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
     if (mysqli_query($conn, $insert)) {
         $new_request_id = mysqli_insert_id($conn);
-        processAutoApprove($conn, $new_request_id);
+
+        // ── Move uploaded document and update document_path ────────────────────
+        if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] === UPLOAD_ERR_OK) {
+            $orig_name   = basename($_FILES['request_document']['name']);
+            $safe_name   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
+            $dest_name   = time() . '_' . $student_id . '_' . $safe_name;
+            $dest_dir    = __DIR__ . '/uploads/request_letters/';
+            $dest_path   = $dest_dir . $dest_name;
+            $rel_path    = 'uploads/request_letters/' . $dest_name;
+
+            if (move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
+                $stmt_doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
+                if ($stmt_doc) {
+                    $stmt_doc->bind_param('si', $rel_path, $new_request_id);
+                    $stmt_doc->execute();
+                    $stmt_doc->close();
+                }
+            }
+        }
+
+        ArbitrationEngine::process($conn, $new_request_id);
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else die("Error processing request: " . mysqli_error($conn));
@@ -607,7 +645,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             <span class="material-symbols-outlined">inventory_2</span>
                             <span id="selectedItemLabel">No item selected</span>
                         </div>
-                        <form id="borrowForm" method="POST" action="">
+                        <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
                             <input type="hidden" name="equipment_name" id="selectedItem">
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <div class="form-group">
@@ -623,6 +661,11 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                     <label class="form-label">Return Date</label>
                                     <input type="date" name="return_date" id="return_date" class="form-input" required>
                                 </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="request_document">Request Letter <span style="font-size:0.8em;color:var(--text-light);">(Optional — PDF, JPG, PNG, WEBP; max 5 MB)</span></label>
+                                <input type="file" id="request_document" name="request_document" accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom">
+                                <small style="color:var(--text-light);font-size:0.75rem;">Required for high-value equipment or organization borrowing.</small>
                             </div>
                             <button type="submit" class="btn-submit-form">
                                 <span class="material-symbols-outlined">send</span> Submit Borrow Request

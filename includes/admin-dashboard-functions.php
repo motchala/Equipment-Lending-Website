@@ -13,177 +13,6 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// ================= AUTO-APPROVE HELPER FUNCTIONS =================
-
-/**
- * Returns the current auto-approve toggle state from the database.
- * Queries the settings row (id=1) and returns 1 if enabled, 0 otherwise.
- *
- * @param  mysqli $conn  Active DB connection
- * @return int           1 if auto-approve is ON, 0 if OFF or row absent
- */
-
-function getAutoApproveEnabled(mysqli $conn): int
-{
-    $config_path = __DIR__ . '/auto_approve_config.json';
-    if (!file_exists($config_path)) return 0;
-    $config = json_decode(file_get_contents($config_path), true);
-    return (int)($config['is_enabled'] ?? 0);
-}
-
-/**
- * Returns the list of item names currently marked for auto-approval.
- * Queries all rows where is_auto_approved = 1 and returns their item_name values.
- *
- * @param  mysqli   $conn  Active DB connection
- * @return string[]        Flat array of item name strings; empty array if none
- */
-function getAutoApproveItems(mysqli $conn): array
-{
-    $config_path = __DIR__ . '/auto_approve_config.json';
-    if (!file_exists($config_path)) return [];
-    $config = json_decode(file_get_contents($config_path), true);
-    return $config['items'] ?? [];
-}
-
-
-// ================= AUTO-APPROVAL ENGINE =================
-
-/**
- * Evaluates a newly inserted borrow request for auto-approval.
- * Approves, declines, or leaves as Waiting based on toggle state,
- * item set membership, and current stock.
- *
- * Logic flow:
- *  1. Fetch request row — bail if not found or status !== 'Waiting'
- *  2. Read is_enabled from settings (id=1) — bail if OFF or row absent
- *  3. Read auto-approved item set — bail if equipment_name not in set
- *  4. Check is_archived on tbl_inventory — bail if archived or not found
- *  5. Read quantity — if 0, decline with out-of-stock reason and return
- *  6. Approve: UPDATE tbl_requests SET status='Approved', reason=NULL
- *  7. Decrement: UPDATE tbl_inventory SET quantity=quantity-1
- *  8. If new quantity = 0, cascade-decline all remaining Waiting requests for that item
- *
- * @param mysqli $conn        Active DB connection
- * @param int    $request_id  The id of the newly inserted tbl_requests row
- */
-function processAutoApprove(mysqli $conn, int $request_id): void
-{
-
-    // ── Step 1: Fetch the request row ────────────────────────────────────────
-    $stmt = $conn->prepare("SELECT equipment_name, status FROM tbl_requests WHERE id = ?");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->bind_param("i", $request_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $request = $result->fetch_assoc();
-    $stmt->close();
-
-    if (!$request || $request['status'] !== 'Waiting') {
-        return;
-    }
-
-    $equipment_name = $request['equipment_name'];
-
-    // ── Step 2: Read is_enabled from settings row (id=1) ─────────────────────
-    $stmt = $conn->prepare("SELECT is_enabled FROM tbl_auto_approve_settings WHERE id = 1");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $settings = $result->fetch_assoc();
-    $stmt->close();
-
-    if (!$settings || (int) $settings['is_enabled'] === 0) {
-        return;
-    }
-
-    // ── Step 3: Read auto-approved item set; bail if item not in set ──────────
-    $stmt = $conn->prepare("SELECT item_name FROM tbl_auto_approve_settings WHERE is_auto_approved = 1");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $auto_approve_items = [];
-    while ($row = $result->fetch_assoc()) {
-        $auto_approve_items[] = $row['item_name'];
-    }
-    $stmt->close();
-
-    if (!in_array($equipment_name, $auto_approve_items, true)) {
-        return;
-    }
-
-    // ── Step 4: Check is_archived on tbl_inventory ────────────────────────────
-    $stmt = $conn->prepare("SELECT is_archived, quantity FROM tbl_inventory WHERE item_name = ?");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->bind_param("s", $equipment_name);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $inventory = $result->fetch_assoc();
-    $stmt->close();
-
-    if (!$inventory || (int) $inventory['is_archived'] === 1) {
-        return;
-    }
-
-    // ── Step 5: Check quantity; decline if out of stock ───────────────────────
-    $quantity = (int) $inventory['quantity'];
-
-    if ($quantity === 0) {
-        $reason = 'Out of stock – maximum approved requests reached';
-        $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined', reason = ? WHERE id = ?");
-        if (!$stmt) {
-            return;
-        }
-        $stmt->bind_param("si", $reason, $request_id);
-        $stmt->execute();
-        $stmt->close();
-        return;
-    }
-
-    // ── Step 6: Approve the request ───────────────────────────────────────────
-    $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Approved', reason = NULL WHERE id = ?");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->bind_param("i", $request_id);
-    $stmt->execute();
-    $stmt->close();
-
-    // ── Step 7: Decrement inventory quantity ──────────────────────────────────
-    $stmt = $conn->prepare("UPDATE tbl_inventory SET quantity = quantity - 1 WHERE item_name = ?");
-    if (!$stmt) {
-        return;
-    }
-    $stmt->bind_param("s", $equipment_name);
-    $stmt->execute();
-    $stmt->close();
-
-    // ── Step 8: Cascade-decline remaining Waiting requests if stock is now 0 ──
-    $new_quantity = $quantity - 1;
-
-    if ($new_quantity === 0) {
-        $reason = 'Out of stock – maximum approved requests reached';
-        $stmt = $conn->prepare(
-            "UPDATE tbl_requests SET status = 'Declined', reason = ? WHERE equipment_name = ? AND status = 'Waiting'"
-        );
-        if (!$stmt) {
-            return;
-        }
-        $stmt->bind_param("ss", $reason, $equipment_name);
-        $stmt->execute();
-        $stmt->close();
-    }
-}
-
-
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {
     header('Content-Type: application/json');
@@ -234,58 +63,6 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
 }
 
 
-// ================= AJAX TOGGLE AUTO APPROVE =================
-if (isset($_POST['action']) && $_POST['action'] === 'toggle_auto_approve') {
-    header('Content-Type: application/json');
-    $enabled = isset($_POST['enabled']) ? intval($_POST['enabled']) : 0;
-    $enabled = ($enabled >= 1) ? 1 : 0;
-
-    $config_path = __DIR__ . '/auto_approve_config.json';
-    $config = file_exists($config_path)
-        ? json_decode(file_get_contents($config_path), true)
-        : ['is_enabled' => 0, 'items' => []];
-
-    $config['is_enabled'] = $enabled;
-
-    if (file_put_contents($config_path, json_encode($config)) !== false) {
-        echo json_encode(['status' => 'success', 'enabled' => $enabled]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Could not write config file.']);
-    }
-    exit();
-}
-
-
-// ================= AJAX: UPDATE AUTO-APPROVE ITEMS =================
-if (isset($_POST['action']) && $_POST['action'] === 'update_auto_approve_items') {
-    header('Content-Type: application/json');
-
-    $config_path = __DIR__ . '/auto_approve_config.json';
-    $config = file_exists($config_path)
-        ? json_decode(file_get_contents($config_path), true)
-        : ['is_enabled' => 0, 'items' => []];
-
-    $saved_items = [];
-    if (!empty($_POST['items']) && is_array($_POST['items'])) {
-        foreach ($_POST['items'] as $raw_item) {
-            $item_name = trim($raw_item);
-            if ($item_name !== '') {
-                $saved_items[] = $item_name;
-            }
-        }
-    }
-
-    $config['items'] = $saved_items;
-
-    if (file_put_contents($config_path, json_encode($config)) !== false) {
-        echo json_encode(['status' => 'success', 'items' => $saved_items]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Could not write config file.']);
-    }
-    exit();
-}
-
-
 // ================= AUTO DECLINE EXPIRED REQUESTS =================
 
 $today = date('Y-m-d');
@@ -309,110 +86,6 @@ mysqli_query($conn, "
     WHERE status = 'Approved'
     AND return_date < '$today'
 ");
-
-
-// ================= HANDLE APPROVE / DECLINE ACTIONS =================
-
-if (isset($_GET['action'], $_GET['id'])) {
-    $request_id = (int) $_GET['id'];
-    $action = $_GET['action'];
-
-    if ($action === 'approve') {
-
-        // Get equipment name
-        $stmt_req = $conn->prepare("
-            SELECT equipment_name
-            FROM tbl_requests
-            WHERE id = ?
-        ");
-        $stmt_req->bind_param("i", $request_id);
-        $stmt_req->execute();
-        $req_result = $stmt_req->get_result();
-        $request = $req_result->fetch_assoc();
-
-        if (!$request) {
-            header("Location: admin-dashboard.php");
-            exit();
-        }
-
-        $equipment_name = $request['equipment_name'];
-
-        // Get current stock quantity
-        $stmt_stock = $conn->prepare("
-            SELECT quantity
-            FROM tbl_inventory
-            WHERE item_name = ?
-        ");
-        $stmt_stock->bind_param("s", $equipment_name);
-        $stmt_stock->execute();
-        $stock_result = $stmt_stock->get_result();
-        $stock = $stock_result->fetch_assoc();
-
-        if (!$stock) {
-            header("Location: admin-dashboard.php");
-            exit();
-        }
-
-        $current_quantity = (int) $stock['quantity'];
-
-        if ($current_quantity > 0) {
-
-            // Approve this request
-            $stmt_approve = $conn->prepare("
-                UPDATE tbl_requests
-                SET status = 'Approved', reason = NULL
-                WHERE id = ?
-            ");
-            $stmt_approve->bind_param("i", $request_id);
-            $stmt_approve->execute();
-
-            // Deduct stock
-            $stmt_deduct = $conn->prepare("
-                UPDATE tbl_inventory
-                SET quantity = quantity - 1
-                WHERE item_name = ?
-            ");
-            $stmt_deduct->bind_param("s", $equipment_name);
-            $stmt_deduct->execute();
-
-            // AUTO-DECLINE remaining WAITING requests if stock is now depleted
-            if (($current_quantity - 1) <= 0) {
-
-                $reason = "Out of stock – maximum approved requests reached";
-
-                $stmt_auto_decline = $conn->prepare("
-                    UPDATE tbl_requests
-                    SET status = 'Declined', reason = ?
-                    WHERE equipment_name = ?
-                    AND status = 'Waiting'
-                ");
-                $stmt_auto_decline->bind_param("ss", $reason, $equipment_name);
-                $stmt_auto_decline->execute();
-            }
-        } else {
-
-            // No stock left → decline this request
-            $reason = "Out of stock – maximum approved requests reached";
-
-            $stmt_decline = $conn->prepare("
-                UPDATE tbl_requests
-                SET status = 'Declined', reason = ?
-                WHERE id = ?
-            ");
-            $stmt_decline->bind_param("si", $reason, $request_id);
-            $stmt_decline->execute();
-        }
-
-        header("Location: admin-dashboard.php#lending-waiting");
-        exit();
-    } elseif ($action === 'decline') {
-        $stmt = $conn->prepare("UPDATE tbl_requests SET status = 'Declined' WHERE id = ?");
-        $stmt->bind_param("i", $request_id);
-        $stmt->execute();
-        header("Location: admin-dashboard.php#lending-declined");
-        exit();
-    }
-}
 
 
 // ================= ADD ITEM =================
@@ -709,5 +382,37 @@ if (empty($_SESSION['admin_last_login']) && $admin_email === 'main@admin.edu') {
         }
     }
 }
+
+// ================= FETCH ARBITRATION LOG =================
+
+$arb_log_sql = "SELECT * FROM tbl_arbitration_log";
+
+if (!empty($_GET['arb_log_search'])) {
+    $search = "%" . $_GET['arb_log_search'] . "%";
+    $arb_log_sql .= " WHERE (
+        borrower_name LIKE ?
+        OR borrower_id LIKE ?
+        OR equipment_name LIKE ?
+    ) ORDER BY created_at DESC";
+    $stmt = $conn->prepare($arb_log_sql);
+    $stmt->bind_param("sss", $search, $search, $search);
+    $stmt->execute();
+    $arb_log_result = $stmt->get_result();
+} else {
+    $arb_log_sql .= " ORDER BY created_at DESC";
+    $arb_log_result = mysqli_query($conn, $arb_log_sql);
+}
+
+
+// ================= LOAD ARBITRATION CONFIG =================
+
+$arb_config = [];
+$arb_config_result = mysqli_query($conn, "SELECT config_key, config_value FROM tbl_arbitration_config");
+if ($arb_config_result) {
+    while ($row = mysqli_fetch_assoc($arb_config_result)) {
+        $arb_config[$row['config_key']] = $row['config_value'];
+    }
+}
+
 
 $init_view = $_GET['view'] ?? 'dashboard';

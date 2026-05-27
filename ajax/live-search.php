@@ -21,7 +21,7 @@ switch ($section) {
 
         if ($result->num_rows === 0) {
             echo "<tr>
-                    <td colspan='7' class='text-center text-muted py-5'>
+                    <td colspan='6' class='text-center text-muted py-5'>
                         <i class='bi bi-inbox fs-1 d-block mb-2'></i>
                         No matching results found.
                     </td>
@@ -42,14 +42,6 @@ switch ($section) {
                 <td>" . date('M d, Y', strtotime($row['return_date'])) . "</td>
                 <td>
                     <span class='badge bg-warning text-dark px-3 py-2'>{$row['status']}</span>
-                </td>
-                <td>
-                    <a href='admin-dashboard.php?action=approve&id={$row['id']}' class='btn btn-success btn-sm btn-circle-sm'>
-                        <i class='bi bi-check-lg'></i>
-                    </a>
-                    <a href='admin-dashboard.php?action=decline&id={$row['id']}' class='btn btn-danger btn-sm btn-circle-sm ms-1'>
-                        <i class='bi bi-x-lg'></i>
-                    </a>
                 </td>
             </tr>";
         }
