@@ -1005,8 +1005,9 @@
 
         // Filter
         const filtered = _reqCurrentFilter === 'All' ? data : data.filter(r => {
-            if (_reqCurrentFilter === 'Waiting') return r.status === 'Waiting';
-            return r.status === _reqCurrentFilter;
+            const s = (r.status || '').trim();
+            if (_reqCurrentFilter === 'Waiting') return s === 'Waiting';
+            return s === _reqCurrentFilter;
         });
 
         if (filtered.length === 0) {
@@ -1050,7 +1051,9 @@
     }
 
     function checkOverdueState() {
-        const overdueCount = (window.REQUESTS_DATA || []).filter(r => r.status === 'Overdue').length;
+         const overdueCount = (typeof window.OVERDUE_COUNT !== 'undefined')
+            ? window.OVERDUE_COUNT
+            : (window.REQUESTS_DATA || []).filter(r => (r.status || '').trim() === 'Overdue').length;
         // Update overdue stat value
         const statEl = document.getElementById('statOverdueVal');
         if (statEl) statEl.textContent = overdueCount;
