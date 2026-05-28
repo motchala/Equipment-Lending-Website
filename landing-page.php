@@ -112,7 +112,7 @@ if (isset($_POST['login'])) {
 
     // ===== FACULTY LOGIN (borrower — uses tbl_users, goes to faculty-dashboard) =====
     elseif ($user_type === 'student') {
-        $stmt = $conn->prepare("SELECT student_id, fullname, password FROM tbl_users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT faculty_id, fullname, password FROM tbl_users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -120,7 +120,7 @@ if (isset($_POST['login'])) {
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
-                $_SESSION['faculty_id'] = $user['student_id'];
+                $_SESSION['faculty_id'] = $user['faculty_id'];
                 $_SESSION['faculty_name'] = $user['fullname'];
                 $_SESSION['faculty_email'] = $email;
                 $_SESSION['login_time'] = time();

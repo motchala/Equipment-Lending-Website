@@ -13,8 +13,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     exit();
 }
 
-$auto_approve_enabled = getAutoApproveEnabled($conn);
-$auto_approve_items   = getAutoApproveItems($conn);
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -288,7 +286,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                             <div class="activity-item">
                                 <div class="activity-dot <?php echo $dotClass; ?>"></div>
                                 <div class="activity-info">
-                                    <h4><?php echo htmlspecialchars($r['student_name']); ?></h4>
+                                    <h4><?php echo htmlspecialchars($r['faculty_name']); ?></h4>
                                     <p><?php echo htmlspecialchars($r['equipment_name']); ?> &mdash; <?php echo htmlspecialchars($r['status']); ?></p>
                                 </div>
                                 <span class="activity-time"><?php echo date('M d', strtotime($r['request_date'])); ?></span>
@@ -394,6 +392,22 @@ $auto_approve_items   = getAutoApproveItems($conn);
                     </svg>
                     Raw Data
                 </button>
+                <button class="lending-nav-btn" data-lending-nav="arb-log">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="9" y1="13" x2="15" y2="13" />
+                        <line x1="9" y1="17" x2="15" y2="17" />
+                    </svg>
+                    Arbitration Log
+                </button>
+                <button class="lending-nav-btn" data-lending-nav="arb-config">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    Config Panel
+                </button>
             </div>
 
             <!-- ── BORROW REQUESTS ────────────────────────────────────── -->
@@ -428,33 +442,6 @@ $auto_approve_items   = getAutoApproveItems($conn);
                             <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
                         </button>
                     </div>
-                    <button
-                        class="auto-approve-toggle auto-approve-<?= $auto_approve_enabled ? 'on' : 'off' ?>"
-                        data-action="toggle-auto-approve"
-                        data-enabled="<?= $auto_approve_enabled ? '1' : '0' ?>"
-                        aria-pressed="<?= $auto_approve_enabled ? 'true' : 'false' ?>">Auto-Approve: <?= $auto_approve_enabled ? 'ON' : 'OFF' ?></button>
-                </div>
-                <?php
-                $checklist_result = $conn->query("SELECT item_name FROM tbl_inventory WHERE is_archived = 0 ORDER BY item_name ASC");
-                $inventory_items_for_checklist = [];
-                while ($row = $checklist_result->fetch_assoc()) {
-                    $inventory_items_for_checklist[] = $row;
-                }
-                ?>
-                <div id="auto-approve-checklist" <?= $auto_approve_enabled ? '' : 'style="display:none"' ?>>
-                    <?php foreach ($inventory_items_for_checklist as $item): ?>
-                        <label>
-                            <input
-                                type="checkbox"
-                                data-action="toggle-auto-approve-item"
-                                data-item="<?= htmlspecialchars($item['item_name']) ?>"
-                                <?= in_array($item['item_name'], $auto_approve_items) ? 'checked' : '' ?>>
-                            <?= htmlspecialchars($item['item_name']) ?>
-                        </label>
-                    <?php endforeach; ?>
-                    <p class="auto-approve-empty-msg" <?= !empty($auto_approve_items) ? 'style="display:none"' : '' ?>>
-                        No items selected for auto-approval. Check items above to enable automatic approval.
-                    </p>
                 </div>
 
                 <!-- Pending Approval sub-panel -->
@@ -479,7 +466,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                         <th>Borrow Date</th>
                                         <th>Return Date</th>
                                         <th>Status</th>
-                                        <th>Actions</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="waiting-body">
@@ -497,8 +484,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                             $isPast = strtotime($r['borrow_date']) < strtotime($today);
                                         ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td style="<?php echo $isPast ? 'color:var(--danger);font-weight:600;' : '' ?>">
                                                     <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
@@ -506,20 +493,19 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                                 </td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
                                                 <td><span class="status-pill pill-waiting">Pending</span></td>
-                                                <td class="action-cell">
-                                                    <div class="action-btns">
-                                                        <a href="admin-dashboard.php?action=approve&id=<?php echo $r['id']; ?>" class="btn-action btn-approve" title="Approve">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <polyline points="20 6 9 17 4 12" />
-                                                            </svg>
-                                                        </a>
-                                                        <a href="admin-dashboard.php?action=decline&id=<?php echo $r['id']; ?>" class="btn-action btn-decline" title="Decline" onclick="return confirm('Decline this request?')">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                                            </svg>
-                                                        </a>
-                                                    </div>
+                                                <td>
+                                                    <button class="btn-action btn-override-req"
+                                                        data-action="open-override"
+                                                        data-request-id="<?php echo $r['id']; ?>"
+                                                        data-request-status="Waiting"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                        title="Override this request">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                        </svg>
+                                                    </button>
                                                 </td>
                                             </tr>
                                     <?php endwhile;
@@ -572,8 +558,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
                                         ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td style="<?php echo $isOverdue ? 'color:var(--danger);font-weight:600;' : '' ?>">
@@ -586,7 +572,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                                         <a href="admin-dashboard.php?action=return_confirm&id=<?php echo $r['id']; ?>"
                                                             class="btn-return-confirm"
                                                             title="Confirm item has been returned"
-                                                            onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['student_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
+                                                            onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['faculty_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
                                                                 <polyline points="1 4 1 10 7 10" />
                                                                 <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
@@ -672,8 +658,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($approved_result)): ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
@@ -720,8 +706,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($declined_result)): ?>
                                             <tr>
-                                                <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
@@ -1026,8 +1012,8 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                     </tr>
                                     <?php else: while ($r = mysqli_fetch_assoc($raw_data_result)): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($r['student_id']); ?></td>
-                                            <td class="fw-bold"><?php echo htmlspecialchars($r['student_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                            <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                             <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                             <td><?php echo htmlspecialchars($r['instructor']); ?></td>
                                             <td><?php echo htmlspecialchars($r['room']); ?></td>
@@ -1042,6 +1028,222 @@ $auto_approve_items   = getAutoApproveItems($conn);
                     </div>
                 </div>
             </div><!-- /lending-raw -->
+
+            <!-- ── ARBITRATION LOG ───────────────────────────────────── -->
+            <div class="lending-sub" id="lending-arb-log">
+                <div class="page-header">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="9" y1="13" x2="15" y2="13" />
+                            <line x1="9" y1="17" x2="15" y2="17" />
+                        </svg>Arbitration Log</h2>
+                    <p>Audit trail of all automated decisions made by the Arbitration Engine.</p>
+                </div>
+                <div class="eq-card">
+                    <div class="search-row">
+                        <div class="search-wrap">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                            <input type="text" id="arbLogSearch" placeholder="Search by borrower name, ID, or equipment...">
+                        </div>
+                    </div>
+                    <div class="tbl-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Request ID</th>
+                                    <th>Borrower Name</th>
+                                    <th>Borrower ID</th>
+                                    <th>Equipment</th>
+                                    <th>Decision</th>
+                                    <th>Rule Applied</th>
+                                    <th>Reason</th>
+                                    <th>Timestamp</th>
+                                    <th>Override</th>
+                                </tr>
+                            </thead>
+                            <tbody id="arb-log-body">
+                                <?php if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0): ?>
+                                    <tr>
+                                        <td colspan="9" class="text-muted" style="text-align:center;padding:2.5rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="display:block;margin:0 auto 10px;opacity:0.3;">
+                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                <polyline points="14 2 14 8 20 8" />
+                                                <line x1="9" y1="13" x2="15" y2="13" />
+                                                <line x1="9" y1="17" x2="15" y2="17" />
+                                            </svg>
+                                            No arbitration log entries yet.
+                                        </td>
+                                    </tr>
+                                <?php else: while ($r = mysqli_fetch_assoc($arb_log_result)): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($r['request_id']); ?></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($r['borrower_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($r['borrower_id']); ?></td>
+                                        <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                        <td>
+                                            <?php
+                                            $dec = $r['decision'];
+                                            if ($dec === 'Approved') {
+                                                echo '<span class="status-pill pill-approved">Approved</span>';
+                                            } elseif ($dec === 'Declined') {
+                                                echo '<span class="status-pill pill-declined">Declined</span>';
+                                            } else {
+                                                echo '<span class="status-pill pill-waiting">' . htmlspecialchars($dec) . '</span>';
+                                            }
+                                            ?>
+                                        </td>
+                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?></td>
+                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['reason'] ?? '—'); ?></td>
+                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo date('M d, Y g:i A', strtotime($r['created_at'])); ?></td>
+                                        <td>
+                                            <button class="btn-action btn-override-req"
+                                                data-action="open-override"
+                                                data-request-id="<?php echo $r['request_id']; ?>"
+                                                data-request-status="<?php echo htmlspecialchars($r['decision']); ?>"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['borrower_name']); ?>"
+                                                title="Override this decision">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endwhile;
+                                endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /lending-arb-log -->
+
+            <!-- ── ARBITRATION CONFIG PANEL ──────────────────────────── -->
+            <div class="lending-sub" id="lending-arb-config">
+                <div class="page-header">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>Config Panel</h2>
+                    <p>Configure arbitration rules, role priorities, and high-value item designations.</p>
+                </div>
+
+                <div class="eq-card form-card">
+                    <div class="form-card-body">
+                        <form id="arbConfigForm">
+
+                            <!-- Role Priority -->
+                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;">Role Priority</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Director</label>
+                                    <input type="number" name="config[role_priority_director]" class="form-control-custom" min="1" max="10"
+                                        value="<?php echo htmlspecialchars($arb_config['role_priority_director'] ?? 4); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label>Adviser</label>
+                                    <input type="number" name="config[role_priority_adviser]" class="form-control-custom" min="1" max="10"
+                                        value="<?php echo htmlspecialchars($arb_config['role_priority_adviser'] ?? 3); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label>Regular Faculty</label>
+                                    <input type="number" name="config[role_priority_faculty]" class="form-control-custom" min="1" max="10"
+                                        value="<?php echo htmlspecialchars($arb_config['role_priority_faculty'] ?? 2); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label>Student Representative</label>
+                                    <input type="number" name="config[role_priority_student]" class="form-control-custom" min="1" max="10"
+                                        value="<?php echo htmlspecialchars($arb_config['role_priority_student'] ?? 1); ?>">
+                                </div>
+                            </div>
+
+                            <!-- Tie-Break Window -->
+                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">Tie-Break Window</h3>
+                            <div class="form-group" style="max-width:260px;">
+                                <label>Window (seconds)</label>
+                                <input type="number" name="config[tie_break_window_seconds]" class="form-control-custom" min="1"
+                                    value="<?php echo htmlspecialchars($arb_config['tie_break_window_seconds'] ?? 5); ?>">
+                            </div>
+
+                            <!-- High-Value Items -->
+                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">High-Value Items</h3>
+                            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Items checked here require a signed request letter.</p>
+                            <div class="form-group">
+                                <?php
+                                mysqli_data_seek($inventory_result, 0);
+                                while ($item = mysqli_fetch_assoc($inventory_result)):
+                                    $checked = ($item['is_high_value'] == 1) ? 'checked' : '';
+                                ?>
+                                    <label style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;font-size:0.88rem;cursor:pointer;">
+                                        <input type="checkbox" name="config[high_value_items][]"
+                                            value="<?php echo htmlspecialchars($item['item_id']); ?>"
+                                            <?php echo $checked; ?>>
+                                        <?php echo htmlspecialchars($item['item_name']); ?>
+                                    </label>
+                                <?php endwhile; ?>
+                            </div>
+
+                            <!-- Rule Toggles -->
+                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">Auto-Decline Rules</h3>
+                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+                                <div>
+                                    <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Overdue Block</h4>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline requests from borrowers with overdue items.</p>
+                                </div>
+                                <label class="toggle-sw">
+                                    <input type="checkbox" name="config[rule_overdue_block_enabled]" value="1"
+                                        <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <span class="toggle-track"></span>
+                                </label>
+                            </div>
+                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+                                <div>
+                                    <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Duplicate Block</h4>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline duplicate active requests for the same equipment.</p>
+                                </div>
+                                <label class="toggle-sw">
+                                    <input type="checkbox" name="config[rule_duplicate_block_enabled]" value="1"
+                                        <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <span class="toggle-track"></span>
+                                </label>
+                            </div>
+                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;">
+                                <div>
+                                    <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Missing Document Block</h4>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Hold requests for high-value items or organization borrowing without a signed letter.</p>
+                                </div>
+                                <label class="toggle-sw">
+                                    <input type="checkbox" name="config[rule_missing_doc_block_enabled]" value="1"
+                                        <?php echo (($arb_config['rule_missing_doc_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <span class="toggle-track"></span>
+                                </label>
+                            </div>
+
+                            <!-- Submit -->
+                            <div style="margin-top:1.5rem;">
+                                <button type="button" id="saveArbConfig" class="btn-submit-form">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                        <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                    Save Arbitration Settings
+                                </button>
+                                <div id="arbConfigMsg" style="display:none;margin-top:0.75rem;" class="alert-banner alert-success">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                        <polyline points="22 4 12 14.01 9 11.01" />
+                                    </svg>
+                                    Arbitration settings saved.
+                                </div>
+                            </div>
+
+                        </form>
+                    </div>
+                </div>
+            </div><!-- /lending-arb-config -->
 
         </div><!-- /panel-lending -->
 
@@ -1433,7 +1635,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                             </div>
                             <div class="notif-body-wrap">
                                 <h4>Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                                <p><strong><?php echo htmlspecialchars($on['student_name']); ?></strong> has not returned this item. <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
+                                <p><strong><?php echo htmlspecialchars($on['faculty_name']); ?></strong> has not returned this item. <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
                             </div>
                             <div class="notif-meta">
                                 <span class="notif-time">Due <?php echo date('M d', strtotime($on['return_date'])); ?></span>
@@ -1445,7 +1647,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         </div>
                         <div class="notif-card-detail">
                             <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($on['student_name']); ?> (<?php echo htmlspecialchars($on['student_id']); ?>)</span></div>
+                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($on['faculty_name']); ?> (<?php echo htmlspecialchars($on['faculty_id']); ?>)</span></div>
                                 <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($on['equipment_name']); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Due Date</span><span class="ndv" style="color:#e65100;font-weight:600;"><?php echo date('M d, Y', strtotime($on['return_date'])); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Days Overdue</span><span class="ndv" style="color:#e65100;font-weight:700;"><?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?></span></div>
@@ -1483,7 +1685,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                             </div>
                             <div class="notif-body-wrap">
                                 <h4>New Borrow Request</h4>
-                                <p><strong><?php echo htmlspecialchars($wn['student_name']); ?></strong> requested <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> — awaiting approval.</p>
+                                <p><strong><?php echo htmlspecialchars($wn['faculty_name']); ?></strong> requested <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> — awaiting approval.</p>
                             </div>
                             <div class="notif-meta">
                                 <span class="notif-time"><?php echo date('M d', strtotime($wn['request_date'])); ?></span>
@@ -1495,7 +1697,7 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         </div>
                         <div class="notif-card-detail">
                             <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($wn['student_name']); ?> (<?php echo htmlspecialchars($wn['student_id']); ?>)</span></div>
+                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($wn['faculty_name']); ?> (<?php echo htmlspecialchars($wn['faculty_id']); ?>)</span></div>
                                 <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($wn['equipment_name']); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['borrow_date'])); ?></span></div>
                                 <div class="notif-detail-row"><span class="ndl">Return Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['return_date'])); ?></span></div>
@@ -1503,19 +1705,6 @@ $auto_approve_items   = getAutoApproveItems($conn);
                                 <div class="notif-detail-row"><span class="ndl">Room / Instructor</span><span class="ndv"><?php echo htmlspecialchars($wn['room'] ?? '—'); ?> / <?php echo htmlspecialchars($wn['instructor'] ?? '—'); ?></span></div>
                             </div>
                             <div class="notif-card-actions">
-                                <a href="admin-dashboard.php?action=approve&id=<?php echo $wn['id']; ?>" class="notif-action-btn notif-action-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                    Approve
-                                </a>
-                                <a href="admin-dashboard.php?action=decline&id=<?php echo $wn['id']; ?>" class="notif-action-btn notif-action-danger" onclick="return confirm('Decline this request?')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                        <line x1="18" y1="6" x2="6" y2="18" />
-                                        <line x1="6" y1="6" x2="18" y2="18" />
-                                    </svg>
-                                    Decline
-                                </a>
                                 <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
                             </div>
                         </div>
@@ -1932,6 +2121,50 @@ $auto_approve_items   = getAutoApproveItems($conn);
                         <button type="submit" class="btn-submit-form" style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Override Modal -->
+    <div class="modal-overlay" id="overrideModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center;">
+        <div class="modal-backdrop" id="overrideModalBackdrop" style="position:absolute;inset:0;"></div>
+        <div class="eq-card form-card" style="position:relative;width:100%;max-width:440px;margin:20px;z-index:100000;">
+            <div class="form-card-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Override Request
+                </h2>
+                <button type="button" class="btn-close-custom" id="closeOverrideModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            <div class="form-card-body">
+                <div id="override-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:0.85rem;font-weight:500;"></div>
+                <p id="overrideDesc" style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <div class="form-group" id="overrideStatusGroup" style="display:none;">
+                    <label>New Status</label>
+                    <select id="overrideNewStatus" class="form-control-custom">
+                        <option value="Approved">Approved</option>
+                        <option value="Declined">Declined</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Override Reason <span style="color:var(--danger);">*</span></label>
+                    <textarea id="overrideReason" class="form-control-custom" rows="3" placeholder="Enter mandatory reason for this override..." style="resize:vertical;"></textarea>
+                </div>
+                <input type="hidden" id="overrideRequestId">
+                <input type="hidden" id="overrideCurrentStatus">
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1rem;">
+                    <button type="button" class="btn-cancel-acc" id="cancelOverrideBtn" style="padding:8px 16px;width:auto;">Cancel</button>
+                    <button type="button" class="btn-submit-form" id="submitOverrideBtn" style="margin-top:0;width:auto;padding:8px 16px;">Apply Override</button>
+                </div>
             </div>
         </div>
     </div>

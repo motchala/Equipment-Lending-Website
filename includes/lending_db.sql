@@ -57,7 +57,8 @@ CREATE TABLE `tbl_inventory` (
   `quantity` int(11) NOT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
-  `is_archived` tinyint(1) DEFAULT 0
+  `is_archived` tinyint(1) DEFAULT 0,
+  `is_high_value` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -87,7 +88,9 @@ CREATE TABLE `tbl_requests` (
   `return_date` date NOT NULL,
   `status` varchar(20) DEFAULT 'Waiting',
   `request_date` datetime DEFAULT current_timestamp(),
-  `reason` varchar(255) DEFAULT NULL
+  `reason` varchar(255) DEFAULT NULL,
+  `document_path` varchar(255) DEFAULT NULL,
+  `arbitration_rule` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -159,7 +162,8 @@ CREATE TABLE `tbl_users` (
   `landline` varchar(20) DEFAULT NULL,
   `emergency_name` varchar(120) DEFAULT NULL,
   `emergency_relationship` varchar(50) DEFAULT NULL,
-  `emergency_phone` varchar(20) DEFAULT NULL
+  `emergency_phone` varchar(20) DEFAULT NULL,
+  `role` varchar(50) DEFAULT 'Regular Faculty'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -174,6 +178,59 @@ INSERT INTO `tbl_users` (`fullname`, `student_id`, `email`, `backup_email`, `pas
 ('Aiello Gabriel B. Lastrella', '2023-00294-BN-0', 'aiello.gabbb@gmail.com', NULL, '$2y$10$5rIqe5mYody6ITpFmVzAHudnh3UIghf14/B.w.26v/Uo5AcXZFaOu', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 ('Derick Ramsey', '2023-00651-BN-0', 'derick@gmail.com', NULL, '$2y$10$STa.6os34BGuOndBPJR5/OSurigCNj299HS.Nl/aEYuFNIhulz0La', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 ('John Jr.', '2030-00071-BN-0', 'johnjohn1234@gmail.com', NULL, '$2y$10$Z4WaQGuntPYSnblonEtdKu5WMx9SPxHE5YUUAcd/8tPy6wsuVzuMS', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_arbitration_log`
+--
+
+CREATE TABLE `tbl_arbitration_log` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `request_id`      INT            NOT NULL,
+  `borrower_id`     VARCHAR(50)    NOT NULL,
+  `borrower_name`   VARCHAR(255)   NOT NULL,
+  `equipment_name`  VARCHAR(255)   NOT NULL,
+  `decision`        VARCHAR(20)    NOT NULL,
+  `rule_applied`    VARCHAR(50)    NOT NULL,
+  `reason`          VARCHAR(500)   NOT NULL,
+  `override_by`     VARCHAR(255)   DEFAULT NULL,
+  `override_reason` TEXT           DEFAULT NULL,
+  `created_at`      DATETIME       DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_arbitration_config`
+--
+
+CREATE TABLE `tbl_arbitration_config` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `config_key`   VARCHAR(100) UNIQUE NOT NULL,
+  `config_value` TEXT         NOT NULL,
+  `updated_at`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_arbitration_config`
+--
+
+INSERT INTO `tbl_arbitration_config` (`config_key`, `config_value`) VALUES
+  ('tie_break_window_seconds',      '5'),
+  ('role_priority_director',        '4'),
+  ('role_priority_adviser',         '3'),
+  ('role_priority_faculty',         '2'),
+  ('role_priority_student',         '1'),
+  ('rule_overdue_block_enabled',    '1'),
+  ('rule_duplicate_block_enabled',  '1'),
+  ('rule_missing_doc_block_enabled','1');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_auto_approve_settings`
+--
 
 --
 -- Indexes for dumped tables
@@ -232,11 +289,86 @@ ALTER TABLE `tbl_requests`
 ALTER TABLE `tbl_room_reservations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+--
+-- AUTO_INCREMENT for table `tbl_arbitration_log`
+--
+ALTER TABLE `tbl_arbitration_log`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_arbitration_config`
+--
+ALTER TABLE `tbl_arbitration_config`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
 -- --------------------------------------------------------
 
 --
 -- Table structure for table `tbl_auto_approve_settings`
 --
+
+-- --------------------------------------------------------
+--
+-- Schema additions for AI-Driven Request Arbitration feature
+-- Run these ALTER statements on existing installations that already have tbl_requests
+--
+
+ALTER TABLE `tbl_requests`
+  ADD COLUMN IF NOT EXISTS `document_path` VARCHAR(255) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS `arbitration_rule` VARCHAR(50) DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS `tbl_arbitration_log` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `request_id`      INT            NOT NULL,
+  `borrower_id`     VARCHAR(50)    NOT NULL,
+  `borrower_name`   VARCHAR(255)   NOT NULL,
+  `equipment_name`  VARCHAR(255)   NOT NULL,
+  `decision`        VARCHAR(20)    NOT NULL,
+  `rule_applied`    VARCHAR(50)    NOT NULL,
+  `reason`          VARCHAR(500)   NOT NULL,
+  `override_by`     VARCHAR(255)   DEFAULT NULL,
+  `override_reason` TEXT           DEFAULT NULL,
+  `created_at`      DATETIME       DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `tbl_users`
+  ADD COLUMN IF NOT EXISTS `role` VARCHAR(50) DEFAULT 'Regular Faculty';
+
+ALTER TABLE `tbl_inventory`
+  ADD COLUMN IF NOT EXISTS `is_high_value` TINYINT(1) DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS `tbl_arbitration_config` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `config_key`   VARCHAR(100) UNIQUE NOT NULL,
+  `config_value` TEXT         NOT NULL,
+  `updated_at`   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO `tbl_arbitration_config` (`config_key`, `config_value`) VALUES
+  ('tie_break_window_seconds',      '5'),
+  ('role_priority_director',        '4'),
+  ('role_priority_adviser',         '3'),
+  ('role_priority_faculty',         '2'),
+  ('role_priority_student',         '1'),
+  ('rule_overdue_block_enabled',    '1'),
+  ('rule_duplicate_block_enabled',  '1'),
+  ('rule_missing_doc_block_enabled','1');
+
+  -- ── tbl_users ──────────────────────────────────────────────────
+ALTER TABLE tbl_users
+  CHANGE COLUMN student_id  faculty_id    VARCHAR(255) NOT NULL,
+  CHANGE COLUMN year_level  faculty_rank  VARCHAR(20)  DEFAULT NULL,
+  CHANGE COLUMN program     department    VARCHAR(50)  DEFAULT NULL;
+
+-- ── tbl_requests ───────────────────────────────────────────────
+ALTER TABLE tbl_requests
+  CHANGE COLUMN student_id    faculty_id    VARCHAR(50)  NOT NULL,
+  CHANGE COLUMN student_name  faculty_name  VARCHAR(255) NOT NULL;
+
+-- ── tbl_room_reservations ──────────────────────────────────────
+ALTER TABLE tbl_room_reservations
+  CHANGE COLUMN student_id    faculty_id    VARCHAR(50)  NOT NULL,
+  CHANGE COLUMN student_name  faculty_name  VARCHAR(100) NOT NULL;
 
 COMMIT;
 
