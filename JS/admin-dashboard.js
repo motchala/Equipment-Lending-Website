@@ -803,33 +803,64 @@
 
     // ── Override Modal ────────────────────────────────────────────────────────
     function openOverrideModal(requestId, currentStatus, equipment, borrower) {
-        const modal = document.getElementById('overrideModal');
-        const desc = document.getElementById('overrideDesc');
-        const statusGroup = document.getElementById('overrideStatusGroup');
-        const reasonInput = document.getElementById('overrideReason');
-        const alertBox = document.getElementById('override-alert');
-        document.getElementById('overrideRequestId').value = requestId;
+        const modal        = document.getElementById('overrideModal');
+        const desc         = document.getElementById('overrideDesc');
+        const statusGroup  = document.getElementById('overrideStatusGroup');
+        const contextInfo  = document.getElementById('overrideContextInfo');
+        const reasonInput  = document.getElementById('overrideReason');
+        const alertBox     = document.getElementById('override-alert');
+        const submitBtn    = document.getElementById('submitOverrideBtn');
+
+        document.getElementById('overrideRequestId').value    = requestId;
         document.getElementById('overrideCurrentStatus').value = currentStatus;
         reasonInput.value = '';
         alertBox.style.display = 'none';
-        desc.textContent = 'Override for: ' + borrower + ' — ' + equipment;
-        // Show status selector for Waiting AND Declined (admin override can approve either)
-        if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
+        submitBtn.disabled = true;
+
+        desc.textContent = 'Override for: ' + borrower + ' \u2014 ' + equipment;
+
+        // Configure modal based on current status direction rules
+        if (currentStatus === 'Waiting') {
+            // Admin can choose Approved or Declined — show dropdown
             statusGroup.style.display = '';
-            // Pre-select Approved for Declined overrides (most common case)
-            const statusSelect = document.getElementById('overrideNewStatus');
-            if (statusSelect) {
-                statusSelect.value = currentStatus === 'Declined' ? 'Approved' : 'Approved';
-            }
+            document.getElementById('overrideNewStatus').value = 'Approved';
+            contextInfo.style.display = 'none';
+        } else if (currentStatus === 'Approved' || currentStatus === 'Overdue') {
+            // Fixed direction: Approved/Overdue → Declined only (item is out on loan)
+            statusGroup.style.display = 'none';
+            contextInfo.style.display = 'block';
+            contextInfo.style.background = '#fff3e0';
+            contextInfo.style.color = '#b45309';
+            contextInfo.style.border = '1px solid #fcd34d';
+            contextInfo.textContent = 'This will change the status from ' + currentStatus + ' to Declined and return 1 unit to inventory.';
+        } else if (currentStatus === 'Declined') {
+            // Fixed direction: Declined → Approved only
+            statusGroup.style.display = 'none';
+            contextInfo.style.display = 'block';
+            contextInfo.style.background = '#ecfdf5';
+            contextInfo.style.color = '#065f46';
+            contextInfo.style.border = '1px solid #6ee7b7';
+            contextInfo.textContent = 'This will change the status from Declined to Approved and decrement 1 unit from inventory.';
         } else {
             statusGroup.style.display = 'none';
+            contextInfo.style.display = 'none';
         }
+
         modal.style.display = 'flex';
     }
 
     function closeOverrideModal() {
         const modal = document.getElementById('overrideModal');
         if (modal) modal.style.display = 'none';
+    }
+
+    // Enable/disable submit based on reason length (min 10 chars)
+    const overrideReasonInput = document.getElementById('overrideReason');
+    if (overrideReasonInput) {
+        overrideReasonInput.addEventListener('input', function() {
+            const submitBtn = document.getElementById('submitOverrideBtn');
+            if (submitBtn) submitBtn.disabled = this.value.trim().length < 5;
+        });
     }
 
     // Wire open-override data-action
@@ -855,41 +886,62 @@
     const submitOverrideBtn = document.getElementById('submitOverrideBtn');
     if (submitOverrideBtn) {
         submitOverrideBtn.addEventListener('click', function() {
-            const requestId = document.getElementById('overrideRequestId').value;
+            const requestId     = document.getElementById('overrideRequestId').value;
             const currentStatus = document.getElementById('overrideCurrentStatus').value;
-            const reason = document.getElementById('overrideReason').value.trim();
-            const alertBox = document.getElementById('override-alert');
+            const reason        = document.getElementById('overrideReason').value.trim();
+            const alertBox      = document.getElementById('override-alert');
+
+            // Determine new status based on direction rules
             let newStatus;
-            if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
-                newStatus = document.getElementById('overrideNewStatus').value;
+            if (currentStatus === 'Approved' || currentStatus === 'Overdue') {
+                newStatus = 'Declined';
+            } else if (currentStatus === 'Declined') {
+                newStatus = 'Approved';
             } else {
-                newStatus = 'Approved'; // For Approved/Overdue entries shown in arb log, default to Approved
+                // Waiting — use dropdown selection
+                newStatus = document.getElementById('overrideNewStatus').value;
             }
-            if (!reason) {
+
+            if (reason.length < 5) {
                 alertBox.style.display = 'block';
                 alertBox.style.backgroundColor = '#ffeaea';
                 alertBox.style.color = 'var(--danger)';
                 alertBox.textContent = 'Override reason is required.';
                 return;
             }
+
             submitOverrideBtn.disabled = true;
             submitOverrideBtn.textContent = 'Applying...';
+
             const formData = new FormData();
             formData.append('request_id', requestId);
             formData.append('new_status', newStatus);
             formData.append('override_reason', reason);
+
             fetch('ajax/admin-override.php', { method: 'POST', body: formData })
-            .then(r => {
+            .then(function(r) {
                 if (r.status === 409) {
-                    return r.json().then(d => { throw { status: 409, message: d.message || 'Cannot override: item is out of stock.' }; });
+                    return r.json().then(function(d) {
+                        throw { status: 409, message: d.message || 'Cannot override: item is out of stock.' };
+                    });
+                }
+                if (r.status === 422) {
+                    return r.json().then(function(d) {
+                        throw { status: 422, message: d.message || 'Invalid status transition.' };
+                    });
+                }
+                if (r.status === 400) {
+                    return r.json().then(function(d) {
+                        throw { status: 400, message: d.message || 'Override reason is required.' };
+                    });
                 }
                 return r.json();
             })
-            .then(data => {
+            .then(function(data) {
                 if (data.status === 'success') {
                     closeOverrideModal();
                     showToast('Override applied successfully.');
-                    setTimeout(() => window.location.reload(), 800);
+                    setTimeout(function() { window.location.reload(); }, 800);
                 } else {
                     alertBox.style.display = 'block';
                     alertBox.style.backgroundColor = '#ffeaea';
@@ -897,15 +949,14 @@
                     alertBox.textContent = data.message || 'Override failed.';
                 }
             })
-            .catch(err => {
+            .catch(function(err) {
                 alertBox.style.display = 'block';
                 alertBox.style.backgroundColor = '#ffeaea';
                 alertBox.style.color = 'var(--danger)';
-                // Task 10.5: display out-of-stock message for HTTP 409
                 alertBox.textContent = (err && err.message) ? err.message : 'Network error. Please try again.';
             })
-            .finally(() => {
-                submitOverrideBtn.disabled = false;
+            .finally(function() {
+                submitOverrideBtn.disabled = reason.trim().length < 5;
                 submitOverrideBtn.textContent = 'Apply Override';
             });
         });

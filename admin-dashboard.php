@@ -539,6 +539,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Due Date</th>
                                         <th>Status</th>
                                         <th>Action</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="return-body">
@@ -546,7 +547,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
                                         <tr>
-                                            <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
+                                            <td colspan="8" class="text-muted" style="text-align:center;padding:3rem;">
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="display:block;margin:0 auto 10px;opacity:0.3;">
                                                     <polyline points="1 4 1 10 7 10" />
                                                     <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
@@ -556,6 +557,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($approved_result)):
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
+                                            $actualStatus = $isOverdue ? 'Overdue' : 'Approved';
                                         ?>
                                             <tr>
                                                 <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
@@ -580,6 +582,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                             Returned
                                                         </a>
                                                     </div>
+                                                </td>
+                                                <td>
+                                                    <button class="btn-action btn-override-req"
+                                                        data-action="open-override"
+                                                        data-request-id="<?php echo $r['id']; ?>"
+                                                        data-request-status="<?php echo $actualStatus; ?>"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                        title="Override this request">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                        </svg>
+                                                    </button>
                                                 </td>
                                             </tr>
                                     <?php endwhile;
@@ -648,13 +664,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Borrow Date</th>
                                         <th>Return Date</th>
                                         <th>Status</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="approved-list">
                                     <?php mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
                                         <tr>
-                                            <td colspan="6" class="text-muted" style="text-align:center;padding:2.5rem;">No approved requests.</td>
+                                            <td colspan="7" class="text-muted" style="text-align:center;padding:2.5rem;">No approved requests.</td>
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($approved_result)): ?>
                                             <tr>
@@ -664,6 +681,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
                                                 <td><span class="status-pill pill-approved">Approved</span></td>
+                                                <td>
+                                                    <button class="btn-action btn-override-req"
+                                                        data-action="open-override"
+                                                        data-request-id="<?php echo $r['id']; ?>"
+                                                        data-request-status="Approved"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                        title="Override this request">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                        </svg>
+                                                    </button>
+                                                </td>
                                             </tr>
                                     <?php endwhile;
                                     endif; ?>
@@ -696,13 +727,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Return Date</th>
                                         <th>Status</th>
                                         <th>Reason</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="declined-list">
                                     <?php mysqli_data_seek($declined_result, 0);
                                     if (mysqli_num_rows($declined_result) === 0): ?>
                                         <tr>
-                                            <td colspan="7" class="text-muted" style="text-align:center;padding:2.5rem;">No declined requests.</td>
+                                            <td colspan="8" class="text-muted" style="text-align:center;padding:2.5rem;">No declined requests.</td>
                                         </tr>
                                         <?php else: while ($r = mysqli_fetch_assoc($declined_result)): ?>
                                             <tr>
@@ -713,6 +745,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
                                                 <td><span class="status-pill pill-declined">Declined</span></td>
                                                 <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['reason'] ?? '—'); ?></td>
+                                                <td>
+                                                    <button class="btn-action btn-override-req"
+                                                        data-action="open-override"
+                                                        data-request-id="<?php echo $r['id']; ?>"
+                                                        data-request-status="Declined"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                        title="Override this request">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                        </svg>
+                                                    </button>
+                                                </td>
                                             </tr>
                                     <?php endwhile;
                                     endif; ?>
@@ -1103,7 +1149,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <button class="btn-action btn-override-req"
                                                 data-action="open-override"
                                                 data-request-id="<?php echo $r['request_id']; ?>"
-                                                data-request-status="<?php echo htmlspecialchars($r['decision']); ?>"
+                                                data-request-status="<?php echo htmlspecialchars($r['current_request_status'] ?? $r['decision']); ?>"
                                                 data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                                 data-borrower="<?php echo htmlspecialchars($r['borrower_name']); ?>"
                                                 title="Override this decision">
@@ -2148,6 +2194,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="form-card-body">
                 <div id="override-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:0.85rem;font-weight:500;"></div>
                 <p id="overrideDesc" style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <!-- Context info shown when direction is fixed (Approved→Declined or Declined→Approved) -->
+                <div id="overrideContextInfo" style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:1rem;font-size:0.83rem;font-weight:500;"></div>
                 <div class="form-group" id="overrideStatusGroup" style="display:none;">
                     <label>New Status</label>
                     <select id="overrideNewStatus" class="form-control-custom">
@@ -2157,13 +2205,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="form-group">
                     <label>Override Reason <span style="color:var(--danger);">*</span></label>
-                    <textarea id="overrideReason" class="form-control-custom" rows="3" placeholder="Enter mandatory reason for this override..." style="resize:vertical;"></textarea>
+                    <textarea id="overrideReason" class="form-control-custom" rows="3" placeholder="Enter mandatory reason for this override (min. 5 characters)..." style="resize:vertical;"></textarea>
+                    <small id="overrideReasonHint" style="color:var(--text-light);font-size:0.75rem;">Minimum 5 characters required.</small>
                 </div>
                 <input type="hidden" id="overrideRequestId">
                 <input type="hidden" id="overrideCurrentStatus">
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1rem;">
                     <button type="button" class="btn-cancel-acc" id="cancelOverrideBtn" style="padding:8px 16px;width:auto;">Cancel</button>
-                    <button type="button" class="btn-submit-form" id="submitOverrideBtn" style="margin-top:0;width:auto;padding:8px 16px;">Apply Override</button>
+                    <button type="button" class="btn-submit-form" id="submitOverrideBtn" style="margin-top:0;width:auto;padding:8px 16px;" disabled>Apply Override</button>
                 </div>
             </div>
         </div>

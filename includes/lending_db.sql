@@ -196,7 +196,8 @@ CREATE TABLE `tbl_arbitration_log` (
   `reason`          VARCHAR(500)   NOT NULL,
   `override_by`     VARCHAR(255)   DEFAULT NULL,
   `override_reason` TEXT           DEFAULT NULL,
-  `created_at`      DATETIME       DEFAULT CURRENT_TIMESTAMP
+  `created_at`      DATETIME       DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_request_id` (`request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

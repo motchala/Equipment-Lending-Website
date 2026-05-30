@@ -52,12 +52,12 @@ $raw_request_id    = $_POST['request_id']      ?? '';
 $raw_new_status    = $_POST['new_status']       ?? '';
 $raw_override_reason = trim((string)($_POST['override_reason'] ?? ''));
 
-// ── Task 7.2a: Validate override_reason — must be non-empty ──────────────────
-if ($raw_override_reason === '') {
+// ── Validate override_reason — must be at least 5 characters ─────────────────
+if (mb_strlen($raw_override_reason) < 5) {
     send_json(400, 'error', 'Override reason is required.');
 }
 
-// ── Task 7.2b: Validate new_status — must be 'Approved' or 'Declined' ────────
+// ── Validate new_status — must be 'Approved' or 'Declined' ───────────────────
 $allowed_statuses = ['Approved', 'Declined'];
 
 if (!in_array($raw_new_status, $allowed_statuses, true)) {
@@ -66,7 +66,7 @@ if (!in_array($raw_new_status, $allowed_statuses, true)) {
 
 $new_status = $raw_new_status;
 
-// ── Task 7.2c: Validate request_id — must be a positive integer ──────────────
+// ── Validate request_id — must be a positive integer ─────────────────────────
 if (!is_numeric($raw_request_id) || (int)$raw_request_id <= 0) {
     send_json(400, 'error', 'Invalid request ID.');
 }
@@ -113,11 +113,27 @@ if ($request === null || $request === false) {
     send_json(404, 'error', 'Request not found.');
 }
 
-$borrower_id    = (string)$request['faculty_id'];
-$borrower_name  = (string)($request['faculty_name'] ?? '');
-$equipment_name = (string)$request['equipment_name'];
+$borrower_id     = (string)$request['faculty_id'];
+$borrower_name   = (string)($request['faculty_name'] ?? '');
+$equipment_name  = (string)$request['equipment_name'];
+$current_status  = (string)$request['status'];
 
-// ── Begin transaction — wraps status UPDATE, inventory decrement, and log INSERT
+// ── Enforce direction rules ───────────────────────────────────────────────────
+// Approved/Overdue → only Declined is allowed (item is out on loan)
+// Declined         → only Approved is allowed
+// Waiting          → either Approved or Declined is allowed
+$direction_ok = match ($current_status) {
+    'Approved', 'Overdue' => $new_status === 'Declined',
+    'Declined'            => $new_status === 'Approved',
+    'Waiting'             => true,
+    default               => false,
+};
+
+if (!$direction_ok) {
+    send_json(422, 'error', 'Invalid status transition.');
+}
+
+// ── Begin transaction — wraps status UPDATE, inventory adjustment, and log INSERT
 $conn->begin_transaction();
 
 try {
@@ -174,7 +190,7 @@ try {
 
     $upd_stmt->close();
 
-    // ── Task 7.5: If approving, decrement tbl_inventory.quantity by 1 ─────────
+    // ── If approving, decrement tbl_inventory.quantity by 1 ──────────────────
     if ($new_status === 'Approved') {
         $dec_stmt = $conn->prepare(
             "UPDATE tbl_inventory
@@ -197,7 +213,31 @@ try {
         $dec_stmt->close();
     }
 
-    // ── Task 7.6: INSERT into tbl_arbitration_log ─────────────────────────────
+    // ── If declining a previously Approved/Overdue request, return 1 unit to stock ───
+    if ($new_status === 'Declined' && in_array($current_status, ['Approved', 'Overdue'], true)) {
+        $inc_stmt = $conn->prepare(
+            "UPDATE tbl_inventory
+                SET quantity = quantity + 1
+              WHERE item_name = ?"
+        );
+
+        if ($inc_stmt === false) {
+            throw new RuntimeException('Failed to prepare inventory increment.');
+        }
+
+        $inc_stmt->bind_param('s', $equipment_name);
+
+        if (!$inc_stmt->execute()) {
+            $inc_stmt->close();
+            throw new RuntimeException('Failed to increment inventory quantity.');
+        }
+
+        $inc_stmt->close();
+    }
+
+    // ── INSERT or UPDATE tbl_arbitration_log (one row per request_id) ──────────
+    // ON DUPLICATE KEY UPDATE ensures re-overrides update the existing row
+    // rather than creating duplicates.
     $log_stmt = $conn->prepare(
         "INSERT INTO tbl_arbitration_log
             (request_id, borrower_id, borrower_name, equipment_name,
@@ -206,7 +246,14 @@ try {
          VALUES
             (?, ?, ?, ?,
              ?, 'override', ?,
-             ?, ?, NOW())"
+             ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE
+            decision        = VALUES(decision),
+            rule_applied    = 'override',
+            reason          = VALUES(reason),
+            override_by     = VALUES(override_by),
+            override_reason = VALUES(override_reason),
+            created_at      = NOW()"
     );
 
     if ($log_stmt === false) {
