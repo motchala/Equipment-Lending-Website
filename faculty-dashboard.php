@@ -40,7 +40,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     $faculty_id     = $user['faculty_id'];
     $borrow_date    = mysqli_real_escape_string($conn, $_POST['borrow_date']);
     $return_date    = mysqli_real_escape_string($conn, $_POST['return_date']);
-    $equipment_name = mysqli_real_escape_string($conn, $_POST['equipment_name']);
+    $equipment_name = mysqli_real_escape_string($conn, trim($_POST['equipment_name']));
     $room           = mysqli_real_escape_string($conn, $_POST['room']);
     $instructor     = mysqli_real_escape_string($conn, $faculty_name); // auto-filled from account name
     $current_date   = date('Y-m-d');
