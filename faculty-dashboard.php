@@ -1,7 +1,7 @@
 ﻿<?php
 session_start();
 if (!isset($_SESSION['faculty_id'])) {
-    header("Location: landing-page.php");
+    header("Location: ../Equipment-Lending-Website/landing-page.php");
     exit();
 }
 $fullname = $_SESSION['faculty_name'];
@@ -89,6 +89,30 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         }
 
         ArbitrationEngine::process($conn, $new_request_id);
+
+        // ── Generate return token if engine approved the request ──────────────
+        $check_approved = $conn->prepare(
+            "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
+        );
+        if ($check_approved) {
+            $check_approved->bind_param('i', $new_request_id);
+            $check_approved->execute();
+            $check_approved->get_result(); // consume result
+            if ($check_approved->affected_rows > 0 || $conn->affected_rows > 0) {
+                // Simpler: just always try to stamp it, the NULL guard prevents double-write
+                $auto_token = bin2hex(random_bytes(32));
+                $tok = $conn->prepare(
+                    "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
+                );
+                if ($tok) {
+                    $tok->bind_param('si', $auto_token, $new_request_id);
+                    $tok->execute();
+                    $tok->close();
+                }
+            }
+            $check_approved->close();
+        }
+
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else die("Error processing request: " . mysqli_error($conn));

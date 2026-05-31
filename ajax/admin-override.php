@@ -190,6 +190,19 @@ try {
 
     $upd_stmt->close();
 
+     // ── If approving, generate a unique return token ──────────────────────────
+    if ($new_status === 'Approved') {
+        $return_token = bin2hex(random_bytes(32)); // 64-char hex token
+        $tok_stmt = $conn->prepare(
+            "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND return_token IS NULL"
+        );
+        if ($tok_stmt) {
+            $tok_stmt->bind_param('si', $return_token, $request_id);
+            $tok_stmt->execute();
+            $tok_stmt->close();
+        }
+    }
+
     // ── If approving, decrement tbl_inventory.quantity by 1 ──────────────────
     if ($new_status === 'Approved') {
         $dec_stmt = $conn->prepare(

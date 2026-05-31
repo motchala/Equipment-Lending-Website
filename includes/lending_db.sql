@@ -371,6 +371,14 @@ ALTER TABLE tbl_room_reservations
   CHANGE COLUMN student_id    faculty_id    VARCHAR(50)  NOT NULL,
   CHANGE COLUMN student_name  faculty_name  VARCHAR(100) NOT NULL;
 
+
+-- Add token + returned_at columns to tbl_requests
+ALTER TABLE tbl_requests
+  ADD COLUMN return_token   VARCHAR(64)  NULL UNIQUE AFTER return_date,
+  ADD COLUMN returned_at    DATETIME     NULL AFTER return_token;
+
+-- Create index for fast token lookup
+CREATE INDEX idx_return_token ON tbl_requests (return_token);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
