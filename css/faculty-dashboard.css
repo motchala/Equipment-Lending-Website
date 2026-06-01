@@ -4,35 +4,41 @@
 ================================================================ */
 
 /* ── Design Tokens ─────────────────────────────────────────── */
+/*
+   PUP Maroon: #800000 (official Polytechnic University of the Philippines color)
+   --color-primary          = text/icon uses of the brand color on light surfaces
+   --color-primary-container = filled button / badge / avatar backgrounds
+   --color-on-primary       = text/icons placed ON top of primary-container fills
+*/
 :root {
-    --color-primary: #300000;
-    --color-primary-container: #570000;
+    --color-primary: #800000;
+    --color-primary-container: #800000;
     --color-on-primary: #ffffff;
-    --color-secondary: #5e5e67;
+    --color-secondary: #6b5c5c;
     --color-surface-lowest: #ffffff;
     --color-surface: #fff8f7;
-    --color-surface-low: #fdf1f2;
-    --color-surface-container: #f8ebec;
-    --color-surface-high: #f2e5e6;
-    --color-surface-highest: #ece0e1;
-    --color-outline: #8b716d;
-    --color-outline-variant: #dec0bb;
-    --color-on-surface: #201a1b;
-    --color-on-surface-variant: #57423e;
+    --color-surface-low: #fdf1f1;
+    --color-surface-container: #f8ecec;
+    --color-surface-high: #f0e0e0;
+    --color-surface-highest: #e8d4d4;
+    --color-outline: #9e7070;
+    --color-outline-variant: #ddbdbd;
+    --color-on-surface: #1f1414;
+    --color-on-surface-variant: #5c3d3d;
     --color-background: #fff8f7;
-    --color-error: #ba1a1a;
-    --color-error-container: #ffdad6;
-    --color-warning: #c67c00;
-    --color-success: #00875a;
-    --color-success-container: #e3fcef;
+    --color-error: #c0392b;
+    --color-error-container: #fde8e6;
+    --color-warning: #b45309;
+    --color-success: #166534;
+    --color-success-container: #dcfce7;
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
     --radius-full: 9999px;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 12px rgba(48, 0, 0, 0.10);
-    --shadow-lg: 0 8px 28px rgba(48, 0, 0, 0.14);
+    --shadow-md: 0 4px 12px rgba(128, 0, 0, 0.12);
+    --shadow-lg: 0 8px 28px rgba(128, 0, 0, 0.16);
     --sidebar-w: 272px;
     --topbar-h: 72px;
     --font-sans: 'Inter', 'Hanken Grotesk', system-ui, sans-serif;
@@ -41,42 +47,51 @@
 }
 
 [data-theme="dark"] {
-    --color-primary: #ffb4a8;
-    --color-primary-container: #570000;
-    --color-on-primary: #690000;
-    --color-secondary: #cbc5ce;
-    --color-surface: #1a1212;
-    --color-surface-lowest: #111010;
-    --color-surface-low: #201a1b;
-    --color-surface-container: #251e1f;
-    --color-surface-high: #302829;
-    --color-surface-highest: #3b3233;
-    --color-outline: #9e8481;
-    --color-outline-variant: #534341;
-    --color-on-surface: #ede0de;
-    --color-on-surface-variant: #d8c2be;
-    --color-background: #1a1212;
-    --color-error: #ffb4ab;
-    --color-error-container: #93000a;
-    --color-warning: #ffb951;
-    --color-success: #6dd58c;
-    --color-success-container: #005229;
+    /* In dark mode the maroon is used as a vivid accent on dark surfaces.
+       Buttons/badges keep a lighter tint so text stays readable. */
+    --color-primary: #f4a0a0;
+    --color-primary-container: #9b1c1c;
+    --color-on-primary: #ffffff;
+    --color-secondary: #c9b8b8;
+    --color-surface: #1c1010;
+    --color-surface-lowest: #120c0c;
+    --color-surface-low: #231515;
+    --color-surface-container: #2c1a1a;
+    --color-surface-high: #3a2222;
+    --color-surface-highest: #472a2a;
+    --color-outline: #a07070;
+    --color-outline-variant: #5a3030;
+    --color-on-surface: #f0e0e0;
+    --color-on-surface-variant: #d4b0b0;
+    --color-background: #1c1010;
+    --color-error: #f87171;
+    --color-error-container: #7f1d1d;
+    --color-warning: #fbbf24;
+    --color-success: #4ade80;
+    --color-success-container: #14532d;
 }
 
 [data-theme="high-contrast"] {
-    --color-primary: #ff4455;
-    --color-on-primary: #000000;
+    --color-primary: #ff6666;
+    --color-primary-container: #cc0000;
+    --color-on-primary: #ffffff;
+    --color-secondary: #ddbbbb;
     --color-surface: #000000;
     --color-surface-lowest: #000000;
     --color-surface-low: #111111;
     --color-surface-container: #1a1a1a;
     --color-surface-high: #222222;
     --color-surface-highest: #333333;
-    --color-outline: #888888;
-    --color-outline-variant: #555555;
+    --color-outline: #999999;
+    --color-outline-variant: #666666;
     --color-on-surface: #ffffff;
-    --color-on-surface-variant: #e8e8e8;
+    --color-on-surface-variant: #eeeeee;
     --color-background: #000000;
+    --color-error: #ff6b6b;
+    --color-error-container: #7f0000;
+    --color-warning: #ffd700;
+    --color-success: #00ff88;
+    --color-success-container: #003300;
 }
 
 /* ── Reset ─────────────────────────────────────────────────── */
@@ -277,7 +292,7 @@ body {
 
 .top-bar-search:focus-within {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(48, 0, 0, 0.08);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .top-bar-search .material-symbols-outlined {
@@ -527,7 +542,7 @@ body {
     position: absolute;
     top: calc(100% + 12px);
     right: 0;
-    width: 280px;
+    width: 340px;
     background: var(--color-surface);
     border: 1px solid var(--color-outline-variant);
     border-radius: var(--radius-lg);
@@ -626,7 +641,7 @@ body {
 }
 
 .dd-item.dd-logout:hover {
-    background: #ffeaea;
+    background: var(--color-error-container);
 }
 
 .dd-item.dd-logout .dd-item-icon {
@@ -870,7 +885,45 @@ body {
 }
 
 .stat-card-overdue {
-    border-color: var(--color-error);
+    background: var(--color-error) !important;
+    border-color: var(--color-error) !important;
+    animation: overdue-pulse 2.2s ease-in-out infinite;
+}
+
+.stat-card-overdue .stat-card-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.stat-card-overdue .stat-card-value {
+    color: #ffffff;
+}
+
+.stat-card-overdue .stat-card-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.stat-card-overdue:hover {
+    border-color: var(--color-error) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-error) 30%, transparent), var(--shadow-md) !important;
+}
+
+.stat-card-action-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-full);
+    padding: 2px 8px;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+@keyframes overdue-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-error) 40%, transparent); }
+    50%       { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-error) 0%, transparent); }
 }
 
 .stat-card-label {
@@ -1232,7 +1285,7 @@ body {
 }
 
 .chip-warning {
-    background: #fff8e1;
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
     color: var(--color-warning);
 }
 
@@ -1482,6 +1535,14 @@ body {
     cursor: not-allowed;
 }
 
+.btn-borrow-blocked {
+    background: transparent !important;
+    color: var(--color-on-surface-variant) !important;
+    border: 1px solid var(--color-outline-variant) !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
+}
+
 /* ── Borrow Form Surface ───────────────────────────────────── */
 .form-surface {
     background: var(--color-surface);
@@ -1537,7 +1598,7 @@ body {
 
 .form-input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(48, 0, 0, 0.08);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
 .form-row-2 {
@@ -1697,7 +1758,7 @@ body {
 }
 
 .requests-table tbody tr.row-overdue {
-    background: #fff3f3;
+    background: color-mix(in srgb, var(--color-error) 8%, var(--color-surface));
 }
 
 .requests-table td {
@@ -1730,7 +1791,7 @@ body {
 }
 
 .status-waiting {
-    background: #fff8e1;
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
     color: var(--color-warning);
 }
 
@@ -1745,8 +1806,8 @@ body {
 }
 
 .status-overdue {
-    background: #fff3e0;
-    color: #e65100;
+    background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+    color: var(--color-warning);
 }
 
 .status-returned {
@@ -2024,7 +2085,7 @@ body {
 
 .timeline-card-overdue {
     border-color: var(--color-error);
-    background: #fff8f8;
+    background: color-mix(in srgb, var(--color-error) 6%, var(--color-surface));
 }
 
 /* Flex wrapper for the content area beside the timeline indicator */
@@ -2057,7 +2118,7 @@ body {
 }
 
 .ti-warning {
-    background: #fff8e1;
+    background: color-mix(in srgb, var(--color-warning) 18%, transparent);
     color: var(--color-warning);
 }
 
@@ -2225,8 +2286,8 @@ body {
     left: var(--sidebar-w);
     right: 0;
     z-index: 300;
-    /* below sidebar (z-index: 200 is sidebar; 250 is top-bar) */
     pointer-events: none;
+    overflow-y: auto;
 }
 
 #settingsOverlay .overlay-topbar,
@@ -3016,6 +3077,167 @@ body {
     background: var(--color-error-container);
 }
 
+/* ── Combined dropdown: notifications section ──────────────── */
+.profile-dropdown {
+    width: 340px;
+}
+
+.dd-notif-section {
+    border-top: 1px solid var(--color-outline-variant);
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.dd-notif-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    background: var(--color-surface-low);
+}
+
+.dd-notif-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    display: flex;
+    align-items: center;
+}
+
+.dd-notif-list {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.dd-notif-view-all {
+    width: 100%;
+    padding: 9px 14px;
+    background: none;
+    border: none;
+    border-top: 1px solid var(--color-outline-variant);
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: background var(--transition);
+}
+
+.dd-notif-view-all:hover {
+    background: var(--color-surface-container);
+}
+
+/* ── Notification Overlay ──────────────────────────────────── */
+.notif-overlay-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 36px 32px 64px;
+}
+
+.notif-overlay-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.notif-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.notif-section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--color-secondary);
+    padding: 4px 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.notif-section-label:first-child {
+    margin-top: 0;
+}
+
+.notif-section-overdue {
+    color: var(--color-error);
+}
+
+.notif-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition), border-color var(--transition);
+    cursor: default;
+}
+
+.notif-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.notif-card.unread {
+    background: var(--color-surface-low);
+    border-color: var(--color-outline-variant);
+}
+
+.notif-card-overdue {
+    border-left: 3px solid var(--color-error);
+}
+
+.notif-card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.notif-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-card-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin-bottom: 4px;
+}
+
+.notif-card-sub {
+    font-size: 0.8rem;
+    color: var(--color-secondary);
+    line-height: 1.5;
+}
+
+.notif-card-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
 /* ── Notifications Overlay ─────────────────────────────────── */
 .notif-wrapper {
     padding: 28px 32px;
@@ -3122,7 +3344,7 @@ body {
 }
 
 .ni-warn {
-    background: #fff8e1;
+    background: color-mix(in srgb, var(--color-warning) 18%, transparent);
     color: var(--color-warning);
 }
 
@@ -3415,8 +3637,8 @@ body {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
+    background: color-mix(in srgb, var(--color-warning) 14%, var(--color-surface));
+    border: 1px solid var(--color-warning);
     border-radius: var(--radius-md);
     padding: 12px 14px;
 }
@@ -3473,6 +3695,55 @@ body {
     font-weight: 600;
     margin-top: 3px;
     display: block;
+}
+
+/* ── QR Return Button ─────────────────────────────────────── */
+.btn-show-qr {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container);
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    margin-top: 6px;
+    transition: background var(--transition), border-color var(--transition);
+}
+
+.btn-show-qr:hover {
+    background: var(--color-surface-high);
+    border-color: var(--color-primary);
+}
+
+/* ── Icon Image (SVG inline icons in Quick Actions) ────────── */
+.icon-img {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+/* ── File Input ────────────────────────────────────────────── */
+.form-control-custom {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: border-color var(--transition);
+}
+
+.form-control-custom:hover {
+    border-color: var(--color-primary);
 }
 
 /* ── Toast ─────────────────────────────────────────────────── */

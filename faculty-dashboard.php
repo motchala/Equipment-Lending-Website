@@ -141,6 +141,7 @@ $requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_H
 $overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
 $overdue_notifs = [];
 while ($row = mysqli_fetch_assoc($overdue_items_raw)) $overdue_notifs[] = $row;
+$notif_count = count($overdue_notifs);
 
 // ── Avatar initials ────────────────────────────────────────────────────────
 $name_parts = explode(' ', trim($fullname));
@@ -156,49 +157,31 @@ $profile_row = mysqli_fetch_assoc(mysqli_query(
      emergency_name, emergency_relationship, emergency_phone 
      FROM tbl_users WHERE faculty_id='$uid_safe' LIMIT 1"
 )) ?: [];
-$db_email         = $profile_row['email']         ?? '';
-$db_backup_email  = $profile_row['backup_email']  ?? '';
-$db_profile_pic   = $profile_row['profile_picture'] ?? '';
-$db_dob           = $profile_row['dob']           ?? '';
-$db_gender        = $profile_row['gender']        ?? '';
-$db_nationality   = $profile_row['nationality']   ?? '';
-// Academic
-$db_department      = $profile_row['department']      ?? '';
-$db_faculty_rank    = $profile_row['faculty_rank']    ?? '';
-// Contact
-$db_phone            = $profile_row['phone']            ?? '';
-$db_present_address  = $profile_row['present_address']  ?? '';
 $db_email             = $profile_row['email']             ?? '';
 $db_backup_email      = $profile_row['backup_email']      ?? '';
 $db_profile_pic       = $profile_row['profile_picture']   ?? '';
+$db_dob               = $profile_row['dob']               ?? '';
+$db_gender            = $profile_row['gender']            ?? '';
+$db_nationality       = $profile_row['nationality']       ?? '';
 $db_department        = $profile_row['department']        ?? '';
 $db_faculty_rank      = $profile_row['faculty_rank']      ?? '';
 $db_phone             = $profile_row['phone']             ?? '';
 $db_present_address   = $profile_row['present_address']   ?? '';
 $db_permanent_address = $profile_row['permanent_address'] ?? '';
-$db_landline         = $profile_row['landline']         ?? '';
-// Emergency
-$db_emergency_name   = $profile_row['emergency_name']        ?? '';
-$db_emergency_rel    = $profile_row['emergency_relationship'] ?? '';
-$db_emergency_phone  = $profile_row['emergency_phone']       ?? '';
+$db_landline          = $profile_row['landline']          ?? '';
+$db_emergency_name    = $profile_row['emergency_name']        ?? '';
+$db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
+$db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
 
-$masked_email     = maskEmail($db_email);
-$masked_backup    = maskEmail($db_backup_email);
-$dob_display      = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
-// Locked = value already exists in DB (one-time fields)
+$masked_email       = maskEmail($db_email);
+$masked_backup      = maskEmail($db_backup_email);
+$dob_display        = $db_dob ? date('F j, Y', strtotime($db_dob)) : '';
 $dob_locked         = !empty($db_dob);
 $gender_locked      = !empty($db_gender);
 $nationality_locked = !empty($db_nationality);
 $backup_locked      = !empty($db_backup_email);
-$department_locked     = !empty($db_department);
-// Profile picture path
-$profile_pic_url = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
-$db_landline          = $profile_row['landline']          ?? '';
-$masked_email         = maskEmail($db_email);
-$masked_backup        = maskEmail($db_backup_email);
-$backup_locked        = !empty($db_backup_email);
-$department_locked       = !empty($db_department);
-$profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
+$department_locked  = !empty($db_department);
+$profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $db_profile_pic : '';
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -206,9 +189,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUP Sync | User Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
     <title>PUPSync | Faculty Dashboard</title>
     <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -222,7 +202,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
         rel="stylesheet">
     <!-- Font Awesome (kept for existing icon references in JS) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="CSS/user-dashboard.css">
+    <link rel="stylesheet" href="CSS/faculty-dashboard.css">
 </head>
 
 <body>
@@ -294,64 +274,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                 <div class="live-search-dropdown" id="liveSearchDropdown" style="display:none;"></div>
             </div>
             <div class="top-bar-actions">
-                <!-- Notifications -->
-                <div class="top-bar-notif-wrap">
-                    <button class="top-bar-icon-btn" id="notifBellBtn" aria-label="Notifications" aria-haspopup="true"
-                        aria-expanded="false">
-                        <span class="material-symbols-outlined">notifications</span>
-                        <?php if ((3 + count($overdue_notifs)) > 0): ?>
-                        <span class="top-bar-badge" id="notifBadgeTop">
-                            <?php echo (3 + count($overdue_notifs)); ?>
-                        </span>
-                        <?php endif; ?>
-                    </button>
-                    <!-- Notification Popover -->
-                    <div class="notif-popover" id="notifPopover" role="dialog" aria-label="Notifications">
-                        <div class="notif-popover-head">
-                            <span>Notifications</span>
-                            <button class="notif-mark-read-btn" data-action="mark-all-read">Mark all as read</button>
-                        </div>
-                        <div class="notif-popover-list">
-                            <?php if (!empty($overdue_notifs)): foreach ($overdue_notifs as $on): ?>
-                            <div class="notif-pop-item unread" data-cat="overdue">
-                                <div class="notif-pop-dot notif-dot-error"></div>
-                                <div class="notif-pop-body">
-                                    <div class="notif-pop-title">Overdue:
-                                        <?php echo htmlspecialchars($on['equipment_name']); ?>
-                                    </div>
-                                    <div class="notif-pop-sub">Due
-                                        <?php echo htmlspecialchars($on['return_date']); ?> — return immediately
-                                    </div>
-                                    <div class="notif-pop-time">Overdue</div>
-                                </div>
-                            </div>
-                            <?php endforeach;
-                            endif; ?>
-                            <div class="notif-pop-item unread" data-cat="borrow">
-                                <div class="notif-pop-dot notif-dot-primary"></div>
-                                <div class="notif-pop-body">
-                                    <div class="notif-pop-title">Borrow Request Approved</div>
-                                    <div class="notif-pop-sub">Pick up at Admin Office before 5:00 PM</div>
-                                    <div class="notif-pop-time">9:42 AM</div>
-                                </div>
-                            </div>
-                            <div class="notif-pop-item unread" data-cat="system">
-                                <div class="notif-pop-dot notif-dot-secondary"></div>
-                                <div class="notif-pop-body">
-                                    <div class="notif-pop-title">System Maintenance Tonight</div>
-                                    <div class="notif-pop-sub">PUPSYNC offline 11 PM – 1 AM</div>
-                                    <div class="notif-pop-time">8:00 AM</div>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="notif-popover-footer" data-action="open-overlay" data-target="notifOverlay">View
-                            all notifications</button>
-                    </div>
-                </div>
-
-                <div class="top-bar-divider"></div>
-
-                <!-- Profile -->
+                <!-- Combined Avatar + Notifications + Logout -->
                 <div class="top-bar-profile-wrap">
                     <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false"
                         aria-label="Account menu">
@@ -360,35 +283,73 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         <?php else: ?>
                         <?php echo htmlspecialchars($initials); ?>
                         <?php endif; ?>
+                        <?php if ($notif_count > 0): ?>
+                        <span class="top-bar-badge" id="notifBadgeTop"><?php echo $notif_count; ?></span>
+                        <?php endif; ?>
                     </button>
-                    <!-- Profile Dropdown -->
+                    <!-- Combined Dropdown -->
                     <div class="profile-dropdown" id="profileDropdown" role="menu">
+                        <!-- User identity header -->
                         <div class="dd-header">
                             <div class="dd-avatar">
                                 <?php if ($profile_pic_url): ?>
-                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
-                                    class="avatar-img">
+                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
                                 <?php else: ?>
                                 <?php echo htmlspecialchars($initials); ?>
                                 <?php endif; ?>
                             </div>
                             <div>
-                                <span class="dd-name">
-                                    <?php echo htmlspecialchars($fullname); ?>
-                                </span>
+                                <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
                                 <span class="dd-sub">Faculty</span>
-                                <span class="dd-sub">ID:
-                                    <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                                </span>
+                                <span class="dd-sub">ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
                             </div>
                         </div>
-                        <div class="dd-menu">
-                            <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
-                                <span class="material-symbols-outlined dd-item-icon">notifications</span> Notifications
-                                <span class="notif-badge" id="notifBadge">
-                                    <?php echo (3 + count($overdue_notifs)); ?>
+                        <!-- Notifications section -->
+                        <div class="dd-notif-section">
+                            <div class="dd-notif-head">
+                                <span class="dd-notif-title">
+                                    <span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px;">notifications</span>
+                                    Notifications
                                 </span>
+                                <div style="display:flex;align-items:center;gap:8px;">
+                                    <?php if ($notif_count > 0): ?>
+                                    <span class="notif-badge" id="notifBadge"><?php echo $notif_count; ?></span>
+                                    <?php endif; ?>
+                                    <button class="notif-mark-read-btn" data-action="mark-all-read">Mark read</button>
+                                </div>
+                            </div>
+                            <div class="dd-notif-list">
+                                <?php if (!empty($overdue_notifs)): foreach ($overdue_notifs as $on): ?>
+                                <div class="notif-pop-item unread" data-cat="overdue">
+                                    <div class="notif-pop-dot notif-dot-error"></div>
+                                    <div class="notif-pop-body">
+                                        <div class="notif-pop-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
+                                        <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> — return immediately</div>
+                                    </div>
+                                </div>
+                                <?php endforeach; endif; ?>
+                                <div class="notif-pop-item unread" data-cat="borrow">
+                                    <div class="notif-pop-dot notif-dot-primary"></div>
+                                    <div class="notif-pop-body">
+                                        <div class="notif-pop-title">Borrow Request Approved</div>
+                                        <div class="notif-pop-sub">Pick up at Admin Office before 5:00 PM</div>
+                                    </div>
+                                </div>
+                                <div class="notif-pop-item unread" data-cat="system">
+                                    <div class="notif-pop-dot notif-dot-secondary"></div>
+                                    <div class="notif-pop-body">
+                                        <div class="notif-pop-title">System Maintenance Tonight</div>
+                                        <div class="notif-pop-sub">PUPSYNC offline 11 PM – 1 AM</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="dd-notif-view-all" data-action="open-overlay" data-target="notifOverlay">
+                                View all notifications
+                                <span class="material-symbols-outlined" style="font-size:14px;">chevron_right</span>
                             </button>
+                        </div>
+                        <!-- Actions -->
+                        <div class="dd-menu">
                             <div class="dd-divider"></div>
                             <button class="dd-item dd-logout" data-action="logout">
                                 <span class="material-symbols-outlined dd-item-icon">logout</span> Sign Out
@@ -444,29 +405,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </p>
                 </div>
 
-                <!-- Overdue Urgent Card (shown only when overdue > 0) -->
-                <?php if ($stat_overdue > 0): ?>
-                <div class="urgent-card">
-                    <div class="urgent-card-icon">
-                        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">warning</span>
-                    </div>
-                    <div class="urgent-card-body">
-                        <h3>Overdue Equipment Return</h3>
-                        <p>You have <strong>
-                                <?php echo $stat_overdue; ?>
-                            </strong> overdue item
-                            <?php echo $stat_overdue > 1 ? 's' : ''; ?>. Please return
-                            <?php echo $stat_overdue > 1 ? 'them' : 'it'; ?> to the Admin Office as soon as possible to
-                            avoid late penalties.
-                        </p>
-                        <div class="urgent-card-actions">
-                            <button class="btn-urgent-primary" data-action="filter-requests" data-status="Overdue">View
-                                Overdue Items</button>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
-
+                <!-- Overdue Urgent Card removed — emphasis moved to stat card below -->
                 <!-- Stats + Quick Access Grid -->
                 <div class="dashboard-grid">
 
@@ -490,9 +429,10 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                         <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests"
                             data-status="Overdue">
                             <div class="stat-card-label">Overdue</div>
-                            <div class="stat-card-value" style="color:var(--color-error)" id="statOverdueVal">
+                            <div class="stat-card-value" id="statOverdueVal">
                                 <?php echo $stat_overdue; ?>
                             </div>
+                            <div class="stat-card-action-tag">Action Required</div>
                             <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
                         </div>
                         <?php else: ?>
@@ -574,10 +514,12 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                     aria-hidden="true">
                                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                                </svg> Notifications <span class="notif-badge"
-                                    style="font-size:0.7rem; padding: 1px 6px;">
-                                    <?php echo (3 + count($overdue_notifs)); ?>
+                                </svg> Notifications
+                                <?php if ($notif_count > 0): ?>
+                                <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">
+                                    <?php echo $notif_count; ?>
                                 </span>
+                                <?php endif; ?>
                             </button>
                         </div>
                     </div>
@@ -694,7 +636,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             <div class="eq-item-card item-node"
                                 data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
                                 data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
-                                data-item-id="<?php echo (int)$item['item_id']; ?>">>
+                                data-item-id="<?php echo (int)$item['item_id']; ?>">
                                 <?php if (!empty($item['image_path'])): ?>
                                 <img class="eq-item-img"
                                     src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
@@ -725,8 +667,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                     </span>
                                     <?php endif; ?>
                                     <?php if ($has_overdue_block): ?>
-                                        <button class="btn-borrow" disabled
-                                            style="background:var(--color-error, #b3261e);opacity:0.7;cursor:not-allowed;"
+                                        <button class="btn-borrow btn-borrow-blocked" disabled
                                             title="You have an overdue item. Return it before borrowing again.">
                                             Overdue Block
                                         </button>
@@ -841,9 +782,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             </table>
                         </div>
                     </div>
-                    <script>
-                        window.REQUESTS_DATA = <?php echo $requests_json; ?>;
-                    </script>
                 </div><!-- /lending-requests -->
 
             </div><!-- /panel-lending -->
@@ -1111,7 +1049,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                     </div>
                     <div class="account-hero-card">
                         <div class="acc-avatar-section">
-                            <div class="acc-avatar-large" id="profileAvatarLarge">
+                            <div class="acc-avatar-large" id="accOverlayAvatar">
                                 <?php if ($profile_pic_url): ?>
                                 <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
                                     class="avatar-img">
@@ -1120,9 +1058,9 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                 <?php endif; ?>
                             </div>
                             <div style="position:relative;">
-                                <button class="btn-change-profile" id="changeProfileBtn"
+                                <button class="btn-change-profile" id="accOverlayChangePhotoBtn"
                                     data-action="open-picture-menu">Change Photo</button>
-                                <div class="picture-menu" id="pictureMenu" style="display:none;">
+                                <div class="picture-menu" id="accOverlayPictureMenu" style="display:none;">
                                     <button class="pic-menu-item" data-action="upload-picture">
                                         <span class="material-symbols-outlined"
                                             style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
@@ -1135,7 +1073,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/jpg,image/webp"
+                            <input type="file" id="accOverlayPicInput" accept="image/jpeg,image/png,image/jpg,image/webp"
                                 style="display:none;">
                         </div>
                         <div class="acc-hero-info">
@@ -1152,14 +1090,14 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             </span>
                         </div>
                         <div class="acc-action-wrap">
-                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit
+                            <button class="btn-edit-acc" id="accOverlayEditBtn" data-action="profile-edit">Edit
                                 Profile</button>
-                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;"
+                            <button class="btn-save-acc" id="accOverlaySaveBtn" style="display:none;"
                                 data-action="profile-save">
                                 <span class="material-symbols-outlined"
                                     style="font-size:14px;margin-right:4px;">check</span>Save
                             </button>
-                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;"
+                            <button class="btn-cancel-acc" id="accOverlayCancelBtn" style="display:none;"
                                 data-action="profile-cancel">Cancel</button>
                         </div>
                     </div>
@@ -1345,9 +1283,6 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
      OVERLAY: SETTINGS (unified — Account + System Settings)
 ================================================================ -->
     <div class="overlay-page" id="settingsOverlay">
-        <div class="overlay-topbar">
-            <span class="overlay-topbar-title">Account &amp; System Settings</span>
-        </div>
 
         <div class="unified-settings-wrap">
 
@@ -1609,91 +1544,111 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
             <span class="overlay-topbar-title">Notifications</span>
             <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
         </div>
-        <div class="notif-wrapper">
-            <div class="notif-header-row">
-                <div class="overlay-section-header" style="margin-bottom:0;flex:1;">
-                    <span class="section-eyebrow">Inbox ║ All Notifications</span>
-                    <h2>Notifications</h2>
-                    <p>You have <strong id="unreadCount">
-                            <?php echo (3 + count($overdue_notifs)); ?> unread
-                        </strong> notifications.</p>
+        <div class="notif-overlay-wrap">
+
+            <!-- Header row -->
+            <div class="notif-overlay-header">
+                <div>
+                    <h1 class="page-title">Notifications</h1>
+                    <p class="page-subtitle">You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong> notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.</p>
                 </div>
                 <button class="mark-read-btn" data-action="mark-all-read">Mark all as read</button>
             </div>
+
+            <!-- Filter tabs -->
             <div class="notif-filter-tabs">
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
-                <button class="notif-tab" data-notif-filter="borrow">Borrow</button>
                 <button class="notif-tab" data-notif-filter="overdue">Overdue</button>
+                <button class="notif-tab" data-notif-filter="borrow">Borrow</button>
                 <button class="notif-tab" data-notif-filter="system">System</button>
             </div>
-            <?php if (!empty($overdue_notifs)): ?>
-            <div class="notif-group overdue-notif-group">ΓÜá∩╕Å Overdue — Action Required</div>
-            <?php foreach ($overdue_notifs as $on): ?>
-            <div class="notif-item unread notif-overdue" data-cat="overdue">
-                <div class="notif-icon ni-overdue"><span class="material-symbols-outlined"
-                        style="font-size:16px">alarm</span></div>
-                <div class="notif-body-wrap">
-                    <h4>Overdue Item:
-                        <?php echo htmlspecialchars($on['equipment_name']); ?>
-                    </h4>
-                    <p>Due on <strong>
-                            <?php echo htmlspecialchars($on['return_date']); ?>
-                        </strong>. Return immediately to avoid penalties.</p>
+
+            <!-- Notification cards -->
+            <div class="notif-card-list">
+
+                <?php if (!empty($overdue_notifs)): ?>
+                <div class="notif-section-label notif-section-overdue">
+                    <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
+                    Overdue — Action Required
                 </div>
-                <div class="notif-meta"><span class="notif-time">Overdue since
-                        <?php echo htmlspecialchars($on['return_date']); ?>
-                    </span>
-                    <div class="unread-dot"></div>
+                <?php foreach ($overdue_notifs as $on): ?>
+                <div class="notif-card unread notif-card-overdue" data-cat="overdue">
+                    <div class="notif-card-icon ni-overdue">
+                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
+                    </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
+                        <div class="notif-card-sub">Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong> — return immediately to avoid penalties.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
+                        <div class="unread-dot"></div>
+                    </div>
                 </div>
-            </div>
-            <?php endforeach;
-            endif; ?>
-            <div class="notif-group">Today</div>
-            <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-success"><span class="material-symbols-outlined"
-                        style="font-size:16px">check_circle</span></div>
-                <div class="notif-body-wrap">
-                    <h4>Borrow Request Approved</h4>
-                    <p>Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</p>
+                <?php endforeach; endif; ?>
+
+                <div class="notif-section-label">Today</div>
+
+                <div class="notif-card unread" data-cat="borrow">
+                    <div class="notif-card-icon ni-success">
+                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
+                    </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">Borrow Request Approved</div>
+                        <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="notif-time">9:42 AM</span>
+                        <div class="unread-dot"></div>
+                    </div>
                 </div>
-                <div class="notif-meta"><span class="notif-time">9:42 AM</span>
-                    <div class="unread-dot"></div>
+
+                <div class="notif-card unread" data-cat="system">
+                    <div class="notif-card-icon ni-alert">
+                        <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
+                    </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">System Maintenance Tonight</div>
+                        <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="notif-time">8:00 AM</span>
+                        <div class="unread-dot"></div>
+                    </div>
                 </div>
-            </div>
-            <div class="notif-item unread" data-cat="system">
-                <div class="notif-icon ni-alert"><span class="material-symbols-outlined"
-                        style="font-size:16px">settings</span></div>
-                <div class="notif-body-wrap">
-                    <h4>System Maintenance Tonight</h4>
-                    <p>PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</p>
+
+                <div class="notif-section-label">Yesterday</div>
+
+                <div class="notif-card unread" data-cat="borrow">
+                    <div class="notif-card-icon ni-warn">
+                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
+                    </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">Return Reminder</div>
+                        <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="notif-time">4:15 PM</span>
+                        <div class="unread-dot"></div>
+                    </div>
                 </div>
-                <div class="notif-meta"><span class="notif-time">8:00 AM</span>
-                    <div class="unread-dot"></div>
+
+                <div class="notif-card" data-cat="borrow">
+                    <div class="notif-card-icon ni-success">
+                        <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span>
+                    </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">Request Submitted</div>
+                        <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="notif-time">2:00 PM</span>
+                    </div>
                 </div>
-            </div>
-            <div class="notif-group">Yesterday</div>
-            <div class="notif-item unread" data-cat="borrow">
-                <div class="notif-icon ni-warn"><span class="material-symbols-outlined"
-                        style="font-size:16px">warning</span></div>
-                <div class="notif-body-wrap">
-                    <h4>Return Reminder</h4>
-                    <p>You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</p>
-                </div>
-                <div class="notif-meta"><span class="notif-time">Yesterday, 4:15 PM</span>
-                    <div class="unread-dot"></div>
-                </div>
-            </div>
-            <div class="notif-item" data-cat="borrow">
-                <div class="notif-icon ni-success"><span class="material-symbols-outlined"
-                        style="font-size:16px">inventory_2</span></div>
-                <div class="notif-body-wrap">
-                    <h4>Request Submitted</h4>
-                    <p>Your borrow request was successfully submitted and is under review.</p>
-                </div>
-                <div class="notif-meta"><span class="notif-time">Yesterday, 2:00 PM</span></div>
-            </div>
-        </div>
+
+            </div><!-- /notif-card-list -->
+        </div><!-- /notif-overlay-wrap -->
     </div><!-- /notifOverlay -->
 
     <!-- ================================================================
@@ -1980,7 +1935,7 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo(int)$stat_overdue; ?>;
     </script>
-    <script src="JS/user-dashboard.js"></script>
+    <script src="JS/faculty-dashboard.js"></script>
 </body>
 
 </html>

@@ -88,7 +88,7 @@
         // 8. Notification read state
         const readIdxArr = LS.getJ('notifRead');
         if (readIdxArr && readIdxArr.length) {
-            const items = document.querySelectorAll('.notif-item');
+            const items = document.querySelectorAll('.notif-item, .notif-card');
             let unread = 0;
             items.forEach((item, i) => {
                 if (readIdxArr.includes(i)) {
@@ -368,16 +368,25 @@
         document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
         const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('.notif-item').forEach(item => {
+        document.querySelectorAll('.notif-card').forEach(item => {
             if (cat === 'all') item.style.display = '';
             else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
             else item.style.display = item.dataset.cat === cat ? '' : 'none';
+        });
+        document.querySelectorAll('.notif-section-label').forEach(label => {
+            let next = label.nextElementSibling;
+            let hasVisible = false;
+            while (next && !next.classList.contains('notif-section-label')) {
+                if (next.style.display !== 'none') hasVisible = true;
+                next = next.nextElementSibling;
+            }
+            label.style.display = hasVisible ? '' : 'none';
         });
     }
 
     function markAllRead() {
         const readArr = [];
-        document.querySelectorAll('.notif-item').forEach((item, i) => {
+        document.querySelectorAll('.notif-item, .notif-card').forEach((item, i) => {
             item.classList.remove('unread');
             const dot = item.querySelector('.unread-dot');
             if (dot) dot.style.display = 'none';
@@ -881,7 +890,7 @@
         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
 
         // Remove images and set initials
-        document.querySelectorAll('.avatar-btn, .dd-avatar, .acc-avatar-large').forEach(el => {
+        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large').forEach(el => {
             const img = el.querySelector('.avatar-img');
             if (img) img.remove();
             // Set text content (preserve cam-btn if present)
@@ -897,7 +906,7 @@
     }
 
     function updateAvatarsToImage(url) {
-        document.querySelectorAll('.avatar-btn, .dd-avatar, .acc-avatar-large').forEach(el => {
+        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large').forEach(el => {
             // Remove text nodes and existing images
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE && n.textContent.trim()) n.remove();
@@ -944,7 +953,7 @@
                 .then(data => {
                     if (loadingEl) loadingEl.classList.remove('active');
                     if (data.success) {
-                        updateAvatarsToImage(data.profile_picture);
+                        updateAvatarsToImage('/Equipment-Lending-Website/' + data.profile_picture + '?t=' + Date.now());
                         showToast(data.msg || 'Profile picture updated!');
                     } else {
                         showToast('Error: ' + (data.msg || 'Upload failed.'));
@@ -1269,29 +1278,16 @@
     });
 
     /* ── Notification bell popover ────────────────────────────────────── */
-    const notifBellBtn = document.getElementById('notifBellBtn');
-    const notifPopover = document.getElementById('notifPopover');
-    if (notifBellBtn && notifPopover) {
-        notifBellBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            const isOpen = notifPopover.classList.contains('open');
-            notifPopover.classList.toggle('open', !isOpen);
-            notifBellBtn.setAttribute('aria-expanded', String(!isOpen));
-        });
-        document.addEventListener('click', function (e) {
-            if (!e.target.closest('.top-bar-notif-wrap')) {
-                notifPopover.classList.remove('open');
-                notifBellBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
-    }
+    // Notification bell removed — notifications now live inside the avatar dropdown
 
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
-            // Close any open overlay when navigating to a tab
+            // Close any open overlay and remove settings highlight when navigating to a tab
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+            const settingsNavItem = document.getElementById('nav-settings');
+            if (settingsNavItem) settingsNavItem.classList.remove('active');
             switchTab(this.dataset.tab);
         });
     });
@@ -2227,8 +2223,8 @@
                         if (data.success) {
                             showToast(data.msg, 'success');
                             // Update all avatar displays
-                            const newPicUrl = data.profile_picture + '?t=' + Date.now();
-                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
+                            const newPicUrl = '/Equipment-Lending-Website/' + data.profile_picture + '?t=' + Date.now();
+                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn, .top-bar-avatar').forEach(el => {
                                 el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
                             });
                             updateCompletionProgress();
