@@ -71,6 +71,7 @@ class ArbitrationEngine
 
             if ($request === null) {
                 // Request not found — nothing to process.
+                error_log('ArbitrationEngine: fetchRequest returned null for request_id=' . $request_id);
                 return;
             }
 
@@ -130,6 +131,7 @@ class ArbitrationEngine
 
             if ($quantity === null) {
                 // Could not acquire lock — leave as Waiting (error handling in 2.13).
+                error_log('ArbitrationEngine: acquireStockLock returned null for equipment=' . $equipment_name . ' request_id=' . $request_id);
                 return;
             }
 
@@ -397,7 +399,7 @@ class ArbitrationEngine
                 );
 
                 $conn->query(
-                    "INSERT INTO tbl_arbitration_log
+                    "INSERT IGNORE INTO tbl_arbitration_log
                        (request_id, borrower_id, borrower_name, equipment_name,
                         decision, rule_applied, reason, override_by, override_reason, created_at)
                      VALUES
@@ -727,6 +729,7 @@ class ArbitrationEngine
      */
     private static function acquireStockLock(mysqli $conn, string $equipment_name): ?int
     {
+        $equipment_name = trim($equipment_name);
         // Step 1: Begin the transaction. Caller is responsible for COMMIT/ROLLBACK.
         if (!$conn->begin_transaction()) {
             return null;
@@ -786,7 +789,7 @@ class ArbitrationEngine
     ): void {
         // ── Step 1: UPDATE tbl_requests ──────────────────────────────────────
         $stmt = $conn->prepare(
-            'UPDATE tbl_requests SET status = ?, arbitration_rule = ? WHERE id = ?'
+            'UPDATE tbl_requests SET status = ?, arbitration_rule = ?, reason = ? WHERE id = ?'
         );
 
         if ($stmt === false) {
@@ -797,7 +800,7 @@ class ArbitrationEngine
             return;
         }
 
-        $stmt->bind_param('ssi', $status, $rule, $request_id);
+        $stmt->bind_param('sssi', $status, $rule, $reason, $request_id);
 
         if (!$stmt->execute()) {
             error_log(
@@ -855,11 +858,19 @@ class ArbitrationEngine
         $equipment     = (string)$row['equipment_name'];
 
         // ── Step 3: INSERT into tbl_arbitration_log ──────────────────────────
+        // Use INSERT IGNORE so a duplicate request_id (re-evaluation) doesn't
+        // throw a fatal exception — the status UPDATE above already recorded
+        // the new decision on tbl_requests.
         $stmt = $conn->prepare(
             'INSERT INTO tbl_arbitration_log
-               (request_id, borrower_id, borrower_name, equipment_name,
+            (request_id, borrower_id, borrower_name, equipment_name,
                 decision, rule_applied, reason, override_by, override_reason, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NOW())'
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NOW())
+            ON DUPLICATE KEY UPDATE
+            decision = VALUES(decision),
+            rule_applied = VALUES(rule_applied),
+            reason = VALUES(reason),
+            created_at = NOW()'
         );
 
         if ($stmt === false) {

@@ -1016,9 +1016,22 @@
         }
 
         tbody.innerHTML = filtered.map(r => {
-            const noteCol = r.status === 'Declined' ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
-                : r.status === 'Overdue' ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
+            const noteCol = r.status === 'Declined'
+                ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
+                : r.status === 'Overdue'
+                    ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
                     : '—';
+
+            // Show QR button for Approved and Overdue rows that have a return token
+            const qrBtn = (r.status === 'Approved' || r.status === 'Overdue') && r.return_token
+                ? `<button class="btn-show-qr" data-action="show-return-qr"
+                       data-token="${_escHtml(r.return_token)}"
+                       data-equipment="${_escHtml(r.equipment_name)}"
+                       title="Show return QR code">
+                       <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">qr_code_2</span>Return QR
+                   </button>`
+                : '';
+
             return `<tr class="${r.status === 'Overdue' ? 'row-overdue' : ''}">
                         <td><strong>${_escHtml(r.equipment_name)}</strong></td>
                         <td>${_escHtml(r.instructor)}</td>
@@ -1026,7 +1039,7 @@
                         <td>${_escHtml(r.borrow_date)}</td>
                         <td>${_escHtml(r.return_date)}</td>
                         <td>${_statusPill(r.status)}</td>
-                        <td>${noteCol}</td>
+                        <td>${noteCol}${qrBtn}</td>
                     </tr>`;
         }).join('');
     }
@@ -1051,7 +1064,7 @@
     }
 
     function checkOverdueState() {
-         const overdueCount = (typeof window.OVERDUE_COUNT !== 'undefined')
+        const overdueCount = (typeof window.OVERDUE_COUNT !== 'undefined')
             ? window.OVERDUE_COUNT
             : (window.REQUESTS_DATA || []).filter(r => (r.status || '').trim() === 'Overdue').length;
         // Update overdue stat value
@@ -1223,6 +1236,14 @@
                 case 'toast':
                     showToast(el.dataset.msg || '');
                     break;
+                case 'show-return-qr': {
+                    const token = el.dataset.token;
+                    const equipment = el.dataset.equipment;
+                    const basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+                    const returnUrl = basePath + 'return_confirm.php?token=' + token;
+                    _openReturnQrModal(equipment, returnUrl);
+                    break;
+                }
                 case 'logout':
                     closeDropdown();
                     if (confirm('Confirm Logout?')) window.location.href = 'includes/logout.php';
@@ -1584,6 +1605,8 @@
         initBorrowForm();
         renderRequestsTable();
         checkOverdueState();
+        startRequestsPolling();
+        startInventoryPolling();
 
         // Password strength meter
         const pwNewInput = document.getElementById('pwNew');
@@ -2272,4 +2295,166 @@
     ══════════════════════════════════════════════════════════════════ */
     // showToast is already defined above using #app-toast
 
+
+    /* ── Return QR Modal ───────────────────────────────────────────────── */
+    function _openReturnQrModal(equipment, url) {
+        // Reuse or create the modal
+        let modal = document.getElementById('returnQrModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'returnQrModal';
+            modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div style="background:var(--color-surface,#fff);border-radius:20px;padding:2rem;max-width:360px;width:90%;text-align:center;position:relative;">
+                    <button id="returnQrClose" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--color-on-surface-variant);">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                    <span class="material-symbols-outlined" style="font-size:36px;color:var(--accent-maroon,#600302);margin-bottom:8px;display:block;">qr_code_2</span>
+                    <h3 id="returnQrTitle" style="font-size:1rem;font-weight:700;margin-bottom:4px;"></h3>
+                    <p style="font-size:0.8rem;color:var(--color-on-surface-variant);margin-bottom:16px;">Show this QR code to the admin when returning the equipment.</p>
+                    <div id="returnQrCanvas" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
+                    <p style="font-size:0.7rem;color:var(--color-on-surface-variant);word-break:break-all;">Token verified on scan</p>
+                </div>`;
+            document.body.appendChild(modal);
+            document.getElementById('returnQrClose').addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+        }
+        document.getElementById('returnQrTitle').textContent = equipment;
+        document.getElementById('returnQrCanvas').setAttribute('title', url);
+        document.getElementById('returnQrCanvas').innerHTML = '';
+        modal.style.display = 'flex';
+
+        // Load QR library dynamically (only once)
+        if (window._qrLoaded) {
+            _renderQr(url);
+        } else {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            script.onload = () => { window._qrLoaded = true; _renderQr(url); };
+            document.head.appendChild(script);
+        }
+    }
+
+    function _renderQr(url) {
+        const container = document.getElementById('returnQrCanvas');
+        if (!container || typeof QRCode === 'undefined') return;
+        new QRCode(container, {
+            text: url,
+            width: 200,
+            height: 200,
+            colorDark: '#600302',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    }
+
+    function _updateFacultyStatCards(data) {
+        const counts = {
+            'Active Borrowings': data.filter(r => r.status === 'Approved').length,
+            'Pending Requests': data.filter(r => r.status === 'Waiting').length,
+            'Total Requests': data.length,
+        };
+        document.querySelectorAll('.stat-card').forEach(card => {
+            const label = (card.querySelector('.stat-card-label') || {}).textContent?.trim();
+            const val = card.querySelector('.stat-card-value');
+            if (!val || !(label in counts)) return;
+            if (val.textContent.trim() !== String(counts[label])) {
+                val.textContent = counts[label];
+            }
+        });
+    }
+
+    function startInventoryPolling() {
+        const INTERVAL = 8000;
+
+        function doPoll() {
+            fetch('includes/poll-inventory.php', { method: 'GET' })
+                .then(r => r.json())
+                .then(items => {
+                    if (!Array.isArray(items)) return;
+                    items.forEach(function (item) {
+                        const card = document.querySelector('.item-node[data-item-id="' + item.item_id + '"]');
+                        if (!card) return;
+                        const qty = parseInt(item.quantity, 10);
+
+                        // Update availability badge
+                        const badge = card.querySelector('.stock-badge');
+                        if (badge) {
+                            if (qty > 0) {
+                                badge.className = 'stock-badge stock-avail';
+                                badge.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> ' + qty + ' available';
+                            } else {
+                                badge.className = 'stock-badge stock-unavail';
+                                badge.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">cancel</span> Out of stock';
+                            }
+                        }
+
+                        // Update borrow button
+                        const btn = card.querySelector('.btn-borrow[data-action="open-borrow-form"]');
+                        if (btn) {
+                            btn.disabled = qty <= 0;
+                            btn.textContent = qty > 0 ? 'Borrow' : 'Unavailable';
+                        }
+                    });
+                })
+                .catch(function () { });
+        }
+
+        doPoll();                        // run immediately on page load
+        setInterval(doPoll, INTERVAL);   // then every 8 seconds
+    }
+
+    /* ── Real-time Requests Polling ────────────────────────────────────── */
+    function startRequestsPolling() {
+        const INTERVAL = 5000; // check every 5 seconds
+        let lastStatuses = {};
+
+        // Build initial status snapshot
+        (window.REQUESTS_DATA || []).forEach(r => {
+            lastStatuses[r.id] = r.status;
+        });
+
+        setInterval(function () {
+            fetch('includes/poll-requests.php', { method: 'GET' })
+                .then(r => r.json())
+                .then(fresh => {
+                    if (!Array.isArray(fresh)) return;
+
+                    let changed = false;
+
+                    // Check for any status changes
+                    fresh.forEach(r => {
+                        if (lastStatuses[r.id] !== r.status) {
+                            changed = true;
+                            lastStatuses[r.id] = r.status;
+
+                            // Show toast for specific transitions
+                            if (r.status === 'Returned') {
+                                showToast(r.equipment_name + ' has been marked as Returned.', 'success');
+                            } else if (r.status === 'Approved') {
+                                showToast(r.equipment_name + ' request has been Approved!', 'success');
+                            } else if (r.status === 'Declined') {
+                                showToast(r.equipment_name + ' request was Declined.', 'error');
+                            }
+                        }
+                    });
+
+                    if (changed) {
+                        // Update the global data and re-render
+                        window.REQUESTS_DATA = fresh;
+                        window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
+                        renderRequestsTable();
+                        checkOverdueState();
+                        _updateFacultyStatCards(fresh);
+                    }
+                })
+                .catch(() => { }); // silently ignore network errors
+        }, INTERVAL);
+    }
+
 })();
+

@@ -805,7 +805,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
         </div><!-- /modal-card -->
     </div><!-- /modal-overlay -->
 
-    <script src="js/landing-page.js"></script>
+    <script src="JS/landing-page.js"></script>
     <script>
         /* ================================================================
            INIT — PHP-generated values injected here

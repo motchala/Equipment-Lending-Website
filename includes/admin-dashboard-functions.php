@@ -385,21 +385,26 @@ if (empty($_SESSION['admin_last_login']) && $admin_email === 'main@admin.edu') {
 
 // ================= FETCH ARBITRATION LOG =================
 
-$arb_log_sql = "SELECT * FROM tbl_arbitration_log";
+// Show all log entries joined with the current live request status.
+// The auto-overdue transition never writes to this table, so no status
+// filtering is needed — every row here is a genuine engine or override decision.
+$arb_log_sql = "SELECT l.*, r.status AS current_request_status
+                  FROM tbl_arbitration_log l
+                  LEFT JOIN tbl_requests r ON r.id = l.request_id";
 
 if (!empty($_GET['arb_log_search'])) {
     $search = "%" . $_GET['arb_log_search'] . "%";
     $arb_log_sql .= " WHERE (
-        borrower_name LIKE ?
-        OR borrower_id LIKE ?
-        OR equipment_name LIKE ?
-    ) ORDER BY created_at DESC";
+        l.borrower_name LIKE ?
+        OR l.borrower_id LIKE ?
+        OR l.equipment_name LIKE ?
+    ) ORDER BY l.created_at DESC";
     $stmt = $conn->prepare($arb_log_sql);
     $stmt->bind_param("sss", $search, $search, $search);
     $stmt->execute();
     $arb_log_result = $stmt->get_result();
 } else {
-    $arb_log_sql .= " ORDER BY created_at DESC";
+    $arb_log_sql .= " ORDER BY l.created_at DESC";
     $arb_log_result = mysqli_query($conn, $arb_log_sql);
 }
 

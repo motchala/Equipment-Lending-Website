@@ -21,7 +21,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | Admin Portal</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="CSS/admin-dashboard.css">
 </head>
 
@@ -33,14 +34,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <header class="app-header">
         <div class="header-left">
             <div class="app-logo">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon" style="color:var(--accent-maroon)">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon"
+                    style="color:var(--accent-maroon)">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
                 <div class="app-logo-text" style="display:flex;flex-direction:column;">
                     <span style="white-space:nowrap;line-height:1.1;">
-                        <strong style="font-size:25px;">PUP</strong><span style="font-weight:500;font-size:21px;margin-left:1px;">SYNC</span>
+                        <strong style="font-size:25px;">PUP</strong><span
+                            style="font-weight:500;font-size:21px;margin-left:1px;">SYNC</span>
                         <span class="admin-badge">Admin</span>
                     </span>
                     <small>Admin Portal</small>
@@ -58,30 +62,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <div class="header-right">
             <!-- Notification Bell -->
             <button class="notif-btn" data-action="open-overlay" data-target="notifOverlay" title="Notifications">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 <?php if ($stat_waiting > 0 || $stat_overdue > 0): ?>
-                    <span class="notif-btn-badge"><?php echo $stat_waiting + $stat_overdue; ?></span>
+                <span class="notif-btn-badge">
+                    <?php echo $stat_waiting + $stat_overdue; ?>
+                </span>
                 <?php endif; ?>
             </button>
 
             <div class="header-user-info">
-                <span class="u-name"><?php echo htmlspecialchars($admin_name); ?></span>
+                <span class="u-name">
+                    <?php echo htmlspecialchars($admin_name); ?>
+                </span>
                 <span class="u-role">Administrator</span>
             </div>
 
-            <div class="avatar-btn" id="avatarBtn" role="button" aria-haspopup="true" aria-expanded="false" title="Account menu">
+            <div class="avatar-btn" id="avatarBtn" role="button" aria-haspopup="true" aria-expanded="false"
+                title="Account menu">
                 <?php echo htmlspecialchars($initials); ?>
             </div>
 
             <!-- Profile Dropdown -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
-                    <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
+                    <div class="dd-avatar">
+                        <?php echo htmlspecialchars($initials); ?>
+                    </div>
                     <div>
-                        <span class="dd-name"><?php echo htmlspecialchars($admin_name); ?></span>
+                        <span class="dd-name">
+                            <?php echo htmlspecialchars($admin_name); ?>
+                        </span>
                         <span class="dd-sub">Administrator</span>
                         <span class="dd-sub" style="margin-top:2px;">Full Access</span>
                     </div>
@@ -89,7 +103,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="dd-menu">
                     <button class="dd-item" data-action="open-overlay" data-target="accountOverlay">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                 <circle cx="12" cy="7" r="4" />
                             </svg>
@@ -97,27 +113,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
                                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                             </svg>
                         </div>Notifications
                         <?php if ($stat_waiting + $stat_overdue > 0): ?>
-                            <span class="notif-badge"><?php echo $stat_waiting + $stat_overdue; ?></span>
+                        <span class="notif-badge">
+                            <?php echo $stat_waiting + $stat_overdue; ?>
+                        </span>
                         <?php endif; ?>
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="settingsOverlay">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
                                 <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                <path
+                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
                         </div>Settings
                     </button>
                     <div class="dd-divider"></div>
                     <button class="dd-item dd-logout" data-action="logout">
                         <div class="dd-icon" style="background:#ffeaea;">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="color:var(--danger)">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16" style="color:var(--danger)">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                                 <polyline points="16 17 21 12 16 7" />
                                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -136,35 +161,39 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
         <!-- Alerts -->
         <?php if (isset($_GET['added'])): ?>
-            <div class="alert-banner alert-success" id="added-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Success!</strong> Item added to inventory.
-                <button class="alert-close" data-action="dismiss-alert" data-target="added-alert">✕</button>
-            </div>
+        <div class="alert-banner alert-success" id="added-alert">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <strong>Success!</strong> Item added to inventory.
+            <button class="alert-close" data-action="dismiss-alert" data-target="added-alert">✕</button>
+        </div>
         <?php endif; ?>
         <?php if (isset($_GET['updated'])): ?>
-            <div class="alert-banner alert-success" id="updated-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Updated!</strong> Item has been updated successfully.
-                <button class="alert-close" data-action="dismiss-alert" data-target="updated-alert">✕</button>
-            </div>
+        <div class="alert-banner alert-success" id="updated-alert">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <strong>Updated!</strong> Item has been updated successfully.
+            <button class="alert-close" data-action="dismiss-alert" data-target="updated-alert">✕</button>
+        </div>
         <?php endif; ?>
         <?php if ($stat_overdue > 0): ?>
-            <div class="alert-banner alert-danger" id="overdue-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <strong>Overdue Alert:</strong> <?php echo $stat_overdue; ?> item(s) are currently overdue and need immediate attention.
-                <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert">✕</button>
-            </div>
+        <div class="alert-banner alert-danger" id="overdue-alert">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <strong>Overdue Alert:</strong>
+            <?php echo $stat_overdue; ?> item(s) are currently overdue and need immediate attention.
+            <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert">✕</button>
+        </div>
         <?php endif; ?>
 
         <!-- ============================================================
@@ -173,7 +202,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <div class="tab-panel active" id="panel-dashboard">
             <div class="section-header">
                 <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                         <rect x="3" y="3" width="7" height="7" />
                         <rect x="14" y="3" width="7" height="7" />
                         <rect x="14" y="14" width="7" height="7" />
@@ -181,18 +211,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </svg>
                     Admin Dashboard
                 </h2>
-                <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
+                <p>
+                    <?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.
+                </p>
             </div>
 
             <!-- Hero Card -->
             <div class="hero-card">
                 <h1>Equipment Lending Management</h1>
-                <p>Manage borrow requests, track inventory, approve or decline student requests — all from one place.</p>
+                <p>Manage borrow requests, track inventory, approve or decline student requests — all from one place.
+                </p>
             </div>
 
             <!-- Stats Grid -->
-            <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-light);margin-bottom:0.8rem;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+            <p
+                style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-light);margin-bottom:0.8rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                     <line x1="18" y1="20" x2="18" y2="10" />
                     <line x1="12" y1="20" x2="12" y2="4" />
                     <line x1="6" y1="20" x2="6" y2="14" />
@@ -202,63 +237,92 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </p>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                    <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            width="20" height="20">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                         </svg></div>
                     <div class="stat-label">Total Requests</div>
-                    <div class="stat-value"><?php echo $stat_total_req; ?></div>
+                    <div class="stat-value">
+                        <?php echo $stat_total_req; ?>
+                    </div>
                     <div class="stat-sub">All time</div>
                 </div>
-                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="waiting" title="View pending requests">
-                    <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="waiting"
+                    title="View pending requests">
+                    <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
                         </svg></div>
                     <div class="stat-label">Pending</div>
-                    <div class="stat-value" style="color:#c67c00;"><?php echo $stat_waiting; ?></div>
+                    <div class="stat-value" style="color:#c67c00;">
+                        <?php echo $stat_waiting; ?>
+                    </div>
                     <div class="stat-sub stat-sub-link">Needs action →</div>
                 </div>
-                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="approved" title="View approved requests">
-                    <div class="stat-icon" style="background:#e3fcef;color:#00875a;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="approved"
+                    title="View approved requests">
+                    <div class="stat-icon" style="background:#e3fcef;color:#00875a;"><svg
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg></div>
                     <div class="stat-label">Approved</div>
-                    <div class="stat-value" style="color:#00875a;"><?php echo $stat_approved; ?></div>
+                    <div class="stat-value" style="color:#00875a;">
+                        <?php echo $stat_approved; ?>
+                    </div>
                     <div class="stat-sub stat-sub-link">Currently out →</div>
                 </div>
-                <div class="stat-card stat-card-clickable<?php echo $stat_overdue > 0 ? ' stat-card-alert' : ''; ?>" data-action="go-lending" data-lending="waiting" title="Overdue items need attention">
-                    <div class="stat-icon" style="background:#fff3e0;color:#e65100;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <div class="stat-card stat-card-clickable<?php echo $stat_overdue > 0 ? ' stat-card-alert' : ''; ?>"
+                    data-action="go-lending" data-lending="waiting" title="Overdue items need attention">
+                    <div class="stat-icon" style="background:#fff3e0;color:#e65100;"><svg
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                             <line x1="12" y1="9" x2="12" y2="13" />
                             <line x1="12" y1="17" x2="12.01" y2="17" />
                         </svg></div>
                     <div class="stat-label">Overdue</div>
-                    <div class="stat-value" style="color:#e65100;"><?php echo $stat_overdue; ?></div>
+                    <div class="stat-value" style="color:#e65100;">
+                        <?php echo $stat_overdue; ?>
+                    </div>
                     <div class="stat-sub stat-sub-link" style="color:#e65100;">Immediate action →</div>
                 </div>
                 <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="inventory">
-                    <div class="stat-icon" style="background:#e3f2fd;color:#1565c0;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <div class="stat-icon" style="background:#e3f2fd;color:#1565c0;"><svg
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                             <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                             <line x1="12" y1="22.08" x2="12" y2="12" />
                         </svg></div>
                     <div class="stat-label">Inventory Items</div>
-                    <div class="stat-value" style="color:#1565c0;"><?php echo $stat_inv_total; ?></div>
+                    <div class="stat-value" style="color:#1565c0;">
+                        <?php echo $stat_inv_total; ?>
+                    </div>
                     <div class="stat-sub stat-sub-link">Manage stock →</div>
                 </div>
                 <?php if ($stat_inv_low > 0): ?>
-                    <div class="stat-card stat-card-alert">
-                        <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg></div>
-                        <div class="stat-label">Low Stock</div>
-                        <div class="stat-value" style="color:#c67c00;"><?php echo $stat_inv_low; ?></div>
-                        <div class="stat-sub">Items with ≤2 units</div>
+                <div class="stat-card stat-card-alert">
+                    <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg></div>
+                    <div class="stat-label">Low Stock</div>
+                    <div class="stat-value" style="color:#c67c00;">
+                        <?php echo $stat_inv_low; ?>
                     </div>
+                    <div class="stat-sub">Items with ≤2 units</div>
+                </div>
                 <?php endif; ?>
             </div>
 
@@ -267,7 +331,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Recent Activity -->
                 <div class="activity-container">
                     <h3>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img"
+                            style="color:var(--accent-maroon)">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                         </svg>
                         Recent Activity
@@ -275,22 +341,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <?php
                     $recent = mysqli_query($conn, "SELECT * FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
                     if (mysqli_num_rows($recent) === 0): ?>
-                        <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem;">No activity yet.</p>
-                        <?php else:
+                    <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem;">No activity
+                        yet.</p>
+                    <?php else:
                         while ($r = mysqli_fetch_assoc($recent)):
                             $dotClass = 'dot-waiting';
                             if ($r['status'] === 'Approved') $dotClass = 'dot-approved';
                             if ($r['status'] === 'Declined') $dotClass = 'dot-declined';
                             if ($r['status'] === 'Overdue')  $dotClass = 'dot-overdue';
                         ?>
-                            <div class="activity-item">
-                                <div class="activity-dot <?php echo $dotClass; ?>"></div>
-                                <div class="activity-info">
-                                    <h4><?php echo htmlspecialchars($r['faculty_name']); ?></h4>
-                                    <p><?php echo htmlspecialchars($r['equipment_name']); ?> &mdash; <?php echo htmlspecialchars($r['status']); ?></p>
-                                </div>
-                                <span class="activity-time"><?php echo date('M d', strtotime($r['request_date'])); ?></span>
-                            </div>
+                    <div class="activity-item">
+                        <div class="activity-dot <?php echo $dotClass; ?>"></div>
+                        <div class="activity-info">
+                            <h4>
+                                <?php echo htmlspecialchars($r['faculty_name']); ?>
+                            </h4>
+                            <p>
+                                <?php echo htmlspecialchars($r['equipment_name']); ?> &mdash;
+                                <?php echo htmlspecialchars($r['status']); ?>
+                            </p>
+                        </div>
+                        <span class="activity-time">
+                            <?php echo date('M d', strtotime($r['request_date'])); ?>
+                        </span>
+                    </div>
                     <?php endwhile;
                     endif; ?>
                 </div>
@@ -298,33 +372,43 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Quick Actions -->
                 <div class="quick-actions">
                     <h3>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon)">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img"
+                            style="color:var(--accent-maroon)">
                             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                         </svg>
                         Quick Actions
                     </h3>
                     <button class="qa-btn" data-action="go-lending" data-lending="waiting">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
                         </svg>
-                        Pending Requests <span style="margin-left:auto;background:#fff8e1;color:#c67c00;font-size:0.72rem;font-weight:700;padding:2px 9px;border-radius:20px;"><?php echo $stat_waiting; ?></span>
+                        Pending Requests <span
+                            style="margin-left:auto;background:#fff8e1;color:#c67c00;font-size:0.72rem;font-weight:700;padding:2px 9px;border-radius:20px;">
+                            <?php echo $stat_waiting; ?>
+                        </span>
                     </button>
                     <button class="qa-btn" data-action="go-lending" data-lending="inventory">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                         </svg>
                         Manage Inventory
                     </button>
                     <button class="qa-btn" data-action="go-lending" data-lending="approved">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg>
                         Approved Requests
                     </button>
                     <button class="qa-btn" data-action="go-lending" data-lending="raw">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                             <line x1="8" y1="6" x2="21" y2="6" />
                             <line x1="8" y1="12" x2="21" y2="12" />
                             <line x1="8" y1="18" x2="21" y2="18" />
@@ -335,13 +419,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         Raw Data
                     </button>
                     <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                         </svg>
                         Notifications
                         <?php if ($stat_waiting + $stat_overdue > 0): ?>
-                            <span class="notif-badge" style="font-size:0.7rem;padding:1px 7px;"><?php echo $stat_waiting + $stat_overdue; ?></span>
+                        <span class="notif-badge" style="font-size:0.7rem;padding:1px 7px;">
+                            <?php echo $stat_waiting + $stat_overdue; ?>
+                        </span>
                         <?php endif; ?>
                     </button>
                 </div>
@@ -357,32 +444,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <!-- Lending Sub-Nav -->
             <div class="lending-nav">
                 <button class="lending-nav-btn active" data-lending-nav="waiting">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                         <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                         <line x1="9" y1="12" x2="15" y2="12" />
                         <line x1="12" y1="9" x2="12" y2="15" />
                     </svg>
-                    Borrow Requests <span class="lnb-badge"><?php echo $stat_waiting; ?></span>
+                    Borrow Requests <span class="lnb-badge">
+                        <?php echo $stat_waiting; ?>
+                    </span>
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="history">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                         <polyline points="14 2 14 8 20 8" />
                         <line x1="9" y1="13" x2="15" y2="13" />
                         <line x1="9" y1="17" x2="15" y2="17" />
                         <polyline points="9 9 10 9 12 9" />
                     </svg>
-                    Borrow History <span class="lnb-badge"><?php echo $stat_approved + $stat_declined; ?></span>
+                    Borrow History <span class="lnb-badge">
+                        <?php echo $stat_approved + $stat_declined; ?>
+                    </span>
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="inventory">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                     </svg>
                     Equipment Registry
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="raw">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <line x1="8" y1="6" x2="21" y2="6" />
                         <line x1="8" y1="12" x2="21" y2="12" />
                         <line x1="8" y1="18" x2="21" y2="18" />
@@ -393,7 +489,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     Raw Data
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="arb-log">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                         <polyline points="14 2 14 8 20 8" />
                         <line x1="9" y1="13" x2="15" y2="13" />
@@ -402,9 +499,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     Arbitration Log
                 </button>
                 <button class="lending-nav-btn" data-lending-nav="arb-config">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <circle cx="12" cy="12" r="3" />
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
                     Config Panel
                 </button>
@@ -413,7 +512,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <!-- ── BORROW REQUESTS ────────────────────────────────────── -->
             <div class="lending-sub active" id="lending-waiting">
                 <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                             <line x1="9" y1="12" x2="15" y2="12" />
@@ -426,20 +526,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
                     <div class="history-toggle-wrap" style="margin-bottom:0;">
                         <button class="history-toggle-btn active" data-history-tab="pending-loans">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="14" height="14">
                                 <circle cx="12" cy="12" r="10" />
                                 <polyline points="12 6 12 12 16 14" />
                             </svg>
                             Pending Approval
-                            <span class="history-toggle-count"><?php echo $stat_waiting; ?></span>
+                            <span class="history-toggle-count">
+                                <?php echo $stat_waiting; ?>
+                            </span>
                         </button>
                         <button class="history-toggle-btn" data-history-tab="return-confirmation">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="14" height="14">
                                 <polyline points="1 4 1 10 7 10" />
                                 <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
                             </svg>
                             Return Confirmation
-                            <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
+                            <span class="history-toggle-count">
+                                <?php echo $stat_approved; ?>
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -449,7 +557,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="eq-card">
                         <div class="search-row">
                             <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
@@ -471,43 +581,57 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </thead>
                                 <tbody id="waiting-body">
                                     <?php if (mysqli_num_rows($waiting_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="display:block;margin:0 auto 10px;opacity:0.3;">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <polyline points="12 6 12 12 16 14" />
-                                                </svg>
-                                                No pending requests.
-                                            </td>
-                                        </tr>
-                                        <?php else: while ($r = mysqli_fetch_assoc($waiting_result)):
+                                    <tr>
+                                        <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round" width="40" height="40"
+                                                style="display:block;margin:0 auto 10px;opacity:0.3;">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <polyline points="12 6 12 12 16 14" />
+                                            </svg>
+                                            No pending requests.
+                                        </td>
+                                    </tr>
+                                    <?php else: while ($r = mysqli_fetch_assoc($waiting_result)):
                                             $isPast = strtotime($r['borrow_date']) < strtotime($today);
                                         ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td style="<?php echo $isPast ? 'color:var(--danger);font-weight:600;' : '' ?>">
-                                                    <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
-                                                    <?php if ($isPast): ?><br><small style="font-size:0.68rem;">(Date Passed)</small><?php endif; ?>
-                                                </td>
-                                                <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                                <td><span class="status-pill pill-waiting">Pending</span></td>
-                                                <td>
-                                                    <button class="btn-action btn-override-req"
-                                                        data-action="open-override"
-                                                        data-request-id="<?php echo $r['id']; ?>"
-                                                        data-request-status="Waiting"
-                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                        data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                        title="Override this request">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                        </svg>
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                    <tr>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['faculty_id']); ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </td>
+                                        <td style="<?php echo $isPast ? 'color:var(--danger);font-weight:600;' : '' ?>">
+                                            <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
+                                            <?php if ($isPast): ?><br><small style="font-size:0.68rem;">(Date
+                                                Passed)</small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
+                                        </td>
+                                        <td><span class="status-pill pill-waiting">Pending</span></td>
+                                        <td>
+                                            <button class="btn-action btn-override-req" data-action="open-override"
+                                                data-request-id="<?php echo $r['id']; ?>" data-request-status="Waiting"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                title="Override this request">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" width="14" height="14">
+                                                    <path
+                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -521,7 +645,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="eq-card">
                         <div class="search-row">
                             <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
@@ -539,49 +665,86 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Due Date</th>
                                         <th>Status</th>
                                         <th>Action</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="return-body">
                                     <?php
                                     mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="display:block;margin:0 auto 10px;opacity:0.3;">
-                                                    <polyline points="1 4 1 10 7 10" />
-                                                    <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                </svg>
-                                                No items awaiting return confirmation.
-                                            </td>
-                                        </tr>
-                                        <?php else: while ($r = mysqli_fetch_assoc($approved_result)):
+                                    <tr>
+                                        <td colspan="8" class="text-muted" style="text-align:center;padding:3rem;">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round" width="40" height="40"
+                                                style="display:block;margin:0 auto 10px;opacity:0.3;">
+                                                <polyline points="1 4 1 10 7 10" />
+                                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                            </svg>
+                                            No items awaiting return confirmation.
+                                        </td>
+                                    </tr>
+                                    <?php else: while ($r = mysqli_fetch_assoc($approved_result)):
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
+                                            $actualStatus = $isOverdue ? 'Overdue' : 'Approved';
                                         ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
-                                                <td style="<?php echo $isOverdue ? 'color:var(--danger);font-weight:600;' : '' ?>">
-                                                    <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
-                                                    <?php if ($isOverdue): ?><br><small style="font-size:0.68rem;">(Overdue)</small><?php endif; ?>
-                                                </td>
-                                                <td><span class="status-pill <?php echo $isOverdue ? 'pill-overdue' : 'pill-approved'; ?>"><?php echo $isOverdue ? 'Overdue' : 'Out on Loan'; ?></span></td>
-                                                <td class="action-cell">
-                                                    <div class="action-btns">
-                                                        <a href="admin-dashboard.php?action=return_confirm&id=<?php echo $r['id']; ?>"
-                                                            class="btn-return-confirm"
-                                                            title="Confirm item has been returned"
-                                                            onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['faculty_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13">
-                                                                <polyline points="1 4 1 10 7 10" />
-                                                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                            </svg>
-                                                            Returned
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                    <tr>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['faculty_id']); ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
+                                        </td>
+                                        <td
+                                            style="<?php echo $isOverdue ? 'color:var(--danger);font-weight:600;' : '' ?>">
+                                            <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
+                                            <?php if ($isOverdue): ?><br><small
+                                                style="font-size:0.68rem;">(Overdue)</small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><span
+                                                class="status-pill <?php echo $isOverdue ? 'pill-overdue' : 'pill-approved'; ?>">
+                                                <?php echo $isOverdue ? 'Overdue' : 'Out on Loan'; ?>
+                                            </span></td>
+                                        <td class="action-cell">
+                                            <div class="action-btns">
+                                                <a href="admin-dashboard.php?action=return_confirm&id=<?php echo $r['id']; ?>"
+                                                    class="btn-return-confirm" title="Confirm item has been returned"
+                                                    onclick="return confirm('Confirm that <?php echo htmlspecialchars(addslashes($r['faculty_name'])); ?> has returned the <?php echo htmlspecialchars(addslashes($r['equipment_name'])); ?>?')">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2.5"
+                                                        stroke-linecap="round" stroke-linejoin="round" width="13"
+                                                        height="13">
+                                                        <polyline points="1 4 1 10 7 10" />
+                                                        <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                    </svg>
+                                                    Returned
+                                                </a>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <button class="btn-action btn-override-req" data-action="open-override"
+                                                data-request-id="<?php echo $r['id']; ?>"
+                                                data-request-status="<?php echo $actualStatus; ?>"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                title="Override this request">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" width="14" height="14">
+                                                    <path
+                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -596,7 +759,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="lending-sub" id="lending-history">
                 <div class="page-header">
                     <h2>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                             <polyline points="14 2 14 8 20 8" />
                             <line x1="9" y1="13" x2="15" y2="13" />
@@ -609,20 +773,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Status toggle -->
                 <div class="history-toggle-wrap">
                     <button class="history-toggle-btn active" data-history-tab="approved">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                             <polyline points="22 4 12 14.01 9 11.01" />
                         </svg>
                         Approved
-                        <span class="history-toggle-count"><?php echo $stat_approved; ?></span>
+                        <span class="history-toggle-count">
+                            <?php echo $stat_approved; ?>
+                        </span>
                     </button>
                     <button class="history-toggle-btn" data-history-tab="declined">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                         Declined
-                        <span class="history-toggle-count"><?php echo $stat_declined; ?></span>
+                        <span class="history-toggle-count">
+                            <?php echo $stat_declined; ?>
+                        </span>
                     </button>
                 </div>
 
@@ -631,7 +801,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="eq-card">
                         <div class="search-row">
                             <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
@@ -648,23 +820,50 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Borrow Date</th>
                                         <th>Return Date</th>
                                         <th>Status</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="approved-list">
                                     <?php mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="6" class="text-muted" style="text-align:center;padding:2.5rem;">No approved requests.</td>
-                                        </tr>
-                                        <?php else: while ($r = mysqli_fetch_assoc($approved_result)): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                                <td><span class="status-pill pill-approved">Approved</span></td>
-                                            </tr>
+                                    <tr>
+                                        <td colspan="7" class="text-muted" style="text-align:center;padding:2.5rem;">No
+                                            approved requests.</td>
+                                    </tr>
+                                    <?php else: while ($r = mysqli_fetch_assoc($approved_result)): ?>
+                                    <tr>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['faculty_id']); ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
+                                        </td>
+                                        <td><span class="status-pill pill-approved">Approved</span></td>
+                                        <td>
+                                            <button class="btn-action btn-override-req" data-action="open-override"
+                                                data-request-id="<?php echo $r['id']; ?>" data-request-status="Approved"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                title="Override this request">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" width="14" height="14">
+                                                    <path
+                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -678,7 +877,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="eq-card">
                         <div class="search-row">
                             <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
@@ -696,24 +897,53 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Return Date</th>
                                         <th>Status</th>
                                         <th>Reason</th>
+                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="declined-list">
                                     <?php mysqli_data_seek($declined_result, 0);
                                     if (mysqli_num_rows($declined_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="7" class="text-muted" style="text-align:center;padding:2.5rem;">No declined requests.</td>
-                                        </tr>
-                                        <?php else: while ($r = mysqli_fetch_assoc($declined_result)): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                                <td><span class="status-pill pill-declined">Declined</span></td>
-                                                <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['reason'] ?? '—'); ?></td>
-                                            </tr>
+                                    <tr>
+                                        <td colspan="8" class="text-muted" style="text-align:center;padding:2.5rem;">No
+                                            declined requests.</td>
+                                    </tr>
+                                    <?php else: while ($r = mysqli_fetch_assoc($declined_result)): ?>
+                                    <tr>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['faculty_id']); ?>
+                                        </td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
+                                        </td>
+                                        <td><span class="status-pill pill-declined">Declined</span></td>
+                                        <td class="text-muted" style="font-size:0.78rem;">
+                                            <?php echo htmlspecialchars($r['reason'] ?? '—'); ?>
+                                        </td>
+                                        <td>
+                                            <button class="btn-action btn-override-req" data-action="open-override"
+                                                data-request-id="<?php echo $r['id']; ?>" data-request-status="Declined"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                title="Override this request">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                    stroke-linejoin="round" width="14" height="14">
+                                                    <path
+                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -726,15 +956,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             <!-- ── EQUIPMENT REGISTRY ────────────────────────────────── -->
             <div class="lending-sub" id="lending-inventory">
-                <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div class="page-header"
+                    style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
                     <div>
-                        <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                class="important-icon">
+                                <path
+                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                             </svg>Equipment Registry</h2>
                         <p>Manage active equipment and archived items in one place.</p>
                     </div>
                     <button class="btn-add-item" data-action="show-add-form">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
@@ -743,17 +978,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
 
                 <!-- Add / Edit Form (hidden by default) -->
-                <div id="item-form-wrap" class="<?php echo $edit_item ? '' : 'hidden'; ?>" style="margin-bottom:1.5rem;">
+                <div id="item-form-wrap" class="<?php echo $edit_item ? '' : 'hidden'; ?>"
+                    style="margin-bottom:1.5rem;">
                     <div class="eq-card form-card">
                         <div class="form-card-header">
                             <h2>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="18" height="18">
+                                    <path
+                                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                                 </svg>
-                                <span id="form-title"><?php echo $edit_item ? 'Edit Item' : 'Add New Item'; ?></span>
+                                <span id="form-title">
+                                    <?php echo $edit_item ? 'Edit Item' : 'Add New Item'; ?>
+                                </span>
                             </h2>
                             <button type="button" class="btn-close-custom" data-action="hide-item-form">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <line x1="18" y1="6" x2="6" y2="18" />
                                     <line x1="6" y1="6" x2="18" y2="18" />
                                 </svg>
@@ -762,8 +1005,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="form-card-body">
                             <form method="POST" enctype="multipart/form-data" id="itemForm">
                                 <?php if ($edit_item): ?>
-                                    <input type="hidden" name="item_id" value="<?php echo $edit_item['item_id']; ?>">
-                                    <input type="hidden" name="old_image" value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
+                                <input type="hidden" name="item_id" value="<?php echo $edit_item['item_id']; ?>">
+                                <input type="hidden" name="old_image"
+                                    value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
                                 <?php endif; ?>
 
                                 <div class="form-group">
@@ -795,25 +1039,35 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <div class="form-group">
                                     <label>Item Image</label>
                                     <div class="drop-zone" id="dropZone">
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="32" height="32" style="color:var(--text-light)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="32" height="32"
+                                            style="color:var(--text-light)">
                                             <rect x="3" y="3" width="18" height="18" rx="2" />
                                             <circle cx="8.5" cy="8.5" r="1.5" />
                                             <polyline points="21 15 16 10 5 21" />
                                         </svg>
                                         <p>Click to upload, drag & drop, or paste an image</p>
-                                        <input type="file" name="item_image" id="itemImageInput" accept="image/*" style="display:none;">
+                                        <input type="file" name="item_image" id="itemImageInput" accept="image/*"
+                                            style="display:none;">
                                         <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                            <img src="<?php echo htmlspecialchars($edit_item['image_path']); ?>" class="drop-zone-preview" id="imagePreview" style="display:block;">
+                                        <img src="<?php echo htmlspecialchars($edit_item['image_path']); ?>"
+                                            class="drop-zone-preview" id="imagePreview" style="display:block;">
                                         <?php else: ?>
-                                            <img id="imagePreview" class="drop-zone-preview" style="display:none;">
+                                        <img id="imagePreview" class="drop-zone-preview" style="display:none;">
                                         <?php endif; ?>
                                     </div>
-                                    <button type="button" id="removeImageBtn" class="<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : 'hidden'; ?>"
-                                        style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">✕ Remove image</button>
+                                    <button type="button" id="removeImageBtn"
+                                        class="<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : 'hidden'; ?>"
+                                        style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">✕
+                                        Remove image</button>
                                 </div>
 
-                                <button type="submit" name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>" class="btn-submit-form">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <button type="submit" name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                                    class="btn-submit-form">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="16" height="16">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                     <?php echo $edit_item ? 'Update Item' : 'Add to Inventory'; ?>
@@ -826,13 +1080,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Equipment Registry toggle -->
                 <div class="history-toggle-wrap" id="registry-toggle-wrap">
                     <button class="history-toggle-btn active" data-history-tab="reg-active">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                         </svg>
                         Active Equipment
                     </button>
                     <button class="history-toggle-btn" data-history-tab="reg-archived">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                             <polyline points="21 8 21 21 3 21 3 8" />
                             <rect x="1" y="3" width="22" height="5" />
                             <line x1="10" y1="12" x2="14" y2="12" />
@@ -847,7 +1104,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="eq-card" id="inv-table-card">
                         <div class="search-row">
                             <div class="search-wrap">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="16" height="16">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
@@ -869,44 +1128,63 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <tbody id="inventory-body">
                                     <?php mysqli_data_seek($inventory_result, 0);
                                     if (mysqli_num_rows($inventory_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="6" class="text-muted" style="text-align:center;padding:3rem;">Inventory is empty.</td>
-                                        </tr>
-                                        <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
-                                            <tr>
-                                                <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>" class="item-img" onerror="this.src='uploads/default.png'"></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                <td><span class="status-pill pill-info"><?php echo $item['quantity']; ?> units</span></td>
-                                                <td>
-                                                    <?php if ($item['quantity'] > 2): ?>
-                                                        <span class="stock-badge stock-avail">Available</span>
-                                                    <?php elseif ($item['quantity'] > 0): ?>
-                                                        <span class="stock-badge stock-low">Low Stock</span>
-                                                    <?php else: ?>
-                                                        <span class="stock-badge stock-unavail">No Stock</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td class="action-cell">
-                                                    <div class="action-btns">
-                                                        <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>" class="btn-action btn-edit-item" title="Edit">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                            </svg>
-                                                        </a>
-                                                        <a href="admin-dashboard.php?delete_item=<?php echo $item['item_id']; ?>" class="btn-action btn-delete-item" title="Archive" onclick="return confirm('Archive this item?')">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <polyline points="3 6 5 6 21 6" />
-                                                                <path d="M19 6l-1 14H6L5 6" />
-                                                                <path d="M10 11v6" />
-                                                                <path d="M14 11v6" />
-                                                                <path d="M9 6V4h6v2" />
-                                                            </svg>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                    <tr>
+                                        <td colspan="6" class="text-muted" style="text-align:center;padding:3rem;">
+                                            Inventory is empty.</td>
+                                    </tr>
+                                    <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
+                                    <tr>
+                                        <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>"
+                                                class="item-img" onerror="this.src='uploads/default.png'"></td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($item['item_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($item['category']); ?>
+                                        </td>
+                                        <td><span class="status-pill pill-info">
+                                                <?php echo $item['quantity']; ?> units
+                                            </span></td>
+                                        <td>
+                                            <?php if ($item['quantity'] > 2): ?>
+                                            <span class="stock-badge stock-avail">Available</span>
+                                            <?php elseif ($item['quantity'] > 0): ?>
+                                            <span class="stock-badge stock-low">Low Stock</span>
+                                            <?php else: ?>
+                                            <span class="stock-badge stock-unavail">No Stock</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="action-cell">
+                                            <div class="action-btns">
+                                                <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>"
+                                                    class="btn-action btn-edit-item" title="Edit">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" width="14"
+                                                        height="14">
+                                                        <path
+                                                            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                        <path
+                                                            d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                    </svg>
+                                                </a>
+                                                <a href="admin-dashboard.php?delete_item=<?php echo $item['item_id']; ?>"
+                                                    class="btn-action btn-delete-item" title="Archive"
+                                                    onclick="return confirm('Archive this item?')">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" width="14"
+                                                        height="14">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6l-1 14H6L5 6" />
+                                                        <path d="M10 11v6" />
+                                                        <path d="M14 11v6" />
+                                                        <path d="M9 6V4h6v2" />
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -930,34 +1208,49 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </thead>
                                 <tbody>
                                     <?php if (mysqli_num_rows($archive_result) === 0): ?>
-                                        <tr>
-                                            <td colspan="4" class="text-muted" style="text-align:center;padding:2.5rem;">No archived items.</td>
-                                        </tr>
-                                        <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
-                                            <tr>
-                                                <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>" class="item-img" onerror="this.src='uploads/default.png'"></td>
-                                                <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                <td class="action-cell">
-                                                    <div class="action-btns">
-                                                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>" class="btn-action btn-restore" title="Restore to active">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <polyline points="1 4 1 10 7 10" />
-                                                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                            </svg>
-                                                        </a>
-                                                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>" class="btn-action btn-force-del" title="Delete permanently" onclick="return confirm('Permanently delete this item? This cannot be undone.')">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                                <polyline points="3 6 5 6 21 6" />
-                                                                <path d="M19 6l-1 14H6L5 6" />
-                                                                <path d="M10 11v6" />
-                                                                <path d="M14 11v6" />
-                                                                <path d="M9 6V4h6v2" />
-                                                            </svg>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                    <tr>
+                                        <td colspan="4" class="text-muted" style="text-align:center;padding:2.5rem;">No
+                                            archived items.</td>
+                                    </tr>
+                                    <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
+                                    <tr>
+                                        <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>"
+                                                class="item-img" onerror="this.src='uploads/default.png'"></td>
+                                        <td class="fw-bold">
+                                            <?php echo htmlspecialchars($item['item_name']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo htmlspecialchars($item['category']); ?>
+                                        </td>
+                                        <td class="action-cell">
+                                            <div class="action-btns">
+                                                <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                                                    class="btn-action btn-restore" title="Restore to active">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" width="14"
+                                                        height="14">
+                                                        <polyline points="1 4 1 10 7 10" />
+                                                        <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                    </svg>
+                                                </a>
+                                                <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                                                    class="btn-action btn-force-del" title="Delete permanently"
+                                                    onclick="return confirm('Permanently delete this item? This cannot be undone.')">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round" width="14"
+                                                        height="14">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6l-1 14H6L5 6" />
+                                                        <path d="M10 11v6" />
+                                                        <path d="M14 11v6" />
+                                                        <path d="M9 6V4h6v2" />
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
                                     <?php endwhile;
                                     endif; ?>
                                 </tbody>
@@ -971,7 +1264,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <!-- ── RAW DATA ───────────────────────────────────────────── -->
             <div class="lending-sub" id="lending-raw">
                 <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                             <line x1="8" y1="6" x2="21" y2="6" />
                             <line x1="8" y1="12" x2="21" y2="12" />
                             <line x1="8" y1="18" x2="21" y2="18" />
@@ -984,7 +1278,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="eq-card">
                     <div class="search-row">
                         <div class="search-wrap">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
                                 <circle cx="11" cy="11" r="8" />
                                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
                             </svg>
@@ -1007,20 +1303,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </thead>
                             <tbody id="raw-data-body">
                                 <?php if (mysqli_num_rows($raw_data_result) === 0): ?>
-                                    <tr>
-                                        <td colspan="8" class="text-muted" style="text-align:center;padding:2.5rem;">No records found.</td>
-                                    </tr>
-                                    <?php else: while ($r = mysqli_fetch_assoc($raw_data_result)): ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
-                                            <td class="fw-bold"><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['instructor']); ?></td>
-                                            <td><?php echo htmlspecialchars($r['room']); ?></td>
-                                            <td><?php echo date('M d, Y', strtotime($r['borrow_date'])); ?></td>
-                                            <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                            <td class="text-muted" style="font-size:0.78rem;"><?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?></td>
-                                        </tr>
+                                <tr>
+                                    <td colspan="8" class="text-muted" style="text-align:center;padding:2.5rem;">No
+                                        records found.</td>
+                                </tr>
+                                <?php else: while ($r = mysqli_fetch_assoc($raw_data_result)): ?>
+                                <tr>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['faculty_id']); ?>
+                                    </td>
+                                    <td class="fw-bold">
+                                        <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['instructor']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['room']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo date('M d, Y', strtotime($r['return_date'])); ?>
+                                    </td>
+                                    <td class="text-muted" style="font-size:0.78rem;">
+                                        <?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>
+                                    </td>
+                                </tr>
                                 <?php endwhile;
                                 endif; ?>
                             </tbody>
@@ -1032,7 +1345,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <!-- ── ARBITRATION LOG ───────────────────────────────────── -->
             <div class="lending-sub" id="lending-arb-log">
                 <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                             <polyline points="14 2 14 8 20 8" />
                             <line x1="9" y1="13" x2="15" y2="13" />
@@ -1043,11 +1357,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="eq-card">
                     <div class="search-row">
                         <div class="search-wrap">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                width="16" height="16">
                                 <circle cx="11" cy="11" r="8" />
                                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
                             </svg>
-                            <input type="text" id="arbLogSearch" placeholder="Search by borrower name, ID, or equipment...">
+                            <input type="text" id="arbLogSearch"
+                                placeholder="Search by borrower name, ID, or equipment...">
                         </div>
                     </div>
                     <div class="tbl-wrap">
@@ -1067,25 +1384,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </thead>
                             <tbody id="arb-log-body">
                                 <?php if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0): ?>
-                                    <tr>
-                                        <td colspan="9" class="text-muted" style="text-align:center;padding:2.5rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="display:block;margin:0 auto 10px;opacity:0.3;">
-                                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                                <polyline points="14 2 14 8 20 8" />
-                                                <line x1="9" y1="13" x2="15" y2="13" />
-                                                <line x1="9" y1="17" x2="15" y2="17" />
-                                            </svg>
-                                            No arbitration log entries yet.
-                                        </td>
-                                    </tr>
+                                <tr>
+                                    <td colspan="9" class="text-muted" style="text-align:center;padding:2.5rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" width="40" height="40"
+                                            style="display:block;margin:0 auto 10px;opacity:0.3;">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                            <polyline points="14 2 14 8 20 8" />
+                                            <line x1="9" y1="13" x2="15" y2="13" />
+                                            <line x1="9" y1="17" x2="15" y2="17" />
+                                        </svg>
+                                        No arbitration log entries yet.
+                                    </td>
+                                </tr>
                                 <?php else: while ($r = mysqli_fetch_assoc($arb_log_result)): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($r['request_id']); ?></td>
-                                        <td class="fw-bold"><?php echo htmlspecialchars($r['borrower_name']); ?></td>
-                                        <td><?php echo htmlspecialchars($r['borrower_id']); ?></td>
-                                        <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                        <td>
-                                            <?php
+                                <tr>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['request_id']); ?>
+                                    </td>
+                                    <td class="fw-bold">
+                                        <?php echo htmlspecialchars($r['borrower_name']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['borrower_id']); ?>
+                                    </td>
+                                    <td>
+                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                    </td>
+                                    <td>
+                                        <?php
                                             $dec = $r['decision'];
                                             if ($dec === 'Approved') {
                                                 echo '<span class="status-pill pill-approved">Approved</span>';
@@ -1095,25 +1423,32 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 echo '<span class="status-pill pill-waiting">' . htmlspecialchars($dec) . '</span>';
                                             }
                                             ?>
-                                        </td>
-                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?></td>
-                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo htmlspecialchars($r['reason'] ?? '—'); ?></td>
-                                        <td class="text-muted" style="font-size:0.78rem;"><?php echo date('M d, Y g:i A', strtotime($r['created_at'])); ?></td>
-                                        <td>
-                                            <button class="btn-action btn-override-req"
-                                                data-action="open-override"
-                                                data-request-id="<?php echo $r['request_id']; ?>"
-                                                data-request-status="<?php echo htmlspecialchars($r['decision']); ?>"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['borrower_name']); ?>"
-                                                title="Override this decision">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                                </svg>
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    </td>
+                                    <td class="text-muted" style="font-size:0.78rem;">
+                                        <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
+                                    </td>
+                                    <td class="text-muted" style="font-size:0.78rem;">
+                                        <?php echo htmlspecialchars($r['reason'] ?? '—'); ?>
+                                    </td>
+                                    <td class="text-muted" style="font-size:0.78rem;">
+                                        <?php echo date('M d, Y g:i A', strtotime($r['created_at'])); ?>
+                                    </td>
+                                    <td>
+                                        <button class="btn-action btn-override-req" data-action="open-override"
+                                            data-request-id="<?php echo $r['request_id']; ?>"
+                                            data-request-status="<?php echo htmlspecialchars($r['current_request_status'] ?? $r['decision']); ?>"
+                                            data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                            data-borrower="<?php echo htmlspecialchars($r['borrower_name']); ?>"
+                                            title="Override this decision">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                stroke-linejoin="round" width="14" height="14">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                            </svg>
+                                        </button>
+                                    </td>
+                                </tr>
                                 <?php endwhile;
                                 endif; ?>
                             </tbody>
@@ -1125,9 +1460,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <!-- ── ARBITRATION CONFIG PANEL ──────────────────────────── -->
             <div class="lending-sub" id="lending-arb-config">
                 <div class="page-header">
-                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                             <circle cx="12" cy="12" r="3" />
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                         </svg>Config Panel</h2>
                     <p>Configure arbitration rules, role priorities, and high-value item designations.</p>
                 </div>
@@ -1137,88 +1474,113 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <form id="arbConfigForm">
 
                             <!-- Role Priority -->
-                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;">Role Priority</h3>
+                            <h3
+                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;">
+                                Role Priority</h3>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Director</label>
-                                    <input type="number" name="config[role_priority_director]" class="form-control-custom" min="1" max="10"
+                                    <input type="number" name="config[role_priority_director]"
+                                        class="form-control-custom" min="1" max="10"
                                         value="<?php echo htmlspecialchars($arb_config['role_priority_director'] ?? 4); ?>">
                                 </div>
                                 <div class="form-group">
                                     <label>Adviser</label>
-                                    <input type="number" name="config[role_priority_adviser]" class="form-control-custom" min="1" max="10"
+                                    <input type="number" name="config[role_priority_adviser]"
+                                        class="form-control-custom" min="1" max="10"
                                         value="<?php echo htmlspecialchars($arb_config['role_priority_adviser'] ?? 3); ?>">
                                 </div>
                                 <div class="form-group">
                                     <label>Regular Faculty</label>
-                                    <input type="number" name="config[role_priority_faculty]" class="form-control-custom" min="1" max="10"
+                                    <input type="number" name="config[role_priority_faculty]"
+                                        class="form-control-custom" min="1" max="10"
                                         value="<?php echo htmlspecialchars($arb_config['role_priority_faculty'] ?? 2); ?>">
                                 </div>
                                 <div class="form-group">
                                     <label>Student Representative</label>
-                                    <input type="number" name="config[role_priority_student]" class="form-control-custom" min="1" max="10"
+                                    <input type="number" name="config[role_priority_student]"
+                                        class="form-control-custom" min="1" max="10"
                                         value="<?php echo htmlspecialchars($arb_config['role_priority_student'] ?? 1); ?>">
                                 </div>
                             </div>
 
                             <!-- Tie-Break Window -->
-                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">Tie-Break Window</h3>
+                            <h3
+                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
+                                Tie-Break Window</h3>
                             <div class="form-group" style="max-width:260px;">
                                 <label>Window (seconds)</label>
-                                <input type="number" name="config[tie_break_window_seconds]" class="form-control-custom" min="1"
+                                <input type="number" name="config[tie_break_window_seconds]" class="form-control-custom"
+                                    min="1"
                                     value="<?php echo htmlspecialchars($arb_config['tie_break_window_seconds'] ?? 5); ?>">
                             </div>
 
                             <!-- High-Value Items -->
-                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">High-Value Items</h3>
-                            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Items checked here require a signed request letter.</p>
+                            <h3
+                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
+                                High-Value Items</h3>
+                            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Items checked
+                                here require a signed request letter.</p>
                             <div class="form-group">
                                 <?php
                                 mysqli_data_seek($inventory_result, 0);
                                 while ($item = mysqli_fetch_assoc($inventory_result)):
                                     $checked = ($item['is_high_value'] == 1) ? 'checked' : '';
                                 ?>
-                                    <label style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;font-size:0.88rem;cursor:pointer;">
-                                        <input type="checkbox" name="config[high_value_items][]"
-                                            value="<?php echo htmlspecialchars($item['item_id']); ?>"
-                                            <?php echo $checked; ?>>
-                                        <?php echo htmlspecialchars($item['item_name']); ?>
-                                    </label>
+                                <label
+                                    style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;font-size:0.88rem;cursor:pointer;">
+                                    <input type="checkbox" name="config[high_value_items][]"
+                                        value="<?php echo htmlspecialchars($item['item_id']); ?>" <?php echo $checked;
+                                        ?>>
+                                    <?php echo htmlspecialchars($item['item_name']); ?>
+                                </label>
                                 <?php endwhile; ?>
                             </div>
 
                             <!-- Rule Toggles -->
-                            <h3 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">Auto-Decline Rules</h3>
-                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+                            <h3
+                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
+                                Auto-Decline Rules</h3>
+                            <div class="s-row"
+                                style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
                                 <div>
                                     <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Overdue Block</h4>
-                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline requests from borrowers with overdue items.</p>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline requests from
+                                        borrowers with overdue items.</p>
                                 </div>
                                 <label class="toggle-sw">
-                                    <input type="checkbox" name="config[rule_overdue_block_enabled]" value="1"
-                                        <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <input type="checkbox" name="config[rule_overdue_block_enabled]" value="1" <?php
+                                        echo (($arb_config['rule_overdue_block_enabled'] ?? '1' )==='1' ) ? 'checked'
+                                        : '' ; ?>>
                                     <span class="toggle-track"></span>
                                 </label>
                             </div>
-                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
+                            <div class="s-row"
+                                style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--border);">
                                 <div>
                                     <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Duplicate Block</h4>
-                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline duplicate active requests for the same equipment.</p>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Decline duplicate
+                                        active requests for the same equipment.</p>
                                 </div>
                                 <label class="toggle-sw">
-                                    <input type="checkbox" name="config[rule_duplicate_block_enabled]" value="1"
-                                        <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <input type="checkbox" name="config[rule_duplicate_block_enabled]" value="1" <?php
+                                        echo (($arb_config['rule_duplicate_block_enabled'] ?? '1' )==='1' ) ? 'checked'
+                                        : '' ; ?>>
                                     <span class="toggle-track"></span>
                                 </label>
                             </div>
-                            <div class="s-row" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;">
+                            <div class="s-row"
+                                style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;">
                                 <div>
-                                    <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Missing Document Block</h4>
-                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Hold requests for high-value items or organization borrowing without a signed letter.</p>
+                                    <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Missing Document Block
+                                    </h4>
+                                    <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Hold requests for
+                                        high-value items or organization borrowing without a signed letter.</p>
                                 </div>
                                 <label class="toggle-sw">
-                                    <input type="checkbox" name="config[rule_missing_doc_block_enabled]" value="1"
-                                        <?php echo (($arb_config['rule_missing_doc_block_enabled'] ?? '1') === '1') ? 'checked' : ''; ?>>
+                                    <input type="checkbox" name="config[rule_missing_doc_block_enabled]" value="1" <?php
+                                        echo (($arb_config['rule_missing_doc_block_enabled'] ?? '1' )==='1' )
+                                        ? 'checked' : '' ; ?>>
                                     <span class="toggle-track"></span>
                                 </label>
                             </div>
@@ -1226,13 +1588,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <!-- Submit -->
                             <div style="margin-top:1.5rem;">
                                 <button type="button" id="saveArbConfig" class="btn-submit-form">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="16" height="16">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                     Save Arbitration Settings
                                 </button>
-                                <div id="arbConfigMsg" style="display:none;margin-top:0.75rem;" class="alert-banner alert-success">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                                <div id="arbConfigMsg" style="display:none;margin-top:0.75rem;"
+                                    class="alert-banner alert-success">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="icon-img">
                                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                         <polyline points="22 4 12 14.01 9 11.01" />
                                     </svg>
@@ -1254,7 +1621,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <div class="tab-panel" id="panel-rooms">
             <div class="section-header">
                 <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                         <line x1="9" y1="3" x2="9" y2="21" />
                         <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
@@ -1265,12 +1633,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
 
             <div class="coming-soon-banner">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40" style="color:var(--accent-maroon);margin-bottom:0.5rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40"
+                    style="color:var(--accent-maroon);margin-bottom:0.5rem;">
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12 6 12 12 16 14" />
                 </svg>
                 <h3>Room Reservation Management — Coming Soon</h3>
-                <p>Admin controls for room scheduling, conflict detection, and approval workflows are under development.</p>
+                <p>Admin controls for room scheduling, conflict detection, and approval workflows are under development.
+                </p>
             </div>
 
             <!-- Room Preview Cards -->
@@ -1278,7 +1649,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Room 1 -->
                 <div class="room-card">
                     <div class="room-img">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                             <line x1="8" y1="21" x2="16" y2="21" />
                             <line x1="12" y1="17" x2="12" y2="21" />
@@ -1291,7 +1663,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <p>3rd Floor, Main Building</p>
                             </div>
                             <span class="capacity-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="margin-right:5px;vertical-align:middle;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="13" height="13"
+                                    style="margin-right:5px;vertical-align:middle;">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
                                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -1303,15 +1678,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="amenities" style="margin-top:8px;">
                             <span>WiFi</span><span>A/C</span><span>Projector</span>
                         </div>
-                        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <div
+                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                             <span class="room-avail">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7" style="vertical-align:middle;margin-right:5px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
+                                    style="vertical-align:middle;margin-right:5px;">
                                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                                 </svg>
                                 Available
                             </span>
                             <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="14" height="14">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                     <line x1="16" y1="2" x2="16" y2="6" />
                                     <line x1="8" y1="2" x2="8" y2="6" />
@@ -1326,7 +1705,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Room 2 -->
                 <div class="room-card">
                     <div class="room-img">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
                             <path d="M9 3h6" />
                             <path d="M10 3v7l-5 11h14L14 10V3" />
                         </svg>
@@ -1338,7 +1718,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <p>2nd Floor, Science Wing</p>
                             </div>
                             <span class="capacity-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="margin-right:5px;vertical-align:middle;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="13" height="13"
+                                    style="margin-right:5px;vertical-align:middle;">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
                                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -1350,15 +1733,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="amenities" style="margin-top:8px;">
                             <span>A/C</span><span>Running Water</span><span>Safety Kit</span>
                         </div>
-                        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <div
+                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                             <span class="room-occupied">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7" style="vertical-align:middle;margin-right:5px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
+                                    style="vertical-align:middle;margin-right:5px;">
                                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                                 </svg>
                                 Occupied until 3 PM
                             </span>
                             <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="14" height="14">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                     <line x1="16" y1="2" x2="16" y2="6" />
                                     <line x1="8" y1="2" x2="8" y2="6" />
@@ -1373,7 +1760,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Room 3 -->
                 <div class="room-card">
                     <div class="room-img">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
                             <rect x="2" y="3" width="20" height="14" rx="2" />
                             <line x1="8" y1="21" x2="16" y2="21" />
                             <line x1="12" y1="17" x2="12" y2="21" />
@@ -1387,7 +1775,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <p>Ground Floor, Academic Building</p>
                             </div>
                             <span class="capacity-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="margin-right:5px;vertical-align:middle;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="13" height="13"
+                                    style="margin-right:5px;vertical-align:middle;">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
                                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -1399,15 +1790,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="amenities" style="margin-top:8px;">
                             <span>WiFi</span><span>A/C</span><span>PA System</span><span>Projector</span>
                         </div>
-                        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                        <div
+                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
                             <span class="room-avail">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7" style="vertical-align:middle;margin-right:5px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
+                                    style="vertical-align:middle;margin-right:5px;">
                                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                                 </svg>
                                 Available
                             </span>
                             <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="14" height="14">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                     <line x1="16" y1="2" x2="16" y2="6" />
                                     <line x1="8" y1="2" x2="8" y2="6" />
@@ -1430,7 +1825,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div class="overlay-page" id="accountOverlay">
         <div class="overlay-topbar">
             <button class="overlay-topbar-back" data-action="close-overlay" data-target="accountOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    style="vertical-align:middle;margin-right:4px;">
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 5 5 12 12 19" />
                 </svg>
@@ -1439,7 +1836,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">My Account</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
@@ -1452,7 +1850,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="account-sidebar">
                 <span class="account-sidebar-label">Admin Account</span>
                 <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <rect x="2" y="5" width="20" height="14" rx="2" />
                         <circle cx="8" cy="12" r="2" />
                         <path d="M14 9h4" />
@@ -1462,7 +1861,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     Overview
                 </button>
                 <button class="acc-nav-btn" data-acc-tab="acc-security">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                     Security
@@ -1477,26 +1877,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <p>Your administrator account details.</p>
                     </div>
                     <div class="account-hero-card">
-                        <div class="acc-avatar-large"><?php echo htmlspecialchars($initials); ?></div>
+                        <div class="acc-avatar-large">
+                            <?php echo htmlspecialchars($initials); ?>
+                        </div>
                         <div class="acc-hero-info">
-                            <h2><?php echo htmlspecialchars($admin_name); ?></h2>
+                            <h2>
+                                <?php echo htmlspecialchars($admin_name); ?>
+                            </h2>
                             <p>System Administrator</p>
                             <span class="acc-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" style="vertical-align:middle;margin-right:4px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12"
+                                    style="vertical-align:middle;margin-right:4px;">
                                     <circle cx="12" cy="12" r="7" fill="#22c55e" stroke="none" />
                                 </svg>
                                 Active Admin
                             </span>
                         </div>
                         <div class="acc-action-wrap">
-                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit Profile</button>
-                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;" data-action="profile-save">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit
+                                Profile</button>
+                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;"
+                                data-action="profile-save">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" width="14" height="14">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                                 Save
                             </button>
-                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;" data-action="profile-cancel">Cancel</button>
+                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;"
+                                data-action="profile-cancel">Cancel</button>
                         </div>
                     </div>
                     <div class="info-card">
@@ -1511,7 +1921,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 echo htmlspecialchars($admin_name);
                                 ?>
                             </span>
-                            <input class="info-input-f" data-input="admin_name" value="<?php echo htmlspecialchars($admin_name); ?>" disabled style="display:none;">
+                            <input class="info-input-f" data-input="admin_name"
+                                value="<?php echo htmlspecialchars($admin_name); ?>" disabled style="display:none;">
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Role</span>
@@ -1520,13 +1931,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="info-row">
                             <span class="info-lbl">Email</span>
                             <span class="info-val 
-                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>"
-                                data-field="admin_email">
+                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>" data-field="admin_email">
                                 <?php
                                 echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided';
                                 ?>
                             </span>
-                            <input class="info-input-f" data-input="admin_email" type="email" value="<?php echo htmlspecialchars($admin_email ?? ''); ?>" placeholder="admin@pup.edu.ph" disabled style="display:none;">
+                            <input class="info-input-f" data-input="admin_email" type="email"
+                                value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
+                                placeholder="admin@pup.edu.ph" disabled style="display:none;">
                         </div>
                     </div>
                 </div>
@@ -1581,7 +1993,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div class="overlay-page" id="notifOverlay" style="flex-direction:column;overflow-y:auto;">
         <div class="overlay-topbar" style="flex-shrink:0;">
             <button class="overlay-topbar-back" data-action="close-overlay" data-target="notifOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    style="vertical-align:middle;margin-right:4px;">
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 5 5 12 12 19" />
                 </svg>
@@ -1590,7 +2004,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">Notifications</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
@@ -1600,13 +2015,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
 
         <div class="notif-wrapper">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:10px;">
+            <div
+                style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.2rem;flex-wrap:wrap;gap:10px;">
                 <div class="overlay-section-header" style="flex:1;margin-bottom:0;">
                     <span class="section-eyebrow">Admin Inbox</span>
                     <h2>Notifications</h2>
-                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount"><?php echo $stat_waiting + $stat_overdue + 2; ?> unread</strong> notifications.</p>
+                    <p>You have <strong style="color:var(--accent-maroon);" id="unreadCount">
+                            <?php echo $stat_waiting + $stat_overdue + 2; ?> unread
+                        </strong> notifications.</p>
                 </div>
-                <button class="mark-read-btn" data-action="mark-all-read" style="margin-top:0.5rem;">Mark all as read</button>
+                <button class="mark-read-btn" data-action="mark-all-read" style="margin-top:0.5rem;">Mark all as
+                    read</button>
             </div>
 
             <div class="notif-filter-tabs">
@@ -1618,97 +2037,153 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
 
             <?php if ($stat_overdue > 0): ?>
-                <div class="notif-group" style="color:#e65100;">⚠️ Overdue — Immediate Action Needed</div>
-                <?php
+            <div class="notif-group" style="color:#e65100;">⚠️ Overdue — Immediate Action Needed</div>
+            <?php
                 $ov_notif = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Overdue' ORDER BY return_date ASC LIMIT 5");
                 while ($on = mysqli_fetch_assoc($ov_notif)):
                     $days_late = floor((time() - strtotime($on['return_date'])) / 86400);
                 ?>
-                    <div class="notif-item notif-card unread notif-urgent" data-cat="overdue">
-                        <div class="notif-card-main" role="button" tabindex="0">
-                            <div class="notif-icon ni-urgent">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                    <line x1="12" y1="9" x2="12" y2="13" />
-                                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                                </svg>
-                            </div>
-                            <div class="notif-body-wrap">
-                                <h4>Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                                <p><strong><?php echo htmlspecialchars($on['faculty_name']); ?></strong> has not returned this item. <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
-                            </div>
-                            <div class="notif-meta">
-                                <span class="notif-time">Due <?php echo date('M d', strtotime($on['return_date'])); ?></span>
-                                <div class="unread-dot"></div>
-                                <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="6 9 12 15 18 9" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="notif-card-detail">
-                            <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($on['faculty_name']); ?> (<?php echo htmlspecialchars($on['faculty_id']); ?>)</span></div>
-                                <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($on['equipment_name']); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Due Date</span><span class="ndv" style="color:#e65100;font-weight:600;"><?php echo date('M d, Y', strtotime($on['return_date'])); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Days Overdue</span><span class="ndv" style="color:#e65100;font-weight:700;"><?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($on['borrow_date'])); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Room / Instructor</span><span class="ndv"><?php echo htmlspecialchars($on['room'] ?? '—'); ?> / <?php echo htmlspecialchars($on['instructor'] ?? '—'); ?></span></div>
-                            </div>
-                            <div class="notif-card-actions">
-                                <a href="admin-dashboard.php?view=overdue" class="notif-action-btn notif-action-primary" data-action="close-overlay" data-target="notifOverlay">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                        <circle cx="12" cy="12" r="3" />
-                                    </svg>
-                                    View in Overdue
-                                </a>
-                                <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
-                            </div>
-                        </div>
+            <div class="notif-item notif-card unread notif-urgent" data-cat="overdue">
+                <div class="notif-card-main" role="button" tabindex="0">
+                    <div class="notif-icon ni-urgent">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                            <line x1="12" y1="9" x2="12" y2="13" />
+                            <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
                     </div>
+                    <div class="notif-body-wrap">
+                        <h4>Overdue:
+                            <?php echo htmlspecialchars($on['equipment_name']); ?>
+                        </h4>
+                        <p><strong>
+                                <?php echo htmlspecialchars($on['faculty_name']); ?>
+                            </strong> has not returned this item.
+                            <?php echo $days_late; ?> day
+                            <?php echo $days_late != 1 ? 's' : ''; ?> overdue.
+                        </p>
+                    </div>
+                    <div class="notif-meta">
+                        <span class="notif-time">Due
+                            <?php echo date('M d', strtotime($on['return_date'])); ?>
+                        </span>
+                        <div class="unread-dot"></div>
+                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="notif-card-detail">
+                    <div class="notif-detail-grid">
+                        <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv">
+                                <?php echo htmlspecialchars($on['faculty_name']); ?> (
+                                <?php echo htmlspecialchars($on['faculty_id']); ?>)
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv">
+                                <?php echo htmlspecialchars($on['equipment_name']); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Due Date</span><span class="ndv"
+                                style="color:#e65100;font-weight:600;">
+                                <?php echo date('M d, Y', strtotime($on['return_date'])); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Days Overdue</span><span class="ndv"
+                                style="color:#e65100;font-weight:700;">
+                                <?php echo $days_late; ?> day
+                                <?php echo $days_late != 1 ? 's' : ''; ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv">
+                                <?php echo date('M d, Y', strtotime($on['borrow_date'])); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Room / Instructor</span><span class="ndv">
+                                <?php echo htmlspecialchars($on['room'] ?? '—'); ?> /
+                                <?php echo htmlspecialchars($on['instructor'] ?? '—'); ?>
+                            </span></div>
+                    </div>
+                    <div class="notif-card-actions">
+                        <a href="admin-dashboard.php?view=overdue" class="notif-action-btn notif-action-primary"
+                            data-action="close-overlay" data-target="notifOverlay">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            View in Overdue
+                        </a>
+                        <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
+                    </div>
+                </div>
+            </div>
             <?php endwhile;
             endif; ?>
 
             <?php if ($stat_waiting > 0): ?>
-                <div class="notif-group">Pending Requests</div>
-                <?php
+            <div class="notif-group">Pending Requests</div>
+            <?php
                 $wt_notif = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC LIMIT 5");
                 while ($wn = mysqli_fetch_assoc($wt_notif)):
                 ?>
-                    <div class="notif-item notif-card unread" data-cat="request">
-                        <div class="notif-card-main" role="button" tabindex="0">
-                            <div class="notif-icon ni-warn">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <polyline points="12 6 12 12 16 14" />
-                                </svg>
-                            </div>
-                            <div class="notif-body-wrap">
-                                <h4>New Borrow Request</h4>
-                                <p><strong><?php echo htmlspecialchars($wn['faculty_name']); ?></strong> requested <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> — awaiting approval.</p>
-                            </div>
-                            <div class="notif-meta">
-                                <span class="notif-time"><?php echo date('M d', strtotime($wn['request_date'])); ?></span>
-                                <div class="unread-dot"></div>
-                                <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="6 9 12 15 18 9" />
-                                </svg>
-                            </div>
-                        </div>
-                        <div class="notif-card-detail">
-                            <div class="notif-detail-grid">
-                                <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv"><?php echo htmlspecialchars($wn['faculty_name']); ?> (<?php echo htmlspecialchars($wn['faculty_id']); ?>)</span></div>
-                                <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv"><?php echo htmlspecialchars($wn['equipment_name']); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['borrow_date'])); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Return Date</span><span class="ndv"><?php echo date('M d, Y', strtotime($wn['return_date'])); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Requested On</span><span class="ndv"><?php echo date('M d, Y g:i A', strtotime($wn['request_date'])); ?></span></div>
-                                <div class="notif-detail-row"><span class="ndl">Room / Instructor</span><span class="ndv"><?php echo htmlspecialchars($wn['room'] ?? '—'); ?> / <?php echo htmlspecialchars($wn['instructor'] ?? '—'); ?></span></div>
-                            </div>
-                            <div class="notif-card-actions">
-                                <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
-                            </div>
-                        </div>
+            <div class="notif-item notif-card unread" data-cat="request">
+                <div class="notif-card-main" role="button" tabindex="0">
+                    <div class="notif-icon ni-warn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
                     </div>
+                    <div class="notif-body-wrap">
+                        <h4>New Borrow Request</h4>
+                        <p><strong>
+                                <?php echo htmlspecialchars($wn['faculty_name']); ?>
+                            </strong> requested <strong>
+                                <?php echo htmlspecialchars($wn['equipment_name']); ?>
+                            </strong> — awaiting approval.</p>
+                    </div>
+                    <div class="notif-meta">
+                        <span class="notif-time">
+                            <?php echo date('M d', strtotime($wn['request_date'])); ?>
+                        </span>
+                        <div class="unread-dot"></div>
+                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="notif-card-detail">
+                    <div class="notif-detail-grid">
+                        <div class="notif-detail-row"><span class="ndl">Student</span><span class="ndv">
+                                <?php echo htmlspecialchars($wn['faculty_name']); ?> (
+                                <?php echo htmlspecialchars($wn['faculty_id']); ?>)
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Equipment</span><span class="ndv">
+                                <?php echo htmlspecialchars($wn['equipment_name']); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Borrow Date</span><span class="ndv">
+                                <?php echo date('M d, Y', strtotime($wn['borrow_date'])); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Return Date</span><span class="ndv">
+                                <?php echo date('M d, Y', strtotime($wn['return_date'])); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Requested On</span><span class="ndv">
+                                <?php echo date('M d, Y g:i A', strtotime($wn['request_date'])); ?>
+                            </span></div>
+                        <div class="notif-detail-row"><span class="ndl">Room / Instructor</span><span class="ndv">
+                                <?php echo htmlspecialchars($wn['room'] ?? '—'); ?> /
+                                <?php echo htmlspecialchars($wn['instructor'] ?? '—'); ?>
+                            </span></div>
+                    </div>
+                    <div class="notif-card-actions">
+                        <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
+                    </div>
+                </div>
+            </div>
             <?php endwhile;
             endif; ?>
 
@@ -1716,7 +2191,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="notif-item notif-card unread" data-cat="system">
                 <div class="notif-card-main" role="button" tabindex="0">
                     <div class="notif-icon ni-info">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10" />
                             <line x1="12" y1="8" x2="12" y2="12" />
                             <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -1729,16 +2205,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="notif-meta">
                         <span class="notif-time">8:00 AM</span>
                         <div class="unread-dot"></div>
-                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="6 9 12 15 18 9" />
                         </svg>
                     </div>
                 </div>
                 <div class="notif-card-detail">
                     <div class="notif-detail-grid">
-                        <div class="notif-detail-row"><span class="ndl">Window</span><span class="ndv">11:00 PM – 1:00 AM tonight</span></div>
-                        <div class="notif-detail-row"><span class="ndl">Affected</span><span class="ndv">All PUPSYNC services (lending, inventory, login)</span></div>
-                        <div class="notif-detail-row"><span class="ndl">Action Required</span><span class="ndv">Notify active users before 10:30 PM</span></div>
+                        <div class="notif-detail-row"><span class="ndl">Window</span><span class="ndv">11:00 PM – 1:00
+                                AM tonight</span></div>
+                        <div class="notif-detail-row"><span class="ndl">Affected</span><span class="ndv">All PUPSYNC
+                                services (lending, inventory, login)</span></div>
+                        <div class="notif-detail-row"><span class="ndl">Action Required</span><span class="ndv">Notify
+                                active users before 10:30 PM</span></div>
                     </div>
                     <div class="notif-card-actions">
                         <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
@@ -1749,7 +2230,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="notif-item notif-card" data-cat="system">
                 <div class="notif-card-main" role="button" tabindex="0">
                     <div class="notif-icon ni-success">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12" />
                         </svg>
                     </div>
@@ -1759,16 +2241,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="notif-meta">
                         <span class="notif-time">Yesterday, 2:00 AM</span>
-                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="notif-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="6 9 12 15 18 9" />
                         </svg>
                     </div>
                 </div>
                 <div class="notif-card-detail">
                     <div class="notif-detail-grid">
-                        <div class="notif-detail-row"><span class="ndl">Database</span><span class="ndv">lending_db</span></div>
-                        <div class="notif-detail-row"><span class="ndl">Completed At</span><span class="ndv">Yesterday at 2:00 AM</span></div>
-                        <div class="notif-detail-row"><span class="ndl">Status</span><span class="ndv"><span class="stock-badge stock-avail">Success</span></span></div>
+                        <div class="notif-detail-row"><span class="ndl">Database</span><span
+                                class="ndv">lending_db</span></div>
+                        <div class="notif-detail-row"><span class="ndl">Completed At</span><span class="ndv">Yesterday
+                                at 2:00 AM</span></div>
+                        <div class="notif-detail-row"><span class="ndl">Status</span><span class="ndv"><span
+                                    class="stock-badge stock-avail">Success</span></span></div>
                     </div>
                     <div class="notif-card-actions">
                         <button class="notif-action-btn notif-action-dismiss" data-notif-dismiss>Got it</button>
@@ -1786,7 +2273,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div class="overlay-page" id="settingsOverlay">
         <div class="overlay-topbar">
             <button class="overlay-topbar-back" data-action="close-overlay" data-target="settingsOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    style="vertical-align:middle;margin-right:4px;">
                     <line x1="19" y1="12" x2="5" y2="12" />
                     <polyline points="12 5 5 12 12 19" />
                 </svg>
@@ -1795,7 +2284,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="overlay-topbar-sep"></div>
             <span class="overlay-topbar-title">Settings</span>
             <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
@@ -1808,17 +2298,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="settings-sidebar">
                 <span class="s-cat-label">Appearance</span>
                 <button class="s-nav-item active" data-sett-tab="st-appearance">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align:middle;margin-right:6px;">
                         <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
                         <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
                         <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
                         <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-                        <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+                        <path
+                            d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
                     </svg>
                     Appearance
                 </button>
                 <button class="s-nav-item" data-sett-tab="st-accessibility">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align:middle;margin-right:6px;">
                         <circle cx="12" cy="6" r="2" />
                         <path d="m4 14 8-2 8 2" />
                         <path d="M8 12v1.5l-3 5" />
@@ -1829,7 +2324,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
                 <span class="s-cat-label">Admin</span>
                 <button class="s-nav-item" data-sett-tab="st-notifications">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align:middle;margin-right:6px;">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                         <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
@@ -1838,7 +2335,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="s-divider"></div>
                 <span class="s-cat-label">System</span>
                 <button class="s-nav-item" data-sett-tab="st-advanced">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        style="vertical-align:middle;margin-right:6px;">
                         <line x1="4" y1="21" x2="4" y2="14" />
                         <line x1="4" y1="10" x2="4" y2="3" />
                         <line x1="12" y1="21" x2="12" y2="12" />
@@ -1873,7 +2372,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">Light <svg id="tc-light" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;">
+                                <div class="theme-lbl">Light <svg id="tc-light" xmlns="http://www.w3.org/2000/svg"
+                                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+                                        style="color:var(--accent-maroon);vertical-align:middle;">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg></div>
                             </div>
@@ -1883,7 +2385,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">Dark <svg id="tc-dark" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
+                                <div class="theme-lbl">Dark <svg id="tc-dark" xmlns="http://www.w3.org/2000/svg"
+                                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+                                        style="color:var(--accent-maroon);vertical-align:middle;display:none;">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg></div>
                             </div>
@@ -1893,7 +2398,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <div class="theme-prev-bar"></div>
                                     <div class="theme-prev-bar"></div>
                                 </div>
-                                <div class="theme-lbl">High Contrast <svg id="tc-hc" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-maroon);vertical-align:middle;display:none;">
+                                <div class="theme-lbl">High Contrast <svg id="tc-hc" xmlns="http://www.w3.org/2000/svg"
+                                        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"
+                                        style="color:var(--accent-maroon);vertical-align:middle;display:none;">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg></div>
                             </div>
@@ -1905,12 +2413,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <p>Pick a highlight color for buttons and active elements.</p>
                         </div>
                         <div class="color-dots">
-                            <div class="c-dot selected" style="background:#600302;" data-action="apply-accent" data-color="#600302" data-light="#f3e5e6" title="Maroon (Default)"></div>
-                            <div class="c-dot" style="background:#1a5276;" data-action="apply-accent" data-color="#1a5276" data-light="#d6eaf8" title="Navy Blue"></div>
-                            <div class="c-dot" style="background:#1e8449;" data-action="apply-accent" data-color="#1e8449" data-light="#d5f5e3" title="Forest Green"></div>
-                            <div class="c-dot" style="background:#7d3c98;" data-action="apply-accent" data-color="#7d3c98" data-light="#f0e6fa" title="Purple"></div>
-                            <div class="c-dot" style="background:#d35400;" data-action="apply-accent" data-color="#d35400" data-light="#fde8d8" title="Burnt Orange"></div>
-                            <div class="c-dot" style="background:#2e86c1;" data-action="apply-accent" data-color="#2e86c1" data-light="#d6eaf8" title="Sky Blue"></div>
+                            <div class="c-dot selected" style="background:#600302;" data-action="apply-accent"
+                                data-color="#600302" data-light="#f3e5e6" title="Maroon (Default)"></div>
+                            <div class="c-dot" style="background:#1a5276;" data-action="apply-accent"
+                                data-color="#1a5276" data-light="#d6eaf8" title="Navy Blue"></div>
+                            <div class="c-dot" style="background:#1e8449;" data-action="apply-accent"
+                                data-color="#1e8449" data-light="#d5f5e3" title="Forest Green"></div>
+                            <div class="c-dot" style="background:#7d3c98;" data-action="apply-accent"
+                                data-color="#7d3c98" data-light="#f0e6fa" title="Purple"></div>
+                            <div class="c-dot" style="background:#d35400;" data-action="apply-accent"
+                                data-color="#d35400" data-light="#fde8d8" title="Burnt Orange"></div>
+                            <div class="c-dot" style="background:#2e86c1;" data-action="apply-accent"
+                                data-color="#2e86c1" data-light="#d6eaf8" title="Sky Blue"></div>
                         </div>
                     </div>
                     <div class="settings-card">
@@ -1923,7 +2437,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <h4>Enable Compact Mode</h4>
                                 <p>Makes cards and table rows more compact.</p>
                             </div>
-                            <label class="toggle-sw"><input type="checkbox" id="compactToggle" data-action="apply-compact"><span class="toggle-track"></span></label>
+                            <label class="toggle-sw"><input type="checkbox" id="compactToggle"
+                                    data-action="apply-compact"><span class="toggle-track"></span></label>
                         </div>
                     </div>
                 </div>
@@ -1942,7 +2457,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="range-wrap">
                             <h4>Font Size <span id="fontSizeLbl" style="color:var(--accent-maroon);">100%</span></h4>
                             <div class="range-labels"><span>Small</span><span>Default</span><span>Large</span></div>
-                            <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" data-action="apply-fontsize">
+                            <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange"
+                                data-action="apply-fontsize">
                         </div>
                     </div>
                     <div class="settings-card">
@@ -1954,7 +2470,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <h4>Reduce Motion</h4>
                                 <p>Disables fade-in and slide animations.</p>
                             </div>
-                            <label class="toggle-sw"><input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion"><span class="toggle-track"></span></label>
+                            <label class="toggle-sw"><input type="checkbox" id="reduceMotionToggle"
+                                    data-action="apply-reduce-motion"><span class="toggle-track"></span></label>
                         </div>
                     </div>
                     <div class="settings-card">
@@ -1966,7 +2483,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <h4>Enhanced Focus Ring</h4>
                                 <p>Makes keyboard focus outlines more visible.</p>
                             </div>
-                            <label class="toggle-sw"><input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring"><span class="toggle-track"></span></label>
+                            <label class="toggle-sw"><input type="checkbox" id="focusRingToggle"
+                                    data-action="apply-focus-ring"><span class="toggle-track"></span></label>
                         </div>
                     </div>
                 </div>
@@ -1986,19 +2504,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="s-row-label">
                                 <h4>New Borrow Requests</h4>
                                 <p>Alert when a student submits a new request.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="s-row">
                             <div class="s-row-label">
                                 <h4>Overdue Items</h4>
                                 <p>Alert when a borrowed item passes its return date.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="s-row">
                             <div class="s-row-label">
                                 <h4>Low Stock Warning</h4>
                                 <p>Alert when any item drops to 2 or fewer units.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                     </div>
                     <div class="settings-card">
@@ -2009,13 +2530,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="s-row-label">
                                 <h4>System Maintenance</h4>
                                 <p>Scheduled downtime notifications.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="s-row">
                             <div class="s-row-label">
                                 <h4>Database Backup</h4>
                                 <p>Daily backup completion status.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                     </div>
                 </div>
@@ -2035,13 +2558,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="s-row-label">
                                 <h4>Show Asset IDs</h4>
                                 <p>Display equipment item IDs in tables.</p>
-                            </div><label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="s-row">
                             <div class="s-row-label">
                                 <h4>Verbose Error Messages</h4>
                                 <p>Show detailed database error information.</p>
-                            </div><label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                            </div><label class="toggle-sw"><input type="checkbox"><span
+                                    class="toggle-track"></span></label>
                         </div>
                     </div>
                     <div class="settings-card danger-card">
@@ -2071,8 +2596,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div id="app-toast"></div>
 
 
-    <div class="modal-overlay" id="changePassModal"
-        style="display: none; 
+    <div class="modal-overlay" id="changePassModal" style="display: none; 
             position: fixed; 
             top: 0; 
             left: 0; 
@@ -2083,24 +2607,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             align-items: center; 
             justify-content: center;">
         <div class="modal-backdrop" data-action="close-change-pass" style="position: absolute; inset: 0;"></div>
-        <div class="eq-card form-card" style="position: relative; width: 100%; max-width: 400px; margin: 20px; z-index: 100000;">
+        <div class="eq-card form-card"
+            style="position: relative; width: 100%; max-width: 400px; margin: 20px; z-index: 100000;">
             <div class="form-card-header">
                 <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                     Change Password
                 </h2>
                 <button type="button" class="btn-close-custom" data-action="close-change-pass">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
             </div>
             <div class="form-card-body">
-                <div id="cp-alert" style="display:none; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; font-weight: 500;"></div>
+                <div id="cp-alert"
+                    style="display:none; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; font-weight: 500;">
+                </div>
 
                 <form id="changePasswordForm">
                     <div class="form-group">
@@ -2113,12 +2642,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="form-group">
                         <label>Confirm New Password</label>
-                        <input type="password" name="confirm_password" class="form-control-custom" minlength="4" required>
+                        <input type="password" name="confirm_password" class="form-control-custom" minlength="4"
+                            required>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                        <button type="button" class="btn-cancel-acc" data-action="close-change-pass" style="padding: 8px 16px; width: auto;">Cancel</button>
-                        <button type="submit" class="btn-submit-form" style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
+                        <button type="button" class="btn-cancel-acc" data-action="close-change-pass"
+                            style="padding: 8px 16px; width: auto;">Cancel</button>
+                        <button type="submit" class="btn-submit-form"
+                            style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
                     </div>
                 </form>
             </div>
@@ -2132,22 +2664,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <div class="eq-card form-card" style="position:relative;width:100%;max-width:440px;margin:20px;z-index:100000;">
             <div class="form-card-header">
                 <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
                     Override Request
                 </h2>
                 <button type="button" class="btn-close-custom" id="closeOverrideModal">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                         <line x1="18" y1="6" x2="6" y2="18" />
                         <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
                 </button>
             </div>
             <div class="form-card-body">
-                <div id="override-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:0.85rem;font-weight:500;"></div>
+                <div id="override-alert"
+                    style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:0.85rem;font-weight:500;">
+                </div>
                 <p id="overrideDesc" style="font-size:0.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <!-- Context info shown when direction is fixed (Approved→Declined or Declined→Approved) -->
+                <div id="overrideContextInfo"
+                    style="display:none;padding:10px 12px;border-radius:6px;margin-bottom:1rem;font-size:0.83rem;font-weight:500;">
+                </div>
                 <div class="form-group" id="overrideStatusGroup" style="display:none;">
                     <label>New Status</label>
                     <select id="overrideNewStatus" class="form-control-custom">
@@ -2157,19 +2697,32 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="form-group">
                     <label>Override Reason <span style="color:var(--danger);">*</span></label>
-                    <textarea id="overrideReason" class="form-control-custom" rows="3" placeholder="Enter mandatory reason for this override..." style="resize:vertical;"></textarea>
+                    <textarea id="overrideReason" class="form-control-custom" rows="3"
+                        placeholder="Enter mandatory reason for this override (min. 5 characters)..."
+                        style="resize:vertical;"></textarea>
+                    <small id="overrideReasonHint" style="color:var(--text-light);font-size:0.75rem;">Minimum 5
+                        characters required.</small>
                 </div>
                 <input type="hidden" id="overrideRequestId">
                 <input type="hidden" id="overrideCurrentStatus">
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1rem;">
-                    <button type="button" class="btn-cancel-acc" id="cancelOverrideBtn" style="padding:8px 16px;width:auto;">Cancel</button>
-                    <button type="button" class="btn-submit-form" id="submitOverrideBtn" style="margin-top:0;width:auto;padding:8px 16px;">Apply Override</button>
+                    <button type="button" class="btn-cancel-acc" id="cancelOverrideBtn"
+                        style="padding:8px 16px;width:auto;">Cancel</button>
+                    <button type="button" class="btn-submit-form" id="submitOverrideBtn"
+                        style="margin-top:0;width:auto;padding:8px 16px;" disabled>Apply Override</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="js/admin-dashboard.js"></script>
+    <script src="JS/admin-dashboard.js"></script>
+    <script src="JS/admin-live-render.js"></script>
+
+    <!-- Admin poll toast -->
+    <div id="admin-poll-toast" style="display:none;position:fixed;bottom:24px;right:24px;
+     background:#1e3a5f;color:#fff;padding:12px 20px;border-radius:12px;
+     font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
+    </div>
 
 </body>
 

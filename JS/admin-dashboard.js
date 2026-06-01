@@ -615,7 +615,7 @@
             e.preventDefault();
             const alertBox = document.getElementById('cp-alert');
             const submitBtn = this.querySelector('button[type="submit"]');
-            
+
             const formData = new FormData(this);
             formData.append('ajax_action', 'change_password');
 
@@ -636,35 +636,35 @@
                 method: 'POST',
                 body: formData
             })
-            .then(res => res.json())
-            .then(data => {
-                alertBox.style.display = 'block';
-                if (data.status === 'success') {
-                    alertBox.style.backgroundColor = '#e3fcef';
-                    alertBox.style.color = '#00875a';
-                    alertBox.innerHTML = '✅ ' + data.message;
-                    
-                    setTimeout(() => {
-                        document.getElementById('changePassModal').style.display = 'none';
-                        showToast('Password updated successfully');
-                        cpForm.reset();
-                    }, 1500);
-                } else {
+                .then(res => res.json())
+                .then(data => {
+                    alertBox.style.display = 'block';
+                    if (data.status === 'success') {
+                        alertBox.style.backgroundColor = '#e3fcef';
+                        alertBox.style.color = '#00875a';
+                        alertBox.innerHTML = '✅ ' + data.message;
+
+                        setTimeout(() => {
+                            document.getElementById('changePassModal').style.display = 'none';
+                            showToast('Password updated successfully');
+                            cpForm.reset();
+                        }, 1500);
+                    } else {
+                        alertBox.style.backgroundColor = '#ffeaea';
+                        alertBox.style.color = 'var(--danger)';
+                        alertBox.innerHTML = '⚠️ ' + data.message;
+                    }
+                })
+                .catch(err => {
+                    alertBox.style.display = 'block';
                     alertBox.style.backgroundColor = '#ffeaea';
                     alertBox.style.color = 'var(--danger)';
-                    alertBox.innerHTML = '⚠️ ' + data.message;
-                }
-            })
-            .catch(err => {
-                alertBox.style.display = 'block';
-                alertBox.style.backgroundColor = '#ffeaea';
-                alertBox.style.color = 'var(--danger)';
-                alertBox.innerHTML = '⚠️ Network error. Please try again.';
-            })
-            .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Update';
-            });
+                    alertBox.innerHTML = '⚠️ Network error. Please try again.';
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Update';
+                });
         });
     }
 
@@ -745,7 +745,7 @@
         const arbLogSearchInput = document.getElementById('arbLogSearch');
         if (arbLogSearchInput) {
             let arbLogTimer;
-            arbLogSearchInput.addEventListener('keyup', function() {
+            arbLogSearchInput.addEventListener('keyup', function () {
                 clearTimeout(arbLogTimer);
                 const q = this.value.trim();
                 arbLogTimer = setTimeout(() => {
@@ -763,7 +763,7 @@
         // ── Save Arbitration Config ───────────────────────────────────────
         const saveArbConfigBtn = document.getElementById('saveArbConfig');
         if (saveArbConfigBtn) {
-            saveArbConfigBtn.addEventListener('click', function() {
+            saveArbConfigBtn.addEventListener('click', function () {
                 const form = document.getElementById('arbConfigForm');
                 if (!form) return;
                 const formData = new FormData(form);
@@ -779,24 +779,24 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        const msg = document.getElementById('arbConfigMsg');
-                        if (msg) {
-                            msg.style.display = 'flex';
-                            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const msg = document.getElementById('arbConfigMsg');
+                            if (msg) {
+                                msg.style.display = 'flex';
+                                setTimeout(() => { msg.style.display = 'none'; }, 3000);
+                            }
+                            showToast('Arbitration settings saved.');
+                        } else {
+                            showToast(data.message || 'Could not save settings.');
                         }
-                        showToast('Arbitration settings saved.');
-                    } else {
-                        showToast(data.message || 'Could not save settings.');
-                    }
-                })
-                .catch(() => showToast('Network error. Please try again.'))
-                .finally(() => {
-                    saveArbConfigBtn.disabled = false;
-                    saveArbConfigBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12" /></svg> Save Arbitration Settings';
-                });
+                    })
+                    .catch(() => showToast('Network error. Please try again.'))
+                    .finally(() => {
+                        saveArbConfigBtn.disabled = false;
+                        saveArbConfigBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="20 6 9 17 4 12" /></svg> Save Arbitration Settings';
+                    });
             });
         }
     }
@@ -806,24 +806,46 @@
         const modal = document.getElementById('overrideModal');
         const desc = document.getElementById('overrideDesc');
         const statusGroup = document.getElementById('overrideStatusGroup');
+        const contextInfo = document.getElementById('overrideContextInfo');
         const reasonInput = document.getElementById('overrideReason');
         const alertBox = document.getElementById('override-alert');
+        const submitBtn = document.getElementById('submitOverrideBtn');
+
         document.getElementById('overrideRequestId').value = requestId;
         document.getElementById('overrideCurrentStatus').value = currentStatus;
         reasonInput.value = '';
         alertBox.style.display = 'none';
-        desc.textContent = 'Override for: ' + borrower + ' — ' + equipment;
-        // Show status selector for Waiting AND Declined (admin override can approve either)
-        if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
+        submitBtn.disabled = true;
+
+        desc.textContent = 'Override for: ' + borrower + ' \u2014 ' + equipment;
+
+        // Configure modal based on current status direction rules
+        if (currentStatus === 'Waiting') {
+            // Admin can choose Approved or Declined — show dropdown
             statusGroup.style.display = '';
-            // Pre-select Approved for Declined overrides (most common case)
-            const statusSelect = document.getElementById('overrideNewStatus');
-            if (statusSelect) {
-                statusSelect.value = currentStatus === 'Declined' ? 'Approved' : 'Approved';
-            }
+            document.getElementById('overrideNewStatus').value = 'Approved';
+            contextInfo.style.display = 'none';
+        } else if (currentStatus === 'Approved' || currentStatus === 'Overdue') {
+            // Fixed direction: Approved/Overdue → Declined only (item is out on loan)
+            statusGroup.style.display = 'none';
+            contextInfo.style.display = 'block';
+            contextInfo.style.background = '#fff3e0';
+            contextInfo.style.color = '#b45309';
+            contextInfo.style.border = '1px solid #fcd34d';
+            contextInfo.textContent = 'This will change the status from ' + currentStatus + ' to Declined and return 1 unit to inventory.';
+        } else if (currentStatus === 'Declined') {
+            // Fixed direction: Declined → Approved only
+            statusGroup.style.display = 'none';
+            contextInfo.style.display = 'block';
+            contextInfo.style.background = '#ecfdf5';
+            contextInfo.style.color = '#065f46';
+            contextInfo.style.border = '1px solid #6ee7b7';
+            contextInfo.textContent = 'This will change the status from Declined to Approved and decrement 1 unit from inventory.';
         } else {
             statusGroup.style.display = 'none';
+            contextInfo.style.display = 'none';
         }
+
         modal.style.display = 'flex';
     }
 
@@ -832,8 +854,17 @@
         if (modal) modal.style.display = 'none';
     }
 
+    // Enable/disable submit based on reason length (min 10 chars)
+    const overrideReasonInput = document.getElementById('overrideReason');
+    if (overrideReasonInput) {
+        overrideReasonInput.addEventListener('input', function () {
+            const submitBtn = document.getElementById('submitOverrideBtn');
+            if (submitBtn) submitBtn.disabled = this.value.trim().length < 5;
+        });
+    }
+
     // Wire open-override data-action
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-action="open-override"]');
         if (btn) {
             openOverrideModal(
@@ -854,63 +885,83 @@
 
     const submitOverrideBtn = document.getElementById('submitOverrideBtn');
     if (submitOverrideBtn) {
-        submitOverrideBtn.addEventListener('click', function() {
+        submitOverrideBtn.addEventListener('click', function () {
             const requestId = document.getElementById('overrideRequestId').value;
             const currentStatus = document.getElementById('overrideCurrentStatus').value;
             const reason = document.getElementById('overrideReason').value.trim();
             const alertBox = document.getElementById('override-alert');
+
+            // Determine new status based on direction rules
             let newStatus;
-            if (currentStatus === 'Waiting' || currentStatus === 'Declined') {
-                newStatus = document.getElementById('overrideNewStatus').value;
+            if (currentStatus === 'Approved' || currentStatus === 'Overdue') {
+                newStatus = 'Declined';
+            } else if (currentStatus === 'Declined') {
+                newStatus = 'Approved';
             } else {
-                newStatus = 'Approved'; // For Approved/Overdue entries shown in arb log, default to Approved
+                // Waiting — use dropdown selection
+                newStatus = document.getElementById('overrideNewStatus').value;
             }
-            if (!reason) {
+
+            if (reason.length < 5) {
                 alertBox.style.display = 'block';
                 alertBox.style.backgroundColor = '#ffeaea';
                 alertBox.style.color = 'var(--danger)';
                 alertBox.textContent = 'Override reason is required.';
                 return;
             }
+
             submitOverrideBtn.disabled = true;
             submitOverrideBtn.textContent = 'Applying...';
+
             const formData = new FormData();
             formData.append('request_id', requestId);
             formData.append('new_status', newStatus);
             formData.append('override_reason', reason);
+
             fetch('ajax/admin-override.php', { method: 'POST', body: formData })
-            .then(r => {
-                if (r.status === 409) {
-                    return r.json().then(d => { throw { status: 409, message: d.message || 'Cannot override: item is out of stock.' }; });
-                }
-                return r.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    closeOverrideModal();
-                    showToast('Override applied successfully.');
-                    setTimeout(() => window.location.reload(), 800);
-                } else {
+                .then(function (r) {
+                    if (r.status === 409) {
+                        return r.json().then(function (d) {
+                            throw { status: 409, message: d.message || 'Cannot override: item is out of stock.' };
+                        });
+                    }
+                    if (r.status === 422) {
+                        return r.json().then(function (d) {
+                            throw { status: 422, message: d.message || 'Invalid status transition.' };
+                        });
+                    }
+                    if (r.status === 400) {
+                        return r.json().then(function (d) {
+                            throw { status: 400, message: d.message || 'Override reason is required.' };
+                        });
+                    }
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        closeOverrideModal();
+                        showToast('Override applied successfully.');
+                    } else {
+                        alertBox.style.display = 'block';
+                        alertBox.style.backgroundColor = '#ffeaea';
+                        alertBox.style.color = 'var(--danger)';
+                        alertBox.textContent = data.message || 'Override failed.';
+                    }
+                })
+                .catch(function (err) {
                     alertBox.style.display = 'block';
                     alertBox.style.backgroundColor = '#ffeaea';
                     alertBox.style.color = 'var(--danger)';
-                    alertBox.textContent = data.message || 'Override failed.';
-                }
-            })
-            .catch(err => {
-                alertBox.style.display = 'block';
-                alertBox.style.backgroundColor = '#ffeaea';
-                alertBox.style.color = 'var(--danger)';
-                // Task 10.5: display out-of-stock message for HTTP 409
-                alertBox.textContent = (err && err.message) ? err.message : 'Network error. Please try again.';
-            })
-            .finally(() => {
-                submitOverrideBtn.disabled = false;
-                submitOverrideBtn.textContent = 'Apply Override';
-            });
+                    alertBox.textContent = (err && err.message) ? err.message : 'Network error. Please try again.';
+                })
+                .finally(function () {
+                    submitOverrideBtn.disabled = reason.trim().length < 5;
+                    submitOverrideBtn.textContent = 'Apply Override';
+                });
         });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+
 })();
