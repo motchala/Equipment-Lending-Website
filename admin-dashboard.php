@@ -2715,7 +2715,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
-    <script src="js/admin-dashboard.js"></script>
+    <script src="JS/admin-dashboard.js"></script>
 
     <script>
         /* ── Admin Real-time Polling ─────────────────────────────────── */
