@@ -266,6 +266,12 @@
             value: id
         });
         _openOverlayDOM(id);
+        // Close mobile nav if open
+        const nav = document.getElementById('sideNav');
+        const backdrop = document.getElementById('navBackdrop');
+        if (nav) nav.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('open');
+        document.body.style.overflow = '';
     }
 
     function closeOverlay(id) {
@@ -1324,10 +1330,34 @@
         });
     }
 
+    /* ── Mobile menu toggle ──────────────────────────────────────────── */
+    function openMobileNav() {
+        const nav = document.getElementById('sideNav');
+        const backdrop = document.getElementById('navBackdrop');
+        if (nav) nav.classList.add('open');
+        if (backdrop) backdrop.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeMobileNav() {
+        const nav = document.getElementById('sideNav');
+        const backdrop = document.getElementById('navBackdrop');
+        if (nav) nav.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileNav);
+
+    const navBackdrop = document.getElementById('navBackdrop');
+    if (navBackdrop) navBackdrop.addEventListener('click', closeMobileNav);
+
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
+            closeMobileNav();
             // Close any open overlays
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
             // Remove active from all sidebar items (including settings and help)

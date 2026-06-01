@@ -159,7 +159,7 @@ body {
     position: fixed;
     left: 0;
     top: 0;
-    z-index: 200;
+    z-index: 240;
     flex-shrink: 0;
     transition: background var(--transition), border-color var(--transition);
 }
@@ -307,7 +307,7 @@ body {
     padding: 0 28px;
     position: sticky;
     top: 0;
-    z-index: 250;
+    z-index: 230;
     flex-shrink: 0;
     box-shadow: 0 2px 12px rgba(128, 0, 0, 0.08);
     transition: background var(--transition);
@@ -885,12 +885,6 @@ body {
     grid-template-columns: 256px 1fr;
     gap: 24px;
     margin-bottom: 32px;
-}
-
-@media(max-width:900px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ── Stat Cards ────────────────────────────────────────────── */
@@ -2369,13 +2363,13 @@ body {
     bottom: 0;
     left: var(--sidebar-w);
     right: 0;
-    z-index: 300;
+    z-index: 235;
     pointer-events: none;
     overflow-y: auto;
 }
 
 #settingsOverlay .overlay-topbar,
-#settingsOverlay .unified-settings-wrap,
+#settingsOverlay .settings-bento-wrap,
 #helpOverlay .unified-settings-wrap {
     pointer-events: auto;
 }
@@ -3837,31 +3831,84 @@ body {
     display: none !important;
 }
 
-/* ── Responsive ────────────────────────────────────────────── */
-@media (max-width:768px) {
+/* ── Mobile Nav Overlay Backdrop ──────────────────────────── */
+.nav-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 239;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+}
+
+.nav-backdrop.open {
+    display: block;
+}
+
+/* ── Mobile Menu Toggle Button ─────────────────────────────── */
+.mobile-menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: transparent;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-on-surface-variant);
+    flex-shrink: 0;
+    transition: background var(--transition);
+}
+
+.mobile-menu-btn:hover {
+    background: var(--color-surface-high);
+}
+
+.mobile-menu-btn .material-symbols-outlined {
+    font-size: 22px;
+}
+
+/* ── Tablet: collapse sidebar to icon-only rail ────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+    :root {
+        --sidebar-w: 72px;
+    }
+
     .side-nav {
-        transform: translateX(-100%);
-        transition: transform var(--transition);
+        width: 72px;
+        overflow: hidden;
     }
 
-    .side-nav.open {
-        transform: translateX(0);
+    .side-nav-title,
+    .side-nav-sub,
+    .side-nav-item span:not(.material-symbols-outlined) {
+        display: none;
     }
 
-    .main-wrapper {
-        margin-left: 0;
+    .side-nav-brand {
+        justify-content: center;
+        padding: 16px 0;
+    }
+
+    .side-nav-links,
+    .side-nav-footer {
+        padding: 8px 6px 0;
+        align-items: center;
+    }
+
+    .side-nav-item {
+        justify-content: center;
+        padding: 12px;
+        border-radius: var(--radius-md);
     }
 
     .app-main {
-        padding: 20px 16px;
+        padding: 24px 20px;
     }
 
     .top-bar {
-        padding: 0 16px;
-    }
-
-    .top-bar-search {
-        display: none;
+        padding: 0 20px;
     }
 
     .dashboard-grid {
@@ -3869,17 +3916,236 @@ body {
     }
 
     .bento-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .active-cards-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .eq-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+
+    .settings-bento-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bento-card-notif {
+        grid-column: span 2;
+    }
+
+    #settingsOverlay,
+    #helpOverlay {
+        left: 72px;
+    }
+}
+
+/* ── Mobile ────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .side-nav {
+        width: var(--sidebar-w);
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 240;
+        top: 0;
+    }
+
+    .side-nav.open {
+        transform: translateX(0);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .mobile-menu-btn {
+        display: flex;
+    }
+
+    .main-wrapper {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .top-bar {
+        padding: 0 12px;
+        gap: 8px;
+        position: sticky;
+        top: 0;
+        z-index: 230;
+        width: 100%;
+    }
+
+    .top-bar-search {
+        display: none;
+    }
+
+    .app-main {
+        padding: 16px 12px;
+    }
+
+    /* Dashboard */
+    .dashboard-grid {
         grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .dashboard-stats-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .stat-card-value {
+        font-size: 1.8rem;
+    }
+
+    .audit-card,
+    .quick-actions {
+        grid-column: 1 / -1;
+    }
+
+    /* Bento */
+    .bento-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .bento-item {
+        min-height: 110px;
+        padding: 14px;
     }
 
     .bento-item-wide {
-        grid-column: auto;
+        grid-column: 1 / -1;
+        min-height: 80px;
     }
 
+    .bento-title {
+        font-size: 0.875rem;
+        margin-top: 8px;
+    }
+
+    .bento-sub {
+        font-size: 0.72rem;
+    }
+
+    /* Active cards */
+    .active-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Equipment grid */
+    .eq-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .eq-item-img,
+    .eq-item-img-placeholder {
+        height: 110px;
+    }
+
+    /* Catalog */
+    .catalog-card {
+        padding: 12px;
+    }
+
+    /* Form */
     .form-row-2 {
         grid-template-columns: 1fr;
     }
 
+    .form-surface {
+        max-width: 100%;
+        padding: 16px 12px;
+    }
+
+    /* Table */
+    .table-surface {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .requests-table {
+        min-width: 560px;
+    }
+
+    .table-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .table-toolbar-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    /* Room cards */
+    .room-card {
+        flex-direction: column;
+    }
+
+    .room-card-thumb {
+        width: 100%;
+        height: 72px;
+    }
+
+    .room-card-body {
+        padding: 14px 16px;
+    }
+
+    /* Timeline */
+    .timeline-container {
+        max-width: 100%;
+    }
+
+    .timeline-items {
+        padding-left: 24px;
+    }
+
+    .timeline-indicator {
+        left: -24px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .timeline-card {
+        padding: 14px 16px;
+    }
+
+    .timeline-card-top {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    /* Overlays */
+    .overlay-topbar {
+        padding: 0 12px;
+        gap: 8px;
+    }
+
+    #settingsOverlay,
+    #helpOverlay {
+        left: 0;
+        z-index: 235;
+        overflow-y: auto;
+    }
+
+    #settingsOverlay.active .settings-bento-wrap,
+    #helpOverlay.active .unified-settings-wrap {
+        pointer-events: auto;
+    }
+
+    .notif-overlay-wrap {
+        padding: 20px 12px 48px;
+    }
+
+    .notif-overlay-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Account / Settings inner layouts */
     .account-layout,
     .settings-layout {
         flex-direction: column;
@@ -3894,25 +4160,203 @@ body {
         flex-wrap: wrap;
         border-right: none;
         border-bottom: 1px solid var(--color-outline-variant);
+        padding: 12px 8px;
     }
 
-    .room-card {
-        flex-direction: column;
+    .account-content {
+        padding: 16px 12px;
     }
 
-    .room-card-thumb {
+    .settings-content {
+        padding: 16px 12px;
+    }
+
+    /* Info rows */
+    .info-row {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .info-lbl {
+        min-width: unset;
         width: 100%;
-        height: 80px;
     }
 
-    .timeline-items {
-        padding-left: 24px;
+    /* Popovers */
+    .notif-popover {
+        position: fixed;
+        top: var(--topbar-h);
+        left: 8px;
+        right: 8px;
+        width: auto;
     }
 
-    .timeline-indicator {
-        left: -24px;
-        width: 20px;
-        height: 20px;
+    .profile-dropdown {
+        position: fixed;
+        top: var(--topbar-h);
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+
+    /* Toast */
+    #app-toast {
+        bottom: 16px;
+        right: 12px;
+        left: 12px;
+        max-width: none;
+    }
+
+    /* Typography */
+    .page-title {
+        font-size: 1.4rem;
+    }
+
+    .page-title-sm {
+        font-size: 1.15rem;
+    }
+
+    /* Urgent card */
+    .urgent-card {
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px;
+    }
+
+    /* Settings bento — full mobile reflow */
+    .settings-bento-wrap {
+        padding: 16px 12px 40px;
+    }
+
+    .settings-bento-header {
+        gap: 10px;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+
+    .settings-bento-header h1 {
+        font-size: 1.3rem;
+    }
+
+    .settings-bento-header p {
+        font-size: 0.8rem;
+    }
+
+    .settings-back-btn {
+        width: 36px;
+        height: 36px;
+        flex-shrink: 0;
+    }
+
+    .settings-bento-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    /* Profile card: full width, no row-span */
+    .bento-card-profile {
+        grid-column: 1 / -1;
+        grid-row: span 1;
+    }
+
+    .bento-profile-content {
+        flex-direction: row;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .bento-avatar {
+        width: 56px;
+        height: 56px;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .bento-profile-info {
+        text-align: left;
+    }
+
+    .bento-profile-info h4 {
+        font-size: 0.95rem;
+    }
+
+    /* Notifications card: full width, no col-span needed */
+    .bento-card-notif {
+        grid-column: 1 / -1;
+    }
+
+    /* All cards: tighter padding */
+    .bento-card {
+        padding: 14px;
+    }
+
+    .bento-card-header {
+        margin-bottom: 10px;
+    }
+
+    .bento-card-header h3 {
+        font-size: 0.875rem;
+    }
+
+    .bento-icon {
+        font-size: 18px;
+    }
+
+    /* Theme circles smaller */
+    .theme-circle {
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Font scale buttons */
+    .font-scale-btn {
+        padding: 8px 6px;
+        font-size: 0.8rem;
+    }
+
+    /* Security items */
+    .security-item,
+    .privacy-item {
+        padding: 8px 10px;
+        font-size: 0.8rem;
+    }
+
+    /* Notif toggle rows */
+    .notif-toggle-row h4 {
+        font-size: 0.8rem;
+    }
+
+    .notif-toggle-row p {
+        font-size: 0.72rem;
+    }
+
+    /* Bento action button */
+    .bento-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        margin-top: 10px;
+    }
+
+    /* Unified settings */
+    .unified-settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .u-card-full {
+        grid-column: 1;
+    }
+
+    .u-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .u-form-col-span {
+        grid-column: 1;
+    }
+
+    .unified-settings-wrap {
+        padding: 16px 12px 48px;
     }
 }
 
@@ -4217,28 +4661,7 @@ body {
     font-size: 18px;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .unified-settings-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .u-card-full {
-        grid-column: 1;
-    }
-
-    .u-form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .u-form-col-span {
-        grid-column: 1;
-    }
-
-    .unified-settings-wrap {
-        padding: 20px 16px 48px;
-    }
-}
+/* Responsive — handled in the consolidated @media block above */
 
 /* ================================================================
    BENTO SETTINGS OVERLAY
@@ -4624,32 +5047,5 @@ body {
     font-weight: 600;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .settings-bento-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
 
-    .bento-card-notif {
-        grid-column: span 2;
-    }
-}
-
-@media (max-width: 768px) {
-    .settings-bento-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .bento-card-profile {
-        grid-row: span 1;
-    }
-
-    .bento-card-notif {
-        grid-column: span 1;
-    }
-
-    .settings-bento-wrap {
-        padding: 24px 16px 48px;
-    }
-}
 

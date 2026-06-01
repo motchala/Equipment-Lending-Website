@@ -267,6 +267,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
      TOP APP BAR
 ================================================================ -->
         <header class="top-bar" id="topBar">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
             <div class="top-bar-search" style="position:relative;">
                 <span class="material-symbols-outlined">search</span>
                 <input type="search" id="globalSearch" placeholder="Search equipment, requests, facilities…"
@@ -1835,6 +1838,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
     </script>
+    <!-- Mobile Nav Backdrop -->
+    <div class="nav-backdrop" id="navBackdrop"></div>
+
     <script src="JS/faculty-dashboard.js"></script>
 </body>
 
