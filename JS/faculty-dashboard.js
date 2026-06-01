@@ -4,6 +4,17 @@
     const todayStr = new Date().toISOString().split('T')[0];
 
     /* ══════════════════════════════════════════════════════════════════
+       CRITICAL: Close all overlays on page load to prevent stuck modals
+    ══════════════════════════════════════════════════════════════════ */
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+        });
+    } else {
+        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
        STATE PERSISTENCE — localStorage
        Saves settings, account edits, and notification read state so
        everything survives a page reload. Active tab is intentionally
@@ -235,11 +246,17 @@
         document.querySelectorAll('.overlay-page.active').forEach(o => {
             if (o !== el) o.classList.remove('active');
         });
+        // Remove active from all sidebar items first
+        document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
         // Highlight the Settings sidebar item when settings overlay is open
         if (id === 'settingsOverlay') {
-            document.querySelectorAll('.side-nav-item[data-tab]').forEach(b => b.classList.remove('active'));
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
+        }
+        // Highlight Help Center sidebar item when help overlay is open
+        if (id === 'helpOverlay') {
+            const helpNavItem = document.querySelector('.side-nav-item[data-target="helpOverlay"]');
+            if (helpNavItem) helpNavItem.classList.add('active');
         }
     }
 
@@ -256,10 +273,14 @@
         // We also immediately remove the class for instant visual feedback.
         const el = document.getElementById(id);
         if (el) el.classList.remove('active');
-        // Remove active state from settings nav item when closing settings overlay
-        if (id === 'settingsOverlay') {
-            const settingsNavItem = document.getElementById('nav-settings');
-            if (settingsNavItem) settingsNavItem.classList.remove('active');
+        // Remove active state from all sidebar items
+        document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
+        // Restore the active state to the current tab
+        const activePanel = document.querySelector('.tab-panel.active');
+        if (activePanel) {
+            const tabName = activePanel.id.replace('panel-', '');
+            const tabNavItem = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
+            if (tabNavItem) tabNavItem.classList.add('active');
         }
         history.back();
     }
@@ -1268,26 +1289,50 @@
     if (avatarBtn) {
         avatarBtn.addEventListener('click', function (e) {
             e.stopPropagation();
+            closeNotifPopover();
             toggleDropdown();
         });
     }
 
     /* ── Close dropdown on outside click ─────────────────────────────── */
     document.addEventListener('click', function (e) {
-        if (!e.target.closest('.top-bar-profile-wrap') && !e.target.closest('.header-right')) closeDropdown();
+        if (!e.target.closest('#avatarWrap')) closeDropdown();
+        if (!e.target.closest('#notifWrap')) closeNotifPopover();
     });
 
     /* ── Notification bell popover ────────────────────────────────────── */
-    // Notification bell removed — notifications now live inside the avatar dropdown
+    function openNotifPopover() {
+        const pop = document.getElementById('notifPopover');
+        const btn = document.getElementById('notifBtn');
+        if (pop) pop.classList.add('open');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+    function closeNotifPopover() {
+        const pop = document.getElementById('notifPopover');
+        const btn = document.getElementById('notifBtn');
+        if (pop) pop.classList.remove('open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+    const notifBtn = document.getElementById('notifBtn');
+    if (notifBtn) {
+        notifBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            closeDropdown();
+            const pop = document.getElementById('notifPopover');
+            if (pop && pop.classList.contains('open')) closeNotifPopover();
+            else openNotifPopover();
+        });
+    }
 
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
-            // Close any open overlay and remove settings highlight when navigating to a tab
+            // Close any open overlays
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
-            const settingsNavItem = document.getElementById('nav-settings');
-            if (settingsNavItem) settingsNavItem.classList.remove('active');
+            // Remove active from all sidebar items (including settings and help)
+            document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
+            // Switch to the clicked tab (which will set its active state)
             switchTab(this.dataset.tab);
         });
     });
@@ -1362,6 +1407,7 @@
         /* Build and render dropdown from combined results */
         function renderDropdown(q, inventoryItems) {
             const ql = q.trim().toLowerCase();
+            if (ql.length < 2) { dropdown.style.display = 'none'; return; }
 
             // Equipment results — from live-search.php JSON (always fresh, works on any tab)
             const eqResults = (inventoryItems || []).slice(0, 5);
@@ -1466,7 +1512,7 @@
         /* Main entry: show spinner, fetch from PHP, then render */
         function buildDropdown(q) {
             q = (q || '').trim();
-            if (!q) { dropdown.style.display = 'none'; return; }
+            if (q.length < 2) { dropdown.style.display = 'none'; return; }
 
             // Show loading state immediately so the search feels responsive
             dropdown.innerHTML = '<div class="ls-empty" style="padding:10px 14px;">' +
@@ -1502,12 +1548,12 @@
         input.addEventListener('input', function () {
             clearTimeout(debounceTimer);
             const val = this.value;
-            if (!val.trim()) { dropdown.style.display = 'none'; return; }
+            if (!val.trim() || val.trim().length < 2) { dropdown.style.display = 'none'; return; }
             debounceTimer = setTimeout(() => buildDropdown(val), 220);
         });
 
         input.addEventListener('focus', function () {
-            if (this.value.trim()) buildDropdown(this.value);
+            dropdown.style.display = 'none';
         });
 
         document.addEventListener('click', function (e) {
@@ -2453,4 +2499,3 @@
     }
 
 })();
-
