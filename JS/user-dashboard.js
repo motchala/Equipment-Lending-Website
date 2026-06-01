@@ -2351,6 +2351,22 @@
         });
     }
 
+    function _updateFacultyStatCards(data) {
+        const counts = {
+            'Active Borrowings': data.filter(r => r.status === 'Approved').length,
+            'Pending Requests': data.filter(r => r.status === 'Waiting').length,
+            'Total Requests': data.length,
+        };
+        document.querySelectorAll('.stat-card').forEach(card => {
+            const label = (card.querySelector('.stat-card-label') || {}).textContent?.trim();
+            const val = card.querySelector('.stat-card-value');
+            if (!val || !(label in counts)) return;
+            if (val.textContent.trim() !== String(counts[label])) {
+                val.textContent = counts[label];
+            }
+        });
+    }
+
     /* ── Real-time Requests Polling ────────────────────────────────────── */
     function startRequestsPolling() {
         const INTERVAL = 5000; // check every 5 seconds
@@ -2389,8 +2405,10 @@
                     if (changed) {
                         // Update the global data and re-render
                         window.REQUESTS_DATA = fresh;
+                        window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
                         renderRequestsTable();
                         checkOverdueState();
+                        _updateFacultyStatCards(fresh);
                     }
                 })
                 .catch(() => { }); // silently ignore network errors
