@@ -693,7 +693,8 @@ $profile_pic_url      = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . 
                             <?php while ($item = mysqli_fetch_assoc($inventory_result)): ?>
                             <div class="eq-item-card item-node"
                                 data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
-                                data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>">
+                                data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
+                                data-item-id="<?php echo (int)$item['item_id']; ?>">>
                                 <?php if (!empty($item['image_path'])): ?>
                                 <img class="eq-item-img"
                                     src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"

@@ -1606,6 +1606,7 @@
         renderRequestsTable();
         checkOverdueState();
         startRequestsPolling();
+        startInventoryPolling();
 
         // Password strength meter
         const pwNewInput = document.getElementById('pwNew');
@@ -2365,6 +2366,46 @@
                 val.textContent = counts[label];
             }
         });
+    }
+
+    function startInventoryPolling() {
+        const INTERVAL = 8000;
+
+        function doPoll() {
+            fetch('includes/poll-inventory.php', { method: 'GET' })
+                .then(r => r.json())
+                .then(items => {
+                    if (!Array.isArray(items)) return;
+                    items.forEach(function (item) {
+                        const card = document.querySelector('.item-node[data-item-id="' + item.item_id + '"]');
+                        if (!card) return;
+                        const qty = parseInt(item.quantity, 10);
+
+                        // Update availability badge
+                        const badge = card.querySelector('.stock-badge');
+                        if (badge) {
+                            if (qty > 0) {
+                                badge.className = 'stock-badge stock-avail';
+                                badge.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> ' + qty + ' available';
+                            } else {
+                                badge.className = 'stock-badge stock-unavail';
+                                badge.innerHTML = '<span class="material-symbols-outlined" style="font-size:12px;">cancel</span> Out of stock';
+                            }
+                        }
+
+                        // Update borrow button
+                        const btn = card.querySelector('.btn-borrow[data-action="open-borrow-form"]');
+                        if (btn) {
+                            btn.disabled = qty <= 0;
+                            btn.textContent = qty > 0 ? 'Borrow' : 'Unavailable';
+                        }
+                    });
+                })
+                .catch(function () { });
+        }
+
+        doPoll();                        // run immediately on page load
+        setInterval(doPoll, INTERVAL);   // then every 8 seconds
     }
 
     /* ── Real-time Requests Polling ────────────────────────────────────── */
