@@ -2716,42 +2716,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <script src="JS/admin-dashboard.js"></script>
-
-    <script>
-        /* ── Admin Real-time Polling ─────────────────────────────────── */
-        (function () {
-            const INTERVAL = 6000; // every 6 seconds
-
-            function pollAdminRequests() {
-                fetch('includes/poll-admin-requests.php')
-                    .then(r => r.json())
-                    .then(data => {
-                        if (!data || !data.changed) return;
-
-                        // Show a toast notification
-                        const toast = document.getElementById('admin-poll-toast');
-                        if (toast) {
-                            toast.textContent = data.message || 'Requests updated.';
-                            toast.style.display = 'block';
-                            setTimeout(() => toast.style.display = 'none', 4000);
-                        }
-
-                        // Reload just the affected table sections via soft reload
-                        if (data.changed) {
-                            // Reload the page content without full reload
-                            // by refreshing just the current visible section
-                            const currentView = new URLSearchParams(window.location.search).get('view') || 'dashboard';
-                            if (['approved', 'dashboard', 'overdue'].includes(currentView)) {
-                                window.location.reload();
-                            }
-                        }
-                    })
-                    .catch(() => { });
-            }
-
-            setInterval(pollAdminRequests, INTERVAL);
-        })();
-    </script>
+    <script src="JS/admin-live-render.js"></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast" style="display:none;position:fixed;bottom:24px;right:24px;
