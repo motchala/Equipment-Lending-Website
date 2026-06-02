@@ -4131,6 +4131,12 @@ body {
         overflow-y: auto;
     }
 
+    /* Hide the generic overlay topbar inside settings — the
+       settings-bento-header acts as the sticky title bar instead */
+    #settingsOverlay > .overlay-topbar {
+        display: none;
+    }
+
     #settingsOverlay.active .settings-bento-wrap,
     #helpOverlay.active .unified-settings-wrap {
         pointer-events: auto;
@@ -4223,122 +4229,275 @@ body {
         padding: 16px;
     }
 
-    /* Settings bento — full mobile reflow */
+
+    /* Settings: native mobile list layout */
+
+    #settingsOverlay,
+    #helpOverlay {
+        left: 0;
+        z-index: 235;
+        overflow-y: auto;
+    }
+
     .settings-bento-wrap {
-        padding: 16px 12px 40px;
+        padding: 0 0 80px;
+        max-width: 100%;
     }
 
     .settings-bento-header {
-        gap: 10px;
-        margin-bottom: 20px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
         align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        margin-bottom: 0;
+        background: var(--color-surface);
+        border-bottom: 1px solid var(--color-outline-variant);
+        box-shadow: var(--shadow-sm);
     }
 
     .settings-bento-header h1 {
-        font-size: 1.3rem;
+        font-size: 1.05rem;
+        margin: 0;
     }
 
     .settings-bento-header p {
-        font-size: 0.8rem;
+        display: none;
     }
 
     .settings-back-btn {
-        width: 36px;
-        height: 36px;
+        width: 34px;
+        height: 34px;
         flex-shrink: 0;
     }
 
     .settings-bento-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
     }
 
-    /* Profile card: full width, no row-span */
+    .bento-card {
+        border-radius: 0;
+        border: none;
+        border-bottom: 8px solid var(--color-background);
+        box-shadow: none;
+        padding: 0;
+        background: var(--color-surface);
+    }
+
+    .bento-card:hover {
+        transform: none;
+        box-shadow: none;
+    }
+
+    .bento-card:last-child {
+        border-bottom: none;
+    }
+
+    .bento-card-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 18px 16px 6px;
+        margin-bottom: 0;
+        background: var(--color-background);
+    }
+
+    .bento-icon {
+        font-size: 13px;
+        color: var(--color-secondary);
+    }
+
+    .bento-card-header h3 {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.1px;
+        color: var(--color-secondary);
+        margin: 0;
+    }
+
     .bento-card-profile {
-        grid-column: 1 / -1;
-        grid-row: span 1;
+        grid-column: unset;
+        grid-row: unset;
+        order: -1;
+        background: var(--color-surface);
+        border-bottom: 8px solid var(--color-background);
+    }
+
+    .bento-card-profile .bento-card-header {
+        display: none;
     }
 
     .bento-profile-content {
         flex-direction: row;
         align-items: center;
-        gap: 16px;
-        margin-bottom: 14px;
+        gap: 14px;
+        padding: 20px 16px 16px;
+        margin-bottom: 0;
     }
 
     .bento-avatar {
-        width: 56px;
-        height: 56px;
-        font-size: 1.2rem;
+        width: 54px;
+        height: 54px;
+        font-size: 1.1rem;
         flex-shrink: 0;
     }
 
     .bento-profile-info {
         text-align: left;
+        flex: 1;
+        min-width: 0;
     }
 
     .bento-profile-info h4 {
-        font-size: 0.95rem;
+        font-size: 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 2px;
     }
 
-    /* Notifications card: full width, no col-span needed */
-    .bento-card-notif {
-        grid-column: 1 / -1;
+    .bento-profile-info p {
+        font-size: 0.78rem;
     }
 
-    /* All cards: tighter padding */
-    .bento-card {
-        padding: 14px;
+    .bento-badge {
+        font-size: 0.68rem;
+        padding: 2px 8px;
+        margin-top: 4px;
     }
 
-    .bento-card-header {
-        margin-bottom: 10px;
+    .bento-btn {
+        margin-top: 0;
+        border-radius: 0;
+        border: none;
+        border-top: 1px solid var(--color-outline-variant);
+        background: var(--color-surface);
+        padding: 15px 16px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        justify-content: space-between;
+        width: 100%;
     }
 
-    .bento-card-header h3 {
+    .bento-btn:hover,
+    .bento-btn:active {
+        background: var(--color-surface-container);
+        border-color: var(--color-outline-variant);
+        color: var(--color-on-surface);
+    }
+
+    .bento-theme-preview {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 16px;
+        margin-bottom: 0;
+        background: var(--color-surface);
+    }
+
+    .theme-circle {
+        width: 42px;
+        height: 42px;
+    }
+
+    .bento-desc {
+        padding: 4px 16px 14px;
+        margin: 0;
+        font-size: 0.8rem;
+        background: var(--color-surface);
+    }
+
+    .bento-font-scale {
+        display: flex;
+        gap: 0;
+        margin-bottom: 0;
+        padding: 0 16px 14px;
+        background: var(--color-surface);
+    }
+
+    .font-scale-btn {
+        flex: 1;
+        padding: 11px 8px;
+        border-radius: 0;
+        border: 1px solid var(--color-outline-variant);
+        border-right: none;
         font-size: 0.875rem;
     }
 
-    .bento-icon {
-        font-size: 18px;
+    .font-scale-btn:first-child {
+        border-radius: var(--radius-md) 0 0 var(--radius-md);
     }
 
-    /* Theme circles smaller */
-    .theme-circle {
-        width: 36px;
-        height: 36px;
+    .font-scale-btn:last-child {
+        border-radius: 0 var(--radius-md) var(--radius-md) 0;
+        border-right: 1px solid var(--color-outline-variant);
     }
 
-    /* Font scale buttons */
-    .font-scale-btn {
-        padding: 8px 6px;
-        font-size: 0.8rem;
+    .bento-security-list,
+    .bento-privacy-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        margin-bottom: 0;
+        background: var(--color-surface);
     }
 
-    /* Security items */
     .security-item,
     .privacy-item {
-        padding: 8px 10px;
-        font-size: 0.8rem;
+        border-radius: 0;
+        border: none;
+        border-bottom: 1px solid var(--color-outline-variant);
+        padding: 15px 16px;
+        font-size: 0.875rem;
+        background: var(--color-surface);
+        gap: 14px;
     }
 
-    /* Notif toggle rows */
+    .security-item:last-child,
+    .privacy-item:last-child {
+        border-bottom: none;
+    }
+
+    .security-item .material-symbols-outlined,
+    .privacy-item .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    .bento-card-notif {
+        grid-column: unset;
+    }
+
+    .bento-notif-toggles {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        background: var(--color-surface);
+    }
+
+    .notif-toggle-row {
+        padding: 15px 16px;
+        border-bottom: 1px solid var(--color-outline-variant);
+        gap: 12px;
+    }
+
+    .notif-toggle-row:last-child {
+        border-bottom: none;
+    }
+
     .notif-toggle-row h4 {
-        font-size: 0.8rem;
+        font-size: 0.875rem;
+        font-weight: 600;
     }
 
     .notif-toggle-row p {
-        font-size: 0.72rem;
+        font-size: 0.78rem;
     }
 
-    /* Bento action button */
-    .bento-btn {
-        padding: 8px 12px;
-        font-size: 0.8rem;
-        margin-top: 10px;
-    }
-
-    /* Unified settings */
     .unified-settings-grid {
         grid-template-columns: 1fr;
     }
@@ -4359,6 +4518,7 @@ body {
         padding: 16px 12px 48px;
     }
 }
+
 
 /* ================================================================
    UNIFIED SETTINGS OVERLAY — card-grid layout
