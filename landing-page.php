@@ -535,12 +535,12 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             <h3>Faculty</h3>
                             <p>Borrow equipment & reserve rooms</p>
                         </button>
-                        <button class="role-card" onclick="selectRole('faculty')">
+                        <button class="role-card" onclick="window.location.href='student-portal.php'">
                             <div class="role-icon">
                                 <i class="fa-solid fa-graduation-cap"></i>
                             </div>
                             <h3>Student</h3>
-                            <p>View equipment & room availability</p>
+                            <p>No account needed — borrow & reserve</p>
                         </button>
                         <button class="role-card" onclick="selectRole('admin')">
                             <div class="role-icon">
@@ -695,66 +695,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         </form>
                     </div>
                 </div>
-
-                <!-- STUDENT LOGIN (view-only — portal not yet available) -->
-                <div class="auth-section" id="facultySection">
-                    <button class="back-btn" onclick="backToRoleSelector()">
-                        <i class="fa-solid fa-arrow-left"></i> Back
-                    </button>
-
-                    <div class="auth-pane active">
-                        <p class="pane-title">Student Login</p>
-                        <p class="pane-subtitle">Student portal is not yet available</p>
-                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'faculty'): ?>
-                            <div class="auth-alert error">
-                                <i class="fa-solid fa-circle-exclamation"></i>
-                                <?= htmlspecialchars($login_error) ?>
-                            </div>
-                        <?php endif; ?>
-                        <form method="POST" action="">
-                            <input type="hidden" name="user_type" value="faculty">
-                            <div class="form-group">
-                                <label for="faculty-login-email">Faculty Email</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="email" id="faculty-login-email" name="email"
-                                        placeholder="faculty@pup.edu.ph"
-                                        autocomplete="email" required>
-                                    <i class="fa-solid fa-envelope input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="faculty-login-pass">Password</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="password" id="faculty-login-pass" name="password"
-                                        placeholder="Enter your password"
-                                        autocomplete="current-password" required>
-                                    <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" onclick="toggleEye('faculty-login-pass', this)" tabindex="-1" aria-label="Show password">
-                                        <i class="fa-regular fa-eye-slash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="submit" name="login" class="btn-auth">
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                                Sign In
-                            </button>
-                        </form>
-                        <div class="contact-admin-wrap">
-                            <button class="contact-admin-btn" onclick="showContactAdminModal()">
-                                Need an account? Contact Admin
-                            </button>
-                        </div>
-                        <!-- Dev Button (temporary for development) -->
-                        <div class="dev-access-wrap">
-                            <span class="dev-label">⚠️ Development Mode</span>
-                            <button class="dev-access-btn" onclick="window.location.href='faculty-dashboard.php'">
-                                <i class="fa-solid fa-code"></i>
-                                Access Faculty Dashboard (Dev)
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
+                
                 <!-- ADMIN LOGIN -->
                 <div class="auth-section" id="adminSection">
                     <button class="back-btn" onclick="backToRoleSelector()">
