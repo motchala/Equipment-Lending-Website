@@ -131,6 +131,13 @@ $stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FR
 $stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue'"))['c'];
 
 $has_overdue_block = $stat_overdue > 0;
+
+// ── Faculty Authorization Code ─────────────────────────────────────────────
+$code_result = mysqli_query($conn, "SELECT id, created_at FROM tbl_faculty_codes WHERE faculty_id='$uid_safe' AND status='active' ORDER BY created_at DESC LIMIT 1");
+$code_row = mysqli_fetch_assoc($code_result);
+$has_active_code = !empty($code_row);
+$code_generated_at = $code_row['created_at'] ?? '';
+
 // ── Requests JSON for JS ───────────────────────────────────────────────────
 $requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC");
 $requests_js = [];
@@ -279,10 +286,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             <div class="top-bar-actions">
                 <!-- Notification Bell -->
                 <div class="top-bar-notif-wrap" id="notifWrap">
-                    <button class="top-bar-icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+                    <button class="top-bar-icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"
+                        aria-expanded="false">
                         <span class="material-symbols-outlined">notifications</span>
                         <?php if ($notif_count > 0): ?>
-                            <span class="top-bar-badge" id="notifBadge"><?php echo $notif_count; ?></span>
+                        <span class="top-bar-badge" id="notifBadge">
+                            <?php echo $notif_count; ?>
+                        </span>
                         <?php endif; ?>
                     </button>
                     <!-- Notification Popover -->
@@ -293,13 +303,17 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         </div>
                         <div class="notif-popover-list">
                             <?php if (!empty($overdue_notifs)): foreach ($overdue_notifs as $on): ?>
-                                    <div class="notif-pop-item unread" data-cat="overdue">
-                                        <div class="notif-pop-dot notif-dot-error"></div>
-                                        <div class="notif-pop-body">
-                                            <div class="notif-pop-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                            <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> — return immediately</div>
-                                        </div>
+                            <div class="notif-pop-item unread" data-cat="overdue">
+                                <div class="notif-pop-dot notif-dot-error"></div>
+                                <div class="notif-pop-body">
+                                    <div class="notif-pop-title">Overdue:
+                                        <?php echo htmlspecialchars($on['equipment_name']); ?>
                                     </div>
+                                    <div class="notif-pop-sub">Due
+                                        <?php echo htmlspecialchars($on['return_date']); ?> — return immediately
+                                    </div>
+                                </div>
+                            </div>
                             <?php endforeach;
                             endif; ?>
                             <div class="notif-pop-item unread" data-cat="borrow">
@@ -317,16 +331,18 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                 </div>
                             </div>
                         </div>
-                        <button class="notif-popover-footer" data-action="open-overlay" data-target="notifOverlay">View all notifications</button>
+                        <button class="notif-popover-footer" data-action="open-overlay" data-target="notifOverlay">View
+                            all notifications</button>
                     </div>
                 </div>
                 <!-- Avatar -->
                 <div class="top-bar-profile-wrap" id="avatarWrap">
-                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false"
+                        aria-label="Account menu">
                         <?php if ($profile_pic_url): ?>
-                            <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                        <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
                         <?php else: ?>
-                            <?php echo htmlspecialchars($initials); ?>
+                        <?php echo htmlspecialchars($initials); ?>
                         <?php endif; ?>
                     </button>
                     <!-- Simple Avatar Dropdown -->
@@ -334,14 +350,19 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <div class="dd-header">
                             <div class="dd-avatar">
                                 <?php if ($profile_pic_url): ?>
-                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
+                                    class="avatar-img">
                                 <?php else: ?>
-                                    <?php echo htmlspecialchars($initials); ?>
+                                <?php echo htmlspecialchars($initials); ?>
                                 <?php endif; ?>
                             </div>
                             <div>
-                                <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
-                                <span class="dd-sub">Faculty &mdash; ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
+                                <span class="dd-name">
+                                    <?php echo htmlspecialchars($fullname); ?>
+                                </span>
+                                <span class="dd-sub">Faculty &mdash; ID:
+                                    <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
+                                </span>
                             </div>
                         </div>
                         <div class="dd-menu">
@@ -362,19 +383,20 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
 
             <!-- Success Alert -->
             <?php if (isset($_GET['success'])): ?>
-                <div class="alert-banner alert-success" id="success-alert">
-                    <span class="material-symbols-outlined">check_circle</span>
-                    <strong>Success!</strong> Your borrow request has been submitted for approval.
-                    <button class="alert-close" data-action="dismiss-alert" data-target="success-alert" aria-label="Close">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
+            <div class="alert-banner alert-success" id="success-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <strong>Success!</strong> Your borrow request has been submitted for approval.
+                <button class="alert-close" data-action="dismiss-alert" data-target="success-alert" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
             <?php endif; ?>
 
             <!-- Overdue Alert -->
             <div class="alert-banner alert-danger <?php echo $has_overdue_block ? '' : 'hidden'; ?>" id="overdue-alert">
                 <span class="material-symbols-outlined">warning</span>
-                <strong>Borrowing Blocked:</strong> You have overdue equipment. Return it to the Admin Office before you can borrow again.
+                <strong>Borrowing Blocked:</strong> You have overdue equipment. Return it to the Admin Office before you
+                can borrow again.
                 <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
@@ -392,7 +414,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         $h = (int)date('H');
                         echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
                         ?>,
-                        <span style="color:var(--color-primary);"><?php echo htmlspecialchars($firstname); ?></span>.
+                        <span style="color:var(--color-primary);">
+                            <?php echo htmlspecialchars($firstname); ?>
+                        </span>.
                     </h1>
                     <p class="page-subtitle">
                         <?php echo date('l, F j, Y'); ?> &mdash; Here is an overview of your active equipment and
@@ -421,25 +445,64 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
                         </div>
                         <?php if ($stat_overdue > 0): ?>
-                            <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests"
-                                data-status="Overdue">
-                                <div class="stat-card-label">Overdue</div>
-                                <div class="stat-card-value" id="statOverdueVal">
-                                    <?php echo $stat_overdue; ?>
-                                </div>
-                                <div class="stat-card-action-tag">Action Required</div>
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
+                        <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests"
+                            data-status="Overdue">
+                            <div class="stat-card-label">Overdue</div>
+                            <div class="stat-card-value" id="statOverdueVal">
+                                <?php echo $stat_overdue; ?>
                             </div>
+                            <div class="stat-card-action-tag">Action Required</div>
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
+                        </div>
                         <?php else: ?>
-                            <div class="stat-card">
-                                <div class="stat-card-label">Total Requests</div>
-                                <div class="stat-card-value">
-                                    <?php echo $stat_total; ?>
+                        <div class="stat-card">
+                            <div class="stat-card-label">Total Requests</div>
+                            <div class="stat-card-value">
+                                <?php echo $stat_total; ?>
+                            </div>
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+
+                        <!-- Faculty Authorization Code -->
+                        <div class="faculty-code-card" id="facultyCodeCard">
+                            <div class="fcc-head">
+                                <span class="material-symbols-outlined">key</span>
+                                <span>Faculty Authorization Code</span>
+                            </div>
+                            <div class="fcc-body">
+                                <div class="fcc-code-wrap">
+                                    <span class="fcc-code-masked" id="fccCodeMasked">
+                                        <?php echo $has_active_code ? '••••••••••••••••••••••••••••••••' : 'No active code'; ?>
+                                    </span>
+                                    <span class="fcc-code-plain" id="fccCodePlain" style="display:none;"></span>
+                                    <?php if ($has_active_code): ?>
+                                    <button class="fcc-btn-icon" id="fccToggleBtn" title="Show/Hide">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </button>
+                                    <button class="fcc-btn-icon" id="fccCopyBtn" title="Copy">
+                                        <span class="material-symbols-outlined">content_copy</span>
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span>
+                                <div class="fcc-meta" id="fccMeta">
+                                    <?php if ($has_active_code): ?>
+                                    Active code generated
+                                    <?php echo htmlspecialchars(date('M j, g:i A', strtotime($code_generated_at))); ?>.
+                                    <strong>Show once, share once.</strong>
+                                    <?php else: ?>
+                                    Generate a one-time code to share with your student.
+                                    <?php endif; ?>
                                 </div>
                             </div>
-                        <?php endif; ?>
+                            <div class="fcc-actions">
+                                <button class="fcc-btn-generate" id="fccGenerateBtn">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    <?php echo $has_active_code ? 'Generate New Code' : 'Generate Code'; ?>
+                                </button>
+                            </div>
+                        </div>
 
                         <!-- Recent Audit Log -->
                         <div class="audit-card">
@@ -452,18 +515,18 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             if ($recent_raw && mysqli_num_rows($recent_raw) > 0):
                                 while ($rr = mysqli_fetch_assoc($recent_raw)):
                             ?>
-                                    <div class="audit-row">
-                                        <span class="audit-row-label">
-                                            <?php echo htmlspecialchars($rr['equipment_name']); ?>
-                                        </span>
-                                        <span class="audit-row-time">
-                                            <?php echo date('M j', strtotime($rr['request_date'])); ?>
-                                        </span>
-                                    </div>
-                                <?php endwhile;
+                            <div class="audit-row">
+                                <span class="audit-row-label">
+                                    <?php echo htmlspecialchars($rr['equipment_name']); ?>
+                                </span>
+                                <span class="audit-row-time">
+                                    <?php echo date('M j', strtotime($rr['request_date'])); ?>
+                                </span>
+                            </div>
+                            <?php endwhile;
                             else: ?>
-                                <div class="audit-row"><span class="audit-row-label"
-                                        style="color:var(--color-on-surface-variant)">No recent activity</span></div>
+                            <div class="audit-row"><span class="audit-row-label"
+                                    style="color:var(--color-on-surface-variant)">No recent activity</span></div>
                             <?php endif; ?>
                             <a class="audit-view-all" data-tab="activity" href="#">View Full Activity Log</a>
                         </div>
@@ -511,9 +574,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                                 </svg> Notifications
                                 <?php if ($notif_count > 0): ?>
-                                    <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">
-                                        <?php echo $notif_count; ?>
-                                    </span>
+                                <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">
+                                    <?php echo $notif_count; ?>
+                                </span>
                                 <?php endif; ?>
                             </button>
                         </div>
@@ -548,35 +611,35 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                 if ($active_raw) while ($ar = mysqli_fetch_assoc($active_raw)) $active_items[] = $ar;
                 ?>
                 <?php if (!empty($active_items)): ?>
-                    <div class="section-label">Active Now</div>
-                    <div class="active-cards-grid">
-                        <?php foreach ($active_items as $ai): ?>
-                            <div class="active-card <?php echo $ai['status'] === 'Overdue' ? 'active-card-overdue' : ''; ?>">
-                                <div class="active-card-thumb">
-                                    <span class="material-symbols-outlined">inventory_2</span>
-                                </div>
-                                <div class="active-card-body">
-                                    <div class="active-card-meta">Equipment</div>
-                                    <div class="active-card-title">
-                                        <?php echo htmlspecialchars($ai['equipment_name']); ?>
-                                    </div>
-                                    <div class="active-card-sub">Room:
-                                        <?php echo htmlspecialchars($ai['room']); ?>
-                                    </div>
-                                    <div class="active-card-footer">
-                                        <span class="active-card-due">Due:
-                                            <?php echo htmlspecialchars($ai['return_date']); ?>
-                                        </span>
-                                        <span
-                                            class="status-chip <?php echo $ai['status'] === 'Overdue' ? 'chip-error' : 'chip-success'; ?>">
-                                            <span class="chip-dot"></span>
-                                            <?php echo $ai['status']; ?>
-                                        </span>
-                                    </div>
-                                </div>
+                <div class="section-label">Active Now</div>
+                <div class="active-cards-grid">
+                    <?php foreach ($active_items as $ai): ?>
+                    <div class="active-card <?php echo $ai['status'] === 'Overdue' ? 'active-card-overdue' : ''; ?>">
+                        <div class="active-card-thumb">
+                            <span class="material-symbols-outlined">inventory_2</span>
+                        </div>
+                        <div class="active-card-body">
+                            <div class="active-card-meta">Equipment</div>
+                            <div class="active-card-title">
+                                <?php echo htmlspecialchars($ai['equipment_name']); ?>
                             </div>
-                        <?php endforeach; ?>
+                            <div class="active-card-sub">Room:
+                                <?php echo htmlspecialchars($ai['room']); ?>
+                            </div>
+                            <div class="active-card-footer">
+                                <span class="active-card-due">Due:
+                                    <?php echo htmlspecialchars($ai['return_date']); ?>
+                                </span>
+                                <span
+                                    class="status-chip <?php echo $ai['status'] === 'Overdue' ? 'chip-error' : 'chip-success'; ?>">
+                                    <span class="chip-dot"></span>
+                                    <?php echo $ai['status']; ?>
+                                </span>
+                            </div>
+                        </div>
                     </div>
+                    <?php endforeach; ?>
+                </div>
                 <?php endif; ?>
 
             </div><!-- /panel-home -->
@@ -622,61 +685,61 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         </div>
                         <div class="eq-grid" id="equipmentList">
                             <?php if (mysqli_num_rows($inventory_result) == 0): ?>
-                                <div class="eq-empty">
-                                    <span class="material-symbols-outlined">inventory_2</span>
-                                    <p>No equipment available at the moment.</p>
-                                </div>
+                            <div class="eq-empty">
+                                <span class="material-symbols-outlined">inventory_2</span>
+                                <p>No equipment available at the moment.</p>
+                            </div>
                             <?php else: ?>
-                                <?php while ($item = mysqli_fetch_assoc($inventory_result)): ?>
-                                    <div class="eq-item-card item-node"
-                                        data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
-                                        data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
-                                        data-item-id="<?php echo (int)$item['item_id']; ?>">
-                                        <?php if (!empty($item['image_path'])): ?>
-                                            <img class="eq-item-img"
-                                                src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
-                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>">
-                                        <?php else: ?>
-                                            <div class="eq-item-img-placeholder">
-                                                <span class="material-symbols-outlined">inventory_2</span>
-                                            </div>
-                                        <?php endif; ?>
-                                        <div class="eq-item-body">
-                                            <div class="eq-item-name">
-                                                <?php echo htmlspecialchars($item['item_name']); ?>
-                                            </div>
-                                            <div class="eq-item-cat">
-                                                <span class="material-symbols-outlined" style="font-size:13px;">label</span>
-                                                <?php echo htmlspecialchars($item['category']); ?>
-                                            </div>
-                                            <?php if ($item['quantity'] > 0): ?>
-                                                <span class="stock-badge stock-avail">
-                                                    <span class="material-symbols-outlined"
-                                                        style="font-size:12px;">check_circle</span>
-                                                    <?php echo (int)$item['quantity']; ?> available
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="stock-badge stock-unavail">
-                                                    <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
-                                                    Out of stock
-                                                </span>
-                                            <?php endif; ?>
-                                            <?php if ($has_overdue_block): ?>
-                                                <button class="btn-borrow btn-borrow-blocked" disabled
-                                                    title="You have an overdue item. Return it before borrowing again.">
-                                                    Overdue Block
-                                                </button>
-                                            <?php else: ?>
-                                                <button class="btn-borrow" <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
-                                                    data-action="open-borrow-form"
-                                                    data-item="
-                                            <?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                    <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
+                            <?php while ($item = mysqli_fetch_assoc($inventory_result)): ?>
+                            <div class="eq-item-card item-node"
+                                data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
+                                data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
+                                data-item-id="<?php echo (int)$item['item_id']; ?>">
+                                <?php if (!empty($item['image_path'])): ?>
+                                <img class="eq-item-img"
+                                    src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
+                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>">
+                                <?php else: ?>
+                                <div class="eq-item-img-placeholder">
+                                    <span class="material-symbols-outlined">inventory_2</span>
+                                </div>
+                                <?php endif; ?>
+                                <div class="eq-item-body">
+                                    <div class="eq-item-name">
+                                        <?php echo htmlspecialchars($item['item_name']); ?>
                                     </div>
-                                <?php endwhile; ?>
+                                    <div class="eq-item-cat">
+                                        <span class="material-symbols-outlined" style="font-size:13px;">label</span>
+                                        <?php echo htmlspecialchars($item['category']); ?>
+                                    </div>
+                                    <?php if ($item['quantity'] > 0): ?>
+                                    <span class="stock-badge stock-avail">
+                                        <span class="material-symbols-outlined"
+                                            style="font-size:12px;">check_circle</span>
+                                        <?php echo (int)$item['quantity']; ?> available
+                                    </span>
+                                    <?php else: ?>
+                                    <span class="stock-badge stock-unavail">
+                                        <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
+                                        Out of stock
+                                    </span>
+                                    <?php endif; ?>
+                                    <?php if ($has_overdue_block): ?>
+                                    <button class="btn-borrow btn-borrow-blocked" disabled
+                                        title="You have an overdue item. Return it before borrowing again.">
+                                        Overdue Block
+                                    </button>
+                                    <?php else: ?>
+                                    <button class="btn-borrow" <?php if ($item['quantity'] <=0) echo 'disabled' ; ?>
+                                        data-action="open-borrow-form"
+                                        data-item="
+                                        <?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
+                                        <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
+                                    </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endwhile; ?>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -914,13 +977,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     }
                     if (empty($grouped)):
                     ?>
-                        <div class="timeline-empty">
-                            <span class="material-symbols-outlined">history_edu</span>
-                            <p>No activity yet. Start by borrowing equipment or reserving a room.</p>
-                            <button class="btn-borrow" style="width:auto;padding:10px 24px;margin-top:12px;"
-                                data-action="go-tab" data-tab="lending" data-lending="browse">Browse Equipment</button>
-                        </div>
-                        <?php else: foreach ($grouped as $date => $items):
+                    <div class="timeline-empty">
+                        <span class="material-symbols-outlined">history_edu</span>
+                        <p>No activity yet. Start by borrowing equipment or reserving a room.</p>
+                        <button class="btn-borrow" style="width:auto;padding:10px 24px;margin-top:12px;"
+                            data-action="go-tab" data-tab="lending" data-lending="browse">Browse Equipment</button>
+                    </div>
+                    <?php else: foreach ($grouped as $date => $items):
                             $label = '';
                             $d = strtotime($date);
                             $todayTs = strtotime($today);
@@ -930,71 +993,71 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             elseif ($diff === -1) $label = 'Yesterday';
                             else $label = date('M j, Y', $d);
                         ?>
-                            <div class="timeline-group">
-                                <div class="timeline-group-label">
-                                    <span>
-                                        <?php echo htmlspecialchars($label); ?>
-                                    </span>
-                                    <span class="timeline-date-chip">
-                                        <?php echo date('M j', $d); ?>
-                                    </span>
-                                </div>
-                                <div class="timeline-items">
-                                    <?php foreach ($items as $ti):
+                    <div class="timeline-group">
+                        <div class="timeline-group-label">
+                            <span>
+                                <?php echo htmlspecialchars($label); ?>
+                            </span>
+                            <span class="timeline-date-chip">
+                                <?php echo date('M j', $d); ?>
+                            </span>
+                        </div>
+                        <div class="timeline-items">
+                            <?php foreach ($items as $ti):
                                         $isActive = in_array($ti['status'], ['Approved', 'Overdue']);
                                         $isOverdue = $ti['status'] === 'Overdue';
                                         $isPending = $ti['status'] === 'Waiting';
                                     ?>
-                                        <div
-                                            class="timeline-card <?php echo $isOverdue ? 'timeline-card-overdue' : ($isActive ? 'timeline-card-active' : ''); ?>">
-                                            <div
-                                                class="timeline-indicator <?php echo $isOverdue ? 'ti-error' : ($isActive ? 'ti-primary' : ($isPending ? 'ti-warning' : 'ti-muted')); ?>">
+                            <div
+                                class="timeline-card <?php echo $isOverdue ? 'timeline-card-overdue' : ($isActive ? 'timeline-card-active' : ''); ?>">
+                                <div
+                                    class="timeline-indicator <?php echo $isOverdue ? 'ti-error' : ($isActive ? 'ti-primary' : ($isPending ? 'ti-warning' : 'ti-muted')); ?>">
+                                    <span class="material-symbols-outlined"
+                                        style="font-size:16px;font-variation-settings:'FILL' 1">
+                                        <?php echo $isOverdue ? 'alarm' : ($isActive ? 'inventory_2' : ($isPending ? 'hourglass_empty' : 'check_circle')); ?>
+                                    </span>
+                                </div>
+                                <div class="timeline-card-content">
+                                    <div class="timeline-card-top">
+                                        <div>
+                                            <h3 class="timeline-card-title">
+                                                <?php echo htmlspecialchars($ti['equipment_name']); ?>
+                                            </h3>
+                                            <p class="timeline-card-sub">
                                                 <span class="material-symbols-outlined"
-                                                    style="font-size:16px;font-variation-settings:'FILL' 1">
-                                                    <?php echo $isOverdue ? 'alarm' : ($isActive ? 'inventory_2' : ($isPending ? 'hourglass_empty' : 'check_circle')); ?>
-                                                </span>
-                                            </div>
-                                            <div class="timeline-card-content">
-                                                <div class="timeline-card-top">
-                                                    <div>
-                                                        <h3 class="timeline-card-title">
-                                                            <?php echo htmlspecialchars($ti['equipment_name']); ?>
-                                                        </h3>
-                                                        <p class="timeline-card-sub">
-                                                            <span class="material-symbols-outlined"
-                                                                style="font-size:14px">schedule</span>
-                                                            <?php echo htmlspecialchars($ti['borrow_date']); ?> &rarr;
-                                                            <?php echo htmlspecialchars($ti['return_date']); ?>
-                                                            <?php if ($isActive): ?>
-                                                                <span class="timeline-time-left"
-                                                                    id="timeleft-<?php echo $ti['id']; ?>"></span>
-                                                            <?php endif; ?>
-                                                        </p>
-                                                    </div>
-                                                    <span class="status-chip <?php
+                                                    style="font-size:14px">schedule</span>
+                                                <?php echo htmlspecialchars($ti['borrow_date']); ?> &rarr;
+                                                <?php echo htmlspecialchars($ti['return_date']); ?>
+                                                <?php if ($isActive): ?>
+                                                <span class="timeline-time-left"
+                                                    id="timeleft-<?php echo $ti['id']; ?>"></span>
+                                                <?php endif; ?>
+                                            </p>
+                                        </div>
+                                        <span class="status-chip <?php
                                                                                 $chipClass = 'chip-muted';
                                                                                 if ($ti['status'] === 'Approved') $chipClass = 'chip-success';
                                                                                 elseif ($ti['status'] === 'Overdue')  $chipClass = 'chip-error';
                                                                                 elseif ($ti['status'] === 'Waiting')  $chipClass = 'chip-warning';
                                                                                 echo $chipClass;
                                                                                 ?>">
-                                                        <span class="chip-dot"></span>
-                                                        <?php echo htmlspecialchars($ti['status']); ?>
-                                                    </span>
-                                                </div>
-                                                <p class="timeline-card-detail">Room:
-                                                    <?php echo htmlspecialchars($ti['room']); ?>
-                                                </p>
-                                                <?php if ($ti['status'] === 'Declined' && !empty($ti['reason'])): ?>
-                                                    <p class="timeline-card-reason">Reason:
-                                                        <?php echo htmlspecialchars($ti['reason']); ?>
-                                                    </p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
+                                            <span class="chip-dot"></span>
+                                            <?php echo htmlspecialchars($ti['status']); ?>
+                                        </span>
+                                    </div>
+                                    <p class="timeline-card-detail">Room:
+                                        <?php echo htmlspecialchars($ti['room']); ?>
+                                    </p>
+                                    <?php if ($ti['status'] === 'Declined' && !empty($ti['reason'])): ?>
+                                    <p class="timeline-card-reason">Reason:
+                                        <?php echo htmlspecialchars($ti['reason']); ?>
+                                    </p>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
                     <?php endforeach;
                     endif; ?>
                     <div class="timeline-end">
@@ -1046,10 +1109,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <div class="acc-avatar-section">
                             <div class="acc-avatar-large" id="accOverlayAvatar">
                                 <?php if ($profile_pic_url): ?>
-                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
-                                        class="avatar-img">
+                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
+                                    class="avatar-img">
                                 <?php else: ?>
-                                    <?php echo htmlspecialchars($initials); ?>
+                                <?php echo htmlspecialchars($initials); ?>
                                 <?php endif; ?>
                             </div>
                             <div style="position:relative;">
@@ -1061,15 +1124,15 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                             style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
                                     </button>
                                     <?php if ($profile_pic_url): ?>
-                                        <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
-                                            <span class="material-symbols-outlined"
-                                                style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
-                                        </button>
+                                    <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                        <span class="material-symbols-outlined"
+                                            style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
+                                    </button>
                                     <?php endif; ?>
                                 </div>
                             </div>
-                            <input type="file" id="accOverlayPicInput" accept="image/jpeg,image/png,image/jpg,image/webp"
-                                style="display:none;">
+                            <input type="file" id="accOverlayPicInput"
+                                accept="image/jpeg,image/png,image/jpg,image/webp" style="display:none;">
                         </div>
                         <div class="acc-hero-info">
                             <h2>
@@ -1132,7 +1195,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                 <?php echo $masked_backup ?: '— Not provided'; ?>
                             </span>
                             <?php if (!$backup_locked): ?>
-                                <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
+                            <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
                             <?php endif; ?>
                         </div>
                         <div class="info-row">
@@ -1174,31 +1237,33 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Department</span>
-                            <span class="info-val <?php echo $department_locked ? '' : 'empty'; ?>" data-field="department">
+                            <span class="info-val <?php echo $department_locked ? '' : 'empty'; ?>"
+                                data-field="department">
                                 <?php echo $department_locked ? htmlspecialchars($db_department) : '— Not provided'; ?>
                             </span>
                             <?php if (!$department_locked): ?>
-                                <select class="info-input-f" data-input="department" disabled style="display:none;">
-                                    <option value="">Select Department...</option>
-                                    <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
-                                        <option value="<?php echo $p; ?>">
-                                            <?php echo $p; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+                            <select class="info-input-f" data-input="department" disabled style="display:none;">
+                                <option value="">Select Department...</option>
+                                <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                <option value="<?php echo $p; ?>">
+                                    <?php echo $p; ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
                             <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Position / Rank</span>
-                            <span class="info-val <?php echo $db_faculty_rank ? '' : 'empty'; ?>" data-field="faculty_rank">
+                            <span class="info-val <?php echo $db_faculty_rank ? '' : 'empty'; ?>"
+                                data-field="faculty_rank">
                                 <?php echo $db_faculty_rank ? htmlspecialchars($db_faculty_rank) : '— Not provided'; ?>
                             </span>
                             <select class="info-input-f" data-input="faculty_rank" disabled style="display:none;">
                                 <option value="">Select Position...</option>
                                 <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
-                                    <option value="<?php echo $rank; ?>">
-                                        <?php echo $rank; ?>
-                                    </option>
+                                <option value="<?php echo $rank; ?>">
+                                    <?php echo $rank; ?>
+                                </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -1302,14 +1367,19 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     <div class="bento-profile-content">
                         <div class="bento-avatar">
                             <?php if ($profile_pic_url): ?>
-                                <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
+                            <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
+                                class="avatar-img">
                             <?php else: ?>
-                                <?php echo htmlspecialchars($initials); ?>
+                            <?php echo htmlspecialchars($initials); ?>
                             <?php endif; ?>
                         </div>
                         <div class="bento-profile-info">
-                            <h4><?php echo htmlspecialchars($fullname); ?></h4>
-                            <p><?php echo htmlspecialchars($_SESSION['faculty_id']); ?></p>
+                            <h4>
+                                <?php echo htmlspecialchars($fullname); ?>
+                            </h4>
+                            <p>
+                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
+                            </p>
                             <span class="bento-badge">Active Faculty</span>
                         </div>
                     </div>
@@ -1326,9 +1396,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <h3>Appearance</h3>
                     </div>
                     <div class="bento-theme-preview">
-                        <div class="theme-circle theme-light" data-action="apply-theme" data-theme="light" title="Light"></div>
-                        <div class="theme-circle theme-dark" data-action="apply-theme" data-theme="dark" title="Dark"></div>
-                        <div class="theme-circle theme-hc" data-action="apply-theme" data-theme="high-contrast" title="High Contrast"></div>
+                        <div class="theme-circle theme-light" data-action="apply-theme" data-theme="light"
+                            title="Light"></div>
+                        <div class="theme-circle theme-dark" data-action="apply-theme" data-theme="dark" title="Dark">
+                        </div>
+                        <div class="theme-circle theme-hc" data-action="apply-theme" data-theme="high-contrast"
+                            title="High Contrast"></div>
                     </div>
                     <p class="bento-desc">Current: <strong id="currentThemeLabel">Light</strong></p>
                     <select id="themeSelectUnified" style="display:none;">
@@ -1364,7 +1437,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <button class="font-scale-btn" data-scale="120">A</button>
                     </div>
                     <p class="bento-desc"><span id="fontSizeLbl">100%</span></p>
-                    <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" style="display:none;">
+                    <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange"
+                        style="display:none;">
                 </div>
 
                 <!-- Security Card -->
@@ -1401,14 +1475,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                 <h4>Email Alerts</h4>
                                 <p>Overdue reminders</p>
                             </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            <label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="notif-toggle-row">
                             <div>
                                 <h4>Reservation Reminders</h4>
                                 <p>24h before booking</p>
                             </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            <label class="toggle-sw"><input type="checkbox" checked><span
+                                    class="toggle-track"></span></label>
                         </div>
                         <div class="notif-toggle-row">
                             <div>
@@ -1462,7 +1538,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             <div class="notif-overlay-header">
                 <div>
                     <h1 class="page-title">Notifications</h1>
-                    <p class="page-subtitle">You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong> notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.</p>
+                    <p class="page-subtitle">You have <strong id="unreadCount">
+                            <?php echo $notif_count; ?> unread
+                        </strong> notification
+                        <?php echo $notif_count !== 1 ? 's' : ''; ?>.
+                    </p>
                 </div>
                 <button class="mark-read-btn" data-action="mark-all-read">Mark all as read</button>
             </div>
@@ -1480,24 +1560,29 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             <div class="notif-card-list">
 
                 <?php if (!empty($overdue_notifs)): ?>
-                    <div class="notif-section-label notif-section-overdue">
-                        <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
-                        Overdue — Action Required
+                <div class="notif-section-label notif-section-overdue">
+                    <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
+                    Overdue — Action Required
+                </div>
+                <?php foreach ($overdue_notifs as $on): ?>
+                <div class="notif-card unread notif-card-overdue" data-cat="overdue">
+                    <div class="notif-card-icon ni-overdue">
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
                     </div>
-                    <?php foreach ($overdue_notifs as $on): ?>
-                        <div class="notif-card unread notif-card-overdue" data-cat="overdue">
-                            <div class="notif-card-icon ni-overdue">
-                                <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
-                            </div>
-                            <div class="notif-card-body">
-                                <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                <div class="notif-card-sub">Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong> — return immediately to avoid penalties.</div>
-                            </div>
-                            <div class="notif-card-meta">
-                                <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
-                                <div class="unread-dot"></div>
-                            </div>
+                    <div class="notif-card-body">
+                        <div class="notif-card-title">Overdue:
+                            <?php echo htmlspecialchars($on['equipment_name']); ?>
                         </div>
+                        <div class="notif-card-sub">Due on <strong>
+                                <?php echo htmlspecialchars($on['return_date']); ?>
+                            </strong> — return immediately to avoid penalties.</div>
+                    </div>
+                    <div class="notif-card-meta">
+                        <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
+                        <div class="unread-dot"></div>
+                    </div>
+                </div>
                 <?php endforeach;
                 endif; ?>
 
@@ -1505,11 +1590,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
 
                 <div class="notif-card unread" data-cat="borrow">
                     <div class="notif-card-icon ni-success">
-                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
                     </div>
                     <div class="notif-card-body">
                         <div class="notif-card-title">Borrow Request Approved</div>
-                        <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</div>
+                        <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin
+                            Office before 5:00 PM.</div>
                     </div>
                     <div class="notif-card-meta">
                         <span class="notif-time">9:42 AM</span>
@@ -1523,7 +1610,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     </div>
                     <div class="notif-card-body">
                         <div class="notif-card-title">System Maintenance Tonight</div>
-                        <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</div>
+                        <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.
+                        </div>
                     </div>
                     <div class="notif-card-meta">
                         <span class="notif-time">8:00 AM</span>
@@ -1535,11 +1623,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
 
                 <div class="notif-card unread" data-cat="borrow">
                     <div class="notif-card-icon ni-warn">
-                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
                     </div>
                     <div class="notif-card-body">
                         <div class="notif-card-title">Return Reminder</div>
-                        <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</div>
+                        <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to
+                            avoid penalties.</div>
                     </div>
                     <div class="notif-card-meta">
                         <span class="notif-time">4:15 PM</span>
@@ -1553,7 +1643,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     </div>
                     <div class="notif-card-body">
                         <div class="notif-card-title">Request Submitted</div>
-                        <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.</div>
+                        <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.
+                        </div>
                     </div>
                     <div class="notif-card-meta">
                         <span class="notif-time">2:00 PM</span>
@@ -1814,9 +1905,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Profile Config for JS -->
     <script>
         window.USER_PROFILE_LOCKS = {
-            dob: <?php echo $dob_locked ? 'true' : 'false'; ?>,
-            gender: <?php echo $gender_locked ? 'true' : 'false'; ?>,
-            nationality: <?php echo $nationality_locked ? 'true' : 'false'; ?>
+            dob: <? php echo $dob_locked? 'true': 'false'; ?>,
+            gender: <? php echo $gender_locked ? 'true' : 'false'; ?>,
+                nationality: <? php echo $nationality_locked ? 'true' : 'false'; ?>
         };
     </script>
 
@@ -1834,14 +1925,84 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <div id="app-toast"></div>
 
     <script>
-        window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+        window.REQUESTS_DATA = <? php echo $requests_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
-        window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
+        window.OVERDUE_COUNT = <? php echo(int)$stat_overdue; ?>;
     </script>
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
 
     <script src="JS/faculty-dashboard.js"></script>
+
+    <script>
+        /* Faculty Code Generator */
+        document.addEventListener('DOMContentLoaded', function () {
+            const generateBtn = document.getElementById('fccGenerateBtn');
+            if (!generateBtn) return;
+
+            generateBtn.addEventListener('click', function () {
+                const msg = <? php echo $has_active_code ? "'Generating a new code will invalidate the current active code. Students with the old code will need the new one. Continue?'" : "'Generate a one-time faculty authorization code?'"; ?>;
+                if (!confirm(msg)) return;
+
+                fetch('includes/generate-faculty-code.php', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            const plain = document.getElementById('fccCodePlain');
+                            const masked = document.getElementById('fccCodeMasked');
+                            const meta = document.getElementById('fccMeta');
+                            plain.textContent = data.code;
+                            masked.style.display = 'none';
+                            plain.style.display = 'inline';
+                            meta.innerHTML = '<strong style="color:var(--color-primary);">Copy this code now.</strong> You will not see it again after closing.';
+                            alert('New code generated:\n\n' + data.code + '\n\nCopy and share this with one student. This code can only be used once.');
+                        } else {
+                            alert('Error: ' + (data.error || 'Could not generate code'));
+                        }
+                    })
+                    .catch(() => alert('Network error. Please try again.'));
+            });
+
+            // Toggle visibility
+            const toggleBtn = document.getElementById('fccToggleBtn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function () {
+                    const plain = document.getElementById('fccCodePlain');
+                    const masked = document.getElementById('fccCodeMasked');
+                    if (plain.style.display === 'none') {
+                        plain.style.display = 'inline';
+                        masked.style.display = 'none';
+                        this.querySelector('span').textContent = 'visibility_off';
+                    } else {
+                        plain.style.display = 'none';
+                        masked.style.display = 'inline';
+                        this.querySelector('span').textContent = 'visibility';
+                    }
+                });
+            }
+
+            // Copy to clipboard
+            const copyBtn = document.getElementById('fccCopyBtn');
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function () {
+                    const plain = document.getElementById('fccCodePlain');
+                    const text = plain.textContent || plain.innerText;
+                    if (!text || text.includes('•')) {
+                        alert('Please reveal the code first.');
+                        return;
+                    }
+                    navigator.clipboard.writeText(text).then(() => {
+                        const original = this.innerHTML;
+                        this.innerHTML = '<span class="material-symbols-outlined" style="color:var(--color-success);">check</span>';
+                        setTimeout(() => this.innerHTML = original, 1500);
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>

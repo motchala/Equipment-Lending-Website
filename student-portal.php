@@ -148,17 +148,13 @@
 
                     <!-- Faculty Code Input -->
                     <div class="mb-4">
-                        <label for="facultyCode" class="form-label"
-                            style="font-weight:600; color:var(--color-on-surface); font-size:0.875rem;">
-                            Faculty Code
-                        </label>
                         <div class="input-group">
                             <span class="input-group-text"
                                 style="background:var(--color-surface-container); border-color:var(--color-outline-variant); color:var(--color-primary);">
                                 <span class="material-symbols-outlined" style="font-size:20px;">key</span>
                             </span>
                             <input type="text" class="form-control form-control-lg" id="facultyCode"
-                                placeholder="Enter 6-digit faculty code"
+                                placeholder="Enter faculty code"
                                 style="background:var(--color-surface-container); border-color:var(--color-outline-variant); color:var(--color-on-surface); font-size:1rem; padding:12px 16px;"
                                 autocomplete="off">
                         </div>
@@ -236,13 +232,13 @@
             }
         });
 
-        // Verify button handler
-        document.getElementById('btnVerifyCode').addEventListener('click', function () {
+        // Verify button handler        // Verify button handler — real backend verification
+        document.getElementById('btnVerifyCode').addEventListener('click', function() {
             const code = document.getElementById('facultyCode').value.trim();
             const name = document.getElementById('studentName').value.trim();
             const id = document.getElementById('studentId').value.trim();
             const action = actionTypeInput.value;
-
+            
             if (!code) {
                 alert('Please enter a faculty code.');
                 return;
@@ -251,14 +247,35 @@
                 alert('Please fill in your name and student ID.');
                 return;
             }
-
-            // TODO: Send to backend to verify code
-            // For now, just show what would happen
-            alert('Action: ' + action + '\nFaculty Code: ' + code + '\nStudent: ' + name + '\nID: ' + id);
-
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(facultyCodeModal);
-            modal.hide();
+            
+            const btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:16px;height:16px;margin-right:8px;"></span> Verifying...';
+            
+            fetch('includes/verify-faculty-code.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'faculty_code=' + encodeURIComponent(code) + 
+                      '&student_name=' + encodeURIComponent(name) + 
+                      '&student_id=' + encodeURIComponent(id) + 
+                      '&action=' + encodeURIComponent(action)
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px; vertical-align:middle; margin-right:6px;">verified</span> Verify & Continue';
+                
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    alert(data.error || 'Verification failed.');
+                }
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px; vertical-align:middle; margin-right:6px;">verified</span> Verify & Continue';
+                alert('Network error. Please try again.');
+            });
         });
     </script>
 </body>
