@@ -1275,8 +1275,11 @@
                 case 'show-return-qr': {
                     const token = el.dataset.token;
                     const equipment = el.dataset.equipment;
-                    const basePath = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-                    const returnUrl = basePath + 'return_confirm.php?token=' + token;
+                    // Use PHP-injected SERVER_BASE_URL so the QR always uses
+                    // the real network IP, not localhost
+                    const base = window.SERVER_BASE_URL
+                        || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+                    const returnUrl = base + 'return_confirm.php?token=' + token;
                     _openReturnQrModal(equipment, returnUrl);
                     break;
                 }

@@ -1837,6 +1837,20 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
+        window.SERVER_BASE_URL = '<?php
+        $scheme = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off") ? "https" : "http";
+
+        // Get the real network IP of the laptop (not loopback 127.0.0.1)
+        $server_addr = $_SERVER["SERVER_ADDR"] ?? "127.0.0.1";
+        if ($server_addr === "127.0.0.1" || $server_addr === "::1") {
+            $server_addr = gethostbyname(gethostname());
+        }
+
+        $port    = $_SERVER["SERVER_PORT"] ?? "80";
+        $portStr = ($port == "80" || $port == "443") ? "" : ":" . $port;
+        $path    = rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/\\");
+        echo $scheme . "://" . $server_addr . $portStr . $path . "/";
+    ?>';
     </script>
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
