@@ -398,6 +398,10 @@ CREATE TABLE IF NOT EXISTS `tbl_faculty_codes` (
   KEY `idx_faculty_status` (`faculty_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+ALTER TABLE tbl_requests 
+ADD COLUMN authorized_by_faculty_id VARCHAR(255) DEFAULT NULL AFTER faculty_id,
+ADD INDEX idx_authorized_by (authorized_by_faculty_id);
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

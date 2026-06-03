@@ -1,6 +1,6 @@
 <?php
-// student-portal.php — No session required, no login needed
-// Student access point for borrowing equipment or reserving rooms
+session_start();
+$borrow_disabled = ($_SESSION['borrow_code_attempts'] ?? 0) >= 3;
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -59,8 +59,11 @@
         <div class="student-choices">
 
             <!-- Borrow Equipment -->
-            <div class="student-choice-card" data-bs-toggle="modal" data-bs-target="#facultyCodeModal"
-                data-action="borrow" style="cursor:pointer;">
+            <div class="student-choice-card" 
+                data-action="borrow" 
+                <?php echo $borrow_disabled ? '' : 'data-bs-toggle="modal" data-bs-target="#facultyCodeModal"'; ?>
+                style="cursor:<?php echo $borrow_disabled ? 'not-allowed' : 'pointer'; ?>; 
+                              <?php echo $borrow_disabled ? 'opacity:0.45; pointer-events:none;' : ''; ?>">
                 <div class="choice-glow borrow-glow"></div>
                 <div class="choice-icon-wrap borrow-icon">
                     <span class="material-symbols-outlined">inventory_2</span>
@@ -252,7 +255,7 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:16px;height:16px;margin-right:8px;"></span> Verifying...';
             
-            fetch('includes/verify-faculty-code.php', {
+            fetch('includes/faculty-functions/verify-faculty-code.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'faculty_code=' + encodeURIComponent(code) + 
@@ -265,6 +268,19 @@
                 btn.disabled = false;
                 btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px; vertical-align:middle; margin-right:6px;">verified</span> Verify & Continue';
                 
+                if (data.attempts_exceeded) {
+                    const borrowCard = document.querySelector('[data-action="borrow"]');
+                    if (borrowCard) {
+                        borrowCard.removeAttribute('data-bs-toggle');
+                        borrowCard.removeAttribute('data-bs-target');
+                        borrowCard.style.opacity = '0.45';
+                        borrowCard.style.pointerEvents = 'none';
+                        borrowCard.style.cursor = 'not-allowed';
+                    }
+                    alert(data.error);
+                    return;
+                }
+
                 if (data.success) {
                     window.location.href = data.redirect;
                 } else {

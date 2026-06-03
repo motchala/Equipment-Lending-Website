@@ -124,11 +124,11 @@ $inventory_result = mysqli_query($conn, "SELECT * FROM tbl_inventory WHERE is_ar
 $uid_safe = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 
 // ── Stats ──────────────────────────────────────────────────────────────────
-$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe'"))['c'];
-$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Waiting'"))['c'];
-$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Approved'"))['c'];
-$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Declined'"))['c'];
-$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue'"))['c'];
+$stat_total    = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe'"))['c'];
+$stat_waiting  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE (faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe') AND status='Waiting'"))['c'];
+$stat_approved = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE (faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe') AND status='Approved'"))['c'];
+$stat_declined = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE (faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe') AND status='Declined'"))['c'];
+$stat_overdue  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE (faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe') AND status='Overdue'"))['c'];
 
 $has_overdue_block = $stat_overdue > 0;
 
@@ -139,7 +139,7 @@ $has_active_code = !empty($code_row);
 $code_generated_at = $code_row['created_at'] ?? '';
 
 // ── Requests JSON for JS ───────────────────────────────────────────────────
-$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC");
+$requests_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' OR authorized_by_faculty_id='$uid_safe' ORDER BY request_date DESC");
 $requests_js = [];
 while ($row = mysqli_fetch_assoc($requests_raw)) $requests_js[] = $row;
 $requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
@@ -1905,9 +1905,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Profile Config for JS -->
     <script>
         window.USER_PROFILE_LOCKS = {
-            dob: <? php echo $dob_locked? 'true': 'false'; ?>,
-            gender: <? php echo $gender_locked ? 'true' : 'false'; ?>,
-                nationality: <? php echo $nationality_locked ? 'true' : 'false'; ?>
+            dob: <?php echo $dob_locked? 'true': 'false'; ?>,
+            gender: <?php echo $gender_locked ? 'true' : 'false'; ?>,
+                nationality: <?php echo $nationality_locked ? 'true' : 'false'; ?>
         };
     </script>
 
@@ -1925,9 +1925,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <div id="app-toast"></div>
 
     <script>
-        window.REQUESTS_DATA = <? php echo $requests_json; ?>;
+        window.REQUESTS_DATA = <?php echo $requests_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
-        window.OVERDUE_COUNT = <? php echo(int)$stat_overdue; ?>;
+        window.OVERDUE_COUNT = <?php echo(int)$stat_overdue; ?>;
     </script>
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
@@ -1941,10 +1941,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             if (!generateBtn) return;
 
             generateBtn.addEventListener('click', function () {
-                const msg = <? php echo $has_active_code ? "'Generating a new code will invalidate the current active code. Students with the old code will need the new one. Continue?'" : "'Generate a one-time faculty authorization code?'"; ?>;
+                const msg = <?php echo $has_active_code ? "'Generating a new code will invalidate the current active code. Students with the old code will need the new one. Continue?'" : "'Generate a one-time faculty authorization code?'"; ?>;
                 if (!confirm(msg)) return;
 
-                fetch('includes/generate-faculty-code.php', {
+                fetch('includes/faculty-functions/generate-faculty-code.php', {
                     method: 'POST',
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 })

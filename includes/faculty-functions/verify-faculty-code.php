@@ -13,6 +13,21 @@ $student_name = trim($_POST['student_name'] ?? '');
 $student_id = trim($_POST['student_id'] ?? '');
 $action = $_POST['action'] ?? '';
 
+// Only track attempts for borrow action
+if ($action === 'borrow') {
+    if (!isset($_SESSION['borrow_code_attempts'])) {
+        $_SESSION['borrow_code_attempts'] = 0;
+    }
+    if ($_SESSION['borrow_code_attempts'] >= 3) {
+        echo json_encode([
+            'success' => false, 
+            'error' => 'Too many failed attempts. Contact your faculty.', 
+            'attempts_exceeded' => true
+        ]);
+        exit;
+    }
+}
+
 if (!$input_code || !$student_name || !$student_id || !in_array($action, ['borrow', 'room'])) {
     echo json_encode(['success' => false, 'error' => 'Please fill in all fields.']);
     exit;
@@ -47,12 +62,24 @@ while ($row = mysqli_fetch_assoc($result)) {
             'verified_at' => date('Y-m-d H:i:s')
         ];
 
-        echo json_encode(['success' => true, 'redirect' => $action === 'borrow' ? 'student-borrow.php' : 'student-room.php']);
+        echo json_encode(['success' => true, 'redirect' => $action === 'borrow' ? 'includes/student-functions/student-borrow.php' : 'includes/student-functions/student-room.php']);
         $found = true;
         break;
     }
 }
 
 if (!$found) {
-    echo json_encode(['success' => false, 'error' => 'Invalid or already used faculty code.']);
+    if ($action === 'borrow') {
+        $_SESSION['borrow_code_attempts']++;
+        $remaining = max(0, 3 - $_SESSION['borrow_code_attempts']);
+        echo json_encode([
+            'success' => false,
+            'error' => "Invalid or used code. Attempts remaining: $remaining",
+            'attempts_remaining' => $remaining,
+            'attempts_exceeded' => $_SESSION['borrow_code_attempts'] >= 3
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid or already used faculty code.']);
+    }
+    exit;
 }
