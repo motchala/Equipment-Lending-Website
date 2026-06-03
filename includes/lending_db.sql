@@ -379,29 +379,6 @@ ALTER TABLE tbl_requests
 
 -- Create index for fast token lookup
 CREATE INDEX idx_return_token ON tbl_requests (return_token);
-
-
-CREATE TABLE IF NOT EXISTS `tbl_faculty_codes` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `faculty_id` varchar(255) NOT NULL,
-  `code_hash` varchar(255) NOT NULL,
-  `status` enum('active','used','expired') DEFAULT 'active',
-  `created_at` datetime DEFAULT current_timestamp(),
-  `used_at` datetime DEFAULT NULL,
-  `used_by_student_id` varchar(50) DEFAULT NULL,
-  `used_by_student_name` varchar(100) DEFAULT NULL,
-  `used_for_action` enum('borrow','room') DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_faculty_id` (`faculty_id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_faculty_status` (`faculty_id`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-ALTER TABLE tbl_requests 
-ADD COLUMN authorized_by_faculty_id VARCHAR(255) DEFAULT NULL AFTER faculty_id,
-ADD INDEX idx_authorized_by (authorized_by_faculty_id);
-
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
