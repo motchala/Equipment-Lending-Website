@@ -1681,6 +1681,7 @@
         renderRequestsTable();
         checkOverdueState();
         startRequestsPolling();
+        initCodePanel();
         startInventoryPolling();
 
         // Password strength meter
@@ -2531,4 +2532,128 @@
         }, INTERVAL);
     }
 
+    /* ── Faculty Code Panel ─────────────────────────────────────────────── */
+
+    function renderCodePanel(data) {
+        const body = document.getElementById('fccBody');
+        if (!body) return;
+
+        if (!data || !data.has_code) {
+            body.innerHTML = '<div class="fcc-no-code">No active code. Generate one below to let a student borrow equipment.</div>';
+            return;
+        }
+
+        const isUsed = data.is_used;
+        const usedInfo = isUsed
+            ? `<div class="fcc-used-info">Used by: <strong>${esc(data.used_by_name)}</strong> (${esc(data.used_by_id)}) · ${esc(data.used_at)}</div>`
+            : `<div class="fcc-used-info" style="color:var(--color-secondary,#555)">Generated: ${esc(data.created_at)}</div>`;
+
+        body.innerHTML = `
+            <div class="fcc-code-display ${isUsed ? 'fcc-code-used' : ''}">
+                <span class="fcc-code-value" id="fccCodeText">${esc(data.code)}</span>
+                ${!isUsed ? `<button class="fcc-copy-btn" id="fccCopyBtn" title="Copy code">
+                    <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
+                </button>` : ''}
+            </div>
+            <div class="fcc-status-row">
+                <span class="fcc-badge ${isUsed ? 'fcc-badge-used' : 'fcc-badge-active'}">
+                    <span class="material-symbols-outlined" style="font-size:11px;">${isUsed ? 'lock' : 'check_circle'}</span>
+                    ${isUsed ? 'Used' : 'Active'}
+                </span>
+            </div>
+            ${usedInfo}`;
+
+        // Copy button
+        const copyBtn = document.getElementById('fccCopyBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function () {
+                const code = document.getElementById('fccCodeText')?.textContent?.trim();
+                if (!code) return;
+                navigator.clipboard.writeText(code).then(() => {
+                    copyBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;color:#2e7d32;">check</span>';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>';
+                    }, 2000);
+                }).catch(() => {
+                    // Fallback for older browsers
+                    const el = document.createElement('textarea');
+                    el.value = code;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    showToast('Code copied!', 'success');
+                });
+            });
+        }
+
+        // If code was just used, notify
+        if (isUsed && window._fccWasActive) {
+            showToast('✅ Your code was used by ' + data.used_by_name + '. A new borrow request was submitted.', 'success');
+            window._fccWasActive = false;
+        }
+        window._fccWasActive = !isUsed;
+    }
+
+    function esc(str) {
+        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function initCodePanel() {
+        // Load initial state
+        fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => { renderCodePanel(data); })
+            .catch(() => {
+                const body = document.getElementById('fccBody');
+                if (body) body.innerHTML = '<div class="fcc-no-code">Could not load code status.</div>';
+            });
+
+        // Generate button
+        const btn = document.getElementById('btnGenerateCode');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;animation:spin 1s linear infinite;">sync</span> Generating...';
+
+            fetch('includes/generate-faculty-code.php', {
+                method: 'POST',
+                credentials: 'same-origin'
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
+
+                if (data.error) { showToast(data.error, 'error'); return; }
+
+                window._fccWasActive = false;
+                renderCodePanel({
+                    has_code: true,
+                    code: data.code,
+                    is_used: false,
+                    created_at: data.created_at,
+                    used_by_name: null,
+                    used_by_id: null,
+                    used_at: null,
+                });
+                showToast('New code generated! Share it with your student.', 'success');
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
+                showToast('Failed to generate code. Please try again.', 'error');
+            });
+        });
+    }
+
+    function startCodePolling() {
+        const INTERVAL = 5000; // 5 seconds — same as requests
+        setInterval(function () {
+            fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(data => { renderCodePanel(data); })
+                .catch(() => {});
+        }, INTERVAL);
+    }
 })();

@@ -203,6 +203,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Font Awesome (kept for existing icon references in JS) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="CSS/faculty-dashboard.css">
+
+    <!-- Faculty Code Card -->
+     <link rel="stylesheet" href="css/faculty-code-card.css">
 </head>
 
 <body>
@@ -467,6 +470,29 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             <?php endif; ?>
                             <a class="audit-view-all" data-tab="activity" href="#">View Full Activity Log</a>
                         </div>
+
+                        <!-- ── Faculty Code Generator ───────────────────── -->
+                        <div class="faculty-code-card" id="facultyCodePanel">
+                            <div class="fcc-head">
+                                <span class="material-symbols-outlined fcc-icon">qr_code_2</span>
+                                <div>
+                                    <div class="fcc-title">Student Access Code</div>
+                                    <div class="fcc-sub">Share with your student to let them borrow equipment</div>
+                                </div>
+                            </div>
+                            <div class="fcc-body" id="fccBody">
+                                <!-- Populated by JS -->
+                                <div class="fcc-loading">
+                                    <span class="material-symbols-outlined" style="font-size:1.2rem;opacity:.4;animation:spin 1s linear infinite;">sync</span>
+                                </div>
+                            </div>
+                            <button class="fcc-generate-btn" id="btnGenerateCode">
+                                <span class="material-symbols-outlined" style="font-size:16px;">add_circle</span>
+                                Generate New Code
+                            </button>
+                        </div>
+                        <!-- ── /Faculty Code Generator ──────────────────── -->
+
                         <!-- Quick Actions -->
                         <div class="quick-actions">
                             <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"

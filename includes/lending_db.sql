@@ -379,6 +379,27 @@ ALTER TABLE tbl_requests
 
 -- Create index for fast token lookup
 CREATE INDEX idx_return_token ON tbl_requests (return_token);
+
+-- Faculty one-time codes
+CREATE TABLE IF NOT EXISTS tbl_faculty_codes (
+  id           INT AUTO_INCREMENT PRIMARY KEY,
+  faculty_id   VARCHAR(255) NOT NULL,
+  faculty_name VARCHAR(255) NOT NULL,
+  code         VARCHAR(15)  NOT NULL UNIQUE,
+  is_used      TINYINT(1)   DEFAULT 0,
+  used_by_name VARCHAR(255) DEFAULT NULL,
+  used_by_id   VARCHAR(50)  DEFAULT NULL,
+  created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  used_at      DATETIME     DEFAULT NULL,
+  INDEX idx_fc_faculty (faculty_id),
+  INDEX idx_fc_code    (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Track which student physically submitted the request
+ALTER TABLE tbl_requests
+  ADD COLUMN IF NOT EXISTS submitted_by_name VARCHAR(255) DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS submitted_by_id   VARCHAR(50)  DEFAULT NULL;
+  
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
