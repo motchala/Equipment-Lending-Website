@@ -1,0 +1,135 @@
+/* ── Faculty Code Card ─────────────────────────────────── */
+.faculty-code-card {
+    background: var(--color-surface-container, #f8f5f5);
+    border: 1px solid var(--color-outline-variant, #e0d0d0);
+    border-radius: 16px;
+    padding: 18px 20px 14px;
+    margin-bottom: 16px;
+}
+.fcc-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.fcc-icon {
+    font-size: 28px;
+    color: var(--accent-maroon, #800000);
+    margin-top: 2px;
+}
+.fcc-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--color-on-surface, #1a1a1a);
+    margin-bottom: 2px;
+}
+.fcc-sub {
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant, #666);
+    line-height: 1.4;
+}
+.fcc-body {
+    margin-bottom: 12px;
+    min-height: 56px;
+}
+.fcc-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 0;
+}
+.fcc-code-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--color-surface, #fff);
+    border: 2px dashed var(--accent-maroon, #800000);
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+.fcc-code-display.fcc-code-used {
+    border-color: var(--color-outline-variant, #ccc);
+    opacity: .65;
+}
+.fcc-code-value {
+    font-family: 'Courier New', monospace;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent-maroon, #800000);
+    flex: 1;
+}
+.fcc-code-display.fcc-code-used .fcc-code-value {
+    color: var(--color-on-surface-variant, #888);
+    text-decoration: line-through;
+}
+.fcc-copy-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--accent-maroon, #800000);
+    padding: 4px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    transition: background .15s;
+}
+.fcc-copy-btn:hover { background: rgba(128,0,0,.08); }
+.fcc-status-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+}
+.fcc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+}
+.fcc-badge-active {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+.fcc-badge-used {
+    background: #fce4ec;
+    color: #c62828;
+}
+.fcc-used-info {
+    color: var(--color-on-surface-variant, #666);
+    font-size: 0.73rem;
+    margin-top: 4px;
+}
+.fcc-generate-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 0;
+    border-radius: 10px;
+    border: 1px solid var(--accent-maroon, #800000);
+    background: transparent;
+    color: var(--accent-maroon, #800000);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.fcc-generate-btn:hover {
+    background: var(--accent-maroon, #800000);
+    color: #fff;
+}
+.fcc-no-code {
+    text-align: center;
+    color: var(--color-on-surface-variant, #888);
+    font-size: 0.82rem;
+    padding: 8px 0 4px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

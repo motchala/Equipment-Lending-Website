@@ -654,6 +654,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <input type="text" id="returnSearch" placeholder="Search by ID, name, or equipment...">
                             </div>
                         </div>
+                        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                            <button id="openQrScannerBtn" class="btn-submit-form" style="width:auto;padding:8px 18px;margin:0;display:flex;align-items:center;gap:8px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                    <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
+                                    <rect x="3" y="16" width="5" height="5"/><line x1="21" y1="16" x2="21" y2="21"/>
+                                    <line x1="16" y1="21" x2="21" y2="21"/><line x1="16" y1="16" x2="16" y2="16"/>
+                                </svg>
+                                Scan Return QR
+                            </button>
+                        </div>
                         <div class="tbl-wrap">
                             <table class="admin-table">
                                 <thead>
@@ -2590,6 +2600,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div id="loading-overlay">
         <div class="spinner"></div>
         <p style="margin-top:1rem;font-weight:600;color:var(--text-dark);font-size:0.9rem;">Processing...</p>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div id="qrScannerModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+        <div style="background:var(--surface,#fff);border-radius:20px;padding:2rem;max-width:420px;width:90%;text-align:center;position:relative;">
+            <button id="closeQrScanner" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:22px;color:#555;">✕</button>
+            <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;color:var(--text-dark,#1a1a1a);">Scan Return QR Code</h3>
+            <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Point the camera at the faculty member's QR code. This will be available if the website is hosted or becomes https</p>
+            <div style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;">
+                <video id="qrVideo" style="width:100%;display:block;" playsinline autoplay></video>
+                <!-- Scan guide overlay -->
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+                    <div style="width:200px;height:200px;border:3px solid rgba(255,255,255,0.8);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
+                </div>
+            </div>
+            <p id="qrScanStatus" style="margin-top:14px;font-size:0.85rem;color:#888;">
+                Initializing camera... 
+            </p>
+        </div>
     </div>
 
     <!-- Toast -->
