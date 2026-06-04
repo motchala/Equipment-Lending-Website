@@ -498,15 +498,14 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         }
 
         /* ================================================================
-           EQUIPMENT PANEL REDESIGN
-           Inline so these always beat the external CSS file.
+           EQUIPMENT PANEL REDESIGN v4
            Scoped 100% to #panel-lending — zero impact on other tabs.
         ================================================================ */
 
-        /* Sub-nav buttons */
+        /* ── Sub-nav ──────────────────────────────────────────────── */
         #panel-lending .lending-subnav {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 28px;
             flex-wrap: wrap;
         }
@@ -515,17 +514,17 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             display: inline-flex;
             align-items: center;
             gap: 7px;
-            padding: 9px 22px;
+            padding: 9px 20px;
             border-radius: 8px;
             border: 1.5px solid #e5e7eb;
             background: #ffffff;
             color: #374151;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             font-family: var(--font-sans);
             box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
-            transition: all .18s;
+            transition: all .2s cubic-bezier(.4, 0, .2, 1);
         }
 
         #panel-lending .lending-nav-btn .material-symbols-outlined {
@@ -536,15 +535,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             background: #570000;
             color: #fff;
             border-color: #570000;
-            box-shadow: 0 2px 10px rgba(87, 0, 0, .25);
+            box-shadow: 0 3px 12px rgba(87, 0, 0, .28);
         }
 
         #panel-lending .lending-nav-btn:not(.active):hover {
-            background: #f9fafb;
-            border-color: #9ca3af;
+            background: #fdf1f1;
+            border-color: #c0a0a0;
+            color: #570000;
         }
 
-        /* Page header — must override the #panel-home hide rule */
+        /* ── Page Header ──────────────────────────────────────────── */
         #panel-lending .page-header-block {
             display: block !important;
             margin-bottom: 24px;
@@ -559,9 +559,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             font-size: 1.875rem !important;
             font-weight: 700 !important;
             color: #111827 !important;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.4px;
             margin-bottom: 4px;
-            line-height: 1.2;
+            line-height: 1.15;
         }
 
         #panel-lending .page-subtitle {
@@ -570,22 +570,249 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             font-weight: 400 !important;
         }
 
+        /* ── Featured Banner ──────────────────────────────────────── */
+        #panel-lending .featured-section {
+            margin-bottom: 32px;
+        }
+
+        #panel-lending .featured-label {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: 'Hanken Grotesk', var(--font-display);
+            font-size: 1rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 16px;
+            letter-spacing: -0.1px;
+        }
+
+        #panel-lending .featured-label .material-symbols-outlined {
+            font-size: 18px;
+            color: #f59e0b;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        #panel-lending .featured-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        /* Hero featured card — spans 2 cols */
+        #panel-lending .feat-hero {
+            grid-column: span 2;
+            background: #ffffff;
+            border: 1px solid #f0e0e0;
+            border-left: 4px solid #570000;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            box-shadow: 0 4px 20px -4px rgba(87, 0, 0, .10);
+            transition: box-shadow .25s, transform .25s;
+            min-height: 200px;
+        }
+
+        #panel-lending .feat-hero:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 32px -6px rgba(87, 0, 0, .14);
+        }
+
+        #panel-lending .feat-hero-body {
+            flex: 1;
+            padding: 28px 28px 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        #panel-lending .feat-hero-img {
+            width: 46%;
+            background: linear-gradient(145deg, #f7f0f0, #ede4e4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        #panel-lending .feat-hero-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform .45s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        #panel-lending .feat-hero-img-placeholder {
+            width: 46%;
+            background: linear-gradient(145deg, #f7f0f0, #ede4e4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #panel-lending .feat-hero-img-placeholder .material-symbols-outlined {
+            font-size: 64px;
+            color: #570000;
+            opacity: .12;
+        }
+
+        #panel-lending .feat-hero:hover .feat-hero-img img {
+            transform: scale(1.07);
+        }
+
+        #panel-lending .feat-hero-title {
+            font-family: 'Hanken Grotesk', var(--font-display);
+            font-size: 1.45rem;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: -0.3px;
+            margin-bottom: 6px;
+            line-height: 1.25;
+        }
+
+        #panel-lending .feat-hero-desc {
+            font-size: 0.835rem;
+            color: #6b7280;
+            line-height: 1.55;
+            margin-bottom: 0;
+            flex: 1;
+        }
+
+        #panel-lending .feat-hero-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        #panel-lending .feat-hero-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Secondary featured card */
+        #panel-lending .feat-secondary {
+            background: #ffffff;
+            border: 1px solid #f0e0e0;
+            border-radius: 14px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px -4px rgba(87, 0, 0, .08);
+            transition: box-shadow .25s, transform .25s;
+        }
+
+        #panel-lending .feat-secondary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 28px -6px rgba(87, 0, 0, .13);
+        }
+
+        #panel-lending .feat-secondary-img {
+            height: 130px;
+            background: linear-gradient(145deg, #f7f0f0, #ede4e4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #panel-lending .feat-secondary-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform .4s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        #panel-lending .feat-secondary-img .material-symbols-outlined {
+            font-size: 52px;
+            color: #570000;
+            opacity: .12;
+        }
+
+        #panel-lending .feat-secondary:hover .feat-secondary-img img {
+            transform: scale(1.08);
+        }
+
+        #panel-lending .feat-secondary-body {
+            padding: 16px 18px 18px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        #panel-lending .feat-secondary-title {
+            font-family: 'Hanken Grotesk', var(--font-display);
+            font-size: 1rem;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: -0.15px;
+            margin-bottom: 3px;
+        }
+
+        #panel-lending .feat-secondary-cat {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+
+        #panel-lending .feat-secondary-cat .material-symbols-outlined {
+            font-size: 11px;
+            color: rgba(87, 0, 0, .4);
+        }
+
+        /* ── Catalog section ──────────────────────────────────────── */
+        #panel-lending .catalog-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        #panel-lending .catalog-section-title {
+            font-family: 'Hanken Grotesk', var(--font-display);
+            font-size: 1rem;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: -0.1px;
+        }
+
+        #panel-lending .catalog-count-chip {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #6b7280;
+            background: #f3f4f6;
+            border-radius: 20px;
+            padding: 3px 10px;
+        }
+
         /* Catalog glass card */
         #panel-lending .catalog-card {
-            background: rgba(255, 255, 255, .78) !important;
+            background: rgba(255, 255, 255, .82) !important;
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
-            border: 1px solid rgba(255, 255, 255, .55) !important;
-            border-radius: 14px !important;
-            padding: 28px !important;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, .06) !important;
+            border: 1px solid rgba(240, 224, 224, .7) !important;
+            border-radius: 16px !important;
+            padding: 24px !important;
+            box-shadow: 0 4px 24px rgba(87, 0, 0, .05) !important;
         }
 
         /* Filter bar */
         #panel-lending .catalog-filters {
             display: flex;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
@@ -595,16 +822,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             display: flex;
             align-items: center;
             gap: 10px;
-            background: rgba(249, 250, 251, .7) !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 8px !important;
+            background: #f9fafb !important;
+            border: 1.5px solid #e5e7eb !important;
+            border-radius: 10px !important;
             padding: 10px 16px !important;
             transition: border-color .18s, box-shadow .18s;
         }
 
         #panel-lending .catalog-search-wrap:focus-within {
             border-color: #570000 !important;
-            box-shadow: 0 0 0 3px rgba(87, 0, 0, .09) !important;
+            box-shadow: 0 0 0 3px rgba(87, 0, 0, .08) !important;
             background: #fff !important;
         }
 
@@ -629,93 +856,116 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         }
 
         #panel-lending .catalog-filter-select {
-            padding: 10px 16px !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 8px !important;
-            background: rgba(249, 250, 251, .7) !important;
+            padding: 10px 14px !important;
+            border: 1.5px solid #e5e7eb !important;
+            border-radius: 10px !important;
+            background: #f9fafb !important;
             color: #374151 !important;
             font-family: var(--font-sans);
             font-size: 0.875rem !important;
             font-weight: 500;
             outline: none;
             cursor: pointer;
-            min-width: 180px;
+            min-width: 175px;
+            transition: border-color .18s;
         }
 
         #panel-lending .catalog-filter-select:focus {
             border-color: #570000 !important;
-            box-shadow: 0 0 0 3px rgba(87, 0, 0, .09) !important;
+            box-shadow: 0 0 0 3px rgba(87, 0, 0, .08) !important;
         }
 
-        /* Equipment grid */
+        /* ── Equipment grid ───────────────────────────────────────── */
         #panel-lending .eq-grid {
             display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
-            gap: 20px !important;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+            gap: 16px !important;
         }
 
-        /* Equipment card */
+        /* ── Equipment card ───────────────────────────────────────── */
         #panel-lending .eq-item-card,
         #panel-lending .item-node {
-            background: linear-gradient(145deg, #ffffff, #fcfcfc) !important;
-            border: 1px solid rgba(87, 0, 0, .09) !important;
-            border-radius: 12px !important;
+            background: #ffffff !important;
+            border: 1.5px solid #f0e0e0 !important;
+            border-radius: 14px !important;
             overflow: hidden;
-            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, .06), 0 2px 6px -2px rgba(0, 0, 0, .03) !important;
-            transition: transform .28s cubic-bezier(.4, 0, .2, 1), box-shadow .28s cubic-bezier(.4, 0, .2, 1), border-color .28s !important;
+            box-shadow: 0 2px 12px -2px rgba(87, 0, 0, .07) !important;
+            transition: transform .28s cubic-bezier(.4, 0, .2, 1), box-shadow .28s, border-color .28s !important;
             position: relative;
             display: flex !important;
             flex-direction: column !important;
         }
 
-        #panel-lending .eq-item-card::before,
-        #panel-lending .item-node::before {
+        #panel-lending .eq-item-card::after,
+        #panel-lending .item-node::after {
             content: '';
             position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at 100% 0%, rgba(87, 0, 0, .03) 0%, transparent 40%);
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #570000, #a00000);
+            opacity: 0;
+            transition: opacity .25s;
+            border-radius: 14px 14px 0 0;
             pointer-events: none;
-            z-index: 0;
+            z-index: 2;
         }
 
         #panel-lending .eq-item-card:hover,
         #panel-lending .item-node:hover {
             transform: translateY(-4px) !important;
-            border-color: rgba(87, 0, 0, .28) !important;
-            box-shadow: 0 14px 28px -5px rgba(87, 0, 0, .12), 0 8px 12px -6px rgba(87, 0, 0, .06) !important;
+            border-color: rgba(87, 0, 0, .22) !important;
+            box-shadow: 0 12px 28px -5px rgba(87, 0, 0, .13), 0 4px 10px -4px rgba(87, 0, 0, .07) !important;
         }
 
-        /* Image */
+        #panel-lending .eq-item-card:hover::after,
+        #panel-lending .item-node:hover::after {
+            opacity: 1;
+        }
+
+        /* Image zone */
+        #panel-lending .eq-item-img-wrap {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(160deg, #fdf1f1 0%, #f5e8e8 100%);
+            height: 160px;
+        }
+
         #panel-lending .eq-item-img {
             width: 100% !important;
-            height: 165px !important;
+            height: 160px !important;
             object-fit: cover !important;
             display: block;
-            position: relative;
-            z-index: 1;
-            transition: transform .4s cubic-bezier(.4, 0, .2, 1) !important;
+            transition: transform .45s cubic-bezier(.4, 0, .2, 1) !important;
         }
 
         #panel-lending .eq-item-card:hover .eq-item-img,
         #panel-lending .item-node:hover .eq-item-img {
-            transform: scale(1.06) !important;
+            transform: scale(1.07) !important;
         }
 
         #panel-lending .eq-item-img-placeholder {
             width: 100% !important;
-            height: 165px !important;
-            background: linear-gradient(145deg, #f9fafb, #f3f4f6) !important;
+            height: 160px !important;
+            background: linear-gradient(160deg, #fdf1f1 0%, #f0e4e4 100%) !important;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
-            z-index: 1;
         }
 
         #panel-lending .eq-item-img-placeholder .material-symbols-outlined {
-            font-size: 44px !important;
+            font-size: 48px !important;
             color: #570000 !important;
-            opacity: .18 !important;
+            opacity: .12 !important;
+        }
+
+        /* Stock badge overlay on image */
+        #panel-lending .eq-stock-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 2;
         }
 
         /* Card body */
@@ -724,16 +974,14 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             display: flex !important;
             flex-direction: column !important;
             flex: 1;
-            position: relative;
-            z-index: 1;
-            background: rgba(255, 255, 255, .9) !important;
-            border-top: 1px solid #f3f4f6 !important;
+            background: #fff !important;
+            border-top: 1px solid #f8eded !important;
         }
 
         #panel-lending .eq-item-name {
             font-family: 'Hanken Grotesk', var(--font-display) !important;
             font-weight: 700 !important;
-            font-size: 1rem !important;
+            font-size: 0.975rem !important;
             color: #111827 !important;
             margin-bottom: 4px !important;
             letter-spacing: -0.1px;
@@ -747,7 +995,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         }
 
         #panel-lending .eq-item-cat {
-            font-size: 0.7rem !important;
+            font-size: 0.69rem !important;
             font-weight: 600 !important;
             color: #9ca3af !important;
             text-transform: uppercase;
@@ -759,38 +1007,39 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         }
 
         #panel-lending .eq-item-cat .material-symbols-outlined {
-            font-size: 12px !important;
-            color: rgba(87, 0, 0, .45) !important;
+            font-size: 11px !important;
+            color: rgba(87, 0, 0, .4) !important;
         }
 
         /* Stock badges */
         #panel-lending .stock-badge {
             display: inline-flex !important;
             align-items: center;
-            gap: 5px !important;
-            padding: 3px 10px !important;
+            gap: 4px !important;
+            padding: 3px 9px !important;
             border-radius: 20px !important;
-            font-size: 0.72rem !important;
+            font-size: 0.7rem !important;
             font-weight: 700 !important;
             margin-bottom: 12px !important;
             width: fit-content;
+            letter-spacing: 0.01em;
         }
 
         #panel-lending .stock-avail {
-            background: #dcfce7 !important;
-            color: #166534 !important;
-            border: 1px solid rgba(22, 101, 52, .15) !important;
+            background: #d1fae5 !important;
+            color: #065f46 !important;
+            border: 1px solid rgba(16, 185, 129, .18) !important;
         }
 
         #panel-lending .stock-avail .material-symbols-outlined {
             font-size: 12px !important;
-            color: #16a34a !important;
+            color: #059669 !important;
         }
 
         #panel-lending .stock-unavail {
             background: #fee2e2 !important;
             color: #991b1b !important;
-            border: 1px solid rgba(153, 27, 27, .15) !important;
+            border: 1px solid rgba(239, 68, 68, .15) !important;
         }
 
         #panel-lending .stock-unavail .material-symbols-outlined {
@@ -805,20 +1054,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             background: #570000 !important;
             color: #fff !important;
             border: none !important;
-            border-radius: 8px !important;
+            border-radius: 9px !important;
             cursor: pointer;
             font-weight: 600 !important;
-            font-size: 0.875rem !important;
+            font-size: 0.855rem !important;
             font-family: var(--font-sans);
             margin-top: auto;
-            box-shadow: 0 1px 4px rgba(87, 0, 0, .2) !important;
-            transition: background .18s, transform .18s, box-shadow .18s !important;
+            box-shadow: 0 2px 8px rgba(87, 0, 0, .22) !important;
+            transition: background .2s, transform .2s, box-shadow .2s !important;
+            letter-spacing: 0.01em;
         }
 
         #panel-lending .btn-borrow:hover:not(:disabled) {
-            background: rgba(87, 0, 0, .87) !important;
+            background: #3d0000 !important;
             transform: translateY(-1px) !important;
-            box-shadow: 0 5px 14px rgba(87, 0, 0, .3) !important;
+            box-shadow: 0 6px 16px rgba(87, 0, 0, .32) !important;
         }
 
         #panel-lending .btn-borrow:disabled,
@@ -838,6 +1088,68 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             box-shadow: none !important;
         }
 
+        /* Featured borrow button (outline ghost style) */
+        #panel-lending .btn-borrow-ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 9px;
+            background: transparent;
+            color: #374151;
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            transition: border-color .18s, background .18s, color .18s;
+        }
+
+        #panel-lending .btn-borrow-ghost:hover {
+            border-color: #570000;
+            color: #570000;
+            background: #fdf1f1;
+        }
+
+        #panel-lending .btn-borrow-ghost .material-symbols-outlined {
+            font-size: 15px;
+        }
+
+        /* Featured primary borrow button */
+        #panel-lending .btn-borrow-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 10px 22px;
+            background: #570000;
+            color: #fff;
+            border: none;
+            border-radius: 9px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            font-family: var(--font-sans);
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(87, 0, 0, .28);
+            transition: background .2s, transform .2s, box-shadow .2s;
+        }
+
+        #panel-lending .btn-borrow-primary:hover:not(:disabled) {
+            background: #3d0000;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(87, 0, 0, .32);
+        }
+
+        #panel-lending .btn-borrow-primary:disabled {
+            background: #f3f4f6;
+            color: #9ca3af;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        #panel-lending .btn-borrow-primary .material-symbols-outlined {
+            font-size: 16px;
+        }
+
         /* Empty state */
         #panel-lending .eq-empty {
             grid-column: 1/-1;
@@ -849,7 +1161,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             font-size: 52px !important;
             display: block;
             margin-bottom: 14px;
-            opacity: .2 !important;
+            opacity: .18 !important;
             color: #570000 !important;
         }
 
@@ -859,15 +1171,15 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             color: #9ca3af !important;
         }
 
-        /* Dark theme */
+        /* ── Dark theme ───────────────────────────────────────────── */
         [data-theme="dark"] #panel-lending .eq-item-card,
         [data-theme="dark"] #panel-lending .item-node {
-            background: linear-gradient(145deg, var(--color-surface-container), var(--color-surface-low)) !important;
+            background: var(--color-surface-container) !important;
             border-color: var(--color-outline-variant) !important;
         }
 
         [data-theme="dark"] #panel-lending .eq-item-body {
-            background: rgba(28, 16, 16, .9) !important;
+            background: var(--color-surface-low) !important;
             border-top-color: var(--color-outline-variant) !important;
         }
 
@@ -881,7 +1193,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         }
 
         [data-theme="dark"] #panel-lending .catalog-card {
-            background: rgba(35, 21, 21, .8) !important;
+            background: rgba(35, 21, 21, .85) !important;
             border-color: var(--color-outline-variant) !important;
         }
 
@@ -908,8 +1220,38 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             color: var(--color-on-surface) !important;
         }
 
-        [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled) {
+        [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled),
+        [data-theme="dark"] #panel-lending .btn-borrow-primary:not(:disabled) {
             background: var(--color-primary-container) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .feat-hero,
+        [data-theme="dark"] #panel-lending .feat-secondary {
+            background: var(--color-surface-container) !important;
+            border-color: var(--color-outline-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .feat-hero-title,
+        [data-theme="dark"] #panel-lending .feat-secondary-title,
+        [data-theme="dark"] #panel-lending .featured-label,
+        [data-theme="dark"] #panel-lending .catalog-section-title {
+            color: var(--color-on-surface) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .eq-item-img-placeholder,
+        [data-theme="dark"] #panel-lending .feat-hero-img-placeholder,
+        [data-theme="dark"] #panel-lending .feat-secondary-img {
+            background: var(--color-surface-high) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .catalog-count-chip {
+            background: var(--color-surface-high) !important;
+            color: var(--color-on-surface-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .btn-borrow-ghost {
+            border-color: var(--color-outline-variant) !important;
+            color: var(--color-on-surface-variant) !important;
         }
     </style>
 </head>
@@ -1336,7 +1678,114 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <h2 class="page-title-sm">Browse Equipment</h2>
                         <p class="page-subtitle">Search and select equipment to submit a borrow request.</p>
                     </div>
+
+                    <!-- ── Featured Section ────────────────────────────────── -->
+                    <?php
+                    // Grab up to 2 featured (highest quantity available) items for the featured banner
+                    mysqli_data_seek($inventory_result, 0);
+                    $all_items = [];
+                    while ($row = mysqli_fetch_assoc($inventory_result)) $all_items[] = $row;
+                    $avail_items = array_filter($all_items, fn($r) => $r['quantity'] > 0);
+                    usort($avail_items, fn($a, $b) => $b['quantity'] - $a['quantity']);
+                    $featured_hero = $avail_items[0] ?? null;
+                    $featured_sec  = $avail_items[1] ?? null;
+                    if ($featured_hero || $featured_sec):
+                    ?>
+                        <div class="featured-section">
+                            <div class="featured-label">
+                                <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">star</span>
+                                Featured
+                            </div>
+                            <div class="featured-grid">
+                                <!-- Hero Featured -->
+                                <?php if ($featured_hero): ?>
+                                    <div class="feat-hero">
+                                        <div class="feat-hero-body">
+                                            <div>
+                                                <div class="feat-hero-meta">
+                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;">
+                                                        <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
+                                                        <?php echo (int)$featured_hero['quantity']; ?> available
+                                                    </span>
+                                                </div>
+                                                <div class="feat-hero-title" style="margin-top:12px;"><?php echo htmlspecialchars($featured_hero['item_name']); ?></div>
+                                                <div class="feat-hero-desc" style="margin-top:6px;"><?php echo !empty($featured_hero['description']) ? htmlspecialchars(mb_substr($featured_hero['description'], 0, 110)) . (mb_strlen($featured_hero['description']) > 110 ? '…' : '') : 'Available for borrowing. Submit a request to reserve this item for your class or event.'; ?></div>
+                                            </div>
+                                            <div class="feat-hero-actions" style="margin-top:20px;">
+                                                <?php if ($has_overdue_block): ?>
+                                                    <button class="btn-borrow-primary" disabled>
+                                                        <span class="material-symbols-outlined">block</span> Overdue Block
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button class="btn-borrow-primary"
+                                                        data-action="open-borrow-form"
+                                                        data-item="<?php echo htmlspecialchars($featured_hero['item_name'], ENT_QUOTES); ?>">
+                                                        <span class="material-symbols-outlined">add_circle</span> Borrow Now
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($featured_hero['image_path'])): ?>
+                                            <div class="feat-hero-img">
+                                                <img src="/Equipment-Lending-Website/<?php echo htmlspecialchars($featured_hero['image_path']); ?>"
+                                                    alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="feat-hero-img-placeholder">
+                                                <span class="material-symbols-outlined">inventory_2</span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+
+                                <!-- Secondary Featured -->
+                                <?php if ($featured_sec): ?>
+                                    <div class="feat-secondary">
+                                        <div class="feat-secondary-img" style="position:relative;">
+                                            <?php if (!empty($featured_sec['image_path'])): ?>
+                                                <img src="/Equipment-Lending-Website/<?php echo htmlspecialchars($featured_sec['image_path']); ?>"
+                                                    alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
+                                            <?php else: ?>
+                                                <span class="material-symbols-outlined">inventory_2</span>
+                                            <?php endif; ?>
+                                            <span class="stock-badge stock-avail"
+                                                style="position:absolute;top:10px;left:10px;margin-bottom:0;z-index:2;background:rgba(209,250,229,.95);backdrop-filter:blur(4px);">
+                                                <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
+                                                <?php echo (int)$featured_sec['quantity']; ?> available
+                                            </span>
+                                        </div>
+                                        <div class="feat-secondary-body">
+                                            <div class="feat-secondary-title"><?php echo htmlspecialchars($featured_sec['item_name']); ?></div>
+                                            <div class="feat-secondary-cat">
+                                                <span class="material-symbols-outlined">label</span>
+                                                <?php echo htmlspecialchars($featured_sec['category']); ?>
+                                            </div>
+                                            <div style="margin-top:auto;">
+                                                <?php if ($has_overdue_block): ?>
+                                                    <button class="btn-borrow-primary" style="width:100%;" disabled>Overdue Block</button>
+                                                <?php else: ?>
+                                                    <button class="btn-borrow-primary" style="width:100%;justify-content:center;"
+                                                        data-action="open-borrow-form"
+                                                        data-item="<?php echo htmlspecialchars($featured_sec['item_name'], ENT_QUOTES); ?>">
+                                                        Borrow
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- ── All Equipment Catalog ───────────────────────────── -->
                     <div class="catalog-card">
+                        <div class="catalog-section-header">
+                            <span class="catalog-section-title">All Equipment</span>
+                            <span class="catalog-count-chip" id="equipCountChip">
+                                <?php echo count($all_items); ?> items
+                            </span>
+                        </div>
                         <div class="catalog-filters">
                             <div class="catalog-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
@@ -1355,46 +1804,48 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             </select>
                         </div>
                         <div class="eq-grid" id="equipmentList">
-                            <?php if (mysqli_num_rows($inventory_result) == 0): ?>
+                            <?php if (empty($all_items)): ?>
                                 <div class="eq-empty">
                                     <span class="material-symbols-outlined">inventory_2</span>
                                     <p>No equipment available at the moment.</p>
                                 </div>
                             <?php else: ?>
-                                <?php while ($item = mysqli_fetch_assoc($inventory_result)): ?>
+                                <?php foreach ($all_items as $item): ?>
                                     <div class="eq-item-card item-node"
                                         data-name="<?php echo strtolower(htmlspecialchars($item['item_name'])); ?>"
                                         data-category="<?php echo strtolower(htmlspecialchars($item['category'])); ?>"
                                         data-item-id="<?php echo (int)$item['item_id']; ?>">
-                                        <?php if (!empty($item['image_path'])): ?>
-                                            <img class="eq-item-img"
-                                                src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
-                                                alt="<?php echo htmlspecialchars($item['item_name']); ?>">
-                                        <?php else: ?>
-                                            <div class="eq-item-img-placeholder">
-                                                <span class="material-symbols-outlined">inventory_2</span>
+                                        <div class="eq-item-img-wrap">
+                                            <?php if (!empty($item['image_path'])): ?>
+                                                <img class="eq-item-img"
+                                                    src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
+                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>">
+                                            <?php else: ?>
+                                                <div class="eq-item-img-placeholder">
+                                                    <span class="material-symbols-outlined">inventory_2</span>
+                                                </div>
+                                            <?php endif; ?>
+                                            <!-- Stock badge overlay on image -->
+                                            <div class="eq-stock-overlay">
+                                                <?php if ($item['quantity'] > 0): ?>
+                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(209,250,229,.9) !important;">
+                                                        <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
+                                                        <?php echo (int)$item['quantity']; ?> available
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="stock-badge stock-unavail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(254,226,226,.9) !important;">
+                                                        <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
+                                                        Out of stock
+                                                    </span>
+                                                <?php endif; ?>
                                             </div>
-                                        <?php endif; ?>
+                                        </div>
                                         <div class="eq-item-body">
-                                            <div class="eq-item-name">
-                                                <?php echo htmlspecialchars($item['item_name']); ?>
-                                            </div>
+                                            <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
                                             <div class="eq-item-cat">
-                                                <span class="material-symbols-outlined" style="font-size:13px;">label</span>
+                                                <span class="material-symbols-outlined">label</span>
                                                 <?php echo htmlspecialchars($item['category']); ?>
                                             </div>
-                                            <?php if ($item['quantity'] > 0): ?>
-                                                <span class="stock-badge stock-avail">
-                                                    <span class="material-symbols-outlined"
-                                                        style="font-size:12px;">check_circle</span>
-                                                    <?php echo (int)$item['quantity']; ?> available
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="stock-badge stock-unavail">
-                                                    <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
-                                                    Out of stock
-                                                </span>
-                                            <?php endif; ?>
                                             <?php if ($has_overdue_block): ?>
                                                 <button class="btn-borrow btn-borrow-blocked" disabled
                                                     title="You have an overdue item. Return it before borrowing again.">
@@ -1403,14 +1854,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                             <?php else: ?>
                                                 <button class="btn-borrow" <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
                                                     data-action="open-borrow-form"
-                                                    data-item="
-                                            <?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
+                                                    data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
                                                     <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
                                     </div>
-                                <?php endwhile; ?>
+                                <?php endforeach; ?>
                             <?php endif; ?>
                         </div>
                     </div>
