@@ -964,4 +964,146 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 
+
+    /* ================================================================
+   QR RETURN SCANNER
+   Uses jsQR (loaded dynamically) + Camera API.
+   Works on phones, laptops, and desktop PCs with a webcam.
+================================================================ */
+    (function initQrScanner() {
+        const openBtn    = document.getElementById('openQrScannerBtn');
+        const modal      = document.getElementById('qrScannerModal');
+        const closeBtn   = document.getElementById('closeQrScanner');
+        const video      = document.getElementById('qrVideo');
+        const status     = document.getElementById('qrScanStatus');
+        if (!openBtn || !modal || !video) return;
+
+        let stream = null;
+        let animFrame = null;
+        let scanning = false;
+
+        function stopScanner() {
+            scanning = false;
+            if (animFrame) cancelAnimationFrame(animFrame);
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            modal.style.display = 'none';
+        }
+
+        function processFrame(canvas, ctx) {
+            if (!scanning) return;
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width  = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                    scanning = false;
+                    status.textContent = '✅ QR detected — confirming return...';
+                    status.style.color = '#22c55e';
+
+                    // Extract token from the URL in the QR
+                    let token = null;
+                    try {
+                        const url = new URL(code.data);
+                        token = url.searchParams.get('token');
+                    } catch (e) {
+                        token = null;
+                    }
+
+                    if (!token) {
+                        status.textContent = '❌ Invalid QR code. Not a PUPSync return token.';
+                        status.style.color = '#e53e3e';
+                        setTimeout(() => { scanning = true; tick(); }, 2500);
+                        return;
+                    }
+
+                    // Hit return_confirm.php via fetch — no page reload
+                    fetch('return_confirm.php?token=' + encodeURIComponent(token), {
+                        credentials: 'same-origin'
+                    })
+                    .then(r => r.text())
+                    .then(html => {
+                        // Check if PHP returned success
+                        const isSuccess = html.includes('Return Confirmed');
+                        if (isSuccess) {
+                            status.textContent = '✅ Return confirmed! Updating tables...';
+                            status.style.color = '#22c55e';
+                            showToast('✅ Equipment return confirmed via QR.');
+                            setTimeout(stopScanner, 1800);
+                            // admin-live-render.js will auto-update the tables on next poll
+                        } else {
+                            status.textContent = '❌ Invalid or already-used QR token.';
+                            status.style.color = '#e53e3e';
+                            setTimeout(() => {
+                                status.textContent = 'Point camera at a valid QR code.';
+                                status.style.color = '#888';
+                                scanning = true;
+                                tick();
+                            }, 2500);
+                        }
+                    })
+                    .catch(() => {
+                        status.textContent = '❌ Network error. Please try again.';
+                        status.style.color = '#e53e3e';
+                    });
+                    return;
+                }
+            }
+            tick();
+        }
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function tick() {
+            animFrame = requestAnimationFrame(() => processFrame(canvas, ctx));
+        }
+
+        function startScanner() {
+            modal.style.display = 'flex';
+            status.textContent = 'Initializing camera...';
+            status.style.color = '#888';
+            scanning = false;
+
+            // Load jsQR once
+            function beginScan() {
+                navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' } // rear cam on phone, webcam on laptop
+                })
+                .then(s => {
+                    stream = s;
+                    video.srcObject = s;
+                    video.play();
+                    scanning = true;
+                    status.textContent = 'Point camera at the QR code.';
+                    tick();
+                })
+                .catch(err => {
+                    status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                    status.style.color = '#e53e3e';
+                    console.warn('Camera error:', err);
+                });
+            }
+
+            if (window.jsQR) {
+                beginScan();
+            } else {
+                const script = document.createElement('script');
+                // script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
+                script.src = 'JS/jsQR.min.js';
+                script.onload = beginScan;
+                script.onerror = () => {
+                    status.textContent = '❌ Failed to load QR library. Check your internet connection.';
+                    status.style.color = '#e53e3e';
+                };
+                document.head.appendChild(script);
+            }
+        }
+
+        openBtn.addEventListener('click', startScanner);
+        closeBtn.addEventListener('click', stopScanner);
+        modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
+    })();
 })();
