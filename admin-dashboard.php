@@ -675,7 +675,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Due Date</th>
                                         <th>Status</th>
                                         <th>Action</th>
-                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="return-body">
@@ -683,7 +682,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
                                     <tr>
-                                        <td colspan="8" class="text-muted" style="text-align:center;padding:3rem;">
+                                        <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                                 stroke-linejoin="round" width="40" height="40"
@@ -696,7 +695,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </tr>
                                     <?php else: while ($r = mysqli_fetch_assoc($approved_result)):
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
-                                            $actualStatus = $isOverdue ? 'Overdue' : 'Approved';
                                         ?>
                                     <tr>
                                         <td>
@@ -737,22 +735,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     Returned
                                                 </a>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn-action btn-override-req" data-action="open-override"
-                                                data-request-id="<?php echo $r['id']; ?>"
-                                                data-request-status="<?php echo $actualStatus; ?>"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                title="Override this request">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                    stroke-linejoin="round" width="14" height="14">
-                                                    <path
-                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                </svg>
-                                            </button>
                                         </td>
                                     </tr>
                                     <?php endwhile;
