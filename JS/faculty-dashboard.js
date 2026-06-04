@@ -2540,17 +2540,25 @@
 
         if (!data || !data.has_code) {
             body.innerHTML = '<div class="fcc-no-code">No active code. Generate one below to let a student borrow equipment.</div>';
+            window._fccLastUsed = null;
             return;
         }
 
         const isUsed = data.is_used;
+
+        // Fire toast exactly once when we detect the transition active → used
+        if (isUsed && window._fccLastUsed === false) {
+            showToast('✅ Code used by ' + _fccEsc(data.used_by_name) + '. A borrow request was auto-approved.', 'success');
+        }
+        window._fccLastUsed = isUsed;
+
         const usedInfo = isUsed
-            ? `<div class="fcc-used-info">Used by: <strong>${esc(data.used_by_name)}</strong> (${esc(data.used_by_id)}) · ${esc(data.used_at)}</div>`
-            : `<div class="fcc-used-info" style="color:var(--color-secondary,#555)">Generated: ${esc(data.created_at)}</div>`;
+            ? `<div class="fcc-used-info">Used by: <strong>${_fccEsc(data.used_by_name)}</strong> (${_fccEsc(data.used_by_id)}) &middot; ${_fccEsc(data.used_at)}</div>`
+            : `<div class="fcc-used-info" style="color:var(--color-secondary,#555)">Generated: ${_fccEsc(data.created_at)}</div>`;
 
         body.innerHTML = `
             <div class="fcc-code-display ${isUsed ? 'fcc-code-used' : ''}">
-                <span class="fcc-code-value" id="fccCodeText">${esc(data.code)}</span>
+                <span class="fcc-code-value" id="fccCodeText">${_fccEsc(data.code)}</span>
                 ${!isUsed ? `<button class="fcc-copy-btn" id="fccCopyBtn" title="Copy code">
                     <span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>
                 </button>` : ''}
@@ -2563,7 +2571,6 @@
             </div>
             ${usedInfo}`;
 
-        // Copy button
         const copyBtn = document.getElementById('fccCopyBtn');
         if (copyBtn) {
             copyBtn.addEventListener('click', function () {
@@ -2575,7 +2582,6 @@
                         copyBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">content_copy</span>';
                     }, 2000);
                 }).catch(() => {
-                    // Fallback for older browsers
                     const el = document.createElement('textarea');
                     el.value = code;
                     document.body.appendChild(el);
@@ -2586,16 +2592,9 @@
                 });
             });
         }
-
-        // If code was just used, notify
-        if (isUsed && window._fccWasActive) {
-            showToast('✅ Your code was used by ' + data.used_by_name + '. A new borrow request was submitted.', 'success');
-            window._fccWasActive = false;
-        }
-        window._fccWasActive = !isUsed;
     }
 
-    function esc(str) {
+    function _fccEsc(str) {
         return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
@@ -2648,12 +2647,14 @@
     }
 
     function startCodePolling() {
-        const INTERVAL = 5000; // 5 seconds — same as requests
-        setInterval(function () {
+        function doPoll() {
             fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
-                .then(r => r.json())
-                .then(data => { renderCodePanel(data); })
-                .catch(() => {});
-        }, INTERVAL);
+                .then(function (r) { if (!r.ok) return null; return r.json(); })
+                .then(function (data) { if (data) renderCodePanel(data); })
+                .catch(function () {});
+        }
+
+        doPoll();                        // fire immediately
+        setInterval(doPoll, 5000);       // then every 5 seconds
     }
 })();

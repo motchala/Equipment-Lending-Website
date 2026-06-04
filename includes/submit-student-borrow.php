@@ -81,6 +81,15 @@ if (!$ins->execute()) {
 $request_id = $conn->insert_id;
 $ins->close();
 
+// ── Decrement inventory quantity ──────────────────────────────────────────
+$dec = $conn->prepare(
+    "UPDATE tbl_inventory SET quantity = quantity - 1
+      WHERE item_name = ? AND is_archived = 0 AND quantity > 0"
+);
+$dec->bind_param('s', $equipment);
+$dec->execute();
+$dec->close();
+
 // ── Mark code as used ─────────────────────────────────────────────────────
 $upd = $conn->prepare(
     "UPDATE tbl_faculty_codes
