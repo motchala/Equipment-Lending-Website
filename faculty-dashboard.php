@@ -1,4 +1,4 @@
-﻿﻿<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: ../Equipment-Lending-Website/landing-page.php");
@@ -205,7 +205,298 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <link rel="stylesheet" href="CSS/faculty-dashboard.css">
 
     <!-- Faculty Code Card -->
-     <link rel="stylesheet" href="css/faculty-code-card.css">
+    <link rel="stylesheet" href="css/faculty-code-card.css">
+
+    <!-- Dashboard Redesign v3 — Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ================================================================
+       DASHBOARD REDESIGN v3 — panel-home overrides only
+       All JS-referenced classes are preserved; only visual/layout
+       styles are added or overridden here.
+    ================================================================ */
+
+        /* ── Hero Header ──────────────────────────────────────────────── */
+        .dash-hero {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, var(--color-primary-container) 0%, #5a0000 100%);
+            border-radius: var(--radius-xl);
+            padding: 28px 32px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .dash-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .dash-hero-text {
+            position: relative;
+            z-index: 1;
+        }
+
+        .dash-hero-eyebrow {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 1.8px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 6px;
+        }
+
+        .dash-hero-title {
+            font-family: 'Syne', var(--font-display);
+            font-size: 2rem;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1.15;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+
+        .dash-hero-name {
+            color: #ffcece;
+        }
+
+        .dash-hero-sub {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.65);
+            font-weight: 400;
+        }
+
+        .dash-hero-ornament {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 110px;
+            height: 110px;
+            color: #fff;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        [data-theme="dark"] .dash-hero {
+            background: linear-gradient(135deg, #4a0000 0%, #2a0000 100%);
+        }
+
+        /* ── Stats Row layout override ────────────────────────────────── */
+        /* .dashboard-stats-col already exists; we change it to a row */
+        .dash-stats-row-layout {
+            flex-direction: row !important;
+            gap: 14px !important;
+            margin-bottom: 20px;
+        }
+
+        .dash-stats-row-layout .stat-card {
+            flex: 1;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 18px 20px 16px;
+            border-left: 3px solid var(--color-primary);
+            border-radius: var(--radius-lg);
+            gap: 2px;
+        }
+
+        .dash-stats-row-layout .stat-card-icon {
+            position: static;
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+            margin-bottom: 10px;
+            color: var(--color-primary);
+        }
+
+        .dash-stats-row-layout .stat-card-value {
+            font-family: 'Syne', var(--font-display);
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            margin-bottom: 2px;
+        }
+
+        .dash-stats-row-layout .stat-card-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            color: var(--color-secondary);
+        }
+
+        .dash-stats-row-layout .stat-card-overdue {
+            border-left-color: var(--color-error);
+        }
+
+        .dash-stats-row-layout .stat-card-overdue .stat-card-icon {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ── Main Body Layout override ────────────────────────────────── */
+        /* .dashboard-grid changed from 256px 1fr to 1fr 300px */
+        .dash-body-layout {
+            grid-template-columns: 1fr 296px !important;
+            gap: 20px !important;
+            margin-bottom: 0 !important;
+            align-items: start;
+        }
+
+        .dash-bento-col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .dash-sidebar-col {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* ── Bento cards: taller, more vivid ─────────────────────────── */
+        #panel-home .bento-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        #panel-home .bento-item {
+            min-height: 160px;
+            border-radius: var(--radius-xl);
+            padding: 22px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Decorative corner arc */
+        #panel-home .bento-item::after {
+            content: '';
+            position: absolute;
+            bottom: -28px;
+            right: -28px;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 18px solid currentColor;
+            opacity: 0.07;
+            pointer-events: none;
+        }
+
+        #panel-home .bento-item:nth-child(1) {
+            color: var(--color-primary);
+        }
+
+        #panel-home .bento-item:nth-child(2) {
+            color: #4a6cf7;
+        }
+
+        #panel-home .bento-item:nth-child(3) {
+            color: #0d7a5f;
+        }
+
+        [data-theme="dark"] #panel-home .bento-item:nth-child(2) {
+            color: #7c9fff;
+        }
+
+        [data-theme="dark"] #panel-home .bento-item:nth-child(3) {
+            color: #34d99a;
+        }
+
+        #panel-home .bento-icon .material-symbols-outlined {
+            font-size: 32px;
+            color: inherit;
+            opacity: 0.8;
+        }
+
+        #panel-home .bento-title {
+            font-family: 'Syne', var(--font-display);
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-top: 14px;
+            margin-bottom: 3px;
+            color: var(--color-on-surface);
+        }
+
+        /* ── Audit card inline (under bento) ─────────────────────────── */
+        .dash-audit-inline {
+            border-radius: var(--radius-lg);
+            padding: 16px 18px;
+        }
+
+        /* ── Stat card clickable hover for row layout ─────────────────── */
+        .dash-stats-row-layout .stat-card-clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* ── Section label spacing ────────────────────────────────────── */
+        #panel-home .section-label {
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        /* ── Active card redesign: cleaner ────────────────────────────── */
+        #panel-home .active-card {
+            border-radius: var(--radius-xl);
+            padding: 18px 20px;
+            border-top: 3px solid var(--color-outline-variant);
+            transition: transform var(--transition), box-shadow var(--transition), border-top-color var(--transition);
+        }
+
+        #panel-home .active-card:hover {
+            border-top-color: var(--color-primary);
+            transform: translateY(-2px);
+        }
+
+        #panel-home .active-card-overdue {
+            border-top-color: var(--color-error) !important;
+        }
+
+        #panel-home .active-card-thumb {
+            background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-container));
+            border-radius: var(--radius-md);
+        }
+
+        #panel-home .active-card-title {
+            font-family: 'Syne', var(--font-display);
+            font-weight: 700;
+        }
+
+        /* ── Quick actions pill style ─────────────────────────────────── */
+        #panel-home .qa-btn {
+            border-radius: var(--radius-full);
+            padding: 9px 16px;
+            font-size: 0.8rem;
+            transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+        }
+
+        #panel-home .qa-btn:hover {
+            box-shadow: 0 2px 8px rgba(128, 0, 0, 0.12);
+        }
+
+        /* ── Faculty code card: matches sidebar ───────────────────────── */
+        #panel-home .faculty-code-card {
+            border-radius: var(--radius-lg);
+        }
+
+        /* ── Page header override (hide old one gracefully) ───────────── */
+        #panel-home .page-header-block {
+            display: none;
+        }
+
+        /* ── Dark theme hero ──────────────────────────────────────────── */
+        [data-theme="dark"] .dash-hero-name {
+            color: #ffb3b3;
+        }
+    </style>
 </head>
 
 <body>
@@ -324,7 +615,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     </div>
                 </div>
                 <!-- Avatar -->
-                <div class="top-bar-profile-wrap" id="avatarWrap">
+                <div class="top-bar-profile-wrap" id="avatarWrap" data-name="<?php echo htmlspecialchars($fullname); ?>">
                     <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
                         <?php if ($profile_pic_url): ?>
                             <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
@@ -384,190 +675,214 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             </div>
 
             <!-- ============================================================
-         TAB: DASHBOARD (HOME)
+         TAB: DASHBOARD (HOME)  — Redesigned v3
     ============================================================ -->
             <div class="tab-panel active" id="panel-home">
 
-                <!-- Page Header -->
-                <div class="page-header-block">
-                    <h1 class="page-title">Good
-                        <?php
-                        $h = (int)date('H');
-                        echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
-                        ?>,
-                        <span style="color:var(--color-primary);"><?php echo htmlspecialchars($firstname); ?></span>.
-                    </h1>
-                    <p class="page-subtitle">
-                        <?php echo date('l, F j, Y'); ?> &mdash; Here is an overview of your active equipment and
-                        requests.
-                    </p>
+                <!-- ── Flat Header (Redesign v4) ─────────────────────── -->
+                <div class="dash-flat-header">
+                    <h1 class="dash-flat-title">Good <?php
+                                                        $h = (int)date('H');
+                                                        echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
+                                                        ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                    <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> — Here is an overview of your active equipment and requests.</p>
                 </div>
 
-                <!-- Overdue Urgent Card removed — emphasis moved to stat card below -->
-                <!-- Stats + Quick Access Grid -->
-                <div class="dashboard-grid">
-
-                    <!-- Left: Stats Column -->
-                    <div class="dashboard-stats-col">
-                        <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
-                            <div class="stat-card-label">Active Borrowings</div>
-                            <div class="stat-card-value">
-                                <?php echo $stat_approved; ?>
-                            </div>
-                            <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
+                <!-- ── Stat Cards Row ─────────────────────────────────── -->
+                <!-- dashboard-stats-col kept as wrapper for JS compat; displayed as row via CSS override -->
+                <div class="dashboard-stats-col dash-stats-row-layout">
+                    <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
+                        <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
+                        <div class="stat-card-value"><?php echo $stat_approved; ?></div>
+                        <div class="stat-card-label">Active Borrowings</div>
+                    </div>
+                    <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
+                        <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
+                        <div class="stat-card-value" style="color:var(--color-warning)"><?php echo $stat_waiting; ?></div>
+                        <div class="stat-card-label">Pending Requests</div>
+                    </div>
+                    <?php if ($stat_overdue > 0): ?>
+                        <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests" data-status="Overdue">
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
+                            <div class="stat-card-value" id="statOverdueVal"><?php echo $stat_overdue; ?></div>
+                            <div class="stat-card-label">Overdue</div>
+                            <div class="stat-card-action-tag">Action Required</div>
                         </div>
-                        <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
-                            <div class="stat-card-label">Pending Requests</div>
-                            <div class="stat-card-value" style="color:var(--color-warning)">
-                                <?php echo $stat_waiting; ?>
-                            </div>
-                            <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
+                    <?php else: ?>
+                        <div class="stat-card">
+                            <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span></div>
+                            <div class="stat-card-value"><?php echo $stat_total; ?></div>
+                            <div class="stat-card-label">Total Requests</div>
                         </div>
-                        <?php if ($stat_overdue > 0): ?>
-                            <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests"
-                                data-status="Overdue">
-                                <div class="stat-card-label">Overdue</div>
-                                <div class="stat-card-value" id="statOverdueVal">
-                                    <?php echo $stat_overdue; ?>
-                                </div>
-                                <div class="stat-card-action-tag">Action Required</div>
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
-                            </div>
-                        <?php else: ?>
-                            <div class="stat-card">
-                                <div class="stat-card-label">Total Requests</div>
-                                <div class="stat-card-value">
-                                    <?php echo $stat_total; ?>
-                                </div>
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span>
-                                </div>
-                            </div>
-                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
 
-                        <!-- Recent Audit Log -->
-                        <div class="audit-card">
-                            <div class="audit-card-head">
-                                <span class="material-symbols-outlined">history</span>
-                                <span>Recent Activity</span>
+                <!-- ── Main Two-Column Body ──────────────────────────── -->
+                <!-- dashboard-grid kept for JS compat; layout redefined via CSS -->
+                <div class="dashboard-grid dash-body-layout">
+
+                    <!-- Left: Bento Action Cards -->
+                    <div class="dash-bento-col">
+                        <div class="bento-grid dash-bento-2col">
+                            <div class="bento-item dash-bento-action" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                <div class="bento-icon"><span class="material-symbols-outlined">add_shopping_cart</span></div>
+                                <div class="bento-title">Borrow Equipment</div>
                             </div>
-                            <?php
-                            $recent_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
-                            if ($recent_raw && mysqli_num_rows($recent_raw) > 0):
-                                while ($rr = mysqli_fetch_assoc($recent_raw)):
-                            ?>
-                                    <div class="audit-row">
-                                        <span class="audit-row-label">
-                                            <?php echo htmlspecialchars($rr['equipment_name']); ?>
-                                        </span>
-                                        <span class="audit-row-time">
-                                            <?php echo date('M j', strtotime($rr['request_date'])); ?>
-                                        </span>
-                                    </div>
-                                <?php endwhile;
-                            else: ?>
-                                <div class="audit-row"><span class="audit-row-label"
-                                        style="color:var(--color-on-surface-variant)">No recent activity</span></div>
-                            <?php endif; ?>
-                            <a class="audit-view-all" data-tab="activity" href="#">View Full Activity Log</a>
+                            <div class="bento-item dash-bento-action" data-action="go-tab" data-tab="rooms">
+                                <div class="bento-icon"><span class="material-symbols-outlined">meeting_room</span></div>
+                                <div class="bento-title">Reserve Room</div>
+                            </div>
                         </div>
 
-                        <!-- ── Faculty Code Generator ───────────────────── -->
-                        <div class="faculty-code-card" id="facultyCodePanel">
-                            <div class="fcc-head">
-                                <span class="material-symbols-outlined fcc-icon">qr_code_2</span>
-                                <div>
-                                    <div class="fcc-title">Student Access Code</div>
-                                    <div class="fcc-sub">Share with your student to let them borrow equipment</div>
-                                </div>
+                    </div>
+
+                    <!-- Right: Faculty Code + Quick Actions sidebar -->
+                    <div class="dash-sidebar-col">
+
+                        <!-- Faculty Code Card -->
+                        <div class="faculty-code-card fcc-screenshot" id="facultyCodePanel">
+                            <div class="fcc-top-row">
+                                <span class="fcc-title">Student Access Code</span>
+                                <span class="fcc-badge fcc-badge-active" id="fccBadge">ACTIVE</span>
                             </div>
                             <div class="fcc-body" id="fccBody">
-                                <!-- Populated by JS -->
                                 <div class="fcc-loading">
                                     <span class="material-symbols-outlined" style="font-size:1.2rem;opacity:.4;animation:spin 1s linear infinite;">sync</span>
                                 </div>
                             </div>
                             <button class="fcc-generate-btn" id="btnGenerateCode">
-                                <span class="material-symbols-outlined" style="font-size:16px;">add_circle</span>
                                 Generate New Code
                             </button>
                         </div>
-                        <!-- ── /Faculty Code Generator ──────────────────── -->
 
                         <!-- Quick Actions -->
                         <div class="quick-actions">
-                            <h3><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="icon-img"
-                                    style="color:var(--accent-maroon); margin-right:8px" aria-label="Quick"
-                                    aria-hidden="true">
+                            <h3>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon);margin-right:8px" aria-hidden="true">
                                     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                                </svg>Quick Actions</h3>
+                                </svg>Quick Actions
+                            </h3>
                             <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="icon-img" aria-label="Search" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                </svg> Browse Equipment
+                                </svg>
+                                Browse Equipment
                             </button>
                             <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="icon-img" aria-label="Requests" aria-hidden="true">
-                                    <path
-                                        d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                                </svg> My Requests
+                                </svg>
+                                My Requests
                             </button>
                             <button class="qa-btn" data-action="go-tab" data-tab="rooms">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="icon-img" aria-label="Rooms" aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                                     <line x1="9" y1="3" x2="9" y2="21" />
                                     <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                                </svg> Reserve a Room
+                                </svg>
+                                Reserve a Room
                             </button>
                             <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="icon-img" aria-label="Notifications"
-                                    aria-hidden="true">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
                                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                                </svg> Notifications
+                                </svg>
+                                Notifications
                                 <?php if ($notif_count > 0): ?>
-                                    <span class="notif-badge" style="font-size:0.7rem; padding: 1px 6px;">
-                                        <?php echo $notif_count; ?>
-                                    </span>
+                                    <span class="notif-badge" style="font-size:0.7rem;padding:1px 6px;"><?php echo $notif_count; ?></span>
                                 <?php endif; ?>
                             </button>
                         </div>
+
+                    </div><!-- /dash-sidebar-col -->
+                </div><!-- /dashboard-grid -->
+
+                <!-- ── Activity Overview Section ─────────────────────── -->
+                <?php
+                // Get recent activity for timeline
+                $timeline_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
+                $timeline_items = [];
+                if ($timeline_raw) while ($tr = mysqli_fetch_assoc($timeline_raw)) $timeline_items[] = $tr;
+
+                // Get monthly activity counts for bar chart (last 10 months)
+                $monthly_counts = [];
+                $month_labels = [];
+                for ($i = 9; $i >= 0; $i--) {
+                    $ts = strtotime("-$i months");
+                    $month_labels[] = date('M', $ts);
+                    $y = date('Y', $ts);
+                    $m = date('m', $ts);
+                    $cnt = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND YEAR(request_date)=$y AND MONTH(request_date)=$m"))['c'] ?? 0;
+                    $monthly_counts[] = (int)$cnt;
+                }
+                $max_count = max(1, max($monthly_counts));
+                $highlight_idx = array_search(max($monthly_counts), $monthly_counts);
+                ?>
+                <div class="dash-activity-overview-header">Activity Overview</div>
+                <div class="dash-activity-overview-grid">
+                    <!-- Recent Activity Timeline -->
+                    <div class="dash-activity-card">
+                        <div class="dash-activity-card-head">
+                            <span class="dash-activity-card-title">Recent Activity</span>
+                            <button class="dash-activity-card-btn">Timeline <span style="font-size:10px;">▾</span></button>
+                        </div>
+                        <div class="dash-timeline">
+                            <?php if (!empty($timeline_items)):
+                                foreach ($timeline_items as $idx => $ti): ?>
+                                    <div class="dash-timeline-item <?php echo $idx > 0 ? 'muted' : ''; ?>">
+                                        <div class="dash-timeline-dot <?php echo $idx === 0 ? 'dot-active' : ''; ?>"></div>
+                                        <div class="dash-timeline-time"><?php echo date('g:i A', strtotime($ti['request_date'])); ?></div>
+                                        <div class="dash-timeline-body">
+                                            <div class="dash-timeline-title"><?php echo htmlspecialchars($ti['equipment_name']); ?></div>
+                                            <div class="dash-timeline-date"><?php echo date('F j, Y', strtotime($ti['request_date'])); ?></div>
+                                        </div>
+                                    </div>
+                                <?php endforeach;
+                            else: ?>
+                                <div class="dash-timeline-item muted">
+                                    <div class="dash-timeline-dot"></div>
+                                    <div class="dash-timeline-time">—</div>
+                                    <div class="dash-timeline-body">
+                                        <div class="dash-timeline-title">No recent activity</div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
 
-                    <!-- Right: Quick Access Bento -->
-                    <div class="bento-grid">
-                        <div class="bento-item" data-action="go-tab" data-tab="lending" data-lending="browse">
-                            <div class="bento-icon"><span class="material-symbols-outlined">add_shopping_cart</span>
+                    <!-- My Activity Bar Chart -->
+                    <div class="dash-activity-card">
+                        <div class="dash-activity-card-head">
+                            <span class="dash-activity-card-title">My Activity</span>
+                            <button class="dash-activity-card-btn">Charts <span style="font-size:10px;">▾</span></button>
+                        </div>
+                        <div class="dash-bar-chart">
+                            <div class="dash-bar-chart-y">
+                                <span><?php echo ceil($max_count * 1.25); ?></span>
+                                <span><?php echo ceil($max_count * 1.0); ?></span>
+                                <span><?php echo ceil($max_count * 0.5); ?></span>
+                                <span>0</span>
                             </div>
-                            <div class="bento-title">Borrow Equipment</div>
-                            <div class="bento-sub">Browse the equipment catalog</div>
-                        </div>
-                        <div class="bento-item" data-action="go-tab" data-tab="rooms">
-                            <div class="bento-icon"><span class="material-symbols-outlined">meeting_room</span></div>
-                            <div class="bento-title">Reserve Room</div>
-                            <div class="bento-sub">Book lecture halls and labs</div>
-                        </div>
-                        <div class="bento-item bento-item-wide" data-action="go-tab" data-tab="activity">
-                            <div class="bento-icon"><span class="material-symbols-outlined">history_edu</span></div>
-                            <div class="bento-title">My Activity</div>
-                            <div class="bento-sub">Track all your requests and reservations in one place</div>
+                            <div class="dash-bar-chart-area">
+                                <?php foreach ($monthly_counts as $idx => $cnt):
+                                    $h = $cnt > 0 ? round(($cnt / ($max_count * 1.25)) * 100) : 4;
+                                    $isHL = ($idx == $highlight_idx && $cnt > 0);
+                                ?>
+                                    <div class="dash-bar <?php echo $isHL ? 'highlight' : ''; ?>" style="height:<?php echo $h; ?>%;"></div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="dash-bar-chart-x">
+                                <?php foreach ($month_labels as $ml): ?>
+                                    <span><?php echo $ml; ?></span>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-
-                <!-- Active Now Section -->
+                <!-- ── Active Now Section ─────────────────────────────── -->
                 <?php
                 $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
                 $active_items = [];
@@ -576,32 +891,45 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                 <?php if (!empty($active_items)): ?>
                     <div class="section-label">Active Now</div>
                     <div class="active-cards-grid">
-                        <?php foreach ($active_items as $ai): ?>
-                            <div class="active-card <?php echo $ai['status'] === 'Overdue' ? 'active-card-overdue' : ''; ?>">
-                                <div class="active-card-thumb">
-                                    <span class="material-symbols-outlined">inventory_2</span>
+                        <?php foreach ($active_items as $ai):
+                            $isOverdue = $ai['status'] === 'Overdue';
+                            $chipClass = $isOverdue ? 'chip-error' : 'chip-success';
+                            $chipLabel = $isOverdue ? 'OVERDUE' : 'ACTIVE';
+                            // Calculate progress (days used / total days * 100)
+                            $borrowTs = strtotime($ai['borrow_date']);
+                            $returnTs = strtotime($ai['return_date']);
+                            $nowTs = time();
+                            $totalDays = max(1, $returnTs - $borrowTs);
+                            $usedDays = max(0, min($nowTs - $borrowTs, $totalDays));
+                            $progress = round(($usedDays / $totalDays) * 100);
+                        ?>
+                            <div class="active-card <?php echo $isOverdue ? 'active-card-overdue' : ''; ?>">
+                                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;">
+                                    <div class="active-card-thumb">
+                                        <span class="material-symbols-outlined">inventory_2</span>
+                                    </div>
+                                    <span class="status-chip <?php echo $chipClass; ?>" style="font-size:0.65rem;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;">
+                                        <span class="chip-dot"></span><?php echo $chipLabel; ?>
+                                    </span>
                                 </div>
                                 <div class="active-card-body">
                                     <div class="active-card-meta">Equipment</div>
-                                    <div class="active-card-title">
-                                        <?php echo htmlspecialchars($ai['equipment_name']); ?>
-                                    </div>
-                                    <div class="active-card-sub">Room:
-                                        <?php echo htmlspecialchars($ai['room']); ?>
-                                    </div>
-                                    <div class="active-card-footer">
-                                        <span class="active-card-due">Due:
-                                            <?php echo htmlspecialchars($ai['return_date']); ?>
-                                        </span>
-                                        <span
-                                            class="status-chip <?php echo $ai['status'] === 'Overdue' ? 'chip-error' : 'chip-success'; ?>">
-                                            <span class="chip-dot"></span>
-                                            <?php echo $ai['status']; ?>
-                                        </span>
+                                    <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
+                                    <div class="active-card-sub">Room: <?php echo htmlspecialchars($ai['room']); ?></div>
+                                </div>
+                                <div class="active-card-footer">
+                                    <span class="active-card-due">Due dated: <strong style="color:var(--redesign-text-primary);font-weight:500;"><?php echo date('F j, Y', strtotime($ai['return_date'])); ?></strong></span>
+                                    <div class="active-card-progress">
+                                        <div class="active-card-progress-fill" style="width:<?php echo $progress; ?>%;<?php echo $isOverdue ? 'background:#dc2626;' : ''; ?>"></div>
                                     </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
+                        <?php if (count($active_items) < 3): ?>
+                            <div style="background:#f9fafb;border:1.5px dashed #d1d5db;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:0.875rem;min-height:160px;">
+                                No other active items
+                            </div>
+                        <?php endif; ?>
                     </div>
                 <?php endif; ?>
 
@@ -1864,19 +2192,19 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
         window.SERVER_BASE_URL = '<?php
-        $scheme = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off") ? "https" : "http";
+                                    $scheme = (!empty($_SERVER["HTTPS"]) && $_SERVER["HTTPS"] !== "off") ? "https" : "http";
 
-        // Get the real network IP of the laptop (not loopback 127.0.0.1)
-        $server_addr = $_SERVER["SERVER_ADDR"] ?? "127.0.0.1";
-        if ($server_addr === "127.0.0.1" || $server_addr === "::1") {
-            $server_addr = gethostbyname(gethostname());
-        }
+                                    // Get the real network IP of the laptop (not loopback 127.0.0.1)
+                                    $server_addr = $_SERVER["SERVER_ADDR"] ?? "127.0.0.1";
+                                    if ($server_addr === "127.0.0.1" || $server_addr === "::1") {
+                                        $server_addr = gethostbyname(gethostname());
+                                    }
 
-        $port    = $_SERVER["SERVER_PORT"] ?? "80";
-        $portStr = ($port == "80" || $port == "443") ? "" : ":" . $port;
-        $path    = rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/\\");
-        echo $scheme . "://" . $server_addr . $portStr . $path . "/";
-    ?>';
+                                    $port    = $_SERVER["SERVER_PORT"] ?? "80";
+                                    $portStr = ($port == "80" || $port == "443") ? "" : ":" . $port;
+                                    $path    = rtrim(dirname($_SERVER["SCRIPT_NAME"]), "/\\");
+                                    echo $scheme . "://" . $server_addr . $portStr . $path . "/";
+                                    ?>';
     </script>
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>

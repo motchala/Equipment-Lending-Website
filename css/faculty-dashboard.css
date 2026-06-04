@@ -955,8 +955,15 @@ body {
 }
 
 @keyframes overdue-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-error) 40%, transparent); }
-    50%       { box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-error) 0%, transparent); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-error) 40%, transparent);
+    }
+
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-error) 0%, transparent);
+    }
 }
 
 .stat-card-label {
@@ -1167,6 +1174,7 @@ body {
 .bento-item:nth-child(1) {
     background: linear-gradient(145deg, #fff0f0 0%, #fde8e8 100%);
 }
+
 [data-theme="dark"] .bento-item:nth-child(1) {
     background: linear-gradient(145deg, #2c1a1a 0%, #3a2020 100%);
 }
@@ -1175,6 +1183,7 @@ body {
 .bento-item:nth-child(2) {
     background: linear-gradient(145deg, #f5f0ff 0%, #ede8f8 100%);
 }
+
 [data-theme="dark"] .bento-item:nth-child(2) {
     background: linear-gradient(145deg, #1e1a2c 0%, #261f3a 100%);
 }
@@ -1183,6 +1192,7 @@ body {
 .bento-item:nth-child(3) {
     background: linear-gradient(145deg, #fff8f0 0%, #fdeee0 100%);
 }
+
 [data-theme="dark"] .bento-item:nth-child(3) {
     background: linear-gradient(145deg, #231e18 0%, #2e2518 100%);
 }
@@ -4133,7 +4143,7 @@ body {
 
     /* Hide the generic overlay topbar inside settings — the
        settings-bento-header acts as the sticky title bar instead */
-    #settingsOverlay > .overlay-topbar {
+    #settingsOverlay>.overlay-topbar {
         display: none;
     }
 
@@ -5042,7 +5052,8 @@ body {
     transform: scale(1.1);
 }
 
-.theme-circle.selected, .theme-circle.theme-active {
+.theme-circle.selected,
+.theme-circle.theme-active {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px var(--color-primary-container);
 }
@@ -5205,4 +5216,1289 @@ body {
 .system-info-row strong {
     color: var(--color-on-surface);
     font-weight: 600;
+}
+
+/* ================================================================
+   PUPSYNC REDESIGN v4 — Clean Minimal (Matches Target Screenshot)
+   Overrides sidebar, topbar, and dashboard home panel
+================================================================ */
+
+/* ── Design Token Overrides ─────────────────────────────────── */
+:root {
+    --sidebar-w: 260px;
+    --topbar-h: 64px;
+    --redesign-sidebar-bg: #f9fafb;
+    --redesign-sidebar-border: #e5e7eb;
+    --redesign-active-bg: #f3e8e8;
+    --redesign-active-color: #800000;
+    --redesign-nav-hover: #f3f4f6;
+    --redesign-nav-color: #6b7280;
+    --redesign-nav-hover-color: #111827;
+    --redesign-top-bg: #ffffff;
+    --redesign-top-border: #e5e7eb;
+    --redesign-main-bg: #ffffff;
+    --redesign-card-border: #e5e7eb;
+    --redesign-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --redesign-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.05);
+    --redesign-gradient-start: #e5b2b2;
+    --redesign-gradient-end: #b24d4d;
+    --redesign-text-primary: #111827;
+    --redesign-text-secondary: #6b7280;
+    --redesign-text-muted: #9ca3af;
+}
+
+[data-theme="dark"] {
+    --redesign-sidebar-bg: #1a0f0f;
+    --redesign-sidebar-border: #3d1f1f;
+    --redesign-active-bg: #3d1010;
+    --redesign-active-color: #f4a0a0;
+    --redesign-nav-hover: #2c1515;
+    --redesign-nav-color: #c9b8b8;
+    --redesign-nav-hover-color: #f0e0e0;
+    --redesign-top-bg: #1c1010;
+    --redesign-top-border: #3d1f1f;
+    --redesign-main-bg: #1c1010;
+    --redesign-card-border: #3d2020;
+    --redesign-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --redesign-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --redesign-gradient-start: #6b2020;
+    --redesign-gradient-end: #4a0d0d;
+    --redesign-text-primary: #f0e0e0;
+    --redesign-text-secondary: #c9b8b8;
+    --redesign-text-muted: #a07070;
+}
+
+/* ================================================================
+   SIDEBAR REDESIGN
+================================================================ */
+.side-nav {
+    background: var(--redesign-sidebar-bg) !important;
+    border-right: 1px solid var(--redesign-sidebar-border) !important;
+    box-shadow: none !important;
+    width: var(--sidebar-w) !important;
+}
+
+/* Brand section: white with simple star icon */
+.side-nav-brand {
+    background: transparent !important;
+    border-bottom: 1px solid var(--redesign-sidebar-border);
+    padding: 16px 20px 18px !important;
+    margin-bottom: 0 !important;
+}
+
+.side-nav-brand::after {
+    display: none;
+}
+
+.side-nav-logo {
+    width: 32px !important;
+    height: 32px !important;
+    background: var(--redesign-active-color) !important;
+    border-radius: 50% !important;
+    color: #fbbf24 !important;
+}
+
+.side-nav-logo svg {
+    display: none;
+}
+
+.side-nav-logo::after {
+    content: '★';
+    font-size: 14px;
+    font-weight: 900;
+    color: #fbbf24;
+    line-height: 1;
+}
+
+.side-nav-title {
+    color: var(--redesign-text-primary) !important;
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.5px !important;
+}
+
+.side-nav-title strong {
+    color: var(--redesign-text-primary) !important;
+}
+
+.side-nav-sub {
+    display: none;
+}
+
+/* Nav links */
+.side-nav-links {
+    padding: 16px 12px 0 !important;
+    gap: 2px !important;
+}
+
+.side-nav-footer {
+    padding: 12px 12px 0 !important;
+    border-top: 1px solid var(--redesign-sidebar-border) !important;
+    gap: 2px !important;
+    margin-bottom: 8px;
+}
+
+.side-nav-item {
+    padding: 9px 12px !important;
+    border-radius: 8px !important;
+    color: var(--redesign-nav-color) !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    gap: 12px !important;
+}
+
+.side-nav-item:hover {
+    background: var(--redesign-nav-hover) !important;
+    color: var(--redesign-nav-hover-color) !important;
+}
+
+.side-nav-item.active {
+    background: var(--redesign-active-bg) !important;
+    color: var(--redesign-active-color) !important;
+    font-weight: 600 !important;
+}
+
+.side-nav-item .material-symbols-outlined {
+    font-size: 18px !important;
+}
+
+/* ================================================================
+   TOP BAR REDESIGN
+================================================================ */
+.top-bar {
+    background: var(--redesign-top-bg) !important;
+    border-bottom: 1px solid var(--redesign-top-border) !important;
+    box-shadow: none !important;
+    height: var(--topbar-h) !important;
+    padding: 0 32px !important;
+}
+
+/* Search: bordered input style */
+.top-bar-search {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    max-width: 480px !important;
+    flex: 1 !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+.top-bar-search:focus-within {
+    border-color: var(--redesign-active-color) !important;
+    box-shadow: 0 0 0 3px rgba(128, 0, 0, 0.08) !important;
+}
+
+.top-bar-search .material-symbols-outlined {
+    font-size: 16px !important;
+    color: #9ca3af !important;
+}
+
+.top-bar-search input {
+    font-size: 0.875rem !important;
+    color: var(--redesign-text-primary) !important;
+}
+
+.top-bar-search input::placeholder {
+    color: #9ca3af !important;
+}
+
+/* Notification bell: no border, clean */
+.top-bar-icon-btn {
+    border: none !important;
+    background: transparent !important;
+    color: #6b7280 !important;
+    width: 36px !important;
+    height: 36px !important;
+}
+
+.top-bar-icon-btn:hover {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+}
+
+/* Top bar actions: show user name */
+.top-bar-actions {
+    gap: 16px !important;
+}
+
+/* Add user name display next to avatar */
+.top-bar-profile-wrap {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    cursor: pointer !important;
+}
+
+/* Show full name next to avatar */
+.top-bar-profile-wrap::before {
+    content: attr(data-name);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--redesign-text-secondary);
+    white-space: nowrap;
+}
+
+/* Avatar button */
+.top-bar-avatar {
+    background: linear-gradient(135deg, #9b1c1c 0%, #600000 100%) !important;
+    border: none !important;
+    width: 36px !important;
+    height: 36px !important;
+}
+
+.top-bar-avatar:hover {
+    border: none !important;
+    box-shadow: 0 0 0 2px #d1d5db !important;
+}
+
+/* ================================================================
+   MAIN CONTENT AREA — WHITE BG
+================================================================ */
+.main-wrapper {
+    margin-left: var(--sidebar-w) !important;
+}
+
+.app-main {
+    background: var(--redesign-main-bg) !important;
+    padding: 32px 40px !important;
+}
+
+/* ================================================================
+   DASHBOARD HOME PANEL REDESIGN
+================================================================ */
+
+/* ── Hide hero / replace with clean header ── */
+.dash-hero {
+    display: none !important;
+}
+
+/* ── New flat header block ── */
+#panel-home .dash-flat-header {
+    margin-bottom: 28px;
+}
+
+#panel-home .dash-flat-title {
+    font-family: 'Inter', var(--font-sans);
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--redesign-text-primary);
+    line-height: 1.2;
+    margin-bottom: 4px;
+    letter-spacing: -0.3px;
+}
+
+#panel-home .dash-flat-sub {
+    font-size: 0.875rem;
+    color: var(--redesign-text-secondary);
+    font-weight: 400;
+}
+
+/* ── Stats row: horizontal pill-style bar ── */
+.dashboard-stats-col.dash-stats-row-layout {
+    background: #ffffff !important;
+    border: 1px solid var(--redesign-card-border) !important;
+    border-radius: 12px !important;
+    box-shadow: var(--redesign-card-shadow) !important;
+    padding: 14px 20px !important;
+    flex-direction: row !important;
+    gap: 0 !important;
+    align-items: center !important;
+    margin-bottom: 24px !important;
+}
+
+.dash-stats-row-layout .stat-card {
+    flex: 1 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    border-left: none !important;
+    padding: 4px 20px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+/* Divider between stats */
+.dash-stats-row-layout .stat-card+.stat-card {
+    border-left: 1px solid var(--redesign-card-border) !important;
+}
+
+.dash-stats-row-layout .stat-card-icon {
+    display: none !important;
+}
+
+.dash-stats-row-layout .stat-card-label {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    color: var(--redesign-text-secondary) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+}
+
+.dash-stats-row-layout .stat-card-value {
+    font-family: var(--font-sans) !important;
+    font-size: 0.875rem !important;
+    font-weight: 700 !important;
+    color: var(--redesign-text-primary) !important;
+    letter-spacing: 0 !important;
+    line-height: 1 !important;
+    background: #f3f4f6;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.dash-stats-row-layout .stat-card-overdue .stat-card-value {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+}
+
+.dash-stats-row-layout .stat-card-overdue {
+    background: transparent !important;
+    border: none !important;
+    animation: none !important;
+}
+
+.dash-stats-row-layout .stat-card-action-tag {
+    display: none !important;
+}
+
+.dash-stats-row-layout .stat-card-clickable:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ── Main body layout: two columns ── */
+.dashboard-grid.dash-body-layout {
+    grid-template-columns: 1fr 280px !important;
+    gap: 24px !important;
+    margin-bottom: 0 !important;
+    align-items: start !important;
+}
+
+/* ── Bento Cards: gradient pink ── */
+#panel-home .bento-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 16px !important;
+}
+
+#panel-home .bento-item {
+    background: linear-gradient(135deg, var(--redesign-gradient-start) 0%, var(--redesign-gradient-end) 100%) !important;
+    border: none !important;
+    border-radius: 14px !important;
+    min-height: 160px !important;
+    padding: 22px !important;
+    justify-content: space-between !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    transition: box-shadow 0.2s, transform 0.2s !important;
+}
+
+#panel-home .bento-item:nth-child(1),
+#panel-home .bento-item:nth-child(2) {
+    background: linear-gradient(135deg, var(--redesign-gradient-start) 0%, var(--redesign-gradient-end) 100%) !important;
+}
+
+#panel-home .bento-item:nth-child(3) {
+    background: linear-gradient(135deg, var(--redesign-gradient-start) 0%, var(--redesign-gradient-end) 100%) !important;
+}
+
+#panel-home .bento-item::after {
+    display: none;
+}
+
+#panel-home .bento-item:hover {
+    box-shadow: 0 6px 20px rgba(128, 0, 0, 0.18) !important;
+    transform: translateY(-2px) !important;
+    border: none !important;
+}
+
+/* Bento icon circle */
+.bento-icon {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 50%;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    margin-bottom: 0 !important;
+}
+
+#panel-home .bento-icon .material-symbols-outlined {
+    font-size: 20px !important;
+    color: var(--redesign-active-color) !important;
+    opacity: 1 !important;
+}
+
+#panel-home .bento-title {
+    font-family: 'Inter', var(--font-sans) !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    letter-spacing: -0.2px !important;
+}
+
+#panel-home .bento-sub {
+    display: none;
+}
+
+/* ── Recent Activity & Audit Card ── */
+#panel-home .audit-card.dash-audit-inline {
+    background: #ffffff !important;
+    border: 1px solid var(--redesign-card-border) !important;
+    border-radius: 14px !important;
+    padding: 20px 22px !important;
+    box-shadow: var(--redesign-card-shadow) !important;
+}
+
+#panel-home .audit-card-head {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: var(--redesign-text-primary) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--redesign-card-border);
+}
+
+/* Timeline-style audit rows */
+#panel-home .audit-row {
+    padding: 10px 0 10px 24px !important;
+    border-bottom: none !important;
+    position: relative !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+/* Dot for timeline */
+#panel-home .audit-row::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 14px;
+    width: 10px;
+    height: 10px;
+    background: var(--redesign-active-color);
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px var(--redesign-card-border);
+}
+
+#panel-home .audit-row+.audit-row::before {
+    background: #d1d5db;
+}
+
+/* Vertical line */
+#panel-home .audit-row::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 24px;
+    width: 1px;
+    height: calc(100% + 10px);
+    background: #e5e7eb;
+}
+
+#panel-home .audit-row:last-of-type::after {
+    display: none;
+}
+
+#panel-home .audit-row-label {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    color: var(--redesign-text-primary) !important;
+    max-width: none !important;
+}
+
+#panel-home .audit-row-time {
+    font-size: 0.75rem !important;
+    color: var(--redesign-text-muted) !important;
+}
+
+#panel-home .audit-view-all {
+    font-size: 0.8rem !important;
+    margin-top: 12px !important;
+    display: inline-block !important;
+    color: var(--redesign-active-color) !important;
+}
+
+/* ── Faculty Code Card ── */
+#panel-home .faculty-code-card,
+.faculty-code-card {
+    background: #ffffff !important;
+    border: 1px solid var(--redesign-card-border) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--redesign-card-shadow) !important;
+}
+
+.fcc-head {
+    padding: 16px 20px 0 !important;
+    border-bottom: none !important;
+}
+
+.fcc-title {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    color: var(--redesign-text-primary) !important;
+}
+
+.fcc-sub {
+    font-size: 0.75rem !important;
+    color: var(--redesign-text-muted) !important;
+}
+
+.fcc-body {
+    padding: 12px 20px !important;
+}
+
+/* Style the code display area */
+.fcc-code-wrap,
+.fcc-code-block,
+[class*="fcc-code"] {
+    background: #f9fafb !important;
+    border: 1px solid #f0f0f0 !important;
+    border-radius: 10px !important;
+}
+
+.fcc-code-text,
+[class*="fcc-"] span.code,
+.fcc-body span {
+    font-family: 'Courier New', monospace !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 4px !important;
+    color: var(--redesign-text-primary) !important;
+}
+
+.fcc-generate-btn {
+    margin: 0 20px 20px !important;
+    width: calc(100% - 40px) !important;
+    background: #ffffff !important;
+    color: var(--redesign-active-color) !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 10px !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    padding: 10px 16px !important;
+    transition: background 0.15s !important;
+}
+
+.fcc-generate-btn:hover {
+    background: #f9fafb !important;
+}
+
+/* ── Quick Actions sidebar section ── */
+#panel-home .quick-actions {
+    background: #ffffff !important;
+    border: 1px solid var(--redesign-card-border) !important;
+    border-radius: 14px !important;
+    padding: 18px !important;
+    box-shadow: var(--redesign-card-shadow) !important;
+}
+
+#panel-home .qa-btn {
+    border-radius: 9999px !important;
+    padding: 8px 16px !important;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: var(--redesign-text-primary) !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+}
+
+#panel-home .qa-btn:hover {
+    background: #f3f4f6 !important;
+    color: var(--redesign-active-color) !important;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
+}
+
+/* ── Section headers ── */
+#panel-home .section-label {
+    font-size: 1.05rem !important;
+    font-weight: 700 !important;
+    color: var(--redesign-text-primary) !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    margin-top: 32px !important;
+    margin-bottom: 14px !important;
+}
+
+/* ── Active Now Cards ── */
+#panel-home .active-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 16px !important;
+}
+
+#panel-home .active-card {
+    background: #ffffff !important;
+    border: 1px solid var(--redesign-card-border) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--redesign-card-shadow) !important;
+    padding: 18px 20px !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    border-top: none !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+#panel-home .active-card:hover {
+    box-shadow: var(--redesign-card-shadow-hover) !important;
+    transform: translateY(-2px) !important;
+    border-top-color: transparent !important;
+}
+
+#panel-home .active-card-overdue {
+    border-color: #fca5a5 !important;
+}
+
+.active-card-top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+#panel-home .active-card-thumb {
+    width: 40px !important;
+    height: 40px !important;
+    background: #fef2f2 !important;
+    border-radius: 10px !important;
+}
+
+#panel-home .active-card-thumb .material-symbols-outlined {
+    font-size: 20px !important;
+    color: var(--redesign-active-color) !important;
+    opacity: 1 !important;
+}
+
+#panel-home .active-card-body {
+    flex: 1 !important;
+    justify-content: flex-start !important;
+}
+
+#panel-home .active-card-meta {
+    font-size: 0.7rem !important;
+    letter-spacing: 0 !important;
+    opacity: 1 !important;
+    color: var(--redesign-text-secondary) !important;
+    text-transform: none !important;
+    font-weight: 400 !important;
+}
+
+#panel-home .active-card-title {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: var(--redesign-text-primary) !important;
+    font-family: var(--font-sans) !important;
+}
+
+#panel-home .active-card-footer {
+    border-top: 1px solid #f3f4f6 !important;
+    padding-top: 10px !important;
+    margin-top: 12px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+}
+
+#panel-home .active-card-due {
+    font-size: 0.75rem !important;
+    color: var(--redesign-text-secondary) !important;
+}
+
+/* Progress bar for active cards */
+#panel-home .active-card-progress {
+    width: 100%;
+    height: 4px;
+    background: #e5e7eb;
+    border-radius: 9999px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+#panel-home .active-card-progress-fill {
+    height: 100%;
+    background: var(--redesign-active-color);
+    border-radius: 9999px;
+    width: 60%;
+}
+
+/* Active status chip */
+.chip-success-new {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+}
+
+/* ── Dark mode support for redesign ── */
+[data-theme="dark"] .dashboard-stats-col.dash-stats-row-layout {
+    background: var(--color-surface-container) !important;
+    border-color: var(--redesign-card-border) !important;
+}
+
+[data-theme="dark"] .dash-stats-row-layout .stat-card-value {
+    background: var(--color-surface-high) !important;
+    color: var(--redesign-text-primary) !important;
+}
+
+[data-theme="dark"] #panel-home .bento-item {
+    background: linear-gradient(135deg, #6b2020 0%, #4a0d0d 100%) !important;
+}
+
+[data-theme="dark"] #panel-home .bento-item:nth-child(1),
+[data-theme="dark"] #panel-home .bento-item:nth-child(2),
+[data-theme="dark"] #panel-home .bento-item:nth-child(3) {
+    background: linear-gradient(135deg, #6b2020 0%, #4a0d0d 100%) !important;
+}
+
+[data-theme="dark"] #panel-home .bento-title {
+    color: #f0e0e0 !important;
+}
+
+[data-theme="dark"] .side-nav-logo::after {
+    color: #fbbf24;
+}
+
+
+/* ── Audit row: horizontal with time on left ── */
+#panel-home .audit-row {
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+    padding: 10px 0 10px 0 !important;
+    position: relative !important;
+    padding-left: 0 !important;
+}
+
+#panel-home .audit-row::before,
+#panel-home .audit-row::after {
+    display: none !important;
+}
+
+#panel-home .audit-card-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+/* Add "Timeline" button appearance */
+#panel-home .audit-card-head::after {
+    content: 'Timeline ▾';
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #6b7280;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+#panel-home .audit-row .audit-row-time:first-child {
+    width: 56px;
+    flex-shrink: 0;
+    font-size: 0.7rem !important;
+    color: #9ca3af !important;
+    padding-top: 2px;
+}
+
+/* Timeline dot on left */
+#panel-home .audit-row .audit-row-time:first-child {
+    position: relative;
+}
+
+/* Stats bar: label then badge style */
+.dash-stats-row-layout .stat-card {
+    align-items: center !important;
+    justify-content: flex-start !important;
+}
+
+/* Activity Overview section */
+.dash-activity-overview-header {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--redesign-text-primary);
+    margin-bottom: 14px;
+    margin-top: 28px;
+}
+
+.dash-activity-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 0;
+}
+
+.dash-activity-card {
+    background: #ffffff;
+    border: 1px solid var(--redesign-card-border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    box-shadow: var(--redesign-card-shadow);
+}
+
+.dash-activity-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.dash-activity-card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--redesign-text-primary);
+}
+
+.dash-activity-card-btn {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #6b7280;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Bar chart for My Activity */
+.dash-bar-chart {
+    position: relative;
+    height: 140px;
+    margin-top: 8px;
+}
+
+.dash-bar-chart-y {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 20px;
+    width: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding-right: 4px;
+}
+
+.dash-bar-chart-y span {
+    font-size: 0.62rem;
+    color: #9ca3af;
+}
+
+.dash-bar-chart-area {
+    position: absolute;
+    left: 28px;
+    right: 0;
+    top: 0;
+    bottom: 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 4px;
+}
+
+.dash-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    background: #e5b2b2;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.dash-bar:hover {
+    background: #c47070;
+}
+
+.dash-bar.highlight {
+    background: #800000;
+}
+
+.dash-bar-chart-x {
+    position: absolute;
+    left: 28px;
+    right: 0;
+    bottom: 0;
+    height: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dash-bar-chart-x span {
+    font-size: 0.6rem;
+    color: #9ca3af;
+    flex: 1;
+    text-align: center;
+}
+
+/* Timeline in activity card */
+.dash-timeline {
+    position: relative;
+    padding-left: 20px;
+}
+
+.dash-timeline::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: #e5e7eb;
+}
+
+.dash-timeline-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.dash-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #800000;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1.5px #e5e7eb;
+}
+
+.dash-timeline-item.muted::before {
+    background: #d1d5db;
+}
+
+.dash-timeline-time {
+    width: 52px;
+    font-size: 0.7rem;
+    color: #9ca3af;
+    flex-shrink: 0;
+    padding-top: 1px;
+}
+
+.dash-timeline-body {}
+
+.dash-timeline-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #111827;
+}
+
+.dash-timeline-date {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-top: 1px;
+}
+
+[data-theme="dark"] .dash-timeline-title {
+    color: var(--redesign-text-primary);
+}
+
+[data-theme="dark"] .dash-timeline::before {
+    background: #3d2020;
+}
+
+[data-theme="dark"] .dash-activity-card {
+    background: var(--color-surface-container);
+    border-color: var(--redesign-card-border);
+}
+
+[data-theme="dark"] .dash-activity-card-btn {
+    background: var(--color-surface-container);
+    border-color: var(--redesign-card-border);
+    color: var(--redesign-text-secondary);
+}
+
+[data-theme="dark"] .dash-bar {
+    background: #6b2020;
+}
+
+[data-theme="dark"] .dash-bar.highlight {
+    background: #f4a0a0;
+}
+
+/* ================================================================
+   DASHBOARD REDESIGN — Screenshot Match Fixes
+================================================================ */
+
+/* ── 1. Navbar: only show name once (via CSS ::before, remove span) ── */
+.top-bar-username {
+    display: none !important;
+}
+
+/* ── 2. Bento grid: 2 cards only, taller, like screenshot ─────────── */
+#panel-home .bento-grid.dash-bento-2col {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+#panel-home .bento-item.dash-bento-action {
+    min-height: 130px;
+    border-radius: 18px;
+    padding: 24px 22px 22px;
+    background: linear-gradient(145deg, #c0474a 0%, #8a2020 60%, #700000 100%);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    position: relative;
+    overflow: hidden;
+    border: none;
+    transition: transform 0.18s, box-shadow 0.18s;
+}
+
+#panel-home .bento-item.dash-bento-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(128, 0, 0, 0.22);
+}
+
+#panel-home .bento-item.dash-bento-action .bento-icon {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#panel-home .bento-item.dash-bento-action .bento-icon .material-symbols-outlined {
+    font-size: 22px;
+    color: #fff;
+}
+
+#panel-home .bento-item.dash-bento-action .bento-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    margin-top: 0;
+    margin-bottom: 0;
+    letter-spacing: -0.01em;
+}
+
+/* ── 3. Faculty Code Card — match screenshot ──────────────────────── */
+.faculty-code-card.fcc-screenshot {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 20px 22px 18px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.fcc-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.fcc-screenshot .fcc-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.fcc-screenshot .fcc-body {
+    margin-bottom: 16px;
+    min-height: auto;
+}
+
+.fcc-screenshot .fcc-code-display {
+    border: none;
+    background: transparent;
+    padding: 0;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.fcc-screenshot .fcc-code-value {
+    font-family: 'Courier New', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #111827;
+    line-height: 1.2;
+    flex: 1;
+    word-break: break-all;
+}
+
+.fcc-screenshot .fcc-copy-btn {
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.fcc-screenshot .fcc-generate-btn {
+    width: 100%;
+    padding: 10px;
+    border: 1.5px solid #800000;
+    border-radius: 10px;
+    background: transparent;
+    color: #800000;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fcc-screenshot .fcc-generate-btn:hover {
+    background: #800000;
+    color: #fff;
+}
+
+/* ── 4. Timeline dot element (new) ────────────────────────────────── */
+.dash-timeline-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #d1d5db;
+    flex-shrink: 0;
+    margin-top: 4px;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1.5px #d1d5db;
+}
+
+.dash-timeline-dot.dot-active {
+    background: #800000;
+    box-shadow: 0 0 0 1.5px #800000;
+}
+
+/* Hide old ::before dot when new dot element exists */
+.dash-timeline-item:has(.dash-timeline-dot)::before {
+    display: none;
+}
+
+/* Re-layout timeline item to include dot */
+.dash-timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+/* ── 5. Stats row to match screenshot ─────────────────────────────── */
+.dash-stats-row-layout {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 0;
+    margin-bottom: 18px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.dash-stats-row-layout .stat-card {
+    flex: 1;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 18px 24px !important;
+    border-left: none !important;
+    border-radius: 0 !important;
+    gap: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-right: 1px solid #e5e7eb;
+    margin: 0 !important;
+}
+
+.dash-stats-row-layout .stat-card:last-child {
+    border-right: none;
+}
+
+.dash-stats-row-layout .stat-card-icon {
+    display: none !important;
+}
+
+.dash-stats-row-layout .stat-card-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-right: 10px;
+}
+
+.dash-stats-row-layout .stat-card-value {
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    font-family: var(--font-sans) !important;
+    margin-left: 8px;
+}
+
+/* ── 6. Activity overview header label ────────────────────────────── */
+.dash-activity-overview-header {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 14px;
+    margin-top: 24px;
+}
+
+/* ── 7. Active Now section label ──────────────────────────────────── */
+.section-label {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+    margin-top: 28px;
+    margin-bottom: 14px;
+}
+
+/* ── 8. Dashboard main body layout: stats+bento left, code card right ── */
+.dash-body-layout {
+    display: grid !important;
+    grid-template-columns: 1fr 300px !important;
+    gap: 20px !important;
+    align-items: start !important;
+    margin-bottom: 0 !important;
+}
+
+[data-theme="dark"] .dash-stats-row-layout {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] .dash-stats-row-layout .stat-card {
+    border-right-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] .faculty-code-card.fcc-screenshot {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] .fcc-screenshot .fcc-title,
+[data-theme="dark"] .fcc-screenshot .fcc-code-value {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] .bento-item.dash-bento-action {
+    background: linear-gradient(145deg, #8a1a1a 0%, #5a0000 100%);
 }
