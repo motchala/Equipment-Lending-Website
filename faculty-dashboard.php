@@ -496,6 +496,421 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         [data-theme="dark"] .dash-hero-name {
             color: #ffb3b3;
         }
+
+        /* ================================================================
+           EQUIPMENT PANEL REDESIGN
+           Inline so these always beat the external CSS file.
+           Scoped 100% to #panel-lending — zero impact on other tabs.
+        ================================================================ */
+
+        /* Sub-nav buttons */
+        #panel-lending .lending-subnav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+
+        #panel-lending .lending-nav-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 22px;
+            border-radius: 8px;
+            border: 1.5px solid #e5e7eb;
+            background: #ffffff;
+            color: #374151;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-sans);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .06);
+            transition: all .18s;
+        }
+
+        #panel-lending .lending-nav-btn .material-symbols-outlined {
+            font-size: 16px;
+        }
+
+        #panel-lending .lending-nav-btn.active {
+            background: #570000;
+            color: #fff;
+            border-color: #570000;
+            box-shadow: 0 2px 10px rgba(87, 0, 0, .25);
+        }
+
+        #panel-lending .lending-nav-btn:not(.active):hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+
+        /* Page header — must override the #panel-home hide rule */
+        #panel-lending .page-header-block {
+            display: block !important;
+            margin-bottom: 24px;
+            padding: 0;
+            background: none;
+            border: none;
+            box-shadow: none;
+        }
+
+        #panel-lending .page-title-sm {
+            font-family: 'Hanken Grotesk', var(--font-display);
+            font-size: 1.875rem !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }
+
+        #panel-lending .page-subtitle {
+            font-size: 0.875rem !important;
+            color: #6b7280 !important;
+            font-weight: 400 !important;
+        }
+
+        /* Catalog glass card */
+        #panel-lending .catalog-card {
+            background: rgba(255, 255, 255, .78) !important;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, .55) !important;
+            border-radius: 14px !important;
+            padding: 28px !important;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, .06) !important;
+        }
+
+        /* Filter bar */
+        #panel-lending .catalog-filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        #panel-lending .catalog-search-wrap {
+            flex: 1;
+            min-width: 200px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(249, 250, 251, .7) !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            padding: 10px 16px !important;
+            transition: border-color .18s, box-shadow .18s;
+        }
+
+        #panel-lending .catalog-search-wrap:focus-within {
+            border-color: #570000 !important;
+            box-shadow: 0 0 0 3px rgba(87, 0, 0, .09) !important;
+            background: #fff !important;
+        }
+
+        #panel-lending .catalog-search-wrap .material-symbols-outlined {
+            font-size: 18px;
+            color: #9ca3af;
+            flex-shrink: 0;
+        }
+
+        #panel-lending .catalog-search-wrap input {
+            border: none;
+            background: transparent;
+            outline: none;
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            color: #111827;
+            width: 100%;
+        }
+
+        #panel-lending .catalog-search-wrap input::placeholder {
+            color: #9ca3af;
+        }
+
+        #panel-lending .catalog-filter-select {
+            padding: 10px 16px !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            background: rgba(249, 250, 251, .7) !important;
+            color: #374151 !important;
+            font-family: var(--font-sans);
+            font-size: 0.875rem !important;
+            font-weight: 500;
+            outline: none;
+            cursor: pointer;
+            min-width: 180px;
+        }
+
+        #panel-lending .catalog-filter-select:focus {
+            border-color: #570000 !important;
+            box-shadow: 0 0 0 3px rgba(87, 0, 0, .09) !important;
+        }
+
+        /* Equipment grid */
+        #panel-lending .eq-grid {
+            display: grid !important;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+            gap: 20px !important;
+        }
+
+        /* Equipment card */
+        #panel-lending .eq-item-card,
+        #panel-lending .item-node {
+            background: linear-gradient(145deg, #ffffff, #fcfcfc) !important;
+            border: 1px solid rgba(87, 0, 0, .09) !important;
+            border-radius: 12px !important;
+            overflow: hidden;
+            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, .06), 0 2px 6px -2px rgba(0, 0, 0, .03) !important;
+            transition: transform .28s cubic-bezier(.4, 0, .2, 1), box-shadow .28s cubic-bezier(.4, 0, .2, 1), border-color .28s !important;
+            position: relative;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        #panel-lending .eq-item-card::before,
+        #panel-lending .item-node::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 100% 0%, rgba(87, 0, 0, .03) 0%, transparent 40%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        #panel-lending .eq-item-card:hover,
+        #panel-lending .item-node:hover {
+            transform: translateY(-4px) !important;
+            border-color: rgba(87, 0, 0, .28) !important;
+            box-shadow: 0 14px 28px -5px rgba(87, 0, 0, .12), 0 8px 12px -6px rgba(87, 0, 0, .06) !important;
+        }
+
+        /* Image */
+        #panel-lending .eq-item-img {
+            width: 100% !important;
+            height: 165px !important;
+            object-fit: cover !important;
+            display: block;
+            position: relative;
+            z-index: 1;
+            transition: transform .4s cubic-bezier(.4, 0, .2, 1) !important;
+        }
+
+        #panel-lending .eq-item-card:hover .eq-item-img,
+        #panel-lending .item-node:hover .eq-item-img {
+            transform: scale(1.06) !important;
+        }
+
+        #panel-lending .eq-item-img-placeholder {
+            width: 100% !important;
+            height: 165px !important;
+            background: linear-gradient(145deg, #f9fafb, #f3f4f6) !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        #panel-lending .eq-item-img-placeholder .material-symbols-outlined {
+            font-size: 44px !important;
+            color: #570000 !important;
+            opacity: .18 !important;
+        }
+
+        /* Card body */
+        #panel-lending .eq-item-body {
+            padding: 14px 16px 16px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1;
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, .9) !important;
+            border-top: 1px solid #f3f4f6 !important;
+        }
+
+        #panel-lending .eq-item-name {
+            font-family: 'Hanken Grotesk', var(--font-display) !important;
+            font-weight: 700 !important;
+            font-size: 1rem !important;
+            color: #111827 !important;
+            margin-bottom: 4px !important;
+            letter-spacing: -0.1px;
+            line-height: 1.3;
+            transition: color .18s;
+        }
+
+        #panel-lending .eq-item-card:hover .eq-item-name,
+        #panel-lending .item-node:hover .eq-item-name {
+            color: #570000 !important;
+        }
+
+        #panel-lending .eq-item-cat {
+            font-size: 0.7rem !important;
+            font-weight: 600 !important;
+            color: #9ca3af !important;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 10px !important;
+        }
+
+        #panel-lending .eq-item-cat .material-symbols-outlined {
+            font-size: 12px !important;
+            color: rgba(87, 0, 0, .45) !important;
+        }
+
+        /* Stock badges */
+        #panel-lending .stock-badge {
+            display: inline-flex !important;
+            align-items: center;
+            gap: 5px !important;
+            padding: 3px 10px !important;
+            border-radius: 20px !important;
+            font-size: 0.72rem !important;
+            font-weight: 700 !important;
+            margin-bottom: 12px !important;
+            width: fit-content;
+        }
+
+        #panel-lending .stock-avail {
+            background: #dcfce7 !important;
+            color: #166534 !important;
+            border: 1px solid rgba(22, 101, 52, .15) !important;
+        }
+
+        #panel-lending .stock-avail .material-symbols-outlined {
+            font-size: 12px !important;
+            color: #16a34a !important;
+        }
+
+        #panel-lending .stock-unavail {
+            background: #fee2e2 !important;
+            color: #991b1b !important;
+            border: 1px solid rgba(153, 27, 27, .15) !important;
+        }
+
+        #panel-lending .stock-unavail .material-symbols-outlined {
+            font-size: 12px !important;
+            color: #dc2626 !important;
+        }
+
+        /* Borrow button */
+        #panel-lending .btn-borrow {
+            width: 100% !important;
+            padding: 10px !important;
+            background: #570000 !important;
+            color: #fff !important;
+            border: none !important;
+            border-radius: 8px !important;
+            cursor: pointer;
+            font-weight: 600 !important;
+            font-size: 0.875rem !important;
+            font-family: var(--font-sans);
+            margin-top: auto;
+            box-shadow: 0 1px 4px rgba(87, 0, 0, .2) !important;
+            transition: background .18s, transform .18s, box-shadow .18s !important;
+        }
+
+        #panel-lending .btn-borrow:hover:not(:disabled) {
+            background: rgba(87, 0, 0, .87) !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 5px 14px rgba(87, 0, 0, .3) !important;
+        }
+
+        #panel-lending .btn-borrow:disabled,
+        #panel-lending .btn-borrow[disabled] {
+            background: #f3f4f6 !important;
+            color: #9ca3af !important;
+            cursor: not-allowed !important;
+            box-shadow: none !important;
+            border: 1px solid #e5e7eb !important;
+        }
+
+        #panel-lending .btn-borrow-blocked {
+            background: transparent !important;
+            color: #9ca3af !important;
+            border: 1px solid #e5e7eb !important;
+            cursor: not-allowed !important;
+            box-shadow: none !important;
+        }
+
+        /* Empty state */
+        #panel-lending .eq-empty {
+            grid-column: 1/-1;
+            text-align: center;
+            padding: 5rem 1rem;
+        }
+
+        #panel-lending .eq-empty .material-symbols-outlined {
+            font-size: 52px !important;
+            display: block;
+            margin-bottom: 14px;
+            opacity: .2 !important;
+            color: #570000 !important;
+        }
+
+        #panel-lending .eq-empty p {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #9ca3af !important;
+        }
+
+        /* Dark theme */
+        [data-theme="dark"] #panel-lending .eq-item-card,
+        [data-theme="dark"] #panel-lending .item-node {
+            background: linear-gradient(145deg, var(--color-surface-container), var(--color-surface-low)) !important;
+            border-color: var(--color-outline-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .eq-item-body {
+            background: rgba(28, 16, 16, .9) !important;
+            border-top-color: var(--color-outline-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .eq-item-name {
+            color: var(--color-on-surface) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .eq-item-card:hover .eq-item-name,
+        [data-theme="dark"] #panel-lending .item-node:hover .eq-item-name {
+            color: #f4a0a0 !important;
+        }
+
+        [data-theme="dark"] #panel-lending .catalog-card {
+            background: rgba(35, 21, 21, .8) !important;
+            border-color: var(--color-outline-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .catalog-search-wrap,
+        [data-theme="dark"] #panel-lending .catalog-filter-select {
+            background: var(--color-surface-container) !important;
+            border-color: var(--color-outline-variant) !important;
+            color: var(--color-on-surface) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .lending-nav-btn {
+            background: var(--color-surface-container) !important;
+            border-color: var(--color-outline-variant) !important;
+            color: var(--color-on-surface-variant) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .lending-nav-btn.active {
+            background: var(--color-primary-container) !important;
+            border-color: var(--color-primary-container) !important;
+            color: #fff !important;
+        }
+
+        [data-theme="dark"] #panel-lending .page-title-sm {
+            color: var(--color-on-surface) !important;
+        }
+
+        [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled) {
+            background: var(--color-primary-container) !important;
+        }
     </style>
 </head>
 
@@ -679,7 +1094,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     ============================================================ -->
             <div class="tab-panel active" id="panel-home">
 
-                <!-- ── Flat Header (Redesign v4) ─────────────────────── -->
+                <!-- ── Flat Header ──────────────────────────────────── -->
                 <div class="dash-flat-header">
                     <h1 class="dash-flat-title">Good <?php
                                                         $h = (int)date('H');
@@ -688,125 +1103,84 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> — Here is an overview of your active equipment and requests.</p>
                 </div>
 
-                <!-- ── Stat Cards Row ─────────────────────────────────── -->
-                <!-- dashboard-stats-col kept as wrapper for JS compat; displayed as row via CSS override -->
-                <div class="dashboard-stats-col dash-stats-row-layout">
-                    <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
-                        <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
-                        <div class="stat-card-value"><?php echo $stat_approved; ?></div>
-                        <div class="stat-card-label">Active Borrowings</div>
-                    </div>
-                    <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
-                        <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
-                        <div class="stat-card-value" style="color:var(--color-warning)"><?php echo $stat_waiting; ?></div>
-                        <div class="stat-card-label">Pending Requests</div>
-                    </div>
-                    <?php if ($stat_overdue > 0): ?>
-                        <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests" data-status="Overdue">
-                            <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
-                            <div class="stat-card-value" id="statOverdueVal"><?php echo $stat_overdue; ?></div>
-                            <div class="stat-card-label">Overdue</div>
-                            <div class="stat-card-action-tag">Action Required</div>
-                        </div>
-                    <?php else: ?>
-                        <div class="stat-card">
-                            <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span></div>
-                            <div class="stat-card-value"><?php echo $stat_total; ?></div>
-                            <div class="stat-card-label">Total Requests</div>
-                        </div>
-                    <?php endif; ?>
-                </div>
+                <!-- ── Top Two-Column: [Stats+Bentos] | [Code Card] ── -->
+                <div class="dash-top-grid">
 
-                <!-- ── Main Two-Column Body ──────────────────────────── -->
-                <!-- dashboard-grid kept for JS compat; layout redefined via CSS -->
-                <div class="dashboard-grid dash-body-layout">
+                    <!-- LEFT col: stats bar + bento buttons -->
+                    <div class="dash-top-left">
 
-                    <!-- Left: Bento Action Cards -->
-                    <div class="dash-bento-col">
-                        <div class="bento-grid dash-bento-2col">
-                            <div class="bento-item dash-bento-action" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                <div class="bento-icon"><span class="material-symbols-outlined">add_shopping_cart</span></div>
-                                <div class="bento-title">Borrow Equipment</div>
+                        <!-- Stats Bar -->
+                        <div class="dashboard-stats-col dash-stats-row-layout">
+                            <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
+                                <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
+                                <div class="stat-card-label">Active Borrowings:</div>
+                                <div class="stat-card-value"><?php echo $stat_approved; ?></div>
                             </div>
-                            <div class="bento-item dash-bento-action" data-action="go-tab" data-tab="rooms">
-                                <div class="bento-icon"><span class="material-symbols-outlined">meeting_room</span></div>
-                                <div class="bento-title">Reserve Room</div>
+                            <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
+                                <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
+                                <div class="stat-card-label">Pending Requests:</div>
+                                <div class="stat-card-value"><?php echo $stat_waiting; ?></div>
                             </div>
+                            <?php if ($stat_overdue > 0): ?>
+                                <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests" data-status="Overdue">
+                                    <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
+                                    <div class="stat-card-label">Overdue:</div>
+                                    <div class="stat-card-value" id="statOverdueVal" style="background:#fee2e2;color:#dc2626;"><?php echo $stat_overdue; ?></div>
+                                    <div class="stat-card-action-tag">Action Required</div>
+                                </div>
+                            <?php else: ?>
+                                <div class="stat-card">
+                                    <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span></div>
+                                    <div class="stat-card-label">Total Requests:</div>
+                                    <div class="stat-card-value"><?php echo $stat_total; ?></div>
+                                </div>
+                            <?php endif; ?>
                         </div>
 
-                    </div>
-
-                    <!-- Right: Faculty Code + Quick Actions sidebar -->
-                    <div class="dash-sidebar-col">
-
-                        <!-- Faculty Code Card -->
-                        <div class="faculty-code-card fcc-screenshot" id="facultyCodePanel">
-                            <div class="fcc-top-row">
-                                <span class="fcc-title">Student Access Code</span>
-                                <span class="fcc-badge fcc-badge-active" id="fccBadge">ACTIVE</span>
+                        <!-- Bento Action Buttons -->
+                        <div class="dash-bento-row">
+                            <div class="dash-bento-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                <div class="dash-bento-icon">
+                                    <span class="material-symbols-outlined">add_shopping_cart</span>
+                                </div>
+                                <div class="dash-bento-label">Borrow Equipment</div>
                             </div>
-                            <div class="fcc-body" id="fccBody">
-                                <div class="fcc-loading">
+                            <div class="dash-bento-btn" data-action="go-tab" data-tab="rooms">
+                                <div class="dash-bento-icon">
+                                    <span class="material-symbols-outlined">meeting_room</span>
+                                </div>
+                                <div class="dash-bento-label">Reserve Room</div>
+                            </div>
+                        </div>
+
+                    </div><!-- /dash-top-left -->
+
+                    <!-- RIGHT col: Student Access Code card -->
+                    <div class="dash-top-right">
+                        <div class="dash-code-card" id="facultyCodePanel">
+                            <div class="dash-code-card-header">
+                                <span class="dash-code-card-title">Student Access Code</span>
+                                <span class="dash-code-active-badge" id="fccBadge">ACTIVE</span>
+                            </div>
+                            <div class="dash-code-body" id="fccBody">
+                                <div class="fcc-loading" style="padding:20px 0;">
                                     <span class="material-symbols-outlined" style="font-size:1.2rem;opacity:.4;animation:spin 1s linear infinite;">sync</span>
                                 </div>
                             </div>
-                            <button class="fcc-generate-btn" id="btnGenerateCode">
+                            <button class="dash-code-generate-btn" id="btnGenerateCode">
                                 Generate New Code
                             </button>
                         </div>
+                    </div><!-- /dash-top-right -->
 
-                        <!-- Quick Actions -->
-                        <div class="quick-actions">
-                            <h3>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" style="color:var(--accent-maroon);margin-right:8px" aria-hidden="true">
-                                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                                </svg>Quick Actions
-                            </h3>
-                            <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                    <circle cx="11" cy="11" r="8" />
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                </svg>
-                                Browse Equipment
-                            </button>
-                            <button class="qa-btn" data-action="go-tab" data-tab="lending" data-lending="requests">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                                </svg>
-                                My Requests
-                            </button>
-                            <button class="qa-btn" data-action="go-tab" data-tab="rooms">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="9" y1="3" x2="9" y2="21" />
-                                    <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
-                                </svg>
-                                Reserve a Room
-                            </button>
-                            <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img" aria-hidden="true">
-                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                                </svg>
-                                Notifications
-                                <?php if ($notif_count > 0): ?>
-                                    <span class="notif-badge" style="font-size:0.7rem;padding:1px 6px;"><?php echo $notif_count; ?></span>
-                                <?php endif; ?>
-                            </button>
-                        </div>
+                </div><!-- /dash-top-grid -->
 
-                    </div><!-- /dash-sidebar-col -->
-                </div><!-- /dashboard-grid -->
-
-                <!-- ── Activity Overview Section ─────────────────────── -->
+                <!-- ── Activity Overview ─────────────────────────────── -->
                 <?php
-                // Get recent activity for timeline
                 $timeline_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
                 $timeline_items = [];
                 if ($timeline_raw) while ($tr = mysqli_fetch_assoc($timeline_raw)) $timeline_items[] = $tr;
 
-                // Get monthly activity counts for bar chart (last 10 months)
                 $monthly_counts = [];
                 $month_labels = [];
                 for ($i = 9; $i >= 0; $i--) {
@@ -820,9 +1194,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                 $max_count = max(1, max($monthly_counts));
                 $highlight_idx = array_search(max($monthly_counts), $monthly_counts);
                 ?>
-                <div class="dash-activity-overview-header">Activity Overview</div>
+
+                <div class="dash-section-title">Activity Overview</div>
                 <div class="dash-activity-overview-grid">
-                    <!-- Recent Activity Timeline -->
+
+                    <!-- Recent Activity -->
                     <div class="dash-activity-card">
                         <div class="dash-activity-card-head">
                             <span class="dash-activity-card-title">Recent Activity</span>
@@ -831,7 +1207,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                         <div class="dash-timeline">
                             <?php if (!empty($timeline_items)):
                                 foreach ($timeline_items as $idx => $ti): ?>
-                                    <div class="dash-timeline-item <?php echo $idx > 0 ? 'muted' : ''; ?>">
+                                    <div class="dash-timeline-item">
                                         <div class="dash-timeline-dot <?php echo $idx === 0 ? 'dot-active' : ''; ?>"></div>
                                         <div class="dash-timeline-time"><?php echo date('g:i A', strtotime($ti['request_date'])); ?></div>
                                         <div class="dash-timeline-body">
@@ -841,7 +1217,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                     </div>
                                 <?php endforeach;
                             else: ?>
-                                <div class="dash-timeline-item muted">
+                                <div class="dash-timeline-item">
                                     <div class="dash-timeline-dot"></div>
                                     <div class="dash-timeline-time">—</div>
                                     <div class="dash-timeline-body">
@@ -865,6 +1241,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                 <span><?php echo ceil($max_count * 0.5); ?></span>
                                 <span>0</span>
                             </div>
+                            <div class="dash-bar-chart-grid">
+                                <div class="dash-bar-chart-grid-line"></div>
+                                <div class="dash-bar-chart-grid-line"></div>
+                                <div class="dash-bar-chart-grid-line"></div>
+                                <div class="dash-bar-chart-grid-line"></div>
+                            </div>
                             <div class="dash-bar-chart-area">
                                 <?php foreach ($monthly_counts as $idx => $cnt):
                                     $h = $cnt > 0 ? round(($cnt / ($max_count * 1.25)) * 100) : 4;
@@ -880,22 +1262,22 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ── Active Now Section ─────────────────────────────── -->
+                </div><!-- /dash-activity-overview-grid -->
+
+                <!-- ── Active Now ─────────────────────────────────────── -->
                 <?php
                 $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
                 $active_items = [];
                 if ($active_raw) while ($ar = mysqli_fetch_assoc($active_raw)) $active_items[] = $ar;
                 ?>
                 <?php if (!empty($active_items)): ?>
-                    <div class="section-label">Active Now</div>
+                    <div class="dash-section-title" style="margin-top:32px;">Active Now</div>
                     <div class="active-cards-grid">
                         <?php foreach ($active_items as $ai):
                             $isOverdue = $ai['status'] === 'Overdue';
                             $chipClass = $isOverdue ? 'chip-error' : 'chip-success';
                             $chipLabel = $isOverdue ? 'OVERDUE' : 'ACTIVE';
-                            // Calculate progress (days used / total days * 100)
                             $borrowTs = strtotime($ai['borrow_date']);
                             $returnTs = strtotime($ai['return_date']);
                             $nowTs = time();
@@ -915,10 +1297,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                 <div class="active-card-body">
                                     <div class="active-card-meta">Equipment</div>
                                     <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
-                                    <div class="active-card-sub">Room: <?php echo htmlspecialchars($ai['room']); ?></div>
+                                    <div class="active-card-sub"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
                                 </div>
                                 <div class="active-card-footer">
-                                    <span class="active-card-due">Due dated: <strong style="color:var(--redesign-text-primary);font-weight:500;"><?php echo date('F j, Y', strtotime($ai['return_date'])); ?></strong></span>
+                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?></span>
                                     <div class="active-card-progress">
                                         <div class="active-card-progress-fill" style="width:<?php echo $progress; ?>%;<?php echo $isOverdue ? 'background:#dc2626;' : ''; ?>"></div>
                                     </div>
@@ -926,9 +1308,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                             </div>
                         <?php endforeach; ?>
                         <?php if (count($active_items) < 3): ?>
-                            <div style="background:#f9fafb;border:1.5px dashed #d1d5db;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:0.875rem;min-height:160px;">
-                                No other active items
-                            </div>
+                            <div class="dash-empty-active-slot">No other active items</div>
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
