@@ -101,6 +101,16 @@
 
         </div>
 
+        <!-- Receipt Recall Banner (hidden until a request is submitted) -->
+        <div id="receiptBanner" style="display:none;max-width:560px;margin:20px auto 0;background:#fff8e1;border-radius:14px;padding:14px 20px;display:none;align-items:center;gap:12px;border:1px solid #ffe082;cursor:pointer;">
+            <span class="material-symbols-outlined" style="color:#800000;font-size:24px;">receipt_long</span>
+            <div style="flex:1;">
+                <div style="font-weight:700;font-size:.9rem;color:#333;">You have an active borrow request</div>
+                <div style="font-size:.78rem;color:#666;" id="receiptBannerSub"></div>
+            </div>
+            <span class="material-symbols-outlined" style="color:#800000;">qr_code_2</span>
+        </div>
+
         <!-- Quick Info Footer -->
         <div class="student-info-footer">
             <div class="info-item">
@@ -226,6 +236,33 @@
     // Track verified state
     let _verified = null;
 
+    // Track last submitted receipt so the student can re-open it
+    let _lastReceipt = null;
+    let _openingReceipt = false;
+
+    // Restore receipt from sessionStorage on page load
+    (function () {
+        try {
+            const saved = sessionStorage.getItem('pup_last_receipt');
+            if (saved) {
+                _lastReceipt = JSON.parse(saved);
+                showReceiptBanner(_lastReceipt);
+            }
+        } catch (e) {}
+    })();
+
+    function showReceiptBanner(receipt) {
+        const banner = document.getElementById('receiptBanner');
+        const sub    = document.getElementById('receiptBannerSub');
+        if (!banner) return;
+        if (sub) sub.textContent = receipt.equipment + ' · Return by ' + receipt.return_date;
+        banner.style.display = 'flex';
+        banner.onclick = function () {
+            _openingReceipt = true;
+            bootstrap.Modal.getOrCreateInstance(facultyCodeModal).show();
+        };
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────
     function showPortalError(msg) {
         let el = document.getElementById('portalError');
@@ -245,6 +282,12 @@
 
     // ── Update modal subtitle on card click ─────────────────────────────────
     facultyCodeModal.addEventListener('show.bs.modal', function (event) {
+        if (_openingReceipt && _lastReceipt) {
+            _openingReceipt = false;
+            showStep3(_lastReceipt);
+            return;
+        }
+        _openingReceipt = false;
         const card   = event.relatedTarget;
         const action = card?.getAttribute('data-action');
         if (actionTypeInput) actionTypeInput.value = action || 'borrow';
@@ -366,22 +409,57 @@
     }
 
     // ── Step 3: success view ────────────────────────────────────────────────
-    function showStep3(requestId) {
+    function showStep3(receipt) {
+        const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+        const returnUrl = base + 'return_confirm.php?token=' + receipt.return_token;
+
         document.querySelector('.modal-header').innerHTML = `
             <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Request Submitted!</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Your borrow request is now pending review</p>
+                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Request Approved!</h5>
+                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Show this receipt to the admin to claim your equipment</p>
             </div>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
 
         document.querySelector('.modal-body').innerHTML = `
-            <div style="text-align:center;padding:24px 0 8px;">
-                <span class="material-symbols-outlined" style="font-size:56px;color:#2e7d32;display:block;margin-bottom:16px;">check_circle</span>
-                <p style="font-size:1rem;font-weight:600;margin-bottom:6px;">Your request has been received.</p>
-                <p style="font-size:.85rem;color:var(--color-on-surface-variant);">
-                    Request ID: <strong>#${requestId}</strong><br>
-                    Your request has been <strong style="color:#2e7d32;">auto-approved</strong> based on your faculty's authorization. Proceed to the admin office to claim the equipment.
+            <div style="text-align:center;padding:12px 0 16px;">
+                <span class="material-symbols-outlined" style="font-size:44px;color:#2e7d32;display:block;margin-bottom:8px;">check_circle</span>
+                <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">Request #${escHTML(String(receipt.request_id))}</p>
+                <p style="font-size:.78rem;color:#888;margin-bottom:0;">Auto-approved via faculty authorization</p>
+            </div>
+
+            <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;margin-bottom:16px;line-height:2;">
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Student</span>
+                    <strong>${escHTML(receipt.student_name)} &nbsp;·&nbsp; ${escHTML(receipt.student_id)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Authorized by</span>
+                    <strong>${escHTML(receipt.faculty_name)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Equipment</span>
+                    <strong>${escHTML(receipt.equipment)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Room</span>
+                    <strong>${escHTML(receipt.room)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Borrow</span>
+                    <strong>${escHTML(receipt.borrow_date)}</strong>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                    <span style="color:#666;">Return by</span>
+                    <strong>${escHTML(receipt.return_date)}</strong>
+                </div>
+            </div>
+
+            <div style="text-align:center;">
+                <p style="font-size:.78rem;color:#666;margin-bottom:10px;">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">qr_code_2</span>
+                    Show this QR to the admin to <strong>claim</strong> and again when <strong>returning</strong> the equipment.
                 </p>
+                <div id="studentReceiptQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #800000;"></div>
             </div>`;
 
         document.querySelector('.modal-footer').innerHTML = `
@@ -389,6 +467,26 @@
                 style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;width:100%;">
                 Done
             </button>`;
+
+        _renderStudentQr(returnUrl);
+    }
+
+    function _renderStudentQr(url) {
+        function doRender() {
+            new QRCode(document.getElementById('studentReceiptQr'), {
+                text: url, width: 160, height: 160,
+                colorDark: '#800000', colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+        if (window._qrStudentLoaded) {
+            doRender();
+        } else {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            s.onload = () => { window._qrStudentLoaded = true; doRender(); };
+            document.head.appendChild(s);
+        }
     }
 
     // ── Handlers ────────────────────────────────────────────────────────────
@@ -471,8 +569,22 @@
                 showPortalError(data.error);
                 return;
             }
+            const receipt = {
+                student_name: _verified.student_name,
+                student_id:   _verified.student_id,
+                faculty_name: _verified.faculty_name,
+                equipment:    equipment,
+                room,
+                borrow_date:  borrow,
+                return_date:  ret,
+                request_id:   data.request_id,
+                return_token: data.return_token,
+            };
+            _lastReceipt = receipt;
+            try { sessionStorage.setItem('pup_last_receipt', JSON.stringify(receipt)); } catch(e) {}
             _verified = null;
-            showStep3(data.request_id);
+            showReceiptBanner(receipt);
+            showStep3(receipt);
         })
         .catch(() => {
             btn.disabled = false;

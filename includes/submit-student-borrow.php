@@ -101,4 +101,4 @@ $upd->execute();
 $upd->close();
 $conn->close();
 
-echo json_encode(['success' => true, 'request_id' => $request_id]);
+echo json_encode(['success' => true, 'request_id' => $request_id, 'return_token' => $return_token]);
