@@ -7,7 +7,7 @@
        CRITICAL: Close all overlays on page load to prevent stuck modals
     ══════════════════════════════════════════════════════════════════ */
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
         });
     } else {
@@ -2595,7 +2595,7 @@
     }
 
     function _fccEsc(str) {
-        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function initCodePanel() {
@@ -2619,30 +2619,30 @@
                 method: 'POST',
                 credentials: 'same-origin'
             })
-            .then(r => r.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
 
-                if (data.error) { showToast(data.error, 'error'); return; }
+                    if (data.error) { showToast(data.error, 'error'); return; }
 
-                window._fccWasActive = false;
-                renderCodePanel({
-                    has_code: true,
-                    code: data.code,
-                    is_used: false,
-                    created_at: data.created_at,
-                    used_by_name: null,
-                    used_by_id: null,
-                    used_at: null,
+                    window._fccWasActive = false;
+                    renderCodePanel({
+                        has_code: true,
+                        code: data.code,
+                        is_used: false,
+                        created_at: data.created_at,
+                        used_by_name: null,
+                        used_by_id: null,
+                        used_at: null,
+                    });
+                    showToast('New code generated! Share it with your student.', 'success');
+                })
+                .catch(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
+                    showToast('Failed to generate code. Please try again.', 'error');
                 });
-                showToast('New code generated! Share it with your student.', 'success');
-            })
-            .catch(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">add_circle</span> Generate New Code';
-                showToast('Failed to generate code. Please try again.', 'error');
-            });
         });
     }
 
@@ -2651,7 +2651,7 @@
             fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
                 .then(function (r) { if (!r.ok) return null; return r.json(); })
                 .then(function (data) { if (data) renderCodePanel(data); })
-                .catch(function () {});
+                .catch(function () { });
         }
 
         doPoll();                        // fire immediately
