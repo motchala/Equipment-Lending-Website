@@ -14,7 +14,10 @@ if (!$code || !$student_name || !$student_id) {
 }
 
 $conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) { echo json_encode(['error' => 'DB error']); exit(); }
+if ($conn->connect_error) {
+    echo json_encode(['error' => 'DB error']);
+    exit();
+}
 
 // Look up the code
 $stmt = $conn->prepare(
@@ -40,7 +43,7 @@ if ($row['is_used']) {
 
 // Code is valid — fetch available inventory
 $inv = $conn->query(
-    "SELECT item_id, item_name, category, quantity
+    "SELECT item_id, item_name, category, quantity, image_path
        FROM tbl_inventory
       WHERE is_archived = 0 AND quantity > 0
       ORDER BY item_name ASC"
