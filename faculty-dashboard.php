@@ -1866,54 +1866,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     </div>
                 </div><!-- /lending-browse -->
 
-                <!-- ── Sub: Borrow Form ────────────────────────────────── -->
-                <div class="lending-sub" id="lending-form">
-                    <div class="page-header-block" style="display:flex;align-items:center;gap:12px;">
-                        <button class="btn-back" data-action="lending-back" aria-label="Back">
-                            <span class="material-symbols-outlined">arrow_back</span>
-                        </button>
-                        <div>
-                            <h2 class="page-title-sm">Borrow Request</h2>
-                            <p class="page-subtitle">Fill in the details to submit your request.</p>
-                        </div>
-                    </div>
-                    <div class="form-surface">
-                        <div class="selected-item-banner" id="selectedItemBanner">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                            <span id="selectedItemLabel">No item selected</span>
-                        </div>
-                        <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
-                            <input type="hidden" name="equipment_name" id="selectedItem">
-                            <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
-                            <div class="form-group">
-                                <label class="form-label">Room / Laboratory</label>
-                                <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label class="form-label">Borrow Date</label>
-                                    <input type="date" name="borrow_date" id="borrow_date" class="form-input" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Return Date</label>
-                                    <input type="date" name="return_date" id="return_date" class="form-input" required>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="request_document">Request Letter <span
-                                        style="font-size:0.8em;color:var(--text-light);">(Optional — PDF, JPG, PNG,
-                                        WEBP; max 5 MB)</span></label>
-                                <input type="file" id="request_document" name="request_document"
-                                    accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom">
-                                <small style="color:var(--text-light);font-size:0.75rem;">Required for high-value
-                                    equipment or organization borrowing.</small>
-                            </div>
-                            <button type="submit" class="btn-submit-form">
-                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
-                            </button>
-                        </form>
-                    </div>
-                </div><!-- /lending-form -->
+                <!-- ── Sub: Borrow Form (now a modal — this sub-panel is kept as an
+                     empty shell so lending-nav references don't break) ── -->
+                <div class="lending-sub" id="lending-form"></div><!-- /lending-form -->
 
                 <!-- ── Sub: My Requests ────────────────────────────────── -->
                 <div class="lending-sub" id="lending-requests">
@@ -3163,6 +3118,56 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- ================================================================
      MODALS
 ================================================================ -->
+
+    <!-- ── Borrow Request Modal ───────────────────────────────────────── -->
+    <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
+        <div class="modal-box borrow-modal-box">
+            <div class="modal-header">
+                <h3 id="borrowModalTitle">
+                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
+                    Borrow Request
+                </h3>
+                <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span id="selectedItemLabel">No item selected</span>
+                </div>
+                <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                    <input type="hidden" name="equipment_name" id="selectedItem">
+                    <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
+                    <div class="form-group">
+                        <label class="form-label">Room / Laboratory</label>
+                        <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label class="form-label">Borrow Date</label>
+                            <input type="date" name="borrow_date" id="borrow_date" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Return Date</label>
+                            <input type="date" name="return_date" id="return_date" class="form-input" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="request_document">Request Letter
+                            <span style="font-size:0.8em;color:var(--color-on-surface-variant);">(Optional — PDF, JPG, PNG, WEBP; max 5 MB)</span>
+                        </label>
+                        <input type="file" id="request_document" name="request_document"
+                            accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom">
+                        <small style="color:var(--color-on-surface-variant);font-size:0.75rem;">Required for high-value equipment or organization borrowing.</small>
+                    </div>
+                    <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
+                        <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div><!-- /borrowModal -->
 
     <!-- Confirmation Modal -->
     <div class="modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true">

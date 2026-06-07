@@ -3706,6 +3706,31 @@ body {
     margin-top: 1px;
 }
 
+/* ── Borrow Modal specifics ────────────────────────────────── */
+.borrow-modal-box {
+    max-width: 560px;
+}
+
+.borrow-modal-box .modal-body {
+    padding: 24px 24px 20px;
+}
+
+.borrow-modal-box .form-group {
+    margin-bottom: 16px;
+}
+
+.borrow-modal-box .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+@media (max-width: 500px) {
+    .borrow-modal-box .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Password modal specifics */
 .pw-input-wrap {
     position: relative;

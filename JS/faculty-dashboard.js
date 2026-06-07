@@ -368,8 +368,27 @@
     function openBorrowForm(itemName) {
         document.getElementById('selectedItem').value = itemName;
         document.getElementById('selectedItemLabel').textContent = itemName;
-        switchTab('lending', 'form');
-        switchLendingSub('form');
+        const modal = document.getElementById('borrowModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            // Reset the form fields each time the modal opens
+            const form = document.getElementById('borrowForm');
+            if (form) {
+                const roomInput = form.querySelector('input[name="room"]');
+                if (roomInput) roomInput.value = '';
+                const borrowInp = document.getElementById('borrow_date');
+                const returnInp = document.getElementById('return_date');
+                if (borrowInp) borrowInp.value = '';
+                if (returnInp) returnInp.value = '';
+                const fileInp = document.getElementById('request_document');
+                if (fileInp) fileInp.value = '';
+            }
+        }
+    }
+
+    function closeBorrowModal() {
+        const modal = document.getElementById('borrowModal');
+        if (modal) modal.style.display = 'none';
     }
 
     /* ── Room Form ─────────────────────────────────────────────────────── */
@@ -1200,6 +1219,9 @@
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
+                case 'close-borrow-modal':
+                    closeBorrowModal();
+                    break;
                 case 'lending-back':
                     switchLendingSub('browse');
                     break;
@@ -1696,6 +1718,14 @@
             });
         }
 
+        // Close borrow modal on backdrop click
+        const borrowModal = document.getElementById('borrowModal');
+        if (borrowModal) {
+            borrowModal.addEventListener('click', function (e) {
+                if (e.target === this) closeBorrowModal();
+            });
+        }
+
         // Password show/hide toggles
         document.addEventListener('click', function (e) {
             const btn = e.target.closest('.pw-toggle-btn');
@@ -1716,6 +1746,10 @@
             }
             if (modal && modal.style.display !== 'none' && e.key === 'Escape') {
                 closePwModal();
+            }
+            if (e.key === 'Escape') {
+                const bm = document.getElementById('borrowModal');
+                if (bm && bm.style.display !== 'none') closeBorrowModal();
             }
         });
     }
