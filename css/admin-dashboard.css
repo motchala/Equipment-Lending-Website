@@ -107,6 +107,8 @@ main#app-main,
 html,
 body {
     height: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 body {
@@ -2734,27 +2736,254 @@ input[type="range"] {
 }
 
 /* ── RESPONSIVE ───────────────────────────────────────────────── */
-@media(max-width:768px) {
+/* ── TABLET (769px – 1024px) ──────────────────────────────────── */
+@media (max-width: 1024px) {
+    header.app-header {
+        padding: 0 1.5rem;
+    }
+
+    main#app-main {
+        padding: 0 1.5rem 2rem;
+    }
+
+    .nav-tab {
+        padding: 8px 16px;
+        font-size: 0.85rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .lending-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+
+    .lending-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .lending-nav-btn {
+        flex-shrink: 0;
+    }
+}
+
+/* ── MOBILE (≤ 768px) ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+
+    /* Header: stack nav below logo+avatar row */
     header.app-header {
         padding: 0 1rem;
+        height: auto;
+        min-height: 56px;
+        flex-wrap: wrap;
+        gap: 0;
+    }
+
+    .header-left {
+        flex: 1;
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+    }
+
+    .header-right {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+    }
+
+    .nav-tabs-wrap {
+        order: 3;
+        width: 100%;
+        border-radius: 0;
+        border: none;
+        border-top: 1px solid var(--khaki-border);
+        background: var(--primary-white);
+        padding: 6px 1rem;
+        gap: 6px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        justify-content: flex-start;
+    }
+
+    .nav-tabs-wrap::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-tab {
+        padding: 7px 16px;
+        font-size: 0.82rem;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .header-user-info {
         display: none;
     }
 
+    /* Main padding */
     main#app-main {
         padding: 0 1rem 2rem;
     }
 
-    .nav-tab {
-        padding: 7px 14px;
-        font-size: 0.8rem;
+    /* Stats */
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    /* Hero */
+    .hero-card {
+        padding: 1.4rem 1.5rem;
+    }
+
+    .hero-card h1 {
+        font-size: 1.2rem;
+    }
+
+    .hero-card p {
+        font-size: 0.85rem;
+    }
+
+    /* Home grid */
+    .home-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* Lending nav — horizontal scroll */
+    .lending-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+        padding: 5px;
+        border-radius: 12px;
+    }
+
+    .lending-nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .lending-nav-btn {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 0.78rem;
+    }
+
+    /* History toggle — scrollable */
+    .history-toggle-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .history-toggle-wrap::-webkit-scrollbar {
+        display: none;
+    }
+
+    .history-toggle-btn {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 0.82rem;
+    }
+
+    /* Tables — min-width forces scroll container to work */
+    .admin-table {
+        min-width: 580px;
+    }
+
+    .admin-table thead th {
+        font-size: 0.7rem;
+        padding: 9px 12px;
+    }
+
+    .admin-table tbody td {
+        padding: 10px 12px;
+    }
+
+    /* Page/section headers */
+    .section-header h2,
+    .page-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .section-header p,
+    .page-header p {
+        font-size: 0.82rem;
+    }
+
+    /* Lending sub-header row (Pending Approval + Scan QR btn) */
+    #lending-waiting>div[style] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+    }
+
+    /* Scan QR button full width on mobile */
+    #openQrScannerBtn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    /* Room cards */
+    .room-card {
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+
+    .room-img {
+        width: 100%;
+        height: 70px;
+        border-radius: 10px;
+    }
+
+    .room-header {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .capacity-badge {
+        align-self: flex-start;
+    }
+
+    /* Notification detail grid */
+    .notif-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .notif-wrapper {
+        padding: 1.2rem 1rem;
+    }
+
+    /* Overlays */
+    .overlay-topbar {
+        padding: 0 1rem;
+    }
+
+    .overlay-topbar-brand span {
+        display: none;
     }
 
     .account-layout,
     .settings-layout {
         flex-direction: column;
+        overflow: auto;
     }
 
     .account-sidebar,
@@ -2762,16 +2991,34 @@ input[type="range"] {
         width: 100%;
         border-right: none;
         border-bottom: 1px solid var(--khaki-border);
-        padding: 0.8rem;
+        padding: 0.6rem 0.8rem;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 4px;
+        scrollbar-width: none;
+    }
+
+    .account-sidebar::-webkit-scrollbar,
+    .settings-sidebar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .account-sidebar-label,
+    .s-cat-label,
+    .s-divider {
+        display: none;
     }
 
     .acc-nav-btn,
     .s-nav-item {
         display: inline-flex;
         width: auto;
+        flex-shrink: 0;
         border-left: none;
         border-bottom: 3px solid transparent;
         padding: 8px 14px;
+        white-space: nowrap;
     }
 
     .acc-nav-btn.active,
@@ -2780,61 +3027,295 @@ input[type="range"] {
         border-bottom-color: var(--accent-maroon);
     }
 
-    .account-sidebar,
-    .settings-sidebar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-    }
-
     .account-content,
     .settings-content {
-        padding: 1.2rem;
+        padding: 1.2rem 1rem;
     }
 
-    .overlay-topbar {
-        padding: 0 1rem;
+    .account-hero-card {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
     }
 
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .acc-action-wrap {
+        justify-content: center;
     }
 
-    .home-grid {
-        grid-template-columns: 1fr;
-    }
-
+    /* Form */
     .form-row {
         grid-template-columns: 1fr;
     }
 
-    .lending-nav {
-        gap: 4px;
+    .form-card {
+        max-width: 100%;
+    }
+
+    .form-card-body {
+        padding: 1.2rem 1rem;
+    }
+
+    /* Modals */
+    #changePassModal .eq-card,
+    #overrideModal .eq-card {
+        margin: 10px;
+    }
+
+    /* QR Scanner modal */
+    #qrScannerModal>div {
+        max-width: 94vw !important;
+        padding: 1.2rem !important;
+    }
+
+    /* Quick actions and activity */
+    .activity-container,
+    .quick-actions {
+        padding: 1rem;
+    }
+
+    /* Item form in inventory */
+    #item-form-wrap .form-card {
+        max-width: 100%;
+    }
+
+    /* Profile dropdown: prevent overflow on narrow screens */
+    .profile-dropdown {
+        max-width: calc(100vw - 20px);
+    }
+
+    /* App toast: allow word wrap instead of overflowing */
+    #app-toast {
+        white-space: normal;
+        text-align: center;
+        max-width: 88vw;
+    }
+
+    /* Admin poll toast: pull away from edge */
+    #admin-poll-toast {
+        right: 12px !important;
+        left: auto !important;
+        bottom: 16px !important;
+    }
+
+    /* Card headers: allow wrapping if title + button are too wide */
+    .eq-card-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Reduce top padding in tab panels */
+    .tab-panel {
+        padding-top: 1.4rem;
+    }
+}
+
+/* ── SMALL MOBILE (≤ 480px) ───────────────────────────────────── */
+@media (max-width: 480px) {
+    .logo-icon {
+        width: 26px;
+        height: 26px;
+    }
+
+    .app-logo-text strong {
+        font-size: 1.1rem;
+    }
+
+    .admin-badge {
+        font-size: 0.55rem;
+        padding: 1px 5px;
+    }
+
+    .stats-grid {
+        gap: 0.5rem;
+    }
+
+    .stat-card {
+        padding: 0.85rem 0.9rem;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.68rem;
+    }
+
+    .stat-sub {
+        font-size: 0.68rem;
+    }
+
+    .hero-card {
+        padding: 1.1rem;
+    }
+
+    .hero-card h1 {
+        font-size: 1.05rem;
+    }
+
+    .nav-tab {
+        padding: 6px 13px;
+        font-size: 0.78rem;
     }
 
     .lending-nav-btn {
+        padding: 7px 10px;
+        font-size: 0.75rem;
+        gap: 5px;
+    }
+
+    .admin-table {
+        font-size: 0.78rem;
+        min-width: 520px;
+    }
+
+    .history-toggle-btn {
         padding: 7px 12px;
         font-size: 0.78rem;
     }
 
-    .room-card {
+    .btn-add-item {
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+
+    .btn-return-confirm {
+        padding: 5px 10px;
+        font-size: 0.72rem;
+    }
+
+    .notif-filter-tabs {
+        gap: 5px;
+    }
+
+    .notif-tab {
+        padding: 5px 12px;
+        font-size: 0.75rem;
+    }
+
+    /* Inventory page header - stack button below title */
+    #lending-inventory .page-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .btn-add-item {
+        align-self: flex-start;
+    }
+
+    .overlay-topbar {
+        min-height: 52px;
+    }
+
+    .overlay-topbar-back {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
+
+    .overlay-topbar-title {
+        font-size: 0.82rem;
+    }
+
+    /* Account and settings overlay: tighter content padding */
+    .account-content,
+    .settings-content {
+        padding: 1rem 0.85rem;
+    }
+
+    /* Notifications overlay: tighter padding */
+    .notif-wrapper {
+        padding: 0.9rem 0.75rem;
+    }
+
+    /* Settings rows: allow the label + control to wrap */
+    .s-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Tab panels: reduce top gap further on small phones */
+    .tab-panel {
+        padding-top: 1rem;
+    }
+
+    /* Overlay topbar: allow flexible height on small screens */
+    .overlay-topbar {
+        height: auto;
+        min-height: 52px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+}
+
+/* ── VERY SMALL PHONES (≤ 400px) ─────────────────────────────── */
+@media (max-width: 400px) {
+
+    /* Profile dropdown: stretch to fit the viewport */
+    .profile-dropdown {
+        right: -4px;
+        width: calc(100vw - 16px);
+        max-width: calc(100vw - 16px);
+    }
+
+    /* Account info rows: stack label on top of value */
+    .info-row {
         flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
     }
 
-    .room-img {
+    .info-lbl {
+        min-width: unset;
+    }
+
+    .info-input-f {
         width: 100%;
-        height: 80px;
-        border-radius: 10px;
     }
 
-    .overlay-topbar-brand span {
-        display: none;
+    /* Stat icons: slightly smaller */
+    .stat-icon {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
     }
 
-    .account-sidebar-label,
-    .s-cat-label,
-    .s-divider {
-        display: none;
+    /* Account hero avatar: smaller on tiny screens */
+    .acc-avatar-large {
+        width: 64px;
+        height: 64px;
+        font-size: 1.4rem;
+    }
+
+    .account-hero-card {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    /* Admin poll toast: full-width bar at bottom */
+    #admin-poll-toast {
+        right: 10px !important;
+        left: 10px !important;
+        bottom: 12px !important;
+        font-size: 0.8rem !important;
+        padding: 9px 12px !important;
+        border-radius: 10px !important;
+    }
+
+    /* Notification items: compact layout */
+    .notif-item {
+        padding: 0.75rem;
+        gap: 10px;
+    }
+
+    .notif-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* Quick action buttons: slightly smaller text */
+    .qa-btn {
+        font-size: 0.82rem;
+        padding: 10px 12px;
     }
 }
 
@@ -2894,4 +3375,26 @@ input[type="range"] {
     font-style: italic;
     margin: 0;
     width: 100%;
+}
+
+.inv-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+#admin-poll-toast {
+    display: none;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1e3a5f;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }

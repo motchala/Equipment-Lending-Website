@@ -948,8 +948,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             <!-- ── EQUIPMENT REGISTRY ────────────────────────────────── -->
             <div class="lending-sub" id="lending-inventory">
-                <div class="page-header"
-                    style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div class="page-header inv-page-header">
                     <div>
                         <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -2589,7 +2588,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <div style="background:var(--surface,#fff);border-radius:20px;padding:2rem;max-width:420px;width:90%;text-align:center;position:relative;">
             <button id="closeQrScanner" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:22px;color:#555;">✕</button>
             <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;color:var(--text-dark,#1a1a1a);">Scan Return QR Code</h3>
-            <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Point the camera at the faculty member's QR code. This will be available if the website is hosted or becomes https</p>
+            <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Point the camera at the faculty member's QR code.</p>
             <div style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;">
                 <video id="qrVideo" style="width:100%;display:block;" playsinline autoplay></video>
                 <!-- Scan guide overlay -->
@@ -2730,9 +2729,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <script src="JS/admin-live-render.js"></script>
 
     <!-- Admin poll toast -->
-    <div id="admin-poll-toast" style="display:none;position:fixed;bottom:24px;right:24px;
-     background:#1e3a5f;color:#fff;padding:12px 20px;border-radius:12px;
-     font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
+    <div id="admin-poll-toast">
     </div>
 
 </body>
