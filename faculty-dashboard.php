@@ -2073,121 +2073,440 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
          TAB: MY ACTIVITY (Timeline)
     ============================================================ -->
             <div class="tab-panel" id="panel-activity">
+
+                <?php
+                /* ── Activity panel stats & board queries ─────────────────── */
+                $act_total   = mysqli_fetch_assoc(mysqli_query(
+                    $conn,
+                    "SELECT COUNT(*) as c FROM tbl_requests
+                     WHERE faculty_id='$uid_safe' AND status != 'Waiting'"
+                ))['c'] ?? 0;
+
+                $act_pending = mysqli_fetch_assoc(mysqli_query(
+                    $conn,
+                    "SELECT COUNT(*) as c FROM tbl_requests
+                     WHERE faculty_id='$uid_safe' AND status='Approved'
+                     AND return_date >= '$today'"
+                ))['c'] ?? 0;
+
+                $act_due     = mysqli_fetch_assoc(mysqli_query(
+                    $conn,
+                    "SELECT COUNT(*) as c FROM tbl_requests
+                     WHERE faculty_id='$uid_safe'
+                     AND (status='Overdue'
+                          OR (status='Approved' AND return_date = '$today'))"
+                ))['c'] ?? 0;
+
+                $act_upcoming = mysqli_query(
+                    $conn,
+                    "SELECT * FROM tbl_requests
+                     WHERE faculty_id='$uid_safe'
+                     AND status IN ('Waiting','Approved')
+                     AND borrow_date > '$today'
+                     ORDER BY borrow_date ASC LIMIT 10"
+                );
+
+                $act_ongoing  = mysqli_query(
+                    $conn,
+                    "SELECT * FROM tbl_requests
+                     WHERE faculty_id='$uid_safe'
+                     AND status='Approved'
+                     AND borrow_date <= '$today' AND return_date >= '$today'
+                     ORDER BY return_date ASC LIMIT 10"
+                );
+
+                $act_history  = mysqli_query(
+                    $conn,
+                    "SELECT * FROM tbl_requests
+                     WHERE faculty_id='$uid_safe'
+                     AND (status='Declined' OR status='Overdue'
+                          OR (status='Approved' AND return_date < '$today'))
+                     ORDER BY request_date DESC LIMIT 10"
+                );
+
+                /* ── Equipment icon helper ─────────────────────────────────── */
+                function actEquipIcon(string $name): string
+                {
+                    $n = strtolower($name);
+                    if (str_contains($n, 'projector'))                    return 'videocam';
+                    if (str_contains($n, 'remote') || str_contains($n, ' ac ') || $n === 'ac') return 'settings_remote';
+                    if (str_contains($n, 'cord') || str_contains($n, 'extension')) return 'power';
+                    if (str_contains($n, 'laptop') || str_contains($n, 'computer')) return 'laptop';
+                    if (str_contains($n, 'camera'))                       return 'photo_camera';
+                    if (str_contains($n, 'speaker') || str_contains($n, 'audio'))   return 'speaker';
+                    if (str_contains($n, 'mic'))                          return 'mic';
+                    if (str_contains($n, 'monitor') || str_contains($n, 'screen'))  return 'monitor';
+                    if (str_contains($n, 'tablet') || str_contains($n, 'ipad'))     return 'tablet';
+                    if (str_contains($n, 'printer'))                      return 'print';
+                    return 'inventory_2';
+                }
+
+                /* ── Progress ring helper ──────────────────────────────────── */
+                function actProgressRing(string $borrowDate, string $returnDate, string $today): array
+                {
+                    $bd    = strtotime($borrowDate);
+                    $rd    = strtotime($returnDate);
+                    $td    = strtotime($today);
+                    $total = max(1, ($rd - $bd) / 86400);
+                    $elapsed = max(0, ($td - $bd) / 86400);
+                    $pct   = (int) min(100, round($elapsed / $total * 100));
+                    $left  = max(0, (int) ceil(($rd - $td) / 86400));
+                    $label = $left > 1 ? $left . 'd left' : ($left === 1 ? '1d left' : 'Due today');
+                    return ['pct' => $pct, 'label' => $label, 'days_left' => $left];
+                }
+                ?>
+
+                <!-- ── Page Header ──────────────────────────────────────── -->
                 <div class="page-header-block"
-                    style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;">
+                    style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
                     <div>
                         <h2 class="page-title-sm">My Activity Tracker</h2>
-                        <p class="page-subtitle">Track your current requests, upcoming borrowings, and facility access.
-                        </p>
+                        <p class="page-subtitle">Track your current requests, upcoming borrowings, and facility access.</p>
                     </div>
                     <button class="btn-download-report" onclick="window.print()">
                         <span class="material-symbols-outlined">download</span> Download Report
                     </button>
                 </div>
 
-                <div class="timeline-container" id="activityTimeline">
-                    <?php
-                    // Group requests by date proximity
-                    $all_req = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY borrow_date DESC, request_date DESC LIMIT 20");
-                    $grouped = [];
-                    if ($all_req) {
-                        while ($r = mysqli_fetch_assoc($all_req)) {
-                            $bd = $r['borrow_date'];
-                            $grouped[$bd][] = $r;
-                        }
-                    }
-                    if (empty($grouped)):
-                    ?>
-                        <div class="timeline-empty">
-                            <span class="material-symbols-outlined">history_edu</span>
-                            <p>No activity yet. Start by borrowing equipment or reserving a room.</p>
-                            <button class="btn-borrow" style="width:auto;padding:10px 24px;margin-top:12px;"
-                                data-action="go-tab" data-tab="lending" data-lending="browse">Browse Equipment</button>
+                <!-- ── Stats Bar ────────────────────────────────────────── -->
+                <div class="act-stats-bar">
+                    <div class="act-stat">
+                        <div class="act-stat-icon">
+                            <span class="material-symbols-outlined">layers</span>
                         </div>
-                        <?php else: foreach ($grouped as $date => $items):
-                            $label = '';
-                            $d = strtotime($date);
-                            $todayTs = strtotime($today);
-                            $diff = (int)(($d - $todayTs) / 86400);
-                            if ($diff === 0) $label = 'Today';
-                            elseif ($diff === 1) $label = 'Tomorrow';
-                            elseif ($diff === -1) $label = 'Yesterday';
-                            else $label = date('M j, Y', $d);
-                        ?>
-                            <div class="timeline-group">
-                                <div class="timeline-group-label">
-                                    <span>
-                                        <?php echo htmlspecialchars($label); ?>
-                                    </span>
-                                    <span class="timeline-date-chip">
-                                        <?php echo date('M j', $d); ?>
-                                    </span>
-                                </div>
-                                <div class="timeline-items">
-                                    <?php foreach ($items as $ti):
-                                        $isActive = in_array($ti['status'], ['Approved', 'Overdue']);
-                                        $isOverdue = $ti['status'] === 'Overdue';
-                                        $isPending = $ti['status'] === 'Waiting';
-                                    ?>
-                                        <div
-                                            class="timeline-card <?php echo $isOverdue ? 'timeline-card-overdue' : ($isActive ? 'timeline-card-active' : ''); ?>">
-                                            <div
-                                                class="timeline-indicator <?php echo $isOverdue ? 'ti-error' : ($isActive ? 'ti-primary' : ($isPending ? 'ti-warning' : 'ti-muted')); ?>">
-                                                <span class="material-symbols-outlined"
-                                                    style="font-size:16px;font-variation-settings:'FILL' 1">
-                                                    <?php echo $isOverdue ? 'alarm' : ($isActive ? 'inventory_2' : ($isPending ? 'hourglass_empty' : 'check_circle')); ?>
-                                                </span>
-                                            </div>
-                                            <div class="timeline-card-content">
-                                                <div class="timeline-card-top">
-                                                    <div>
-                                                        <h3 class="timeline-card-title">
-                                                            <?php echo htmlspecialchars($ti['equipment_name']); ?>
-                                                        </h3>
-                                                        <p class="timeline-card-sub">
-                                                            <span class="material-symbols-outlined"
-                                                                style="font-size:14px">schedule</span>
-                                                            <?php echo htmlspecialchars($ti['borrow_date']); ?> &rarr;
-                                                            <?php echo htmlspecialchars($ti['return_date']); ?>
-                                                            <?php if ($isActive): ?>
-                                                                <span class="timeline-time-left"
-                                                                    id="timeleft-<?php echo $ti['id']; ?>"></span>
-                                                            <?php endif; ?>
-                                                        </p>
-                                                    </div>
-                                                    <span class="status-chip <?php
-                                                                                $chipClass = 'chip-muted';
-                                                                                if ($ti['status'] === 'Approved') $chipClass = 'chip-success';
-                                                                                elseif ($ti['status'] === 'Overdue')  $chipClass = 'chip-error';
-                                                                                elseif ($ti['status'] === 'Waiting')  $chipClass = 'chip-warning';
-                                                                                echo $chipClass;
-                                                                                ?>">
-                                                        <span class="chip-dot"></span>
-                                                        <?php echo htmlspecialchars($ti['status']); ?>
-                                                    </span>
-                                                </div>
-                                                <p class="timeline-card-detail">Room:
-                                                    <?php echo htmlspecialchars($ti['room']); ?>
-                                                </p>
-                                                <?php if ($ti['status'] === 'Declined' && !empty($ti['reason'])): ?>
-                                                    <p class="timeline-card-reason">Reason:
-                                                        <?php echo htmlspecialchars($ti['reason']); ?>
-                                                    </p>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                    <?php endforeach;
-                    endif; ?>
-                    <div class="timeline-end">
-                        <div class="timeline-end-line"></div>
-                        <span>End of Activity Log</span>
-                        <div class="timeline-end-line"></div>
+                        <div>
+                            <p class="act-stat-label">Total Borrowed</p>
+                            <p class="act-stat-value"><?php echo (int)$act_total; ?></p>
+                        </div>
+                    </div>
+                    <div class="act-stat">
+                        <div class="act-stat-icon">
+                            <span class="material-symbols-outlined">history</span>
+                        </div>
+                        <div>
+                            <p class="act-stat-label">Pending Returns</p>
+                            <p class="act-stat-value"><?php echo (int)$act_pending; ?></p>
+                        </div>
+                    </div>
+                    <div class="act-stat">
+                        <div class="act-stat-icon">
+                            <span class="material-symbols-outlined">calendar_today</span>
+                        </div>
+                        <div>
+                            <p class="act-stat-label">Items Due Soon</p>
+                            <p class="act-stat-value <?php echo $act_due > 0 ? 'act-stat-value-warn' : ''; ?>">
+                                <?php echo (int)$act_due; ?>
+                            </p>
+                        </div>
                     </div>
                 </div>
+
+                <!-- ── Kanban Board ──────────────────────────────────────── -->
+                <div class="act-board">
+
+                    <!-- ── Column 1: Upcoming ──────────────────────────── -->
+                    <div class="act-col">
+                        <div class="act-col-header">
+                            <h3 class="act-col-title">Upcoming</h3>
+                            <button class="act-col-menu" title="Options">
+                                <span class="material-symbols-outlined" style="font-size:18px;">more_horiz</span>
+                            </button>
+                        </div>
+                        <div class="act-col-body">
+                            <?php
+                            $has_upcoming = false;
+                            if ($act_upcoming):
+                                while ($r = mysqli_fetch_assoc($act_upcoming)):
+                                    $has_upcoming = true;
+                                    $bd       = strtotime($r['borrow_date']);
+                                    $td_ts    = strtotime($today);
+                                    $daysAway = max(0, (int)ceil(($bd - $td_ts) / 86400));
+                                    $awayStr  = $daysAway > 1 ? 'In ' . $daysAway . ' days'
+                                        : ($daysAway === 1 ? 'Tomorrow' : 'Starts today');
+                                    $icon     = actEquipIcon($r['equipment_name']);
+                                    $isPending = $r['status'] === 'Waiting';
+                            ?>
+                                    <div class="act-card">
+                                        <div class="act-card-icon">
+                                            <span class="material-symbols-outlined"
+                                                style="font-variation-settings:'FILL' 0;">
+                                                <?php echo $icon; ?>
+                                            </span>
+                                        </div>
+                                        <h4 class="act-card-title">
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </h4>
+                                        <div class="act-card-meta">
+                                            <span class="material-symbols-outlined">calendar_today</span>
+                                            <?php echo htmlspecialchars($r['borrow_date']); ?> &rarr;
+                                            <?php echo htmlspecialchars($r['return_date']); ?>
+                                        </div>
+                                        <div class="act-card-meta">
+                                            <span class="material-symbols-outlined">location_on</span>
+                                            Room: <?php echo htmlspecialchars($r['room']); ?>
+                                        </div>
+                                        <div class="act-card-progress">
+                                            <div class="act-progress-ring">
+                                                <svg viewBox="0 0 36 36" class="act-ring-svg">
+                                                    <path class="act-ring-bg"
+                                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                        fill="none" stroke-width="3" />
+                                                    <path class="act-ring-fg"
+                                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                        fill="none" stroke-width="3"
+                                                        stroke-dasharray="0, 100" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p class="act-progress-label">Starts in</p>
+                                                <p class="act-progress-value"><?php echo $awayStr; ?></p>
+                                            </div>
+                                        </div>
+                                        <?php if ($isPending): ?>
+                                            <span class="act-status-chip act-chip-warning">
+                                                <span class="chip-dot"></span>Awaiting Approval
+                                            </span>
+                                        <?php else: ?>
+                                            <button class="act-card-action"
+                                                data-action="go-tab" data-tab="lending" data-lending="browse">
+                                                Extend Borrowing
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
+                            <?php endwhile;
+                            endif; ?>
+                            <?php if (!$has_upcoming): ?>
+                                <div class="act-col-empty">
+                                    <span class="material-symbols-outlined">event_upcoming</span>
+                                    <p>No upcoming requests</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- ── Column 2: Ongoing ───────────────────────────── -->
+                    <div class="act-col">
+                        <div class="act-col-header">
+                            <h3 class="act-col-title">Ongoing</h3>
+                            <button class="act-col-menu" title="Options">
+                                <span class="material-symbols-outlined" style="font-size:18px;">more_horiz</span>
+                            </button>
+                        </div>
+                        <div class="act-col-body">
+                            <?php
+                            $has_ongoing = false;
+                            if ($act_ongoing):
+                                while ($r = mysqli_fetch_assoc($act_ongoing)):
+                                    $has_ongoing = true;
+                                    $ring  = actProgressRing($r['borrow_date'], $r['return_date'], $today);
+                                    $icon  = actEquipIcon($r['equipment_name']);
+                            ?>
+                                    <div class="act-card">
+                                        <div class="act-card-icon">
+                                            <span class="material-symbols-outlined"
+                                                style="font-variation-settings:'FILL' 0;">
+                                                <?php echo $icon; ?>
+                                            </span>
+                                        </div>
+                                        <h4 class="act-card-title">
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </h4>
+                                        <div class="act-card-meta">
+                                            <span class="material-symbols-outlined">calendar_today</span>
+                                            <?php echo htmlspecialchars($r['borrow_date']); ?> &rarr;
+                                            <?php echo htmlspecialchars($r['return_date']); ?>
+                                        </div>
+                                        <div class="act-card-meta">
+                                            <span class="material-symbols-outlined">location_on</span>
+                                            Room: <?php echo htmlspecialchars($r['room']); ?>
+                                        </div>
+                                        <div class="act-card-progress">
+                                            <div class="act-progress-ring">
+                                                <svg viewBox="0 0 36 36" class="act-ring-svg">
+                                                    <path class="act-ring-bg"
+                                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                        fill="none" stroke-width="3" />
+                                                    <path class="act-ring-fg"
+                                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                        fill="none" stroke-width="3"
+                                                        stroke-dasharray="<?php echo $ring['pct']; ?>, 100" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <p class="act-progress-label">Time left</p>
+                                                <p class="act-progress-value"><?php echo $ring['label']; ?></p>
+                                            </div>
+                                        </div>
+                                        <button class="act-card-action-outline">
+                                            <span class="material-symbols-outlined"
+                                                style="font-size:15px;vertical-align:middle;margin-right:4px;">report</span>
+                                            Report Issue
+                                        </button>
+                                    </div>
+                            <?php endwhile;
+                            endif; ?>
+                            <?php if (!$has_ongoing): ?>
+                                <div class="act-col-empty">
+                                    <span class="material-symbols-outlined">check_circle</span>
+                                    <p>Nothing currently borrowed</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- ── Column 3: History ───────────────────────────── -->
+                    <div class="act-col">
+                        <div class="act-col-header">
+                            <h3 class="act-col-title">History</h3>
+                            <button class="act-col-menu" title="Options">
+                                <span class="material-symbols-outlined" style="font-size:18px;">more_horiz</span>
+                            </button>
+                        </div>
+                        <div class="act-col-body">
+                            <?php
+                            $has_history = false;
+                            if ($act_history):
+                                while ($r = mysqli_fetch_assoc($act_history)):
+                                    $has_history = true;
+                                    $icon = actEquipIcon($r['equipment_name']);
+                                    $isOverdue = $r['status'] === 'Overdue';
+                                    $isDeclined = $r['status'] === 'Declined';
+                            ?>
+                                    <div class="act-card act-card-history">
+                                        <div class="act-card-icon">
+                                            <span class="material-symbols-outlined"
+                                                style="font-variation-settings:'FILL' 0;">
+                                                <?php echo $icon; ?>
+                                            </span>
+                                        </div>
+                                        <h4 class="act-card-title">
+                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                        </h4>
+                                        <div class="act-card-meta">
+                                            <span class="material-symbols-outlined">calendar_today</span>
+                                            <?php echo htmlspecialchars($r['borrow_date']); ?> &rarr;
+                                            <?php echo htmlspecialchars($r['return_date']); ?>
+                                        </div>
+                                        <div class="act-history-row act-card-meta">
+                                            <span>
+                                                <span class="material-symbols-outlined">location_on</span>
+                                                Room: <?php echo htmlspecialchars($r['room']); ?>
+                                            </span>
+                                            <?php if ($isDeclined): ?>
+                                                <span class="act-status-chip act-chip-error" style="margin-left:auto;">
+                                                    <span class="chip-dot"></span>Declined
+                                                </span>
+                                            <?php elseif ($isOverdue): ?>
+                                                <span class="act-status-chip act-chip-error" style="margin-left:auto;">
+                                                    <span class="chip-dot"></span>Overdue
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="act-card-check">
+                                                    <span class="material-symbols-outlined"
+                                                        style="font-size:11px;font-variation-settings:'FILL' 1;">check</span>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php if ($isDeclined && !empty($r['reason'])): ?>
+                                            <p style="font-size:.75rem;color:var(--color-error);margin-top:6px;">
+                                                <?php echo htmlspecialchars($r['reason']); ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    </div>
+                            <?php endwhile;
+                            endif; ?>
+                            <?php if (!$has_history): ?>
+                                <div class="act-col-empty">
+                                    <span class="material-symbols-outlined">history</span>
+                                    <p>No completed requests yet</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                </div><!-- /.act-board -->
+
             </div><!-- /panel-activity -->
+
+            <!-- ── AI Support Hub ─────────────────────────────────────────── -->
+            <!-- Chat window -->
+            <div class="act-ai-chat" id="actAiChat">
+                <div class="act-ai-chat-head">
+                    <div class="act-ai-chat-head-info">
+                        <div class="act-ai-chat-avatar">
+                            <span class="material-symbols-outlined">smart_toy</span>
+                        </div>
+                        <div>
+                            <div class="act-ai-chat-name">PUPSync AI Support</div>
+                            <div class="act-ai-chat-status">Online</div>
+                        </div>
+                    </div>
+                    <button class="act-ai-chat-close" onclick="document.getElementById('actAiChat').classList.remove('open')" title="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="act-ai-chat-body" id="actAiChatBody">
+                    <div class="act-chat-msg">
+                        <span class="act-chat-msg-time">AI Assistant</span>
+                        <div class="act-chat-bubble act-chat-bubble-ai">
+                            Hello <?php echo htmlspecialchars($fullname); ?>! I'm your PUPSync AI Assistant.
+                            How can I help with your activity tracking today?
+                        </div>
+                    </div>
+                </div>
+                <div class="act-ai-chat-input">
+                    <input type="text" id="actAiInput" placeholder="Type a message…"
+                        onkeydown="if(event.key==='Enter') actAiSend()">
+                    <button class="act-ai-chat-send" onclick="actAiSend()">
+                        <span class="material-symbols-outlined">send</span>
+                    </button>
+                </div>
+                <div class="act-ai-chat-footer">
+                    <a href="#">
+                        <span class="material-symbols-outlined">error_outline</span>
+                        Manual Form: Report Damaged / Lost Item
+                    </a>
+                </div>
+            </div>
+
+            <!-- FAB -->
+            <button class="act-ai-fab" id="actAiFab"
+                onclick="document.getElementById('actAiChat').classList.toggle('open')"
+                title="Chat with AI Support">
+                <span class="material-symbols-outlined">smart_toy</span>
+                <span class="act-ai-fab-tooltip">Chat with AI Support</span>
+            </button>
+
+            <script>
+                /* AI chat send stub — wire to real endpoint later */
+                function actAiSend() {
+                    const input = document.getElementById('actAiInput');
+                    const msg = (input.value || '').trim();
+                    if (!msg) return;
+                    const body = document.getElementById('actAiChatBody');
+
+                    /* User bubble */
+                    const uDiv = document.createElement('div');
+                    uDiv.className = 'act-chat-msg act-chat-msg-user';
+                    uDiv.innerHTML = `<span class="act-chat-msg-time">You</span>
+                    <div class="act-chat-bubble act-chat-bubble-user">${msg.replace(/</g,'&lt;')}</div>`;
+                    body.appendChild(uDiv);
+                    input.value = '';
+                    body.scrollTop = body.scrollHeight;
+
+                    /* Stub AI reply */
+                    setTimeout(() => {
+                        const aDiv = document.createElement('div');
+                        aDiv.className = 'act-chat-msg';
+                        aDiv.innerHTML = `<span class="act-chat-msg-time">AI Assistant</span>
+                        <div class="act-chat-bubble act-chat-bubble-ai">
+                            Thanks for your message! AI response support coming soon.
+                        </div>`;
+                        body.appendChild(aDiv);
+                        body.scrollTop = body.scrollHeight;
+                    }, 600);
+                }
+            </script>
 
         </main><!-- /app-main -->
     </div><!-- /main-wrapper -->

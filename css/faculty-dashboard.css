@@ -6604,3 +6604,683 @@ body {
 [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled) {
     background: var(--color-primary-container);
 }
+
+
+/* ================================================================
+   ACTIVITY PANEL — Kanban Board Redesign
+   Append to faculty-dashboard.css
+================================================================ */
+
+/* ── Stats Bar ─────────────────────────────────────────────────── */
+.act-stats-bar {
+    display: flex;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.act-stat {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    border-right: 1px solid var(--color-outline-variant);
+}
+
+.act-stat:last-child {
+    border-right: none;
+}
+
+.act-stat-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--color-surface-container);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    flex-shrink: 0;
+}
+
+.act-stat-icon .material-symbols-outlined {
+    font-size: 18px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.act-stat-label {
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--color-secondary);
+    margin-bottom: 4px;
+}
+
+.act-stat-value {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--color-on-surface);
+    line-height: 1;
+}
+
+.act-stat-value-warn {
+    color: var(--color-primary);
+}
+
+/* ── Board Grid ────────────────────────────────────────────────── */
+.act-board {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+/* ── Column ────────────────────────────────────────────────────── */
+.act-col {
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    max-height: 580px;
+    overflow: hidden;
+}
+
+.act-col-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: var(--color-surface-low);
+    border-bottom: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    flex-shrink: 0;
+}
+
+.act-col-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+}
+
+.act-col-menu {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-secondary);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--transition), background var(--transition);
+}
+
+.act-col-menu:hover {
+    color: var(--color-on-surface);
+    background: var(--color-surface-high);
+}
+
+.act-col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
+.act-card {
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition), transform var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.act-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.act-card-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--color-surface-container);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-secondary);
+    margin-bottom: 12px;
+}
+
+.act-card-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.act-card-title {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin-bottom: 14px;
+    line-height: 1.3;
+}
+
+.act-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .825rem;
+    color: var(--color-secondary);
+    margin-bottom: 6px;
+}
+
+.act-card-meta .material-symbols-outlined {
+    font-size: 15px;
+    color: var(--color-outline);
+    flex-shrink: 0;
+}
+
+/* ── Progress Ring ─────────────────────────────────────────────── */
+.act-card-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.act-progress-ring {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.act-ring-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.act-ring-bg {
+    stroke: var(--color-surface-high);
+}
+
+.act-ring-fg {
+    stroke: var(--color-primary);
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.6s ease;
+}
+
+.act-progress-label {
+    font-size: .72rem;
+    color: var(--color-secondary);
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.act-progress-value {
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+}
+
+/* ── Action Buttons ────────────────────────────────────────────── */
+.act-card-action {
+    width: 100%;
+    padding: 9px 16px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .875rem;
+    font-family: var(--font-sans);
+    transition: opacity var(--transition), transform var(--transition);
+    text-align: center;
+}
+
+.act-card-action:hover {
+    opacity: .88;
+    transform: translateY(-1px);
+}
+
+.act-card-action-outline {
+    width: 100%;
+    padding: 9px 16px;
+    background: transparent;
+    color: var(--color-primary);
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .875rem;
+    font-family: var(--font-sans);
+    transition: background var(--transition), color var(--transition);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.act-card-action-outline:hover {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+/* ── History Card (muted) ──────────────────────────────────────── */
+.act-card-history {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+.act-card-history .act-card-icon {
+    background: var(--color-surface-lowest);
+    border-color: var(--color-outline-variant);
+    color: var(--color-outline);
+}
+
+.act-card-history .act-card-title {
+    color: var(--color-on-surface-variant);
+}
+
+.act-card-history .act-card-meta {
+    color: var(--color-secondary);
+    opacity: .85;
+}
+
+.act-card-check {
+    width: 20px;
+    height: 20px;
+    background: var(--color-outline);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.act-history-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+}
+
+/* ── Status chips (inline on cards) ───────────────────────────── */
+.act-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: .72rem;
+    font-weight: 700;
+    width: fit-content;
+    margin-top: 4px;
+}
+
+.act-chip-warning {
+    background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+    color: var(--color-warning);
+}
+
+.act-chip-error {
+    background: var(--color-error-container);
+    color: var(--color-error);
+}
+
+/* ── Empty column state ────────────────────────────────────────── */
+.act-col-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--color-secondary);
+    font-size: .85rem;
+}
+
+.act-col-empty .material-symbols-outlined {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 8px;
+    opacity: .22;
+    color: var(--color-primary);
+}
+
+/* ── AI Support FAB ────────────────────────────────────────────── */
+.act-ai-fab {
+    position: fixed;
+    bottom: 24px;
+    right: 32px;
+    width: 56px;
+    height: 56px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(128, 0, 0, .35);
+    z-index: 300;
+    transition: opacity var(--transition), transform var(--transition);
+}
+
+.act-ai-fab:hover {
+    opacity: .9;
+    transform: scale(1.06);
+}
+
+.act-ai-fab .material-symbols-outlined {
+    font-size: 26px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.act-ai-fab-tooltip {
+    position: absolute;
+    right: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1f1414;
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition);
+}
+
+.act-ai-fab:hover .act-ai-fab-tooltip {
+    opacity: 1;
+}
+
+/* ── AI Chat Window ────────────────────────────────────────────── */
+.act-ai-chat {
+    position: fixed;
+    bottom: 92px;
+    right: 32px;
+    width: 320px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .18);
+    z-index: 300;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+    animation: actChatIn .25s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.act-ai-chat.open {
+    display: flex;
+}
+
+@keyframes actChatIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.act-ai-chat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: var(--color-primary);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.act-ai-chat-head-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.act-ai-chat-avatar {
+    width: 32px;
+    height: 32px;
+    background: rgba(255, 255, 255, .2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.act-ai-chat-avatar .material-symbols-outlined {
+    font-size: 16px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.act-ai-chat-name {
+    font-size: .875rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.act-ai-chat-status {
+    font-size: .72rem;
+    color: rgba(255, 255, 255, .7);
+}
+
+.act-ai-chat-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255, 255, 255, .75);
+    display: flex;
+    align-items: center;
+    transition: color var(--transition);
+}
+
+.act-ai-chat-close:hover {
+    color: #fff;
+}
+
+.act-ai-chat-close .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.act-ai-chat-body {
+    height: 260px;
+    overflow-y: auto;
+    padding: 14px;
+    background: var(--color-surface-low);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.act-chat-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    align-items: flex-start;
+}
+
+.act-chat-msg-user {
+    align-items: flex-end;
+}
+
+.act-chat-msg-time {
+    font-size: .68rem;
+    color: var(--color-secondary);
+    padding: 0 4px;
+}
+
+.act-chat-bubble {
+    max-width: 85%;
+    padding: 10px 14px;
+    font-size: .82rem;
+    line-height: 1.5;
+}
+
+.act-chat-bubble-ai {
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+    border-radius: 4px 16px 16px 16px;
+}
+
+.act-chat-bubble-user {
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 16px 4px 16px 16px;
+}
+
+.act-ai-chat-input {
+    padding: 10px;
+    border-top: 1px solid var(--color-outline-variant);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-surface-lowest);
+}
+
+.act-ai-chat-input input {
+    flex: 1;
+    background: var(--color-surface-container);
+    border: none;
+    border-radius: var(--radius-full);
+    padding: 8px 16px;
+    font-size: .85rem;
+    color: var(--color-on-surface);
+    outline: none;
+    font-family: var(--font-sans);
+    transition: box-shadow var(--transition);
+}
+
+.act-ai-chat-input input:focus {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.act-ai-chat-send {
+    width: 32px;
+    height: 32px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity var(--transition);
+}
+
+.act-ai-chat-send:hover {
+    opacity: .85;
+}
+
+.act-ai-chat-send .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.act-ai-chat-footer {
+    padding: 8px 12px;
+    text-align: center;
+    border-top: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-low);
+}
+
+.act-ai-chat-footer a {
+    font-size: .72rem;
+    color: var(--color-secondary);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color var(--transition);
+}
+
+.act-ai-chat-footer a:hover {
+    color: var(--color-primary);
+}
+
+.act-ai-chat-footer .material-symbols-outlined {
+    font-size: 12px;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+    .act-board {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /* History becomes full-width on mid screens */
+    .act-col:last-child {
+        grid-column: 1 / -1;
+        max-height: 340px;
+    }
+
+    .act-col:last-child .act-col-body {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .act-col:last-child .act-card {
+        flex: 1 1 240px;
+    }
+}
+
+@media (max-width: 700px) {
+    .act-board {
+        grid-template-columns: 1fr;
+    }
+
+    .act-col:last-child {
+        grid-column: auto;
+        max-height: 580px;
+    }
+
+    .act-col:last-child .act-col-body {
+        flex-direction: column;
+    }
+
+    .act-stats-bar {
+        flex-direction: column;
+    }
+
+    .act-stat {
+        border-right: none;
+        border-bottom: 1px solid var(--color-outline-variant);
+    }
+
+    .act-stat:last-child {
+        border-bottom: none;
+    }
+
+    .act-ai-chat {
+        right: 12px;
+        width: calc(100vw - 24px);
+    }
+
+    .act-ai-fab {
+        right: 16px;
+    }
+}
