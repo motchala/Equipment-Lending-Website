@@ -535,7 +535,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             <h3>Faculty</h3>
                             <p>Borrow equipment & reserve rooms</p>
                         </button>
-                        <button class="role-card" onclick="window.location.href='student-portal.php'">
+                        <button class="role-card" onclick="window.location.href='student-dashboard.php'">
                             <div class="role-icon">
                                 <i class="fa-solid fa-graduation-cap"></i>
                             </div>
