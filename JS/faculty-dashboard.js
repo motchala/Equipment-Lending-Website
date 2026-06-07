@@ -136,13 +136,29 @@
             const el = document.getElementById('tp-' + k);
             const ch = document.getElementById('tc-' + k);
             if (el) el.classList.remove('selected');
-            if (ch) ch.style.display = 'none';
+            if (ch) {
+                ch.style.display = 'none';
+                // Also remove theme-active from the parent sov-theme-option
+                const opt = ch.closest('.sov-theme-option');
+                if (opt) opt.classList.remove('theme-active');
+            }
         });
         const key = tMap[theme] || theme;
         const el = document.getElementById('tp-' + key);
         const ch = document.getElementById('tc-' + key);
         if (el) el.classList.add('selected');
-        if (ch) ch.style.display = '';
+        if (ch) {
+            ch.style.display = '';
+            // Mark the parent sov-theme-option as active
+            const opt = ch.closest('.sov-theme-option');
+            if (opt) opt.classList.add('theme-active');
+        }
+        // Update current theme label
+        const lbl = document.getElementById('currentThemeLabel');
+        if (lbl) {
+            const names = { light: 'Light', dark: 'Dark', 'high-contrast': 'High Contrast' };
+            lbl.textContent = names[theme] || theme;
+        }
     }
 
     function _applyAccentDOM(color, light) {
@@ -1423,6 +1439,34 @@
     // document.querySelectorAll('.s-nav-item').forEach(btn => {
     //     btn.addEventListener('click', function () { switchSettTab(this.dataset.settTab); });
     // });
+
+    /* ── Settings Overlay sidebar tabs (sov-nav-item) ────────────────── */
+    document.querySelectorAll('.sov-nav-item[data-sov-tab]').forEach(function (navItem) {
+        navItem.addEventListener('click', function (e) {
+            e.preventDefault();
+            var targetId = this.dataset.sovTab;
+            // Update nav items
+            document.querySelectorAll('.sov-nav-item').forEach(function (n) { n.classList.remove('active'); });
+            this.classList.add('active');
+            // Update tab panels
+            document.querySelectorAll('.sov-tab-panel').forEach(function (p) { p.classList.remove('active'); });
+            var panel = document.getElementById(targetId);
+            if (panel) panel.classList.add('active');
+        });
+    });
+
+    /* ── Settings font-size buttons (sov-font-btn mirroring font-scale-btn) */
+    document.querySelectorAll('.sov-font-btn[data-scale]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var scale = this.dataset.scale;
+            // Mirror onto the hidden font-scale-btn so the existing applyFontScale logic fires
+            var legacyBtn = document.querySelector('.font-scale-btn[data-scale="' + scale + '"]');
+            if (legacyBtn) legacyBtn.click();
+            // Update active state on sov buttons
+            document.querySelectorAll('.sov-font-btn').forEach(function (b) { b.classList.remove('font-scale-active'); });
+            this.classList.add('font-scale-active');
+        });
+    });
 
     /* ── Notification filter tabs ─────────────────────────────────────── */
     document.querySelectorAll('.notif-tab').forEach(btn => {
