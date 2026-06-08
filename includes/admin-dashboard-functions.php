@@ -8,10 +8,8 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     exit();
 }
 
-$conn = mysqli_connect("localhost", "root", "", "lending_db");
-if (!$conn) {
-    die("Connection failed: " . mysqli_connect_error());
-}
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {

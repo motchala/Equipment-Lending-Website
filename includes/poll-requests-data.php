@@ -14,11 +14,8 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 
 header('Content-Type: application/json');
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) {
-    echo json_encode(['error' => 'DB error']);
-    exit();
-}
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 $today = date('Y-m-d');
 

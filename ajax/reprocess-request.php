@@ -45,11 +45,8 @@ $logged_in_faculty_id = (string)$_SESSION['faculty_id'];
 require_once __DIR__ . '/../includes/arbitration-engine.php';
 
 // ── Database connection ───────────────────────────────────────────────────────
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-
-if ($conn->connect_error) {
-    send_error(500, 'Database connection failed.');
-}
+require_once __DIR__ . '/../includes/db.php';
+$conn = getDB();
 
 $conn->set_charset('utf8mb4');
 

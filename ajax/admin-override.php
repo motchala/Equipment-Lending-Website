@@ -74,11 +74,8 @@ if (!is_numeric($raw_request_id) || (int)$raw_request_id <= 0) {
 $request_id = (int)$raw_request_id;
 
 // ── Database connection ───────────────────────────────────────────────────────
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-
-if ($conn->connect_error) {
-    send_json(500, 'error', 'Database connection failed.');
-}
+require_once __DIR__ . '/../includes/db.php';
+$conn = getDB();
 
 $conn->set_charset('utf8mb4');
 

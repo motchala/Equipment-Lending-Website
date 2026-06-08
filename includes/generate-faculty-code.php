@@ -9,8 +9,8 @@ if (!isset($_SESSION['faculty_id'])) {
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) { echo json_encode(['error' => 'DB error']); exit(); }
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 $faculty_id   = $_SESSION['faculty_id'];
 $faculty_name = $_SESSION['faculty_name'];

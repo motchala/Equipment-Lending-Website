@@ -13,11 +13,8 @@ if (!$code || !$student_name || !$student_id) {
     exit();
 }
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) {
-    echo json_encode(['error' => 'DB error']);
-    exit();
-}
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 // Look up the code
 $stmt = $conn->prepare(
