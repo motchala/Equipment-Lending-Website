@@ -25,8 +25,8 @@ $today = date('Y-m-d');
 if ($borrow_date < $today)       { echo json_encode(['error' => 'Borrow date cannot be in the past.']);         exit(); }
 if ($return_date < $borrow_date) { echo json_encode(['error' => 'Return date cannot be before borrow date.']); exit(); }
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) { echo json_encode(['error' => 'DB error']); exit(); }
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 // ── Re-verify code is still unused (race-condition guard) ─────────────────
 $chk = $conn->prepare("SELECT id FROM tbl_faculty_codes WHERE id = ? AND is_used = 0 LIMIT 1");

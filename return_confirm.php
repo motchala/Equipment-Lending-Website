@@ -9,8 +9,8 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     exit();
 }
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) die("DB error.");
+require_once __DIR__ . '/includes/db.php';
+$conn = getDB();
 
 $token = trim($_GET['token'] ?? '');
 $message = '';

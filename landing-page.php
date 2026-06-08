@@ -22,7 +22,8 @@ if (isset($_SESSION['user_id'])) {
     // (fall through to show the page normally)
 }
 
-$conn = mysqli_connect("localhost", "root", "", "lending_db");
+require_once __DIR__ . '/includes/db.php';
+$conn = getDB();
 $login_error = $register_error = $register_success = "";
 $login_email_val = $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
 
