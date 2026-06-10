@@ -15,6 +15,27 @@ $conn = getDB();
 $faculty_id   = $_SESSION['faculty_id'];
 $faculty_name = $_SESSION['faculty_name'];
 
+// ── Block generation if faculty has any overdue item ─────────────────────
+$overdue_chk = $conn->prepare(
+    "SELECT id FROM tbl_requests
+      WHERE faculty_id = ? AND status = 'Overdue'
+      LIMIT 1"
+);
+$overdue_chk->bind_param('s', $faculty_id);
+$overdue_chk->execute();
+$overdue_chk->store_result();
+$has_overdue = $overdue_chk->num_rows > 0;
+$overdue_chk->close();
+
+if ($has_overdue) {
+    $conn->close();
+    echo json_encode([
+        'error' => 'You have an overdue item. Please return it before generating a new borrowing code.'
+    ]);
+    exit();
+}
+// ── End overdue block ─────────────────────────────────────────────────────
+
 // Remove any unused (not yet redeemed) codes for this faculty
 $del = $conn->prepare("DELETE FROM tbl_faculty_codes WHERE faculty_id = ? AND is_used = 0");
 $del->bind_param('s', $faculty_id);
