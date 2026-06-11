@@ -38,6 +38,28 @@ if ($row['is_used']) {
     exit();
 }
 
+// ── Block if faculty has any overdue item ─────────────────────────────────
+$overdue_chk = $conn->prepare(
+    "SELECT id FROM tbl_requests
+      WHERE faculty_id = ? AND status = 'Overdue'
+      LIMIT 1"
+);
+$overdue_chk->bind_param('s', $row['faculty_id']);
+$overdue_chk->execute();
+$overdue_chk->store_result();
+$has_overdue = $overdue_chk->num_rows > 0;
+$overdue_chk->close();
+
+if ($has_overdue) {
+    $conn->close();
+    echo json_encode([
+        'error' => 'Your faculty advisor currently has an overdue item. Borrowing is not allowed until it is returned. Please coordinate with ' . htmlspecialchars($row['faculty_name']) . '.'
+    ]);
+    exit();
+}
+// ── End overdue block ─────────────────────────────────────────────────────
+
+
 // ── Email 1: Notify faculty that student is now on the borrow form ────────
 $fac_mail_stmt = $conn->prepare("SELECT email, fullname FROM tbl_users WHERE faculty_id = ? LIMIT 1");
 $fac_mail_stmt->bind_param('s', $row['faculty_id']);

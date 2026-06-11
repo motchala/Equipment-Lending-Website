@@ -5,12 +5,10 @@ use PHPMailer\PHPMailer\Exception;
 require_once __DIR__ . '/PHPMailer/src/Exception.php';
 require_once __DIR__ . '/PHPMailer/src/PHPMailer.php';
 require_once __DIR__ . '/PHPMailer/src/SMTP.php';
+require_once __DIR__ . '/env.php';
 
-// ── TODO: Change these to your real credentials before deployment ──────────
-define('MAIL_USERNAME', 'wcwcwcwcwcec@gmail.com');  // TODO: Replace with PUPSync Gmail address
-define('MAIL_PASSWORD', 'jffk guoj tnxn veut');   // TODO: Replace with your Gmail App Password
-define('MAIL_FROM_NAME', 'PUPSync Notifications');
-// ──────────────────────────────────────────────────────────────────────────
+// Load .env variables into $_ENV
+load_env();
 
 function sendPupSyncEmail(string $to_email, string $to_name, string $subject, string $html_body): bool
 {
@@ -19,12 +17,12 @@ function sendPupSyncEmail(string $to_email, string $to_name, string $subject, st
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = MAIL_USERNAME;
-        $mail->Password   = MAIL_PASSWORD;
+        $mail->Username   = $_ENV['MAIL_USERNAME'] ?? '';
+        $mail->Password   = $_ENV['MAIL_PASSWORD'] ?? '';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
-        $mail->setFrom(MAIL_USERNAME, MAIL_FROM_NAME);
+        $mail->setFrom($_ENV['MAIL_USERNAME'] ?? '', $_ENV['MAIL_FROM_NAME'] ?? 'PUPSync');
         $mail->addAddress($to_email, $to_name);
         $mail->isHTML(true);
         $mail->Subject = $subject;
@@ -34,7 +32,7 @@ function sendPupSyncEmail(string $to_email, string $to_name, string $subject, st
         $mail->send();
         return true;
     } catch (Exception $e) {
-        // Silent fail — email error must never break the borrow flow
+        // Silent fail — email errors must never break the borrow flow
         error_log('[PUPSync Mailer] ' . $mail->ErrorInfo);
         return false;
     }
