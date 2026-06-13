@@ -1,0 +1,558 @@
+/* ================================================================
+   PUPSYNC — FACILITIES TAB  (fcty-facilities.css)
+   All rules scoped to #panel-rooms; prefix: fcty-
+   No Tailwind. Uses the faculty-dashboard.css token system.
+================================================================ */
+
+/* ── View base ──────────────────────────────────────────────── */
+#panel-rooms .fcty-view {
+    animation: fadeSlideIn 0.22s var(--transition, 0.2s ease) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW 1 — CAMPUS SELECTION (Split cards)
+═══════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-split {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    /* full height minus topbar (72px) and app-main padding (32px top + 32px bottom) */
+    height: calc(100vh - var(--topbar-h, 72px) - 64px);
+    min-height: 500px;
+}
+
+/* ── Campus card ─────────────────────────────────────────────── */
+#panel-rooms .fcty-campus-card {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    border-radius: var(--radius-xl, 20px);
+    cursor: pointer;
+    display: block;
+    text-decoration: none;
+    outline: none;
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.3s ease;
+}
+
+#panel-rooms .fcty-campus-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+#panel-rooms .fcty-campus-card:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-primary, #800000),
+                var(--shadow-md);
+}
+
+/* Background image layer */
+#panel-rooms .fcty-card-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+                filter  0.55s ease;
+    will-change: transform;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-bg {
+    transform: scale(1.06);
+    filter: brightness(0.8);
+}
+
+/* Gradient overlay */
+#panel-rooms .fcty-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(80, 0, 0, 0.92) 0%,
+        rgba(80, 0, 0, 0.42) 38%,
+        transparent 100%
+    );
+    transition: opacity 0.35s ease;
+    z-index: 1;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-overlay {
+    opacity: 0.9;
+}
+
+/* Content: floats above overlay */
+#panel-rooms .fcty-card-content {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 44px 40px;
+    transform: translateY(20px);
+    transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-content {
+    transform: translateY(0);
+}
+
+/* Badge pill */
+#panel-rooms .fcty-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    margin-bottom: 14px;
+    width: fit-content;
+}
+
+#panel-rooms .fcty-card-badge .material-symbols-outlined {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 1;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#panel-rooms .fcty-badge-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Title */
+#panel-rooms .fcty-card-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Description */
+#panel-rooms .fcty-card-desc {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.65;
+    max-width: 340px;
+    margin-bottom: 22px;
+    font-weight: 400;
+}
+
+/* CTA row */
+#panel-rooms .fcty-card-cta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffb4a8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: transform 0.3s ease, color 0.2s;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-cta {
+    transform: translateX(8px);
+    color: #ffd4cc;
+}
+
+#panel-rooms .fcty-card-cta .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW 2 — BUILDING SELECTION (Breadcrumb + Carousel)
+═══════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-building-view {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Breadcrumb nav */
+#panel-rooms .fcty-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    letter-spacing: 0.01em;
+    margin-bottom: 2px;
+}
+
+#panel-rooms .fcty-breadcrumb a {
+    color: var(--color-on-surface-variant);
+    text-decoration: none;
+    transition: color 0.18s;
+}
+
+#panel-rooms .fcty-breadcrumb a:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+#panel-rooms .fcty-breadcrumb .material-symbols-outlined {
+    font-size: 14px;
+    opacity: 0.5;
+}
+
+/* Building page header */
+#panel-rooms .fcty-building-header {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-outline-variant, #ddbdbd);
+}
+
+#panel-rooms .fcty-building-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #1f1414);
+    letter-spacing: -0.02em;
+    margin: 6px 0 4px;
+    line-height: 1.2;
+}
+
+#panel-rooms .fcty-building-subtitle {
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+/* ── Carousel ────────────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-wrap {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-xl, 20px);
+    background: var(--color-surface-container, #f8ecec);
+    border: 1px solid var(--color-outline-variant, #ddbdbd);
+    box-shadow: var(--shadow-md);
+    height: 560px;
+    flex-shrink: 0;
+    /* Allows keyboard nav on the carousel element */
+    outline: none;
+}
+
+/* Slide track */
+#panel-rooms .fcty-carousel-inner {
+    display: flex;
+    height: 100%;
+    transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+/* Individual slide */
+#panel-rooms .fcty-carousel-slide {
+    min-width: 100%;
+    height: 100%;
+    position: relative;
+    flex-shrink: 0;
+}
+
+#panel-rooms .fcty-carousel-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+/* Slide gradient overlay */
+#panel-rooms .fcty-slide-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(17, 18, 25, 0.92) 0%,
+        rgba(17, 18, 25, 0.40) 38%,
+        transparent 100%
+    );
+    pointer-events: none;
+}
+
+/* Slide content */
+#panel-rooms .fcty-slide-content {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 40px;
+    max-width: 700px;
+}
+
+/* Slide badge */
+#panel-rooms .fcty-slide-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    margin-bottom: 14px;
+    width: fit-content;
+    color: #ffb4a8;
+}
+
+#panel-rooms .fcty-slide-badge .material-symbols-outlined {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 1;
+}
+
+#panel-rooms .fcty-slide-badge-text {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* Slide title */
+#panel-rooms .fcty-slide-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    line-height: 1.1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Slide description */
+#panel-rooms .fcty-slide-desc {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.65;
+    max-width: 520px;
+    margin-bottom: 20px;
+    font-weight: 400;
+}
+
+/* Room / floor chips row */
+#panel-rooms .fcty-slide-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+#panel-rooms .fcty-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* Slide CTA button */
+#panel-rooms .fcty-slide-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--color-primary-container, #800000);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-md, 12px);
+    font-family: var(--font-sans, 'Inter');
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(128, 0, 0, 0.38);
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    width: fit-content;
+}
+
+#panel-rooms .fcty-slide-btn:hover {
+    background: #5a0000;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(128, 0, 0, 0.44);
+}
+
+#panel-rooms .fcty-slide-btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+#panel-rooms .fcty-slide-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* ── Arrow buttons ───────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.22s, opacity 0.22s, transform 0.22s;
+    opacity: 0;
+    padding: 0;
+}
+
+#panel-rooms .fcty-carousel-wrap:hover .fcty-carousel-arrow,
+#panel-rooms .fcty-carousel-arrow:focus-visible {
+    opacity: 1;
+}
+
+#panel-rooms .fcty-carousel-arrow:hover {
+    background: var(--color-primary-container, #800000);
+    transform: translateY(-50%) scale(1.08);
+}
+
+#panel-rooms .fcty-carousel-arrow.fcty-prev { left: 20px; }
+#panel-rooms .fcty-carousel-arrow.fcty-next { right: 20px; }
+
+#panel-rooms .fcty-carousel-arrow .material-symbols-outlined {
+    font-size: 24px;
+}
+
+/* ── Dots ────────────────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-dots {
+    position: absolute;
+    bottom: 28px;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 20;
+}
+
+#panel-rooms .fcty-dot {
+    height: 10px;
+    width: 10px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.40);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+#panel-rooms .fcty-dot.active {
+    background: var(--color-primary-container, #800000);
+    width: 28px;
+}
+
+#panel-rooms .fcty-dot:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.72);
+}
+
+/* ── Coming-soon slide (placeholder) ────────────────────────── */
+#panel-rooms .fcty-slide-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: linear-gradient(
+        135deg,
+        var(--color-surface-container, #f8ecec),
+        var(--color-surface-high, #f0e0e0)
+    );
+    gap: 16px;
+    text-align: center;
+    padding: 48px;
+}
+
+#panel-rooms .fcty-slide-placeholder .material-symbols-outlined {
+    font-size: 60px;
+    color: var(--color-primary, #800000);
+    opacity: 0.18;
+}
+
+#panel-rooms .fcty-slide-placeholder h3 {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #1f1414);
+    letter-spacing: -0.01em;
+}
+
+#panel-rooms .fcty-slide-placeholder p {
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    max-width: 380px;
+    line-height: 1.65;
+    font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK THEME overrides
+═══════════════════════════════════════════════════════════════ */
+[data-theme="dark"] #panel-rooms .fcty-card-cta {
+    color: #f4a0a0;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-card-cta:hover {
+    color: #ffc0b8;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-carousel-wrap {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-subtitle,
+[data-theme="dark"] #panel-rooms .fcty-breadcrumb {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-header {
+    border-bottom-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder {
+    background: linear-gradient(
+        135deg,
+        var(--color-surface-container),
+        var(--color-surface-high)
+    );
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder h3 {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder p {
+    color: var(--color-on-surface-variant);
+}
