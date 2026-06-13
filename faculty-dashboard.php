@@ -213,6 +213,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Dashboard Redesign v3 — Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
+    <!-- facilities tab portal -->
+     <link rel="stylesheet" href="CSS/fcty-facilities.css">
+
     <style>
         /* ================================================================
        DASHBOARD REDESIGN v3 — panel-home overrides only
@@ -1926,106 +1929,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
             <!-- ============================================================
          TAB: FACILITIES (ROOMS)
     ============================================================ -->
-            <div class="tab-panel" id="panel-rooms">
-                <div class="page-header-block">
-                    <h2 class="page-title-sm">Facilities</h2>
-                    <p class="page-subtitle">Browse available rooms and make a reservation for your class or event.</p>
-                </div>
-                <div class="coming-soon-banner">
-                    <span class="material-symbols-outlined">schedule</span>
-                    <div>
-                        <h3>Room Reservation — Coming Soon</h3>
-                        <p>This feature is under development. Preview available rooms below.</p>
-                    </div>
-                </div>
-                <div class="room-list" id="roomList">
-                    <!-- Room 1 -->
-                    <div class="room-card">
-                        <div class="room-card-thumb">
-                            <span class="material-symbols-outlined">computer</span>
-                        </div>
-                        <div class="room-card-body">
-                            <div class="room-card-header">
-                                <div>
-                                    <h3 class="room-card-title">Computer Laboratory 301</h3>
-                                    <p class="room-card-loc">3rd Floor, Main Building</p>
-                                </div>
-                                <span class="capacity-badge">40 seats</span>
-                            </div>
-                            <div class="room-amenities">
-                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span>
-                                    WiFi</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span>
-                                    A/C</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">videocam</span>
-                                    Projector</span>
-                            </div>
-                            <div class="room-card-footer">
-                                <span class="room-avail"><span class="room-avail-dot"></span> Available</span>
-                                <button class="btn-borrow" style="width:auto;padding:8px 20px;"
-                                    data-action="room-reserve-preview"
-                                    data-room="Computer Laboratory 301">Reserve</button>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Room 2 -->
-                    <div class="room-card">
-                        <div class="room-card-thumb">
-                            <span class="material-symbols-outlined">science</span>
-                        </div>
-                        <div class="room-card-body">
-                            <div class="room-card-header">
-                                <div>
-                                    <h3 class="room-card-title">Science Laboratory</h3>
-                                    <p class="room-card-loc">2nd Floor, Science Wing</p>
-                                </div>
-                                <span class="capacity-badge">30 seats</span>
-                            </div>
-                            <div class="room-amenities">
-                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span>
-                                    WiFi</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span>
-                                    A/C</span>
-                            </div>
-                            <div class="room-card-footer">
-                                <span class="room-avail"><span class="room-avail-dot"></span> Available</span>
-                                <button class="btn-borrow" style="width:auto;padding:8px 20px;"
-                                    data-action="room-reserve-preview" data-room="Science Laboratory">Reserve</button>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Room 3 -->
-                    <div class="room-card">
-                        <div class="room-card-thumb">
-                            <span class="material-symbols-outlined">meeting_room</span>
-                        </div>
-                        <div class="room-card-body">
-                            <div class="room-card-header">
-                                <div>
-                                    <h3 class="room-card-title">Lecture Hall A</h3>
-                                    <p class="room-card-loc">Ground Floor, Academic Building</p>
-                                </div>
-                                <span class="capacity-badge">80 seats</span>
-                            </div>
-                            <div class="room-amenities">
-                                <span><span class="material-symbols-outlined" style="font-size:14px">wifi</span>
-                                    WiFi</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">ac_unit</span>
-                                    A/C</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">videocam</span>
-                                    Projector</span>
-                                <span><span class="material-symbols-outlined" style="font-size:14px">mic</span> Sound
-                                    System</span>
-                            </div>
-                            <div class="room-card-footer">
-                                <span class="room-occupied"><span class="room-occupied-dot"></span> In Use</span>
-                                <button class="btn-borrow" style="width:auto;padding:8px 20px;"
-                                    disabled>Unavailable</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div><!-- /panel-rooms -->
+            <?php include 'fcty-facilities.php'; ?>
 
             <!-- ============================================================
          TAB: MY ACTIVITY (Timeline)
@@ -3578,6 +3482,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <div class="nav-backdrop" id="navBackdrop"></div>
 
     <script src="JS/faculty-dashboard.js"></script>
+    <script src="JS/fcty-facilities.js"></script>
 </body>
 
 </html>
