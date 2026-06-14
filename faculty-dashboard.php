@@ -214,7 +214,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
-     <link rel="stylesheet" href="CSS/fcty-facilities.css">
+     <link rel="stylesheet" href="css/fcty-facilities.css">
 
     <style>
         /* ================================================================
