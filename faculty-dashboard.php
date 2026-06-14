@@ -1733,7 +1733,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                         </div>
                                         <?php if (!empty($featured_hero['image_path'])): ?>
                                             <div class="feat-hero-img">
-                                                <img src="/Equipment-Lending-Website/<?php echo htmlspecialchars($featured_hero['image_path']); ?>"
+                                                <img src="/<?php echo htmlspecialchars($featured_hero['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
                                             </div>
                                         <?php else: ?>
@@ -1749,7 +1749,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                     <div class="feat-secondary">
                                         <div class="feat-secondary-img" style="position:relative;">
                                             <?php if (!empty($featured_sec['image_path'])): ?>
-                                                <img src="/Equipment-Lending-Website/<?php echo htmlspecialchars($featured_sec['image_path']); ?>"
+                                                <img src="/<?php echo htmlspecialchars($featured_sec['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
                                             <?php else: ?>
                                                 <span class="material-symbols-outlined">inventory_2</span>
@@ -1824,7 +1824,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                         <div class="eq-item-img-wrap">
                                             <?php if (!empty($item['image_path'])): ?>
                                                 <img class="eq-item-img"
-                                                    src="/Equipment-Lending-Website/<?php echo htmlspecialchars($item['image_path']); ?>"
+                                                    src="/<?php echo htmlspecialchars($item['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($item['item_name']); ?>">
                                             <?php else: ?>
                                                 <div class="eq-item-img-placeholder">
