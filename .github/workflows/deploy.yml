@@ -25,5 +25,5 @@ jobs:
             **/.git*
             **/.git*/**
             .env
-            db.php  
+            includes/db.php  
             **/node_modules/**
