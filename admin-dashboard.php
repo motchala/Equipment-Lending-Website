@@ -654,6 +654,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <input type="text" id="returnSearch" placeholder="Search by ID, name, or equipment...">
                             </div>
                         </div>
+                        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+                            <button id="openQrScannerBtn" class="btn-submit-form" style="width:auto;padding:8px 18px;margin:0;display:flex;align-items:center;gap:8px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                    <rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/>
+                                    <rect x="3" y="16" width="5" height="5"/><line x1="21" y1="16" x2="21" y2="21"/>
+                                    <line x1="16" y1="21" x2="21" y2="21"/><line x1="16" y1="16" x2="16" y2="16"/>
+                                </svg>
+                                Scan Return QR
+                            </button>
+                        </div>
                         <div class="tbl-wrap">
                             <table class="admin-table">
                                 <thead>
@@ -665,7 +675,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Due Date</th>
                                         <th>Status</th>
                                         <th>Action</th>
-                                        <th>Override</th>
                                     </tr>
                                 </thead>
                                 <tbody id="return-body">
@@ -673,7 +682,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) === 0): ?>
                                     <tr>
-                                        <td colspan="8" class="text-muted" style="text-align:center;padding:3rem;">
+                                        <td colspan="7" class="text-muted" style="text-align:center;padding:3rem;">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                                 stroke-linejoin="round" width="40" height="40"
@@ -686,7 +695,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </tr>
                                     <?php else: while ($r = mysqli_fetch_assoc($approved_result)):
                                             $isOverdue = strtotime($r['return_date']) < strtotime($today);
-                                            $actualStatus = $isOverdue ? 'Overdue' : 'Approved';
                                         ?>
                                     <tr>
                                         <td>
@@ -727,22 +735,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     Returned
                                                 </a>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn-action btn-override-req" data-action="open-override"
-                                                data-request-id="<?php echo $r['id']; ?>"
-                                                data-request-status="<?php echo $actualStatus; ?>"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                title="Override this request">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                    stroke-linejoin="round" width="14" height="14">
-                                                    <path
-                                                        d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                </svg>
-                                            </button>
                                         </td>
                                     </tr>
                                     <?php endwhile;
@@ -956,8 +948,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             <!-- ── EQUIPMENT REGISTRY ────────────────────────────────── -->
             <div class="lending-sub" id="lending-inventory">
-                <div class="page-header"
-                    style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div class="page-header inv-page-header">
                     <div>
                         <h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -2592,6 +2583,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         <p style="margin-top:1rem;font-weight:600;color:var(--text-dark);font-size:0.9rem;">Processing...</p>
     </div>
 
+    <!-- QR Scanner Modal -->
+    <div id="qrScannerModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
+        <div style="background:var(--surface,#fff);border-radius:20px;padding:2rem;max-width:420px;width:90%;text-align:center;position:relative;">
+            <button id="closeQrScanner" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:22px;color:#555;">✕</button>
+            <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;color:var(--text-dark,#1a1a1a);">Scan Return QR Code</h3>
+            <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Point the camera at the faculty member's QR code.</p>
+            <div style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;">
+                <video id="qrVideo" style="width:100%;display:block;" playsinline autoplay></video>
+                <!-- Scan guide overlay -->
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+                    <div style="width:200px;height:200px;border:3px solid rgba(255,255,255,0.8);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
+                </div>
+            </div>
+            <p id="qrScanStatus" style="margin-top:14px;font-size:0.85rem;color:#888;">
+                Initializing camera... 
+            </p>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div id="app-toast"></div>
 
@@ -2719,9 +2729,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <script src="JS/admin-live-render.js"></script>
 
     <!-- Admin poll toast -->
-    <div id="admin-poll-toast" style="display:none;position:fixed;bottom:24px;right:24px;
-     background:#1e3a5f;color:#fff;padding:12px 20px;border-radius:12px;
-     font-size:0.9rem;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);">
+    <div id="admin-poll-toast">
     </div>
 
 </body>

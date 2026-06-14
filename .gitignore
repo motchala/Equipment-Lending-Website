@@ -1,1 +1,12 @@
 .kiro/
+
+# Environment secrets — never push real credentials
+.env
+
+# PHP/XAMPP noise
+*.log
+/uploads/request_letters/
+
+# OS noise
+.DS_Store
+Thumbs.db

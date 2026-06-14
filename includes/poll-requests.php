@@ -8,11 +8,8 @@ if (!isset($_SESSION['faculty_id'])) {
 
 header('Content-Type: application/json');
 
-$conn = new mysqli('localhost', 'root', '', 'lending_db');
-if ($conn->connect_error) {
-    echo json_encode([]);
-    exit();
-}
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 $uid = $_SESSION['faculty_id'];
 $stmt = $conn->prepare(

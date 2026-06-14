@@ -14,11 +14,8 @@ if (!isset($_SESSION['faculty_id'])) {
     exit;
 }
 
-$conn = mysqli_connect("localhost", "root", "", "lending_db");
-if (!$conn) {
-    echo json_encode(['success' => false, 'msg' => 'Database connection failed.']);
-    exit;
-}
+require_once __DIR__ . '/db.php';
+$conn = getDB();
 
 $uid = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 $action = trim($_POST['action'] ?? '');

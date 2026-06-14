@@ -1,6 +1,6 @@
 <?php
-$conn = mysqli_connect("localhost", "root", "", "lending_db");
-if (!$conn) exit("DB Error");
+require_once __DIR__ . '/../includes/db.php';
+$conn = getDB();
 
 $search = $_GET['q'] ?? '';
 $search = "%" . $search . "%";

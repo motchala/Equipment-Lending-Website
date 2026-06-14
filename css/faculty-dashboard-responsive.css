@@ -1,0 +1,1702 @@
+/* ================================================================
+   PUPSYNC FACULTY DASHBOARD — Comprehensive Responsive System
+   Covers: mobile (≤768px), small-mobile (≤480px),
+           tablet (769px–1024px), wide-tablet (769px–900px),
+           and fixes for the new v3 dashboard components.
+   
+   Drop this file AFTER faculty-dashboard.css and faculty-code-card.css.
+   Zero class renames — all existing JS hooks remain intact.
+================================================================ */
+
+/* ================================================================
+   § 1  GLOBAL FLUID SAFETY RAILS
+   Prevent any element from causing horizontal scroll on any device.
+================================================================ */
+html {
+    overflow-x: hidden;
+}
+
+/* NOTE: The global body rule has been intentionally removed.
+   The main faculty-dashboard.css sets body { height: 100%; overflow: hidden; }
+   which is required for the fixed sidebar + scrollable main layout.
+   The min-height override is applied only inside the mobile media query
+   in § 34 below, where it is actually needed. */
+
+img,
+video,
+iframe,
+table,
+.requests-table,
+.eq-grid,
+.bento-grid,
+.active-cards-grid,
+.act-board {
+    max-width: 100%;
+}
+
+
+/* ================================================================
+   § 2  CSS CUSTOM PROPERTIES — RESPONSIVE OVERRIDES
+================================================================ */
+@media (max-width: 768px) {
+    :root {
+        --topbar-h: 60px;
+        /* slimmer top bar on mobile */
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --topbar-h: 56px;
+    }
+}
+
+
+/* ================================================================
+   § 3  TOP BAR — mobile polish
+================================================================ */
+
+/* Mobile brand text: hidden on desktop, fills space on mobile */
+.top-bar-mobile-brand {
+    display: none;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: var(--color-primary);
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    pointer-events: none;
+    /* decorative — no tap action needed */
+}
+
+@media (max-width: 768px) {
+    .top-bar {
+        height: var(--topbar-h);
+        padding: 0 12px;
+        gap: 8px;
+        position: sticky;
+        top: 0;
+        z-index: 230;
+    }
+
+    /* Reveal the mobile brand */
+    .top-bar-mobile-brand {
+        display: block;
+    }
+
+    /* Hide the full search bar on mobile */
+    .top-bar-search {
+        display: none;
+    }
+
+    /* Shrink icon button ring to save space */
+    .top-bar-icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .top-bar-avatar {
+        width: 34px;
+        height: 34px;
+    }
+
+    /* Notification / profile popovers go full-width */
+    .notif-popover,
+    .profile-dropdown {
+        position: fixed;
+        top: var(--topbar-h);
+        left: 8px;
+        right: 8px;
+        width: auto;
+        max-height: calc(100dvh - var(--topbar-h) - 16px);
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .top-bar-divider {
+        display: none;
+    }
+
+    .top-bar-actions {
+        gap: 4px;
+    }
+}
+
+
+/* ================================================================
+   § 4  SIDEBAR — slide-in drawer on mobile (existing, polished)
+================================================================ */
+@media (max-width: 768px) {
+    .side-nav {
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+            box-shadow 0.28s;
+        z-index: 241;
+    }
+
+    .side-nav.open {
+        transform: translateX(0);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.28);
+    }
+
+    .mobile-menu-btn {
+        display: flex !important;
+    }
+
+    .main-wrapper {
+        margin-left: 0 !important;
+        width: 100%;
+    }
+
+    /* Overlay / settings sit full-screen on mobile */
+    #settingsOverlay,
+    #helpOverlay,
+    #notifOverlay,
+    #accountOverlay {
+        left: 0 !important;
+        z-index: 250;
+    }
+}
+
+/* Tablet: icon-rail sidebar */
+@media (min-width: 769px) and (max-width: 1024px) {
+    :root {
+        --sidebar-w: 72px;
+    }
+
+    .side-nav {
+        width: 72px;
+        overflow: hidden;
+    }
+
+    .side-nav-title,
+    .side-nav-sub,
+    .side-nav-item>span:not(.material-symbols-outlined) {
+        display: none;
+    }
+
+    .side-nav-brand {
+        justify-content: center;
+        padding: 16px 0;
+    }
+
+    .side-nav-links,
+    .side-nav-footer {
+        padding: 8px 6px 0;
+        align-items: center;
+    }
+
+    .side-nav-item {
+        justify-content: center;
+        padding: 12px;
+        border-radius: var(--radius-md);
+    }
+
+    #settingsOverlay,
+    #helpOverlay {
+        left: 72px;
+    }
+}
+
+
+/* ================================================================
+   § 5  MAIN CANVAS PADDING
+================================================================ */
+@media (max-width: 768px) {
+    .app-main {
+        padding: 16px 14px 32px;
+        /* overflow-y must be auto so the page scrolls */
+        overflow-y: auto;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .app-main {
+        padding: 20px 20px 32px;
+    }
+
+    .top-bar {
+        padding: 0 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-main {
+        padding: 12px 10px 28px;
+    }
+}
+
+
+/* ================================================================
+   § 6  DASHBOARD HOME — v3 flat header
+================================================================ */
+
+/* The inline-style hero used in v3 redesign */
+.dash-flat-header {
+    margin-bottom: 20px;
+}
+
+.dash-flat-title {
+    font-family: 'Syne', var(--font-display);
+    font-size: clamp(1.35rem, 4vw, 1.9rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--color-on-surface);
+    line-height: 1.15;
+    margin-bottom: 4px;
+}
+
+.dash-flat-sub {
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 400;
+}
+
+@media (max-width: 768px) {
+    .dash-flat-header {
+        margin-bottom: 14px;
+    }
+
+    .dash-flat-title {
+        font-size: clamp(1.15rem, 5.5vw, 1.5rem);
+    }
+
+    .dash-flat-sub {
+        font-size: 0.78rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-flat-title {
+        font-size: 1.15rem;
+    }
+}
+
+
+/* ================================================================
+   § 7  DASHBOARD HOME — dash-top-grid (stats + code card)
+================================================================ */
+
+/* Desktop: two columns: wide left (stats+bento) | narrow right (code card) */
+.dash-top-grid {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 20px;
+    margin-bottom: 24px;
+    align-items: start;
+}
+
+.dash-top-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.dash-top-right {
+    min-width: 0;
+}
+
+/* Tablet: tighten the code card column */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .dash-top-grid {
+        grid-template-columns: 1fr 240px;
+        gap: 16px;
+    }
+}
+
+/* Wide-tablet: start stacking below 900px */
+@media (max-width: 900px) {
+    .dash-top-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .dash-top-right {
+        order: -1;
+        /* code card goes above stats on narrow screens */
+    }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .dash-top-grid {
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+}
+
+
+/* ================================================================
+   § 8  DASHBOARD HOME — stats row (dash-stats-row-layout)
+================================================================ */
+@media (max-width: 768px) {
+
+    /* Keep horizontal row on mobile but shrink */
+    .dash-stats-row-layout {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        /* room for scrollbar */
+        scrollbar-width: none;
+    }
+
+    .dash-stats-row-layout::-webkit-scrollbar {
+        display: none;
+    }
+
+    .dash-stats-row-layout .stat-card {
+        flex: 0 0 auto;
+        min-width: 110px;
+        padding: 14px 14px 12px !important;
+    }
+
+    .dash-stats-row-layout .stat-card-value {
+        font-size: 1.6rem !important;
+    }
+
+    .dash-stats-row-layout .stat-card-label {
+        font-size: 0.62rem !important;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-stats-row-layout .stat-card {
+        min-width: 95px;
+        padding: 10px 10px 8px !important;
+    }
+
+    .dash-stats-row-layout .stat-card-value {
+        font-size: 1.4rem !important;
+    }
+}
+
+
+/* ================================================================
+   § 9  DASHBOARD HOME — bento action buttons row
+   NOTE: Base styles (.dash-bento-btn, .dash-bento-icon, .dash-bento-label)
+   are intentionally defined only in faculty-dashboard.css (dark maroon
+   gradient cards with white text). Only responsive sizing lives here.
+================================================================ */
+@media (max-width: 768px) {
+    .dash-bento-row {
+        gap: 8px;
+    }
+
+    .dash-bento-btn {
+        padding: 14px 14px 12px;
+        min-height: 120px;
+    }
+
+    .dash-bento-icon .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .dash-bento-label {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-bento-btn {
+        padding: 12px 12px 10px;
+        min-height: 100px;
+        border-radius: var(--radius-lg);
+    }
+
+    .dash-bento-label {
+        font-size: 0.75rem;
+    }
+}
+
+
+/* ================================================================
+   § 10  FACULTY ACCESS CODE CARD (dash-code-card)
+   NOTE: Base styles are defined in faculty-dashboard.css.
+   Only responsive layout overrides live here.
+================================================================ */
+@media (max-width: 900px) {
+    .dash-code-card {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 18px;
+    }
+
+    .dash-code-card-header {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .dash-code-body {
+        flex: 1 1 200px;
+        min-height: auto;
+    }
+
+    .dash-code-generate-btn {
+        flex: 0 0 auto;
+        width: auto;
+        padding: 9px 18px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dash-code-card {
+        flex-direction: column;
+        padding: 16px 16px 14px;
+    }
+
+    .dash-code-card-header {
+        width: 100%;
+    }
+
+    .dash-code-body {
+        flex: none;
+        width: 100%;
+    }
+
+    .dash-code-generate-btn {
+        width: 100%;
+        padding: 9px 0;
+    }
+}
+
+
+/* ================================================================
+   § 11  DASHBOARD HOME — Activity Overview section
+   NOTE: Base styles (.dash-section-title, .dash-activity-card,
+   .dash-timeline-*) are defined in faculty-dashboard.css.
+   Only responsive overrides live here.
+================================================================ */
+@media (max-width: 1024px) {
+    .dash-activity-overview-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dash-activity-overview-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .dash-activity-card {
+        padding: 14px 16px;
+    }
+
+    .dash-timeline-name {
+        font-size: 0.8rem;
+    }
+}
+
+
+/* ================================================================
+   § 12  ACTIVE REQUESTS / BORROW CARDS
+   (active-cards-grid used on dashboard home)
+================================================================ */
+@media (min-width: 769px) and (max-width: 1100px) {
+    .active-cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .active-cards-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .active-card {
+        padding: 14px 16px 12px;
+        min-height: auto;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* Compact horizontal active-card on tiny screens */
+    .active-card {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+    }
+
+    .active-card-thumb {
+        width: 40px;
+        height: 40px;
+        flex-shrink: 0;
+    }
+
+    .active-card-body {
+        margin-top: 0;
+    }
+}
+
+
+/* ================================================================
+   § 13  EQUIPMENT PANEL — featured grid & catalog
+================================================================ */
+
+/* Featured section: 2+1 grid */
+#panel-lending .featured-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 1100px) {
+    #panel-lending .featured-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    #panel-lending .feat-hero {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 768px) {
+    #panel-lending .featured-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    #panel-lending .feat-hero {
+        grid-column: unset;
+        flex-direction: column;
+        min-height: auto;
+    }
+
+    #panel-lending .feat-hero-img,
+    #panel-lending .feat-hero-img-placeholder {
+        width: 100%;
+        height: 160px;
+    }
+
+    #panel-lending .feat-hero-body {
+        padding: 16px 18px 16px;
+    }
+
+    #panel-lending .feat-hero-title {
+        font-size: 1.1rem;
+    }
+
+    #panel-lending .feat-hero-meta {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* Lending sub-nav pills: horizontal scroll on mobile */
+    #panel-lending .lending-subnav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        gap: 6px;
+    }
+
+    #panel-lending .lending-subnav::-webkit-scrollbar {
+        display: none;
+    }
+
+    #panel-lending .lending-nav-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Catalog filters: search + select */
+@media (max-width: 768px) {
+    #panel-lending .catalog-filters {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    #panel-lending .catalog-search-wrap,
+    #panel-lending .catalog-filter-select {
+        width: 100%;
+        min-width: unset;
+    }
+
+    #panel-lending .catalog-card {
+        padding: 14px !important;
+    }
+}
+
+/* Equipment grid */
+@media (max-width: 768px) {
+
+    #panel-lending .eq-grid,
+    .eq-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+
+    #panel-lending .eq-item-img-wrap,
+    #panel-lending .eq-item-img-placeholder {
+        height: 130px !important;
+    }
+}
+
+@media (max-width: 480px) {
+
+    #panel-lending .eq-grid,
+    .eq-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+    }
+
+    #panel-lending .eq-item-img-wrap {
+        height: 110px !important;
+    }
+
+    #panel-lending .eq-item-body {
+        padding: 10px 12px 12px !important;
+    }
+
+    #panel-lending .eq-item-name {
+        font-size: 0.82rem !important;
+    }
+}
+
+@media (max-width: 360px) {
+
+    #panel-lending .eq-grid,
+    .eq-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+/* ================================================================
+   § 14  REQUESTS TABLE — horizontal scroll wrapper
+================================================================ */
+.table-surface {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.requests-table {
+    min-width: 580px;
+}
+
+@media (max-width: 768px) {
+    .table-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 14px;
+    }
+
+    .table-toolbar-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .req-filter-select,
+    .req-sort-btn {
+        font-size: 0.78rem;
+        padding: 6px 10px;
+    }
+}
+
+
+/* ================================================================
+   § 15  MY ACTIVITY — kanban board
+   NOTE: Base styles (.act-stats-bar, .act-stat, .act-board, .act-col,
+   .act-card, etc.) are defined in faculty-dashboard.css.
+   Only responsive layout overrides live here.
+================================================================ */
+
+/* Tablet: 2-col kanban */
+@media (min-width: 769px) and (max-width: 1100px) {
+    .act-board {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .act-board .act-col:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Mobile: 1-col scrollable kanban */
+@media (max-width: 768px) {
+    .act-stats-bar {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .act-stat {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 10px 12px;
+        gap: 6px;
+    }
+
+    .act-stat-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .act-stat-value {
+        font-size: 1.3rem;
+    }
+
+    .act-stats-bar .act-stat-label {
+        font-size: 0.62rem;
+        white-space: nowrap;
+    }
+
+    /* Horizontal scroll kanban on mobile */
+    .act-board {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 8px;
+        /* Snap columns */
+        scroll-snap-type: x mandatory;
+    }
+
+    .act-board::-webkit-scrollbar {
+        display: none;
+    }
+
+    .act-col {
+        flex: 0 0 280px;
+        scroll-snap-align: start;
+    }
+}
+
+@media (max-width: 480px) {
+    .act-stats-bar {
+        gap: 6px;
+    }
+
+    .act-stat {
+        padding: 8px 10px;
+    }
+
+    .act-stat-label {
+        font-size: 0.58rem !important;
+    }
+
+    .act-stat-value {
+        font-size: 1.15rem !important;
+    }
+
+    .act-col {
+        flex: 0 0 260px;
+    }
+
+    /* Download report button — full width on tiny screens */
+    .btn-download-report {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+/* ================================================================
+   § 16  ROOMS / FACILITIES PANEL
+   NOTE: Base styles (.room-list, .room-card) are defined in
+   faculty-dashboard.css. Only responsive overrides live here.
+================================================================ */
+
+@media (max-width: 768px) {
+    .room-card {
+        flex-direction: column;
+    }
+
+    .room-card-thumb {
+        width: 100%;
+        height: 72px;
+    }
+
+    .room-card-body {
+        padding: 14px 16px;
+        gap: 8px;
+    }
+
+    .room-amenities {
+        gap: 10px;
+    }
+}
+
+
+/* ================================================================
+   § 17  SETTINGS / ACCOUNT OVERLAYS
+================================================================ */
+
+/* SOV overlay — content sizing on tablet */
+@media (min-width: 769px) and (max-width: 1100px) {
+    .sov-shell {
+        max-width: 100%;
+    }
+
+    .sov-banner {
+        padding: 28px 20px 32px;
+    }
+
+    .sov-body {
+        gap: 20px;
+        padding: 20px 16px 40px;
+    }
+
+    .sov-form-card {
+        padding: 22px 24px;
+    }
+
+    .sov-form-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 18px;
+    }
+}
+
+/* SOV overlay — mobile already handled in main CSS (§8178+),
+   these supplement missing pieces */
+@media (max-width: 768px) {
+    .sov-topbar {
+        padding: 0 14px;
+        height: 56px;
+        gap: 10px;
+    }
+
+    .sov-back-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .sov-topbar-brand {
+        font-size: 0.875rem;
+    }
+
+    .sov-profile-card {
+        flex-direction: column;
+        gap: 16px;
+        padding: 16px 16px 20px;
+    }
+
+    .sov-pc-main {
+        margin-top: 0;
+        order: 0;
+    }
+
+    .sov-pc-meta {
+        display: none;
+        /* hide join date meta on mobile for cleanliness */
+    }
+
+    .sov-pc-actions {
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .sov-action-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .sov-clearance-pill {
+        justify-content: center;
+    }
+
+    .sov-form-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .sov-form-card {
+        padding: 18px 16px;
+        border-radius: 10px;
+    }
+
+    .sov-security-row,
+    .sov-privacy-action-row {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .sov-outline-btn,
+    .sov-danger-btn {
+        flex-shrink: 0;
+    }
+
+    .sov-theme-row {
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+}
+
+
+/* ================================================================
+   § 18  NOTIFICATIONS OVERLAY
+================================================================ */
+@media (max-width: 768px) {
+    .notif-overlay-wrap {
+        padding: 16px 12px 48px;
+    }
+
+    .notif-overlay-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .mark-read-btn {
+        align-self: flex-end;
+    }
+
+    .notif-filter-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+        padding-bottom: 4px;
+    }
+
+    .notif-filter-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .notif-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .notif-card {
+        padding: 12px 14px;
+        gap: 10px;
+    }
+
+    .notif-card-title {
+        font-size: 0.82rem;
+    }
+
+    .notif-card-sub {
+        font-size: 0.75rem;
+    }
+}
+
+
+/* ================================================================
+   § 19  MODALS — full-screen on mobile
+================================================================ */
+@media (max-width: 768px) {
+    .modal-backdrop {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+
+    .modal-box {
+        border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
+        max-height: 92dvh !important;
+        overflow-y: auto !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+    }
+
+    @keyframes modalSlideUp {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        padding: 16px 16px 12px;
+    }
+
+    .modal-body {
+        padding: 0 16px 16px;
+    }
+
+    .modal-footer {
+        padding: 12px 16px 16px;
+        gap: 8px;
+    }
+
+    .borrow-modal-box .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .modal-box {
+        max-height: 96dvh !important;
+    }
+}
+
+
+/* ================================================================
+   § 20  FORMS — borrow form & room form
+================================================================ */
+@media (max-width: 768px) {
+    .form-surface {
+        max-width: 100%;
+        padding: 16px 14px;
+        border-radius: var(--radius-lg);
+    }
+
+    .form-row-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* ================================================================
+   § 21  ACCOUNT OVERLAY INFO CARDS
+================================================================ */
+@media (max-width: 768px) {
+    .info-row {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .info-lbl {
+        min-width: unset;
+        width: 100%;
+        font-size: 0.72rem;
+    }
+
+    .info-val {
+        font-size: 0.82rem;
+    }
+
+    .info-card {
+        padding: 14px 16px;
+    }
+
+    .info-card-head h3 {
+        font-size: 0.82rem;
+    }
+
+    /* Account inner sidebar → horizontal scroll tabs */
+    .account-sidebar,
+    .settings-sidebar {
+        width: 100%;
+        height: auto;
+        position: static;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        border-right: none;
+        border-bottom: 1px solid var(--color-outline-variant);
+        padding: 8px 12px 4px;
+        gap: 4px;
+    }
+
+    .account-sidebar::-webkit-scrollbar,
+    .settings-sidebar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .account-nav-btn,
+    .settings-nav-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .account-content,
+    .settings-content {
+        padding: 14px 12px;
+    }
+}
+
+
+/* ================================================================
+   § 22  HELP CENTER OVERLAY
+================================================================ */
+@media (max-width: 768px) {
+    .help-wrap {
+        padding: 16px 14px 48px;
+    }
+
+    .help-contact-card {
+        padding: 20px 16px;
+        border-radius: var(--radius-lg);
+    }
+
+    details.help-item {
+        padding: 14px 16px;
+    }
+}
+
+
+/* ================================================================
+   § 23  TOAST — bottom-center on mobile
+================================================================ */
+@media (max-width: 768px) {
+    #app-toast {
+        bottom: 16px;
+        left: 12px;
+        right: 12px;
+        max-width: none;
+        border-radius: var(--radius-md);
+        font-size: 0.82rem;
+    }
+}
+
+
+/* ================================================================
+   § 24  COMING SOON BANNER
+================================================================ */
+.coming-soon-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 22px;
+    background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+    border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+    border-radius: var(--radius-xl);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+}
+
+.coming-soon-banner .material-symbols-outlined {
+    font-size: 28px;
+    color: var(--color-warning);
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.coming-soon-banner h3 {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin-bottom: 4px;
+}
+
+.coming-soon-banner p {
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .coming-soon-banner {
+        flex-direction: row;
+        gap: 10px;
+        padding: 14px 16px;
+        border-radius: var(--radius-lg);
+    }
+
+    .coming-soon-banner .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .coming-soon-banner h3 {
+        font-size: 0.9rem;
+    }
+
+    .coming-soon-banner p {
+        font-size: 0.78rem;
+    }
+}
+
+
+/* ================================================================
+   § 25  URGENT CARD (overdue block)
+================================================================ */
+@media (max-width: 768px) {
+    .urgent-card {
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px;
+        border-radius: var(--radius-lg);
+    }
+
+    .urgent-card-actions {
+        flex-wrap: wrap;
+    }
+
+    .btn-urgent-primary {
+        font-size: 0.8rem;
+        padding: 8px 16px;
+    }
+}
+
+
+/* ================================================================
+   § 26  SECTION / PAGE HEADERS
+================================================================ */
+@media (max-width: 768px) {
+    .page-header-block {
+        margin-bottom: 16px;
+    }
+
+    .page-title {
+        font-size: 1.35rem !important;
+    }
+
+    .page-title-sm {
+        font-size: 1.15rem !important;
+    }
+
+    .page-subtitle {
+        font-size: 0.8rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-title {
+        font-size: 1.2rem !important;
+    }
+
+    .page-title-sm {
+        font-size: 1.05rem !important;
+    }
+}
+
+
+/* ================================================================
+   § 27  DASHBOARD REDESIGN v3 — inline <style> overrides for mobile
+   These patch the <style> block inside faculty-dashboard.php that
+   defines dash-hero, dash-stats-row-layout, dash-body-layout, etc.
+================================================================ */
+
+/* Hero block (legacy, used by older panel-home) */
+@media (max-width: 768px) {
+    .dash-hero {
+        padding: 20px 20px 18px !important;
+        border-radius: var(--radius-lg) !important;
+    }
+
+    .dash-hero-title {
+        font-size: 1.4rem !important;
+    }
+
+    .dash-hero-sub {
+        font-size: 0.78rem !important;
+    }
+
+    .dash-hero-ornament {
+        width: 70px !important;
+        height: 70px !important;
+        right: 12px !important;
+    }
+}
+
+/* Stats row in hero layout */
+@media (max-width: 768px) {
+    .dash-stats-row-layout .stat-card-icon {
+        width: 28px !important;
+        height: 28px !important;
+        margin-bottom: 6px !important;
+    }
+}
+
+/* Sidebar bento column → stacked on mobile */
+@media (max-width: 768px) {
+    .dash-body-layout {
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+    }
+
+    .dash-sidebar-col {
+        order: -1;
+    }
+}
+
+/* Bento grid in home panel */
+@media (max-width: 768px) {
+    #panel-home .bento-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    #panel-home .bento-item {
+        min-height: 120px !important;
+        padding: 16px !important;
+    }
+
+    #panel-home .bento-title {
+        font-size: 0.875rem !important;
+        margin-top: 10px !important;
+    }
+}
+
+@media (max-width: 400px) {
+    #panel-home .bento-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+/* ================================================================
+   § 28  LENDING PANEL — filter bar + sub-nav responsive fixes
+================================================================ */
+@media (max-width: 768px) {
+    .lending-subnav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+    }
+
+    .lending-subnav::-webkit-scrollbar {
+        display: none;
+    }
+
+    .lending-nav-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+
+    .catalog-filters {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .catalog-search-wrap {
+        min-width: unset;
+    }
+
+    .catalog-filter-select {
+        width: 100%;
+    }
+
+    .catalog-card {
+        padding: 14px;
+        border-radius: var(--radius-lg);
+    }
+}
+
+
+/* ================================================================
+   § 29  TIMELINE (My Activity legacy view)
+================================================================ */
+@media (max-width: 768px) {
+    .timeline-container {
+        max-width: 100%;
+    }
+
+    .timeline-items {
+        padding-left: 24px;
+    }
+
+    .timeline-indicator {
+        left: -24px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .timeline-card {
+        padding: 12px 14px;
+    }
+
+    .timeline-card-top {
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .timeline-card-title {
+        font-size: 0.9rem;
+    }
+
+    .timeline-end {
+        margin-top: 20px;
+    }
+}
+
+
+/* ================================================================
+   § 30  STAT CARD ADJUSTMENTS (legacy vertical stats col)
+================================================================ */
+@media (max-width: 768px) {
+    .dashboard-stats-col:not(.dash-stats-row-layout) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .stat-card-value {
+        font-size: 1.8rem;
+    }
+}
+
+
+/* ================================================================
+   § 31  PRINT STYLES — clean activity report
+================================================================ */
+@media print {
+
+    .side-nav,
+    .top-bar,
+    .mobile-menu-btn,
+    .nav-backdrop,
+    #app-toast,
+    .modal-backdrop,
+    .overlay-page,
+    .btn-download-report,
+    .act-col-menu,
+    .alert-close {
+        display: none !important;
+    }
+
+    .main-wrapper {
+        margin-left: 0;
+    }
+
+    .app-main {
+        padding: 0;
+        overflow: visible;
+    }
+
+    body {
+        overflow: visible;
+    }
+
+    .act-board {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+
+    .act-col {
+        flex: none !important;
+        page-break-inside: avoid;
+    }
+
+    .tab-panel {
+        display: block !important;
+    }
+
+    .tab-panel:not(#panel-activity) {
+        display: none !important;
+    }
+}
+
+
+/* ================================================================
+   § 32  ACCESSIBILITY — touch targets & focus
+================================================================ */
+@media (pointer: coarse) {
+
+    /* Enlarge all tap targets on touch devices */
+    .side-nav-item,
+    .lending-nav-btn,
+    .qa-btn,
+    .btn-borrow,
+    .btn-submit-form,
+    .sov-save-btn,
+    .sov-outline-btn,
+    .fcc-generate-btn,
+    .dash-code-generate-btn {
+        min-height: 44px;
+    }
+
+    .top-bar-icon-btn,
+    .top-bar-avatar,
+    .mobile-menu-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+
+/* ================================================================
+   § 33  SCROLL BEHAVIOUR
+   Smooth scrolling for anchor/tab transitions; disabled when user
+   prefers reduced motion (covered above).
+================================================================ */
+html {
+    scroll-behavior: smooth;
+}
+
+
+/* ================================================================
+   § 34  BODY LAYOUT FIX
+   On mobile the body is a flex column (sidebar + wrapper stack),
+   not a side-by-side layout.
+================================================================ */
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+        height: auto;
+        overflow: hidden;
+        /* keep this — side-nav drawer needs it */
+        /* The app-main handles its own scroll */
+    }
+
+    .main-wrapper {
+        flex: 1;
+        height: calc(100dvh - var(--topbar-h));
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .app-main {
+        flex: 1;
+        height: 100%;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Overlays that are full-page need their own scroll */
+    .overlay-page {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+
+/* ================================================================
+   § 35  CATALOG SECTION HEADER
+================================================================ */
+@media (max-width: 768px) {
+    .catalog-section-header {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .catalog-section-title {
+        font-size: 0.9rem !important;
+    }
+}
+
+
+/* ================================================================
+   § 36  FEATURE CHIPS & MISC SMALL COMPONENTS
+================================================================ */
+@media (max-width: 768px) {
+
+    .status-chip,
+    .status-pill,
+    .stock-badge {
+        font-size: 0.68rem !important;
+        padding: 2px 8px !important;
+    }
+
+    .alert-banner {
+        padding: 10px 14px;
+        font-size: 0.82rem;
+        border-radius: var(--radius-md);
+    }
+
+    .section-label {
+        margin-top: 16px;
+        margin-bottom: 8px;
+    }
+
+    .selected-item-banner {
+        font-size: 0.82rem;
+        padding: 8px 12px;
+    }
+}
+
+
+/* ================================================================
+   § 37  OVERDUE / URGENT CARD STAT on mobile home
+================================================================ */
+@media (max-width: 768px) {
+    .stat-card-overdue {
+        /* Force the pulsing overdue card to not grow taller than others */
+        min-height: auto !important;
+    }
+}
+
+
+/* ================================================================
+   § 38  GENERAL GRID COLLAPSE HELPER
+   Any .form-row-2 or two-col grids not already covered above.
+================================================================ */
+@media (max-width: 600px) {
+    .form-row-2 {
+        grid-template-columns: 1fr !important;
+    }
+
+    .sov-form-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .u-form-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .u-card-full {
+        grid-column: 1 !important;
+    }
+
+    .unified-settings-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+/* ================================================================
+   § 39  LIVE SEARCH DROPDOWN — mobile positioning
+================================================================ */
+@media (max-width: 768px) {
+    .live-search-dropdown {
+        left: 0;
+        right: 0;
+        min-width: unset;
+    }
+}
+
+
+/* ================================================================
+   § 40  VERY WIDE SCREENS (≥1440px) — cap content width
+================================================================ */
+@media (min-width: 1440px) {
+    .dash-top-grid {
+        grid-template-columns: 1fr 300px;
+    }
+
+    .app-main {
+        padding: 36px 44px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .app-main {
+        padding: 40px 52px;
+    }
+}

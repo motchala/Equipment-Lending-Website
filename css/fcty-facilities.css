@@ -1,0 +1,2304 @@
+/* ================================================================
+   PUPSYNC — FACILITIES TAB  (fcty-facilities.css)
+   All rules scoped to #panel-rooms; prefix: fcty-
+   No Tailwind. Uses the faculty-dashboard.css token system.
+================================================================ */
+
+/* ── View base ──────────────────────────────────────────────── */
+#panel-rooms .fcty-view {
+    animation: fadeSlideIn 0.22s var(--transition, 0.2s ease) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW 1 — CAMPUS SELECTION (Split cards)
+═══════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-split {
+    display: flex;
+    flex-direction: row;
+    gap: 16px;
+    /* full height minus topbar (72px) and app-main padding (32px top + 32px bottom) */
+    height: calc(100vh - var(--topbar-h, 72px) - 64px);
+    min-height: 500px;
+}
+
+/* ── Campus card ─────────────────────────────────────────────── */
+#panel-rooms .fcty-campus-card {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    border-radius: var(--radius-xl, 20px);
+    cursor: pointer;
+    display: block;
+    text-decoration: none;
+    outline: none;
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.3s ease;
+}
+
+#panel-rooms .fcty-campus-card:hover {
+    box-shadow: var(--shadow-lg);
+}
+
+#panel-rooms .fcty-campus-card:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-primary, #800000),
+        var(--shadow-md);
+}
+
+/* Background image layer */
+#panel-rooms .fcty-card-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+        filter 0.55s ease;
+    will-change: transform;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-bg {
+    transform: scale(1.06);
+    filter: brightness(0.8);
+}
+
+/* Gradient overlay */
+#panel-rooms .fcty-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top,
+            rgba(80, 0, 0, 0.92) 0%,
+            rgba(80, 0, 0, 0.42) 38%,
+            transparent 100%);
+    transition: opacity 0.35s ease;
+    z-index: 1;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-overlay {
+    opacity: 0.9;
+}
+
+/* Content: floats above overlay */
+#panel-rooms .fcty-card-content {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 44px 40px;
+    transform: translateY(20px);
+    transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-content {
+    transform: translateY(0);
+}
+
+/* Badge pill */
+#panel-rooms .fcty-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    margin-bottom: 14px;
+    width: fit-content;
+}
+
+#panel-rooms .fcty-card-badge .material-symbols-outlined {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 1;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#panel-rooms .fcty-badge-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Title */
+#panel-rooms .fcty-card-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Description */
+#panel-rooms .fcty-card-desc {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.65;
+    max-width: 340px;
+    margin-bottom: 22px;
+    font-weight: 400;
+}
+
+/* CTA row */
+#panel-rooms .fcty-card-cta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffb4a8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: transform 0.3s ease, color 0.2s;
+}
+
+#panel-rooms .fcty-campus-card:hover .fcty-card-cta {
+    transform: translateX(8px);
+    color: #ffd4cc;
+}
+
+#panel-rooms .fcty-card-cta .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW 2 — BUILDING SELECTION (Breadcrumb + Carousel)
+═══════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-building-view {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Breadcrumb nav */
+#panel-rooms .fcty-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    letter-spacing: 0.01em;
+    margin-bottom: 2px;
+}
+
+#panel-rooms .fcty-breadcrumb a {
+    color: var(--color-on-surface-variant);
+    text-decoration: none;
+    transition: color 0.18s;
+}
+
+#panel-rooms .fcty-breadcrumb a:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+#panel-rooms .fcty-breadcrumb .material-symbols-outlined {
+    font-size: 14px;
+    opacity: 0.5;
+}
+
+/* Building page header */
+#panel-rooms .fcty-building-header {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-outline-variant, #ddbdbd);
+}
+
+#panel-rooms .fcty-building-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #1f1414);
+    letter-spacing: -0.02em;
+    margin: 6px 0 4px;
+    line-height: 1.2;
+}
+
+#panel-rooms .fcty-building-subtitle {
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+/* ── Carousel ────────────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-wrap {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: var(--radius-xl, 20px);
+    background: var(--color-surface-container, #f8ecec);
+    border: 1px solid var(--color-outline-variant, #ddbdbd);
+    box-shadow: var(--shadow-md);
+    height: 560px;
+    flex-shrink: 0;
+    /* Allows keyboard nav on the carousel element */
+    outline: none;
+}
+
+/* Slide track */
+#panel-rooms .fcty-carousel-inner {
+    display: flex;
+    height: 100%;
+    transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+/* Individual slide */
+#panel-rooms .fcty-carousel-slide {
+    min-width: 100%;
+    height: 100%;
+    position: relative;
+    flex-shrink: 0;
+}
+
+#panel-rooms .fcty-carousel-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+}
+
+/* Slide gradient overlay */
+#panel-rooms .fcty-slide-overlay {
+    position: absolute;
+    inset: 0;
+    /* Matches the maroon/red overlay used on the PUP MAIN / PUP CITE
+       campus selection cards, for visual consistency across views */
+    background: linear-gradient(to top,
+            rgba(80, 0, 0, 0.92) 0%,
+            rgba(80, 0, 0, 0.42) 38%,
+            transparent 100%);
+    pointer-events: none;
+}
+
+/* Slide content */
+#panel-rooms .fcty-slide-content {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 40px;
+    max-width: 700px;
+}
+
+/* Slide badge */
+#panel-rooms .fcty-slide-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    margin-bottom: 14px;
+    width: fit-content;
+    color: #ffb4a8;
+}
+
+#panel-rooms .fcty-slide-badge .material-symbols-outlined {
+    font-size: 15px;
+    font-variation-settings: 'FILL' 1;
+}
+
+#panel-rooms .fcty-slide-badge-text {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* Slide title */
+#panel-rooms .fcty-slide-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    line-height: 1.1;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Slide description */
+#panel-rooms .fcty-slide-desc {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.65;
+    max-width: 520px;
+    margin-bottom: 20px;
+    font-weight: 400;
+}
+
+/* Room / floor chips row */
+#panel-rooms .fcty-slide-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+#panel-rooms .fcty-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+/* Slide CTA button */
+#panel-rooms .fcty-slide-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: var(--color-primary-container, #800000);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius-md, 12px);
+    font-family: var(--font-sans, 'Inter');
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(128, 0, 0, 0.38);
+    transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    width: fit-content;
+}
+
+#panel-rooms .fcty-slide-btn:hover {
+    background: #5a0000;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(128, 0, 0, 0.44);
+}
+
+#panel-rooms .fcty-slide-btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+#panel-rooms .fcty-slide-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* ── Arrow buttons ───────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.22s, opacity 0.22s, transform 0.22s;
+    opacity: 0;
+    padding: 0;
+}
+
+#panel-rooms .fcty-carousel-wrap:hover .fcty-carousel-arrow,
+#panel-rooms .fcty-carousel-arrow:focus-visible {
+    opacity: 1;
+}
+
+#panel-rooms .fcty-carousel-arrow:hover {
+    background: var(--color-primary-container, #800000);
+    transform: translateY(-50%) scale(1.08);
+}
+
+#panel-rooms .fcty-carousel-arrow.fcty-prev {
+    left: 20px;
+}
+
+#panel-rooms .fcty-carousel-arrow.fcty-next {
+    right: 20px;
+}
+
+#panel-rooms .fcty-carousel-arrow .material-symbols-outlined {
+    font-size: 24px;
+}
+
+/* ── Dots ────────────────────────────────────────────────────── */
+#panel-rooms .fcty-carousel-dots {
+    position: absolute;
+    bottom: 28px;
+    right: 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 20;
+}
+
+#panel-rooms .fcty-dot {
+    height: 10px;
+    width: 10px;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(255, 255, 255, 0.40);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+#panel-rooms .fcty-dot.active {
+    background: var(--color-primary-container, #800000);
+    width: 28px;
+}
+
+#panel-rooms .fcty-dot:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.72);
+}
+
+/* ── Coming-soon slide (placeholder) ────────────────────────── */
+#panel-rooms .fcty-slide-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: linear-gradient(135deg,
+            var(--color-surface-container, #f8ecec),
+            var(--color-surface-high, #f0e0e0));
+    gap: 16px;
+    text-align: center;
+    padding: 48px;
+}
+
+#panel-rooms .fcty-slide-placeholder .material-symbols-outlined {
+    font-size: 60px;
+    color: var(--color-primary, #800000);
+    opacity: 0.18;
+}
+
+#panel-rooms .fcty-slide-placeholder h3 {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #1f1414);
+    letter-spacing: -0.01em;
+}
+
+#panel-rooms .fcty-slide-placeholder p {
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant, #5c3d3d);
+    max-width: 380px;
+    line-height: 1.65;
+    font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEW 3 — BUILDING ROOMS VIEW  (hero + metrics + floor accordions)
+═══════════════════════════════════════════════════════════════ */
+
+/* View wrapper */
+#panel-rooms .fcty-rooms-view {
+    display: flex;
+    flex-direction: column;
+    animation: fadeSlideIn 0.22s ease both;
+}
+
+/* ── Hero banner ────────────────────────────────────────────── */
+#panel-rooms .fcty-rooms-hero {
+    background: var(--color-primary, #570000);
+    border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+    padding: 24px 40px 84px;
+    /* reduced top — breadcrumb now lives above */
+    position: relative;
+    overflow: hidden;
+}
+
+/* Noise texture overlay (same SVG as the main dashboard hero) */
+#panel-rooms .fcty-rooms-hero-noise {
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIi8+PC9zdmc+");
+    background-repeat: repeat;
+    z-index: 0;
+}
+
+/* Override breadcrumb colors for the maroon hero */
+/* Breadcrumb now sits above the hero — uses default dark text,
+   no white overrides needed. Just add spacing below it.          */
+#panel-rooms .fcty-rooms-breadcrumb {
+    margin-bottom: 10px;
+}
+
+#panel-rooms .fcty-rooms-breadcrumb span:last-child {
+    font-weight: 700;
+    color: var(--color-on-surface, #1f1414);
+}
+
+/* Hero building title */
+#panel-rooms .fcty-rooms-hero-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Content container (overlaps hero bottom) ───────────────── */
+#panel-rooms .fcty-rooms-content {
+    margin-top: -52px;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 8px;
+}
+
+/* ── Metric Cards Row ───────────────────────────────────────── */
+#panel-rooms .fcty-rooms-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+#panel-rooms .fcty-metric-card {
+    background: #ffffff;
+    border-radius: var(--radius-lg, 12px);
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+    transition: transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
+}
+
+#panel-rooms .fcty-metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 26px -5px rgba(87, 0, 0, 0.13);
+    border-color: var(--color-primary, #570000);
+}
+
+/* Icon container */
+#panel-rooms .fcty-metric-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-lg, 12px);
+    background: var(--color-surface-container-high, #f9e3e2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#panel-rooms .fcty-metric-icon .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--color-primary, #570000);
+    font-variation-settings: 'FILL' 1;
+}
+
+/* Number */
+#panel-rooms .fcty-metric-value {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+    line-height: 1.1;
+}
+
+/* Label */
+#panel-rooms .fcty-metric-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    color: var(--color-on-surface-variant, #5a413d);
+    font-weight: 400;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+/* ── Floor Accordion List ────────────────────────────────────── */
+#panel-rooms .fcty-rooms-floors {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Individual accordion card */
+#panel-rooms .fcty-floor-accordion {
+    background: #ffffff;
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    border-radius: var(--radius-lg, 12px);
+    overflow: hidden;
+    transition: transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+#panel-rooms .fcty-floor-accordion:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -4px rgba(87, 0, 0, 0.1);
+}
+
+/* Toggle button (header row) */
+#panel-rooms .fcty-floor-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease;
+}
+
+#panel-rooms .fcty-floor-toggle:hover {
+    background: var(--color-surface-container-lowest, #fafafa);
+}
+
+#panel-rooms .fcty-floor-toggle:focus-visible {
+    outline: 2px solid var(--color-primary, #570000);
+    outline-offset: -2px;
+    border-radius: var(--radius-lg, 12px);
+}
+
+/* Floor label text */
+#panel-rooms .fcty-floor-label {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-on-surface, #241919);
+}
+
+/* Chevron icon */
+#panel-rooms .fcty-floor-chevron {
+    font-size: 22px;
+    color: var(--color-on-surface-variant, #5a413d);
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    font-variation-settings: normal;
+}
+
+#panel-rooms .fcty-floor-chevron.open {
+    transform: rotate(180deg);
+}
+
+/* Collapsible body */
+#panel-rooms .fcty-floor-body {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.28s ease;
+}
+
+#panel-rooms .fcty-floor-body.open {
+    /* large enough for any floor's room count */
+    max-height: 600px;
+    opacity: 1;
+}
+
+/* Inner padding + chips wrapper */
+#panel-rooms .fcty-floor-body-inner {
+    border-top: 1px solid var(--color-outline-hairline, #ddbdbd);
+    padding: 16px 24px 20px;
+    background: var(--color-surface-bright, #fff8f7);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ── Room Chips ─────────────────────────────────────────────── */
+#panel-rooms .fcty-room-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 15px;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--color-secondary-fixed, #f2dedd);
+    color: var(--color-on-surface, #241919);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    border: 1px solid var(--color-outline-variant, #e2bfb9);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.15s ease;
+}
+
+#panel-rooms .fcty-room-chip:hover {
+    background: var(--color-secondary-fixed-dim, #d6c2c2);
+    border-color: var(--color-outline-warm, #9e7070);
+    transform: translateY(-1px);
+}
+
+#panel-rooms .fcty-room-chip:active {
+    transform: translateY(0);
+}
+
+/* ── Responsive tweaks ───────────────────────────────────────── */
+@media (max-width: 900px) {
+    #panel-rooms .fcty-rooms-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    #panel-rooms .fcty-rooms-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    #panel-rooms .fcty-rooms-hero {
+        padding: 24px 24px 76px;
+    }
+
+    #panel-rooms .fcty-rooms-hero-title {
+        font-size: 1.65rem;
+    }
+
+    #panel-rooms .fcty-floor-body-inner {
+        padding: 12px 16px 16px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK THEME overrides
+═══════════════════════════════════════════════════════════════ */
+
+/* VIEW 1 */
+[data-theme="dark"] #panel-rooms .fcty-card-cta {
+    color: #f4a0a0;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-card-cta:hover {
+    color: #ffc0b8;
+}
+
+/* VIEW 2 */
+[data-theme="dark"] #panel-rooms .fcty-carousel-wrap {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-subtitle,
+[data-theme="dark"] #panel-rooms .fcty-breadcrumb {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-building-header {
+    border-bottom-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder {
+    background: linear-gradient(135deg,
+            var(--color-surface-container),
+            var(--color-surface-high));
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder h3 {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-slide-placeholder p {
+    color: var(--color-on-surface-variant);
+}
+
+/* VIEW 3 */
+[data-theme="dark"] #panel-rooms .fcty-metric-card {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-metric-value {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-metric-label {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-metric-icon {
+    background: var(--color-surface-container-high);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-floor-accordion {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-floor-toggle:hover {
+    background: var(--color-surface-container-high);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-floor-label {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-floor-chevron {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-floor-body-inner {
+    background: var(--color-surface-container-low);
+    border-top-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip {
+    background: var(--color-secondary-container);
+    border-color: var(--color-outline-variant);
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip:hover {
+    background: var(--color-secondary-fixed-dim);
+    border-color: var(--color-outline-warm);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOM DETAILS MODAL
+   Opens when a room chip in the floor accordions is clicked.
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Overlay ─────────────────────────────────────────────────── */
+#panel-rooms .fcty-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 2, 2, 0.68);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 9900;
+    /* above sidebar, topbar, and any stacked panels */
+    opacity: 0;
+    visibility: hidden;
+    cursor: default;
+    /* backdrop is not interactive — no pointer cue */
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+#panel-rooms .fcty-modal-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ── Modal panel ─────────────────────────────────────────────── */
+#panel-rooms .fcty-modal {
+    background: var(--color-surface, #ffffff);
+    border-radius: var(--radius-xl, 20px);
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg, 0 24px 60px rgba(0, 0, 0, 0.25));
+    position: relative;
+    transform: translateY(24px) scale(0.98);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.25s ease;
+}
+
+#panel-rooms .fcty-modal-overlay.open .fcty-modal {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+/* ── Close button ────────────────────────────────────────────── */
+#panel-rooms .fcty-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 5;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.2s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#panel-rooms .fcty-modal-close:hover {
+    background: var(--color-primary-container, #800000);
+    transform: rotate(90deg);
+}
+
+#panel-rooms .fcty-modal-close .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ── Image placeholder (upper section) ──────────────────────── */
+#panel-rooms .fcty-modal-image {
+    height: 200px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg,
+            var(--color-surface-container, #f8ecec),
+            var(--color-surface-high, #f0e0e0));
+    border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#panel-rooms .fcty-modal-image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-on-surface-variant, #8a6a6a);
+}
+
+#panel-rooms .fcty-modal-image-placeholder .material-symbols-outlined {
+    font-size: 44px;
+    opacity: 0.35;
+}
+
+#panel-rooms .fcty-modal-image-placeholder span:last-child {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+/* ── Body ────────────────────────────────────────────────────── */
+#panel-rooms .fcty-modal-body {
+    padding: 22px 26px 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Header row: room name + availability badge */
+#panel-rooms .fcty-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#panel-rooms .fcty-modal-location {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant, #8a6a6a);
+    margin-bottom: 4px;
+}
+
+#panel-rooms .fcty-modal-title {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+/* Availability badge */
+#panel-rooms .fcty-availability-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    border-radius: var(--radius-full, 9999px);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+#panel-rooms .fcty-availability-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Available (green) */
+#panel-rooms .fcty-availability-badge.available {
+    background: #e3f5e9;
+    color: #1e7d44;
+}
+
+#panel-rooms .fcty-availability-badge.available .fcty-availability-dot {
+    background: #2fae5f;
+    box-shadow: 0 0 0 3px rgba(47, 174, 95, 0.2);
+}
+
+/* Occupied (red) */
+#panel-rooms .fcty-availability-badge.occupied {
+    background: #fbe6e6;
+    color: #b3261e;
+}
+
+#panel-rooms .fcty-availability-badge.occupied .fcty-availability-dot {
+    background: #e0463c;
+    box-shadow: 0 0 0 3px rgba(224, 70, 60, 0.2);
+}
+
+/* ── Capacity info chip ──────────────────────────────────────── */
+#panel-rooms .fcty-modal-info-row {
+    display: flex;
+    gap: 12px;
+}
+
+#panel-rooms .fcty-info-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--color-surface-container, #f8ecec);
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    border-radius: var(--radius-lg, 12px);
+}
+
+#panel-rooms .fcty-info-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md, 10px);
+    background: var(--color-surface-container-high, #f9e3e2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#panel-rooms .fcty-info-icon .material-symbols-outlined {
+    font-size: 19px;
+    color: var(--color-primary, #570000);
+    font-variation-settings: 'FILL' 1;
+}
+
+#panel-rooms .fcty-info-value {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+    line-height: 1.2;
+}
+
+#panel-rooms .fcty-info-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.74rem;
+    color: var(--color-on-surface-variant, #5a413d);
+    margin-top: 1px;
+}
+
+/* ── Schedule tabs ───────────────────────────────────────────── */
+#panel-rooms .fcty-schedule-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--color-outline-hairline, #ddbdbd);
+}
+
+#panel-rooms .fcty-schedule-tab {
+    flex: 1;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant, #5a413d);
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+#panel-rooms .fcty-schedule-tab:hover {
+    color: var(--color-primary, #570000);
+}
+
+#panel-rooms .fcty-schedule-tab.active {
+    color: var(--color-primary, #570000);
+    border-bottom-color: var(--color-primary, #570000);
+}
+
+/* ── Schedule panels ─────────────────────────────────────────── */
+#panel-rooms .fcty-schedule-panel {
+    display: none;
+}
+
+#panel-rooms .fcty-schedule-panel.active {
+    display: block;
+    animation: fadeSlideIn 0.2s ease both;
+}
+
+#panel-rooms .fcty-schedule-day-label {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+    margin-bottom: 10px;
+}
+
+/* Daily schedule list */
+#panel-rooms .fcty-schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#panel-rooms .fcty-schedule-slot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md, 10px);
+    border-left: 3px solid transparent;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.84rem;
+}
+
+#panel-rooms .fcty-schedule-slot.occupied {
+    background: var(--color-secondary-fixed, #f2dedd);
+    border-left-color: var(--color-primary, #570000);
+}
+
+#panel-rooms .fcty-schedule-slot.occupied .fcty-slot-occupant {
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-schedule-slot.vacant {
+    background: var(--color-surface-container-lowest, #fafafa);
+    border-left-color: var(--color-outline-variant, #ddbdbd);
+}
+
+#panel-rooms .fcty-schedule-slot.vacant .fcty-slot-occupant {
+    color: var(--color-on-surface-variant, #8a6a6a);
+    font-style: italic;
+}
+
+#panel-rooms .fcty-slot-time {
+    font-weight: 600;
+    color: var(--color-on-surface-variant, #5a413d);
+    white-space: nowrap;
+}
+
+/* Helper note text under either schedule panel */
+#panel-rooms .fcty-schedule-note {
+    margin-top: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.74rem;
+    color: var(--color-on-surface-variant, #8a6a6a);
+    line-height: 1.5;
+}
+
+/* ── Weekly schedule grid (placeholder-ready) ───────────────── */
+#panel-rooms .fcty-weekly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+#panel-rooms .fcty-weekly-day {
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    border-radius: var(--radius-md, 10px);
+    overflow: hidden;
+    background: var(--color-surface-container-lowest, #fafafa);
+    display: flex;
+    flex-direction: column;
+    min-height: 92px;
+}
+
+#panel-rooms .fcty-weekly-day-header {
+    padding: 8px 10px;
+    background: var(--color-surface-container, #f8ecec);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-on-surface, #241919);
+    border-bottom: 1px solid var(--color-outline-hairline, #ddbdbd);
+}
+
+#panel-rooms .fcty-weekly-day-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+}
+
+#panel-rooms .fcty-weekly-slot {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    line-height: 1.4;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: var(--color-secondary-fixed, #f2dedd);
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-weekly-empty {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    color: var(--color-on-surface-variant, #8a6a6a);
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex: 1;
+    padding: 6px;
+}
+
+/* ── Modal action buttons (Reserve / Report) ────────────────── */
+#panel-rooms .fcty-modal-actions {
+    display: flex;
+    gap: 12px;
+    padding: 18px 26px 24px;
+    margin-top: 18px;
+    border-top: 1px solid var(--color-outline-hairline, #ddbdbd);
+}
+
+#panel-rooms .fcty-modal-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: var(--radius-md, 12px);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease,
+        box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+#panel-rooms .fcty-modal-btn .material-symbols-outlined {
+    font-size: 19px;
+}
+
+#panel-rooms .fcty-btn-reserve {
+    background: var(--color-primary-container, #800000);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 4px 16px rgba(128, 0, 0, 0.32);
+}
+
+#panel-rooms .fcty-btn-reserve:hover {
+    background: #5a0000;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(128, 0, 0, 0.4);
+}
+
+#panel-rooms .fcty-btn-report {
+    background: transparent;
+    color: var(--color-on-surface-variant, #5a413d);
+    border: 1.5px solid var(--color-outline-variant, #ddbdbd);
+}
+
+#panel-rooms .fcty-btn-report:hover {
+    border-color: var(--color-primary, #570000);
+    color: var(--color-primary, #570000);
+    background: var(--color-surface-container, #f8ecec);
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    #panel-rooms .fcty-modal-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    #panel-rooms .fcty-modal {
+        max-width: 100%;
+        max-height: 92vh;
+        border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+    }
+
+    #panel-rooms .fcty-modal-overlay.open .fcty-modal {
+        transform: translateY(0) scale(1);
+    }
+
+    #panel-rooms .fcty-modal-image {
+        height: 150px;
+        border-radius: var(--radius-xl, 20px) var(--radius-xl, 20px) 0 0;
+    }
+
+    #panel-rooms .fcty-modal-body {
+        padding: 18px 18px 4px;
+    }
+
+    #panel-rooms .fcty-modal-actions {
+        padding: 14px 18px 18px;
+    }
+
+    #panel-rooms .fcty-weekly-grid {
+        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DARK THEME — ROOM DETAILS MODAL
+═══════════════════════════════════════════════════════════════ */
+[data-theme="dark"] #panel-rooms .fcty-modal {
+    background: var(--color-surface-container);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-modal-image {
+    background: linear-gradient(135deg,
+            var(--color-surface-container),
+            var(--color-surface-high));
+}
+
+[data-theme="dark"] #panel-rooms .fcty-modal-title,
+[data-theme="dark"] #panel-rooms .fcty-info-value,
+[data-theme="dark"] #panel-rooms .fcty-schedule-day-label,
+[data-theme="dark"] #panel-rooms .fcty-weekly-day-header,
+[data-theme="dark"] #panel-rooms .fcty-schedule-slot.occupied .fcty-slot-occupant,
+[data-theme="dark"] #panel-rooms .fcty-weekly-slot {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-modal-location,
+[data-theme="dark"] #panel-rooms .fcty-info-label,
+[data-theme="dark"] #panel-rooms .fcty-slot-time,
+[data-theme="dark"] #panel-rooms .fcty-schedule-note,
+[data-theme="dark"] #panel-rooms .fcty-schedule-slot.vacant .fcty-slot-occupant,
+[data-theme="dark"] #panel-rooms .fcty-weekly-empty,
+[data-theme="dark"] #panel-rooms .fcty-schedule-tab {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-info-chip,
+[data-theme="dark"] #panel-rooms .fcty-weekly-day {
+    background: var(--color-surface-container-high);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-info-icon,
+[data-theme="dark"] #panel-rooms .fcty-weekly-day-header {
+    background: var(--color-surface-container-highest, var(--color-surface-container-high));
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-schedule-slot.occupied,
+[data-theme="dark"] #panel-rooms .fcty-weekly-slot {
+    background: var(--color-secondary-container);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-schedule-slot.vacant {
+    background: var(--color-surface-container-low);
+    border-left-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-schedule-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-schedule-tabs,
+[data-theme="dark"] #panel-rooms .fcty-modal-actions {
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-availability-badge.available {
+    background: rgba(47, 174, 95, 0.18);
+    color: #6fe39d;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-availability-badge.occupied {
+    background: rgba(224, 70, 60, 0.18);
+    color: #ff9b91;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-btn-report {
+    border-color: var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-btn-report:hover {
+    background: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE / MOBILE-READY ENHANCEMENTS  (fcty-facilities.css)
+   Appended block — makes the entire Facilities tab (all 3 views +
+   room modal) fully responsive across phones, tablets, foldables,
+   and landscape orientations. Scoped to #panel-rooms. Mobile-first
+   overrides layered on top of the desktop rules above — later rules
+   win at equal specificity, so these refine each breakpoint down.
+════════════════════════════════════════════════════════════════ */
+
+/* ── Touch devices: hover effects don't work, show state directly ── */
+@media (hover: none) and (pointer: coarse) {
+    #panel-rooms .fcty-carousel-arrow {
+        opacity: 1;
+    }
+
+    #panel-rooms .fcty-card-overlay {
+        opacity: 0.88;
+    }
+
+    #panel-rooms .fcty-card-content {
+        transform: translateY(0);
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ≤ 1024px — Tablets / small laptops
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+
+    /* VIEW 1 — Campus cards */
+    #panel-rooms .fcty-card-content {
+        padding: 32px 28px;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 2.15rem;
+    }
+
+    #panel-rooms .fcty-card-desc {
+        max-width: 100%;
+        font-size: 0.825rem;
+    }
+
+    /* VIEW 2 — Carousel */
+    #panel-rooms .fcty-carousel-wrap {
+        height: 460px;
+    }
+
+    #panel-rooms .fcty-slide-content {
+        padding: 32px;
+        max-width: 100%;
+    }
+
+    #panel-rooms .fcty-slide-title {
+        font-size: 2.1rem;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ≤ 768px — Tablet portrait / large phones
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    #panel-rooms {
+        overflow-x: hidden;
+    }
+
+    /* ── VIEW 1 — stack campus cards vertically ───────────────── */
+    #panel-rooms .fcty-split {
+        flex-direction: column;
+        height: auto;
+        min-height: 0;
+        gap: 14px;
+    }
+
+    #panel-rooms .fcty-campus-card {
+        flex: none;
+        height: 260px;
+    }
+
+    #panel-rooms .fcty-card-content {
+        padding: 26px 22px;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 1.85rem;
+        margin-bottom: 8px;
+    }
+
+    #panel-rooms .fcty-card-desc {
+        font-size: 0.8rem;
+        margin-bottom: 16px;
+    }
+
+    /* ── VIEW 2 — Building selection ──────────────────────────── */
+    #panel-rooms .fcty-building-title {
+        font-size: 1.6rem;
+    }
+
+    #panel-rooms .fcty-building-subtitle {
+        font-size: 0.825rem;
+    }
+
+    #panel-rooms .fcty-carousel-wrap {
+        height: 420px;
+        border-radius: var(--radius-lg, 12px);
+    }
+
+    #panel-rooms .fcty-carousel-arrow {
+        width: 40px;
+        height: 40px;
+    }
+
+    #panel-rooms .fcty-carousel-arrow .material-symbols-outlined {
+        font-size: 20px;
+    }
+
+    #panel-rooms .fcty-slide-content {
+        padding: 24px;
+    }
+
+    #panel-rooms .fcty-slide-title {
+        font-size: 1.7rem;
+        margin-bottom: 8px;
+    }
+
+    #panel-rooms .fcty-slide-desc {
+        font-size: 0.825rem;
+        max-width: 100%;
+        margin-bottom: 14px;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        overflow: hidden;
+    }
+
+    #panel-rooms .fcty-slide-meta {
+        margin-bottom: 16px;
+    }
+
+    #panel-rooms .fcty-slide-btn {
+        padding: 10px 18px;
+        font-size: 0.8rem;
+    }
+
+    #panel-rooms .fcty-carousel-dots {
+        left: 50%;
+        right: auto;
+        bottom: 16px;
+        transform: translateX(-50%);
+    }
+
+    /* ── VIEW 3 — Rooms view ───────────────────────────────────── */
+    #panel-rooms .fcty-rooms-hero {
+        padding: 22px 28px 72px;
+    }
+
+    #panel-rooms .fcty-rooms-content {
+        margin-top: -46px;
+    }
+
+    /* ── Breadcrumbs wrap on narrow widths ────────────────────── */
+    #panel-rooms .fcty-breadcrumb,
+    #panel-rooms .fcty-rooms-breadcrumb {
+        flex-wrap: wrap;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ≤ 600px — Phones
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+
+    /* ── VIEW 1 — Campus cards ─────────────────────────────────── */
+    #panel-rooms .fcty-campus-card {
+        height: 230px;
+        border-radius: var(--radius-lg, 12px);
+    }
+
+    #panel-rooms .fcty-card-content {
+        padding: 20px 18px;
+    }
+
+    #panel-rooms .fcty-card-badge {
+        padding: 4px 10px;
+        margin-bottom: 10px;
+    }
+
+    #panel-rooms .fcty-badge-text {
+        font-size: 0.6rem;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 1.55rem;
+        margin-bottom: 6px;
+    }
+
+    #panel-rooms .fcty-card-desc {
+        font-size: 0.75rem;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+    }
+
+    #panel-rooms .fcty-card-cta {
+        font-size: 0.68rem;
+        gap: 6px;
+    }
+
+    #panel-rooms .fcty-card-cta .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    /* ── VIEW 2 — Building selection ──────────────────────────── */
+    #panel-rooms .fcty-building-header {
+        padding-bottom: 12px;
+    }
+
+    #panel-rooms .fcty-building-title {
+        font-size: 1.3rem;
+        margin: 4px 0;
+    }
+
+    #panel-rooms .fcty-building-subtitle {
+        font-size: 0.8rem;
+    }
+
+    #panel-rooms .fcty-carousel-wrap {
+        height: 380px;
+        border-radius: var(--radius-md, 10px);
+    }
+
+    #panel-rooms .fcty-carousel-arrow {
+        width: 36px;
+        height: 36px;
+    }
+
+    #panel-rooms .fcty-carousel-arrow.fcty-prev {
+        left: 10px;
+    }
+
+    #panel-rooms .fcty-carousel-arrow.fcty-next {
+        right: 10px;
+    }
+
+    #panel-rooms .fcty-slide-content {
+        padding: 18px;
+    }
+
+    #panel-rooms .fcty-slide-badge {
+        padding: 4px 10px;
+        margin-bottom: 10px;
+    }
+
+    #panel-rooms .fcty-slide-badge-text {
+        font-size: 0.62rem;
+    }
+
+    #panel-rooms .fcty-slide-title {
+        font-size: 1.4rem;
+        margin-bottom: 6px;
+    }
+
+    #panel-rooms .fcty-slide-desc {
+        font-size: 0.78rem;
+        margin-bottom: 12px;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    #panel-rooms .fcty-meta-chip {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+    }
+
+    #panel-rooms .fcty-slide-btn {
+        padding: 9px 16px;
+        font-size: 0.76rem;
+        gap: 6px;
+    }
+
+    #panel-rooms .fcty-slide-btn .material-symbols-outlined {
+        font-size: 16px;
+    }
+
+    #panel-rooms .fcty-carousel-dots {
+        bottom: 12px;
+        gap: 6px;
+    }
+
+    #panel-rooms .fcty-dot {
+        height: 8px;
+        width: 8px;
+    }
+
+    #panel-rooms .fcty-dot.active {
+        width: 22px;
+    }
+
+    #panel-rooms .fcty-slide-placeholder {
+        padding: 24px;
+        gap: 10px;
+    }
+
+    #panel-rooms .fcty-slide-placeholder .material-symbols-outlined {
+        font-size: 44px;
+    }
+
+    #panel-rooms .fcty-slide-placeholder h3 {
+        font-size: 1.1rem;
+    }
+
+    #panel-rooms .fcty-slide-placeholder p {
+        font-size: 0.8rem;
+        max-width: 100%;
+    }
+
+    /* ── VIEW 3 — Rooms view ───────────────────────────────────── */
+    #panel-rooms .fcty-rooms-content {
+        margin-top: -40px;
+        gap: 10px;
+    }
+
+    #panel-rooms .fcty-metric-card {
+        padding: 14px 16px;
+        gap: 12px;
+    }
+
+    #panel-rooms .fcty-metric-icon {
+        width: 42px;
+        height: 42px;
+    }
+
+    #panel-rooms .fcty-metric-icon .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    #panel-rooms .fcty-metric-value {
+        font-size: 1.5rem;
+    }
+
+    #panel-rooms .fcty-metric-label {
+        font-size: 0.78rem;
+    }
+
+    #panel-rooms .fcty-floor-toggle {
+        padding: 14px 16px;
+    }
+
+    #panel-rooms .fcty-floor-label {
+        font-size: 0.92rem;
+    }
+
+    #panel-rooms .fcty-room-chip {
+        font-size: 0.7rem;
+        padding: 5px 12px;
+    }
+
+    /* ── Breadcrumb scale ──────────────────────────────────────── */
+    #panel-rooms .fcty-breadcrumb,
+    #panel-rooms .fcty-rooms-breadcrumb {
+        font-size: 0.7rem;
+        gap: 4px;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ≤ 480px — Small phones
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+    /* ── VIEW 1 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-campus-card {
+        height: 210px;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 1.35rem;
+    }
+
+    #panel-rooms .fcty-card-desc {
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
+    /* ── VIEW 2 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-carousel-wrap {
+        height: 340px;
+    }
+
+    #panel-rooms .fcty-slide-title {
+        font-size: 1.2rem;
+    }
+
+    #panel-rooms .fcty-slide-desc {
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        margin-bottom: 10px;
+    }
+
+    #panel-rooms .fcty-slide-meta {
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+
+    #panel-rooms .fcty-meta-chip {
+        font-size: 0.65rem;
+        padding: 3px 9px;
+    }
+
+    /* ── VIEW 3 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-rooms-hero {
+        padding: 20px 20px 64px;
+    }
+
+    #panel-rooms .fcty-rooms-hero-title {
+        font-size: 1.4rem;
+    }
+
+    #panel-rooms .fcty-rooms-content {
+        margin-top: -34px;
+    }
+
+    #panel-rooms .fcty-metric-value {
+        font-size: 1.25rem;
+    }
+
+    #panel-rooms .fcty-metric-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    /* ── ROOM MODAL ────────────────────────────────────────────── */
+    #panel-rooms .fcty-modal-image {
+        height: 120px;
+    }
+
+    #panel-rooms .fcty-modal-title {
+        font-size: 1.3rem;
+    }
+
+    #panel-rooms .fcty-modal-location {
+        font-size: 0.65rem;
+    }
+
+    #panel-rooms .fcty-availability-badge {
+        font-size: 0.7rem;
+        padding: 6px 11px;
+    }
+
+    #panel-rooms .fcty-info-value {
+        font-size: 1rem;
+    }
+
+    #panel-rooms .fcty-schedule-tab {
+        font-size: 0.76rem;
+        padding: 9px 8px;
+    }
+
+    #panel-rooms .fcty-schedule-slot {
+        font-size: 0.78rem;
+        padding: 9px 12px;
+    }
+
+    #panel-rooms .fcty-weekly-grid {
+        grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+        gap: 6px;
+    }
+
+    #panel-rooms .fcty-weekly-day-header {
+        font-size: 0.65rem;
+        padding: 6px 8px;
+    }
+
+    #panel-rooms .fcty-weekly-slot,
+    #panel-rooms .fcty-weekly-empty {
+        font-size: 0.65rem;
+    }
+
+    #panel-rooms .fcty-modal-btn {
+        font-size: 0.8rem;
+        padding: 11px 14px;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ≤ 380px — Extra-small phones (e.g. iPhone SE / older Androids)
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 380px) {
+
+    /* ── VIEW 1 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-campus-card {
+        height: 190px;
+    }
+
+    #panel-rooms .fcty-card-content {
+        padding: 18px 16px;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 1.2rem;
+    }
+
+    /* ── VIEW 2 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-carousel-wrap {
+        height: 300px;
+    }
+
+    #panel-rooms .fcty-slide-content {
+        padding: 14px;
+    }
+
+    #panel-rooms .fcty-slide-title {
+        font-size: 1.05rem;
+    }
+
+    #panel-rooms .fcty-slide-desc {
+        display: none;
+    }
+
+    #panel-rooms .fcty-carousel-arrow {
+        width: 32px;
+        height: 32px;
+    }
+
+    #panel-rooms .fcty-carousel-arrow .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    /* ── VIEW 3 ────────────────────────────────────────────────── */
+    #panel-rooms .fcty-rooms-hero-title {
+        font-size: 1.2rem;
+    }
+
+    #panel-rooms .fcty-rooms-metrics {
+        gap: 8px;
+    }
+
+    /* ── ROOM MODAL — stack action buttons ────────────────────── */
+    #panel-rooms .fcty-modal-actions {
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px 16px;
+    }
+
+    #panel-rooms .fcty-modal-body {
+        padding: 16px 16px 4px;
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Short / landscape phones — keep campus split side-by-side and
+   shrink the hero areas so content fits without excess scrolling
+════════════════════════════════════════════════════════════════ */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+
+    /* VIEW 1 */
+    #panel-rooms .fcty-split {
+        flex-direction: row;
+        height: calc(100vh - var(--topbar-h, 72px) - 32px);
+        min-height: 260px;
+    }
+
+    #panel-rooms .fcty-campus-card {
+        flex: 1;
+        height: auto;
+    }
+
+    #panel-rooms .fcty-card-title {
+        font-size: 1.5rem;
+    }
+
+    #panel-rooms .fcty-card-desc {
+        display: none;
+    }
+
+    /* VIEW 2 */
+    #panel-rooms .fcty-carousel-wrap {
+        height: calc(100vh - var(--topbar-h, 72px) - 140px);
+        min-height: 220px;
+    }
+
+    #panel-rooms .fcty-slide-desc {
+        display: none;
+    }
+
+    /* ROOM MODAL */
+    #panel-rooms .fcty-modal {
+        max-height: 96vh;
+    }
+
+    #panel-rooms .fcty-modal-image {
+        height: 90px;
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════════════
+   ROOM STATUS LEGEND  (View 3 — Building Rooms View)
+   Explains the global color-coding used on room chips:
+     green  = Available       — Open for booking
+     red    = Booked           — Already reserved
+     blue   = Pending          — Booking request awaiting approval
+     yellow = Maintenance      — Temporarily closed
+     gray   = Not Bookable     — Cannot be reserved
+
+   The .status-* classes below are reusable on .fcty-room-chip so
+   that once live reservation data is wired in, chips can simply
+   receive e.g. class="fcty-room-chip status-pending" and pick up
+   the matching color automatically.
+════════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-status-legend {
+    background: #ffffff;
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    border-radius: var(--radius-lg, 12px);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+#panel-rooms .fcty-legend-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-legend-heading .material-symbols-outlined {
+    font-size: 19px;
+    color: var(--color-primary, #570000);
+    font-variation-settings: 'FILL' 1;
+}
+
+#panel-rooms .fcty-legend-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 16px;
+}
+
+#panel-rooms .fcty-legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface-container-low, #faf6f6);
+}
+
+#panel-rooms .fcty-legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+
+#panel-rooms .fcty-legend-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.25;
+}
+
+#panel-rooms .fcty-legend-label {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-legend-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--color-on-surface-variant, #5a413d);
+}
+
+/* ── Status colors ─────────────────────────────────────────────── */
+
+/* Available — green */
+#panel-rooms .fcty-legend-available {
+    background: #2fae5f;
+}
+
+#panel-rooms .fcty-room-chip.status-available {
+    background: #e3f5e9;
+    border-color: #2fae5f;
+    color: #1e7d44;
+}
+
+/* Booked — red */
+#panel-rooms .fcty-legend-unavailable {
+    background: #e0463c;
+}
+
+#panel-rooms .fcty-room-chip.status-unavailable {
+    background: #fbe6e6;
+    border-color: #e0463c;
+    color: #b3261e;
+}
+
+/* Pending — blue */
+#panel-rooms .fcty-legend-pending {
+    background: #2f80ed;
+}
+
+#panel-rooms .fcty-room-chip.status-pending {
+    background: #e8f1fd;
+    border-color: #2f80ed;
+    color: #1c5fc1;
+}
+
+/* Maintenance — yellow */
+#panel-rooms .fcty-legend-maintenance {
+    background: #f2b705;
+}
+
+#panel-rooms .fcty-room-chip.status-maintenance {
+    background: #fef6e0;
+    border-color: #d99a04;
+    color: #92720a;
+}
+
+/* Not Bookable — gray */
+#panel-rooms .fcty-legend-static {
+    background: #9aa0a6;
+}
+
+#panel-rooms .fcty-room-chip.status-static {
+    background: #eef0f1;
+    border-color: #9aa0a6;
+    color: #5f6368;
+    cursor: default;
+}
+
+#panel-rooms .fcty-room-chip.status-static:hover {
+    transform: none;
+}
+
+/* ── Dark theme ───────────────────────────────────────────────── */
+[data-theme="dark"] #panel-rooms .fcty-status-legend {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-heading {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-item {
+    background: var(--color-surface-container-high, rgba(255, 255, 255, 0.04));
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-label {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-desc {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-available {
+    background: rgba(47, 174, 95, 0.18);
+    border-color: #2fae5f;
+    color: #6fe39d;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-unavailable {
+    background: rgba(224, 70, 60, 0.18);
+    border-color: #e0463c;
+    color: #ff9b91;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-pending {
+    background: rgba(47, 128, 237, 0.2);
+    border-color: #2f80ed;
+    color: #8ab4ff;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-maintenance {
+    background: rgba(242, 183, 5, 0.18);
+    border-color: #f2b705;
+    color: #ffd866;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-static {
+    background: rgba(154, 160, 166, 0.18);
+    border-color: #9aa0a6;
+    color: #c4c7c8;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    #panel-rooms .fcty-status-legend {
+        padding: 14px 16px;
+        gap: 10px;
+    }
+
+    #panel-rooms .fcty-legend-heading {
+        font-size: 0.85rem;
+    }
+
+    #panel-rooms .fcty-legend-items {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px 12px;
+    }
+
+    #panel-rooms .fcty-legend-label {
+        font-size: 0.76rem;
+    }
+
+    #panel-rooms .fcty-legend-desc {
+        font-size: 0.68rem;
+    }
+}
+
+@media (max-width: 380px) {
+    #panel-rooms .fcty-legend-items {
+        grid-template-columns: 1fr;
+    }
+}
