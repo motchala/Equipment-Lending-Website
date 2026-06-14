@@ -23,14 +23,14 @@
 
             <!-- ── PUP MAIN ──────────────────────────────────── -->
             <a class="fcty-campus-card"
-               href="#"
-               data-fcty-campus="main"
-               role="button"
-               aria-label="Select PUP Main Campus — manage buildings and rooms">
+                href="#"
+                data-fcty-campus="main"
+                role="button"
+                aria-label="Select PUP Main Campus — manage buildings and rooms">
 
                 <!-- Background image — swap src for a real PUP MAIN photo -->
                 <div class="fcty-card-bg"
-                     style="background-image: url('css/images-design-faculty/pup-main-image.jpg');">
+                    style="background-image: url('css/images-design-faculty/pup-main-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 
@@ -53,14 +53,14 @@
 
             <!-- ── PUP CITE ───────────────────────────────────── -->
             <a class="fcty-campus-card"
-               href="#"
-               data-fcty-campus="cite"
-               role="button"
-               aria-label="Select PUP CITE Engineering Campus — manage buildings and rooms">
+                href="#"
+                data-fcty-campus="cite"
+                role="button"
+                aria-label="Select PUP CITE Engineering Campus — manage buildings and rooms">
 
                 <!-- Background image — swap src for a real PUP CITE photo -->
                 <div class="fcty-card-bg"
-                     style="background-image: url('css/images-design-faculty/pup-cite-image.jpg');">
+                    style="background-image: url('css/images-design-faculty/pup-cite-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 
@@ -107,24 +107,24 @@
 
         <!-- Building Carousel -->
         <div class="fcty-carousel-wrap" id="fcty-carousel-wrap" tabindex="0"
-             aria-label="Building carousel — use arrow keys to navigate">
+            aria-label="Building carousel — use arrow keys to navigate">
 
             <!-- Slide track — populated by fcty-facilities.js -->
             <div class="fcty-carousel-inner" id="fcty-carousel-inner"></div>
 
             <!-- Arrow nav buttons -->
             <button class="fcty-carousel-arrow fcty-prev" id="fcty-prev"
-                    aria-label="Previous building">
+                aria-label="Previous building">
                 <span class="material-symbols-outlined">chevron_left</span>
             </button>
             <button class="fcty-carousel-arrow fcty-next" id="fcty-next"
-                    aria-label="Next building">
+                aria-label="Next building">
                 <span class="material-symbols-outlined">chevron_right</span>
             </button>
 
             <!-- Pagination dots — populated by fcty-facilities.js -->
             <div class="fcty-carousel-dots" id="fcty-carousel-dots"
-                 role="tablist" aria-label="Carousel pagination"></div>
+                role="tablist" aria-label="Carousel pagination"></div>
 
         </div><!-- /#fcty-carousel-wrap -->
 
@@ -162,11 +162,63 @@
 
             <!-- Metric summary cards — populated by fcty-facilities.js -->
             <div class="fcty-rooms-metrics" id="fcty-rooms-metrics"
-                 aria-label="Building metrics"></div>
+                aria-label="Building metrics"></div>
+
+            <!-- Room status legend — explains the color coding used on
+                 room chips below. Colors are global indicators reused
+                 across the system once live reservation data is wired in:
+                   green  = Available
+                   red    = Booked
+                   blue   = Booking Pending
+                   yellow = Under Maintenance
+                   gray   = Not for Reservation -->
+            <div class="fcty-status-legend" aria-label="Room status color guide">
+                <div class="fcty-legend-heading">
+                    <span class="material-symbols-outlined">info</span>
+                    <span>Status Guide</span>
+                </div>
+                <div class="fcty-legend-items">
+                    <span class="fcty-legend-item">
+                        <span class="fcty-legend-dot fcty-legend-available" aria-hidden="true"></span>
+                        <span class="fcty-legend-text">
+                            <span class="fcty-legend-label">Available</span>
+                            <span class="fcty-legend-desc">Open for booking</span>
+                        </span>
+                    </span>
+                    <span class="fcty-legend-item">
+                        <span class="fcty-legend-dot fcty-legend-unavailable" aria-hidden="true"></span>
+                        <span class="fcty-legend-text">
+                            <span class="fcty-legend-label">Booked</span>
+                            <span class="fcty-legend-desc">Already reserved</span>
+                        </span>
+                    </span>
+                    <span class="fcty-legend-item">
+                        <span class="fcty-legend-dot fcty-legend-pending" aria-hidden="true"></span>
+                        <span class="fcty-legend-text">
+                            <span class="fcty-legend-label">Pending</span>
+                            <span class="fcty-legend-desc">Booking request awaiting approval</span>
+                        </span>
+                    </span>
+                    <span class="fcty-legend-item">
+                        <span class="fcty-legend-dot fcty-legend-maintenance" aria-hidden="true"></span>
+                        <span class="fcty-legend-text">
+                            <span class="fcty-legend-label">Maintenance</span>
+                            <span class="fcty-legend-desc">Temporarily closed</span>
+                        </span>
+                    </span>
+                    <span class="fcty-legend-item">
+                        <span class="fcty-legend-dot fcty-legend-static" aria-hidden="true"></span>
+                        <span class="fcty-legend-text">
+                            <span class="fcty-legend-label">Not Bookable</span>
+                            <span class="fcty-legend-desc">Cannot be reserved</span>
+                        </span>
+                    </span>
+                </div>
+            </div>
 
             <!-- Floor accordion list — populated by fcty-facilities.js -->
             <div class="fcty-rooms-floors" id="fcty-rooms-floors"
-                 role="list" aria-label="Building floors"></div>
+                role="list" aria-label="Building floors"></div>
 
         </div><!-- /.fcty-rooms-content -->
 
@@ -223,11 +275,11 @@
                 <!-- Schedule tabs -->
                 <div class="fcty-schedule-tabs" role="tablist" aria-label="Room schedule range">
                     <button class="fcty-schedule-tab active" type="button"
-                            data-schedule-tab="daily" role="tab" aria-selected="true">
+                        data-schedule-tab="daily" role="tab" aria-selected="true">
                         Today&rsquo;s Schedule
                     </button>
                     <button class="fcty-schedule-tab" type="button"
-                            data-schedule-tab="weekly" role="tab" aria-selected="false">
+                        data-schedule-tab="weekly" role="tab" aria-selected="false">
                         Weekly Schedule
                     </button>
                 </div>

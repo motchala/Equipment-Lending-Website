@@ -2070,3 +2070,235 @@
         height: 90px;
     }
 }
+
+
+/* ════════════════════════════════════════════════════════════════
+   ROOM STATUS LEGEND  (View 3 — Building Rooms View)
+   Explains the global color-coding used on room chips:
+     green  = Available       — Open for booking
+     red    = Booked           — Already reserved
+     blue   = Pending          — Booking request awaiting approval
+     yellow = Maintenance      — Temporarily closed
+     gray   = Not Bookable     — Cannot be reserved
+
+   The .status-* classes below are reusable on .fcty-room-chip so
+   that once live reservation data is wired in, chips can simply
+   receive e.g. class="fcty-room-chip status-pending" and pick up
+   the matching color automatically.
+════════════════════════════════════════════════════════════════ */
+
+#panel-rooms .fcty-status-legend {
+    background: #ffffff;
+    border: 1px solid var(--color-outline-hairline, #ddbdbd);
+    border-radius: var(--radius-lg, 12px);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+#panel-rooms .fcty-legend-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-legend-heading .material-symbols-outlined {
+    font-size: 19px;
+    color: var(--color-primary, #570000);
+    font-variation-settings: 'FILL' 1;
+}
+
+#panel-rooms .fcty-legend-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 16px;
+}
+
+#panel-rooms .fcty-legend-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-md, 8px);
+    background: var(--color-surface-container-low, #faf6f6);
+}
+
+#panel-rooms .fcty-legend-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+
+#panel-rooms .fcty-legend-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.25;
+}
+
+#panel-rooms .fcty-legend-label {
+    font-family: var(--font-display, 'Hanken Grotesk');
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-on-surface, #241919);
+}
+
+#panel-rooms .fcty-legend-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--color-on-surface-variant, #5a413d);
+}
+
+/* ── Status colors ─────────────────────────────────────────────── */
+
+/* Available — green */
+#panel-rooms .fcty-legend-available {
+    background: #2fae5f;
+}
+
+#panel-rooms .fcty-room-chip.status-available {
+    background: #e3f5e9;
+    border-color: #2fae5f;
+    color: #1e7d44;
+}
+
+/* Booked — red */
+#panel-rooms .fcty-legend-unavailable {
+    background: #e0463c;
+}
+
+#panel-rooms .fcty-room-chip.status-unavailable {
+    background: #fbe6e6;
+    border-color: #e0463c;
+    color: #b3261e;
+}
+
+/* Pending — blue */
+#panel-rooms .fcty-legend-pending {
+    background: #2f80ed;
+}
+
+#panel-rooms .fcty-room-chip.status-pending {
+    background: #e8f1fd;
+    border-color: #2f80ed;
+    color: #1c5fc1;
+}
+
+/* Maintenance — yellow */
+#panel-rooms .fcty-legend-maintenance {
+    background: #f2b705;
+}
+
+#panel-rooms .fcty-room-chip.status-maintenance {
+    background: #fef6e0;
+    border-color: #d99a04;
+    color: #92720a;
+}
+
+/* Not Bookable — gray */
+#panel-rooms .fcty-legend-static {
+    background: #9aa0a6;
+}
+
+#panel-rooms .fcty-room-chip.status-static {
+    background: #eef0f1;
+    border-color: #9aa0a6;
+    color: #5f6368;
+    cursor: default;
+}
+
+#panel-rooms .fcty-room-chip.status-static:hover {
+    transform: none;
+}
+
+/* ── Dark theme ───────────────────────────────────────────────── */
+[data-theme="dark"] #panel-rooms .fcty-status-legend {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-heading {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-item {
+    background: var(--color-surface-container-high, rgba(255, 255, 255, 0.04));
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-label {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-legend-desc {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-available {
+    background: rgba(47, 174, 95, 0.18);
+    border-color: #2fae5f;
+    color: #6fe39d;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-unavailable {
+    background: rgba(224, 70, 60, 0.18);
+    border-color: #e0463c;
+    color: #ff9b91;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-pending {
+    background: rgba(47, 128, 237, 0.2);
+    border-color: #2f80ed;
+    color: #8ab4ff;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-maintenance {
+    background: rgba(242, 183, 5, 0.18);
+    border-color: #f2b705;
+    color: #ffd866;
+}
+
+[data-theme="dark"] #panel-rooms .fcty-room-chip.status-static {
+    background: rgba(154, 160, 166, 0.18);
+    border-color: #9aa0a6;
+    color: #c4c7c8;
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    #panel-rooms .fcty-status-legend {
+        padding: 14px 16px;
+        gap: 10px;
+    }
+
+    #panel-rooms .fcty-legend-heading {
+        font-size: 0.85rem;
+    }
+
+    #panel-rooms .fcty-legend-items {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px 12px;
+    }
+
+    #panel-rooms .fcty-legend-label {
+        font-size: 0.76rem;
+    }
+
+    #panel-rooms .fcty-legend-desc {
+        font-size: 0.68rem;
+    }
+}
+
+@media (max-width: 380px) {
+    #panel-rooms .fcty-legend-items {
+        grid-template-columns: 1fr;
+    }
+}

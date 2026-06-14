@@ -268,7 +268,7 @@
                     expanded: false,
                     rooms: [
                         'Research Room',
-                        'Room 202', 
+                        'Room 202',
                         'Room 203',
                         'Room 204',
                         'Room 205'
@@ -467,9 +467,25 @@
     }
 
     /* ── Single floor accordion HTML ────────────────────────────── */
+
+    /* DEMO-ONLY status pattern — for visual reference only.
+       Cycles through the five statuses from the Status Guide so every
+       floor shows a mix of colors. Replace with real reservation data
+       later by giving each room object in BUILDING_ROOMS a real
+       `status` field and reading it here instead of the cycle. */
+    var DEMO_ROOM_STATUS_CYCLE = [
+        'status-available',
+        'status-available',
+        'status-unavailable',
+        'status-pending',
+        'status-maintenance',
+        'status-static'
+    ];
+
     function buildFloorAccordionHTML(floor) {
-        var chipsHTML = floor.rooms.map(function (room) {
-            return '<span class="fcty-room-chip">' + room + '</span>';
+        var chipsHTML = floor.rooms.map(function (room, index) {
+            var statusClass = DEMO_ROOM_STATUS_CYCLE[index % DEMO_ROOM_STATUS_CYCLE.length];
+            return '<span class="fcty-room-chip ' + statusClass + '">' + room + '</span>';
         }).join('');
 
         var bodyClass = 'fcty-floor-body' + (floor.expanded ? ' open' : '');
@@ -1044,6 +1060,9 @@
             /* Room chip → open room details modal */
             var chip = e.target.closest('.fcty-room-chip');
             if (chip) {
+                /* "Not Bookable" rooms aren't reservable — no modal */
+                if (chip.classList.contains('status-static')) return;
+
                 var floorEl = chip.closest('.fcty-floor-accordion');
                 var floorLabel = floorEl ? floorEl.querySelector('.fcty-floor-label').textContent : '';
                 var buildingName = roomsHeroTitle.textContent.trim();
