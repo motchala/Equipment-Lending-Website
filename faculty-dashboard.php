@@ -202,13 +202,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         rel="stylesheet">
     <!-- Font Awesome (kept for existing icon references in JS) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="CSS/faculty-dashboard.css">
+    <link rel="stylesheet" href="css/faculty-dashboard.css">
 
     <!-- Faculty Code Card -->
     <link rel="stylesheet" href="css/faculty-code-card.css">
 
     <!-- Responsive System -->
-    <link rel="stylesheet" href="CSS/faculty-dashboard-responsive.css">
+    <link rel="stylesheet" href="css/faculty-dashboard-responsive.css">
 
     <!-- Dashboard Redesign v3 — Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">

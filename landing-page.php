@@ -213,7 +213,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     </noscript>
 
-    <link rel="stylesheet" href="CSS/landing-page.css">
+    <link rel="stylesheet" href="css/landing-page.css">
 </head>
 
 <body>
