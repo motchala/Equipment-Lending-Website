@@ -1,4 +1,5 @@
 .kiro/
+db.php
 
 # Environment secrets — never push real credentials
 .env
