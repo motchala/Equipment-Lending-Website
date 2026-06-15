@@ -23,7 +23,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <title>PUP Sync | Admin Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="CSS/admin-dashboard.css">
+    <link rel="stylesheet" href="css/admin-dashboard.css">
 </head>
 
 <body>
