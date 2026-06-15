@@ -10,6 +10,8 @@ $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 require_once __DIR__ . '/includes/db.php';
 $conn = getDB();
 
+$base_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+
 require_once __DIR__ . '/includes/arbitration-engine.php';
 
 function maskEmail($email)
@@ -1733,7 +1735,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                         </div>
                                         <?php if (!empty($featured_hero['image_path'])): ?>
                                             <div class="feat-hero-img">
-                                                <img src="/<?php echo htmlspecialchars($featured_hero['image_path']); ?>"
+                                                <img src="<?php echo $base_url . htmlspecialchars($featured_hero['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($featured_hero['item_name']); ?>">
                                             </div>
                                         <?php else: ?>
@@ -1749,7 +1751,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                     <div class="feat-secondary">
                                         <div class="feat-secondary-img" style="position:relative;">
                                             <?php if (!empty($featured_sec['image_path'])): ?>
-                                                <img src="/<?php echo htmlspecialchars($featured_sec['image_path']); ?>"
+                                                <img src="<?php echo $base_url . htmlspecialchars($featured_sec['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($featured_sec['item_name']); ?>">
                                             <?php else: ?>
                                                 <span class="material-symbols-outlined">inventory_2</span>
@@ -1824,7 +1826,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                                         <div class="eq-item-img-wrap">
                                             <?php if (!empty($item['image_path'])): ?>
                                                 <img class="eq-item-img"
-                                                    src="/<?php echo htmlspecialchars($item['image_path']); ?>"
+                                                    src="<?php echo $base_url . htmlspecialchars($item['image_path']); ?>"
                                                     alt="<?php echo htmlspecialchars($item['item_name']); ?>">
                                             <?php else: ?>
                                                 <div class="eq-item-img-placeholder">
