@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/includes/csrf.php';
 // Ensure server uses local timezone for login timestamps
 date_default_timezone_set('Asia/Manila');
 
@@ -29,6 +30,7 @@ $login_email_val = $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
 
 // ----------- LOGIN -----------
 if (isset($_POST['login'])) {
+    csrf_verify();
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
     $user_type = $_POST['user_type'] ?? 'student'; // Default to student if not specified
@@ -143,6 +145,7 @@ if (isset($_POST['login'])) {
 
 // ----------- REGISTRATION -----------
 if (isset($_POST['register'])) {
+    csrf_verify(); 
     $fullname         = trim($_POST['fullname']);
     $student_id       = trim($_POST['student_id']);
     $email            = trim($_POST['email']);
@@ -579,6 +582,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             </div>
                         <?php endif; ?>
                         <form method="POST" action="">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="user_type" value="student">
                             <div class="form-group">
                                 <label for="student-login-email">Faculty Email</label>
@@ -626,6 +630,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             </div>
                         <?php endif; ?>
                         <form method="POST" action="">
+                            <?= csrf_field() ?>
                             <div class="form-group">
                                 <label for="reg-name">Full Name</label>
                                 <div class="input-wrap">
@@ -713,6 +718,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             </div>
                         <?php endif; ?>
                         <form method="POST" action="">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="user_type" value="admin">
                             <div class="form-group">
                                 <label for="admin-login-email">Admin Email</label>

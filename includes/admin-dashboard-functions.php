@@ -10,10 +10,12 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 
 require_once __DIR__ . '/db.php';
 $conn = getDB();
+require_once __DIR__ . '/csrf.php';
 
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {
     header('Content-Type: application/json');
+    csrf_verify();
     $current = $_POST['current_password'] ?? '';
     $new     = $_POST['new_password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
@@ -89,7 +91,7 @@ mysqli_query($conn, "
 // ================= ADD ITEM =================
 
 if (isset($_POST['add_item'])) {
-
+    csrf_verify();
     // Sanitize and format basic inputs
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
@@ -136,7 +138,8 @@ if (isset($_POST['add_item'])) {
 // ================= EDIT ITEM =================
 
 if (isset($_POST['update_item'])) {
-
+    csrf_verify();
+    
     $item_id = intval($_POST['item_id']);
     $name = $_POST['item_name'];
     $category = $_POST['category'];

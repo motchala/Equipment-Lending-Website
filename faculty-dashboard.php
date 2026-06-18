@@ -1,5 +1,6 @@
 ﻿<?php
 session_start();
+require_once __DIR__ . '/includes/csrf.php';
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: ../Equipment-Lending-Website/landing-page.php");
     exit();
@@ -34,6 +35,7 @@ mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Appr
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['faculty_id'])) die("Unauthorized access");
+    csrf_verify();
     $user_id = $_SESSION['faculty_id'];
     $user_query = mysqli_query($conn, "SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
     $user = mysqli_fetch_assoc($user_query);
@@ -3257,6 +3259,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     <span id="selectedItemLabel">No item selected</span>
                 </div>
                 <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                    <?= csrf_field() ?>
                     <input type="hidden" name="equipment_name" id="selectedItem">
                     <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                     <div class="form-group">
