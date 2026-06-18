@@ -1,4 +1,9 @@
 ﻿<?php
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL);
+ini_set('log_errors', '1');
+
 session_start();
 require_once __DIR__ . '/includes/csrf.php';
 if (!isset($_SESSION['faculty_id'])) {
@@ -119,7 +124,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
 
         header("Location: faculty-dashboard.php?success=1");
         exit();
-    } else die("Error processing request: " . mysqli_error($conn));
+    } else {
+        error_log('[PUPSync] faculty-dashboard borrow insert failed: ' . mysqli_error($conn));
+        die("Error processing request. Please try again later.");
+    }
 }
 
 // ── Inventory & Requests ───────────────────────────────────────────────────
@@ -218,7 +226,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
-     <link rel="stylesheet" href="css/fcty-facilities.css">
+    <link rel="stylesheet" href="css/fcty-facilities.css">
 
     <style>
         /* ================================================================

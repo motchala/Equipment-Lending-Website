@@ -1,4 +1,9 @@
 <?php
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL);
+ini_set('log_errors', '1');
+
 session_start();
 require_once __DIR__ . '/includes/csrf.php';
 // Ensure server uses local timezone for login timestamps
