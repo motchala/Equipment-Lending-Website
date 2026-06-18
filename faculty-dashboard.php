@@ -1,4 +1,15 @@
 ﻿<?php
+
+// application error disclosure vulnerability prevention 
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL);
+ini_set('log_errors', '1');
+
+// csp vulnerability fix: generate a nonce for inline scripts and styles, and include it in the CSP header
+$csp_nonce = base64_encode(random_bytes(16));
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+
 session_start();
 require_once __DIR__ . '/includes/csrf.php';
 if (!isset($_SESSION['faculty_id'])) {
@@ -119,7 +130,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
 
         header("Location: faculty-dashboard.php?success=1");
         exit();
-    } else die("Error processing request: " . mysqli_error($conn));
+    } else {
+        error_log('[PUPSync] faculty-dashboard borrow insert failed: ' . mysqli_error($conn));
+        die("Error processing request. Please try again later.");
+    }
 }
 
 // ── Inventory & Requests ───────────────────────────────────────────────────
@@ -205,7 +219,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         rel="stylesheet">
     <!-- Font Awesome (kept for existing icon references in JS) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous">
+
     <link rel="stylesheet" href="css/faculty-dashboard.css">
 
     <!-- Faculty Code Card -->
@@ -218,9 +233,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
-     <link rel="stylesheet" href="css/fcty-facilities.css">
+    <link rel="stylesheet" href="css/fcty-facilities.css">
 
-    <style>
+    <style nonce="<?php echo $csp_nonce; ?>">
+        /* fix for csp vulnerability. inline styles */
         /* ================================================================
        DASHBOARD REDESIGN v3 — panel-home overrides only
        All JS-referenced classes are preserved; only visual/layout
@@ -2343,7 +2359,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                 <span class="act-ai-fab-tooltip">Chat with AI Support</span>
             </button>
 
-            <script>
+            <script nonce="<?php echo $csp_nonce; ?>">
+                // nonce for inline script — fix for csp vulnerability
                 /* AI chat send stub — wire to real endpoint later */
                 function actAiSend() {
                     const input = document.getElementById('actAiInput');
@@ -3443,7 +3460,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     </div>
 
     <!-- Profile Config for JS -->
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         window.USER_PROFILE_LOCKS = {
             dob: <?php echo $dob_locked ? 'true' : 'false'; ?>,
             gender: <?php echo $gender_locked ? 'true' : 'false'; ?>,
@@ -3464,7 +3481,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Toast -->
     <div id="app-toast"></div>
 
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;

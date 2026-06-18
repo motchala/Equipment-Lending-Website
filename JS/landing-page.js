@@ -392,3 +392,79 @@ function toggleEye(inputId, btn) {
         btn.setAttribute('aria-label', 'Show password');
     }
 }
+
+/* ================================================================
+   EVENT LISTENER WIRING
+   Replaces all inline onclick/oninput removed from HTML to comply
+   with Content-Security-Policy (no unsafe-inline).
+================================================================ */
+document.addEventListener('DOMContentLoaded', function () {
+
+    // Carousel arrows
+    document.getElementById('carouselPrev')?.addEventListener('click', () => carouselGo(-1));
+    document.getElementById('carouselNext')?.addEventListener('click', () => carouselGo(1));
+
+    // Hero — Access Portal button
+    document.getElementById('accessPortalBtn')?.addEventListener('click', () => openModal());
+
+    // Footer — Sign In / Create Account links
+    document.getElementById('footerSignInBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal('login');
+    });
+    document.getElementById('footerRegisterBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal('register');
+    });
+
+    // Footer — Mobile toggle buttons
+    document.getElementById('mobileToggleBtn')?.addEventListener('click', () => toggleMobileView());
+    document.getElementById('fmbDesktopBtn')?.addEventListener('click', () => toggleMobileView());
+
+    // Modal — backdrop closes modal
+    document.getElementById('modalBackdrop')?.addEventListener('click', () => closeModal());
+
+    // Modal — handle toggles minimize; stop propagation on action buttons area
+    document.getElementById('modalHandle')?.addEventListener('click', () => toggleMinimize());
+    document.getElementById('modalHandle')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') toggleMinimize();
+    });
+    document.getElementById('modalHandleActions')?.addEventListener('click', (e) => e.stopPropagation());
+
+    // Modal — minimize and close buttons
+    document.getElementById('minimizeBtn')?.addEventListener('click', () => toggleMinimize());
+    document.getElementById('minimizeBtn')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') toggleMinimize();
+    });
+    document.getElementById('modalCloseBtn')?.addEventListener('click', () => closeModal());
+    document.getElementById('modalCloseBtn')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') closeModal();
+    });
+
+    // Role selector cards
+    document.getElementById('roleFacultyBtn')?.addEventListener('click', () => selectRole('student'));
+    document.getElementById('roleStudentBtn')?.addEventListener('click', () => {
+        window.location.href = 'student-dashboard.php';
+    });
+    document.getElementById('roleAdminBtn')?.addEventListener('click', () => selectRole('admin'));
+
+    // Back buttons
+    document.getElementById('studentBackBtn')?.addEventListener('click', () => backToRoleSelector());
+    document.getElementById('adminBackBtn')?.addEventListener('click', () => backToRoleSelector());
+
+    // Auth tabs
+    document.getElementById('student-tab-login')?.addEventListener('click', () => switchStudentTab('login'));
+    document.getElementById('student-tab-register')?.addEventListener('click', () => switchStudentTab('register'));
+
+    // Password eye-toggles — wired via data-target attribute
+    document.querySelectorAll('.eye-toggle[data-target]').forEach(btn => {
+        btn.addEventListener('click', function () {
+            toggleEye(this.dataset.target, this);
+        });
+    });
+
+    // Input validators
+    document.getElementById('reg-name')?.addEventListener('input', function () { validateLettersName(this); });
+    document.getElementById('reg-sid')?.addEventListener('input', function () { validateLettersStudentID(this); });
+    document.getElementById('reg-email')?.addEventListener('input', function () { validateLettersEmail(this); });
+});

@@ -1,4 +1,8 @@
 <?php
+// fix for csp vulnerability. nonce is generated per request and is unique.
+$csp_nonce = base64_encode(random_bytes(16));
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+
 // return_confirm.php — Admin scans QR → marks equipment as Returned
 session_start();
 date_default_timezone_set('Asia/Manila');
@@ -83,7 +87,7 @@ if ($token) {
     <meta charset="UTF-8">
     <title>Return Confirmation</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <style>
+    <style nonce="<?php echo $csp_nonce; ?>">
         body {
             font-family: Inter, sans-serif;
             display: flex;
@@ -105,8 +109,8 @@ if ($token) {
         }
 
         h2 {
-            color: <?php echo $success ? '#2e7d32': '#b71c1c';
-            ?>;
+            color: <?php echo $success ? '#2e7d32' : '#b71c1c';
+                    ?>;
             margin-bottom: 12px;
         }
 

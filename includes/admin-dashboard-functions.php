@@ -1,4 +1,9 @@
 <?php
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL);
+ini_set('log_errors', '1');
+
 // admin-dashboard-functions.php
 session_start();
 // Ensure server uses local timezone for displaying login timestamps
@@ -130,7 +135,8 @@ if (isset($_POST['add_item'])) {
         header("Location: admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
-        die("Error saving to database: " . $conn->error);
+        error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
+        die("Error saving to database. Please try again later.");
     }
 }
 
@@ -139,7 +145,7 @@ if (isset($_POST['add_item'])) {
 
 if (isset($_POST['update_item'])) {
     csrf_verify();
-    
+
     $item_id = intval($_POST['item_id']);
     $name = $_POST['item_name'];
     $category = $_POST['category'];

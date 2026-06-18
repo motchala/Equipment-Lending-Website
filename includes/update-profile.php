@@ -435,7 +435,8 @@ if ($action === 'confirm_save_contact') {
             'landline' => $updated['landline']
         ]);
     } else {
-        echo json_encode(['success' => false, 'msg' => 'Database error: ' . mysqli_error($conn)]);
+        error_log('[PUPSync] update-profile DB error: ' . mysqli_error($conn));
+        echo json_encode(['success' => false, 'msg' => 'A database error occurred. Please try again later.']);
     }
     exit;
 }
