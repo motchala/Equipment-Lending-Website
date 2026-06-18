@@ -995,6 +995,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="form-card-body">
                             <form method="POST" enctype="multipart/form-data" id="itemForm">
+                                <?= csrf_field() ?>
                                 <?php if ($edit_item): ?>
                                 <input type="hidden" name="item_id" value="<?php echo $edit_item['item_id']; ?>">
                                 <input type="hidden" name="old_image"
