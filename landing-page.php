@@ -1,8 +1,14 @@
 <?php
+
+// fix for application disclosure vulnerability.
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 ini_set('log_errors', '1');
+
+// fix for csp vulnerability. nonce is generated per request and is unique.
+$csp_nonce = base64_encode(random_bytes(16));
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 
 session_start();
 require_once __DIR__ . '/includes/csrf.php';
@@ -150,7 +156,7 @@ if (isset($_POST['login'])) {
 
 // ----------- REGISTRATION -----------
 if (isset($_POST['register'])) {
-    csrf_verify(); 
+    csrf_verify();
     $fullname         = trim($_POST['fullname']);
     $student_id       = trim($_POST['student_id']);
     $email            = trim($_POST['email']);
@@ -216,9 +222,8 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     <link rel="preload" as="image" href="images/7-hero-page.jpg">
     <!-- Fonts with display=swap to avoid FOIT -->
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" media="print" onload="this.media='all'">
-    <noscript>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous">
     </noscript>
 
     <link rel="stylesheet" href="css/landing-page.css">
@@ -706,7 +711,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         </form>
                     </div>
                 </div>
-                
+
                 <!-- ADMIN LOGIN -->
                 <div class="auth-section" id="adminSection">
                     <button class="back-btn" onclick="backToRoleSelector()">
@@ -759,7 +764,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     </div><!-- /modal-overlay -->
 
     <script src="JS/landing-page.js"></script>
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* ================================================================
            INIT — PHP-generated values injected here
         ================================================================ */
@@ -779,7 +784,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
 </html>
 </script>
-<script>
+<script nonce="<?php echo $csp_nonce; ?>">
     /* ================================================================
            INIT — PHP-generated values injected here
         ================================================================ */

@@ -1,4 +1,10 @@
 <?php
+session_start();
+if (!isset($_SESSION['faculty_id']) && !isset($_SESSION['admin'])) {
+    http_response_code(401);
+    echo json_encode([]);
+    exit();
+}
 require_once __DIR__ . '/../includes/db.php';
 $conn = getDB();
 
