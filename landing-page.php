@@ -8,8 +8,7 @@ ini_set('log_errors', '1');
 
 // fix for csp vulnerability. nonce is generated per request and is unique.
 $csp_nonce = base64_encode(random_bytes(16));
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
-
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 session_start();
 require_once __DIR__ . '/includes/csrf.php';
 // Ensure server uses local timezone for login timestamps
@@ -222,9 +221,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     <link rel="preload" as="image" href="images/7-hero-page.jpg">
     <!-- Fonts with display=swap to avoid FOIT -->
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf" crossorigin="anonymous">
-    </noscript>
 
     <link rel="stylesheet" href="css/landing-page.css">
 </head>
@@ -260,10 +257,10 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
             <div class="blob-br"></div>
 
             <!-- Prev / Next arrows -->
-            <button class="carousel-arrow prev" onclick="carouselGo(-1)" aria-label="Previous image">
+            <button class="carousel-arrow prev" id="carouselPrev" aria-label="Previous image">
                 <i class="fa-solid fa-chevron-left"></i>
             </button>
-            <button class="carousel-arrow next" onclick="carouselGo(1)" aria-label="Next image">
+            <button class="carousel-arrow next" id="carouselNext" aria-label="Next image">
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
 
@@ -306,7 +303,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
                 <!-- Buttons come first -->
                 <div class="hero-cta-group">
-                    <button class="btn-primary" onclick="openModal()" aria-label="Access the system portal">
+                    <button class="btn-primary" id="accessPortalBtn" aria-label="Access the system portal">
                         <span>Access Portal</span>
                         <span class="btn-icon"><i class="fa-solid fa-arrow-right"></i></span>
                     </button>
@@ -354,8 +351,8 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     <div>
                         <p class="footer-col-title">Portal</p>
                         <ul class="footer-links">
-                            <li><a href="#" onclick="openModal('login'); return false;"><i class="fa-solid fa-chevron-right"></i> Sign In</a></li>
-                            <li><a href="#" onclick="openModal('register'); return false;"><i class="fa-solid fa-chevron-right"></i> Create Account</a></li>
+                            <li><a href="#" id="footerSignInBtn"><i class="fa-solid fa-chevron-right"></i> Sign In</a></li>
+                            <li><a href="#" id="footerRegisterBtn"><i class="fa-solid fa-chevron-right"></i> Create Account</a></li>
                             <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
                             <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
                             <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
@@ -413,7 +410,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                     <div class="footer-badges">
                         <span class="footer-badge"><i class="fa-solid fa-shield-halved"></i> Secure Auth</span>
                         <span class="footer-badge"><i class="fa-solid fa-lock"></i> Encrypted</span>
-                        <button class="footer-badge mobile-toggle-btn" id="mobileToggleBtn" onclick="toggleMobileView()" title="Switch to mobile preview layout" aria-pressed="false">
+                        <button class="footer-badge mobile-toggle-btn" id="mobileToggleBtn" title="Switch to mobile preview layout" aria-pressed="false">
                             <i class="fa-solid fa-mobile-screen-button" id="mobileToggleIcon"></i>
                             <span id="mobileToggleLabel">Mobile Ready</span>
                         </button>
@@ -489,7 +486,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                             &copy; 2026 <strong>PUPSYNC</strong> — For Faculty, By PUP Biñan.<br>
                             <a href="https://www.pup.edu.ph/binan/" target="_blank" rel="noopener">PUP Biñan Campus</a>
                         </p>
-                        <button class="fmb-desktop-btn" onclick="toggleMobileView()" aria-label="Switch to desktop layout">
+                        <button class="fmb-desktop-btn" id="fmbDesktopBtn" aria-label="Switch to desktop layout">
                             <i class="fa-solid fa-desktop"></i> Desktop View
                         </button>
                     </div>
@@ -508,26 +505,23 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
      is always relative to the actual viewport, not the frame element
 ================================================================ -->
     <div class="modal-overlay" id="authModal" role="dialog" aria-modal="true" aria-label="Sign in or Register">
-        <div class="modal-backdrop" onclick="closeModal()"></div>
+        <div class="modal-backdrop" id="modalBackdrop"></div>
         <div class="modal-card" id="modalCard">
 
-            <div class="modal-handle" onclick="toggleMinimize()" role="button" tabindex="0"
-                aria-label="Minimize or restore auth panel"
-                onkeydown="if(event.key==='Enter'||event.key===' ')toggleMinimize()">
+            <div class="modal-handle" id="modalHandle" role="button" tabindex="0"
+                aria-label="Minimize or restore auth panel">
                 <div class="modal-handle-bar">
                     <div class="modal-handle-pill"></div>
                     <span class="modal-handle-label">Faculty Portal</span>
                     <span class="modal-minimized-hint">Tap to expand</span>
                 </div>
-                <div class="modal-handle-actions" onclick="event.stopPropagation()">
-                    <div class="modal-action-btn" id="minimizeBtn" onclick="toggleMinimize()"
-                        title="Minimize" aria-label="Minimize panel" role="button" tabindex="0"
-                        onkeydown="if(event.key==='Enter')toggleMinimize()">
+                <div class="modal-handle-actions" id="modalHandleActions">
+                    <div class="modal-action-btn" id="minimizeBtn"
+                        title="Minimize" aria-label="Minimize panel" role="button" tabindex="0">
                         <i class="fa-solid fa-minus"></i>
                     </div>
-                    <div class="modal-action-btn" onclick="closeModal()"
-                        title="Close" aria-label="Close panel" role="button" tabindex="0"
-                        onkeydown="if(event.key==='Enter')closeModal()">
+                    <div class="modal-action-btn" id="modalCloseBtn"
+                        title="Close" aria-label="Close panel" role="button" tabindex="0">
                         <i class="fa-solid fa-xmark"></i>
                     </div>
                 </div>
@@ -542,21 +536,21 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         <p>Choose your role to continue</p>
                     </div>
                     <div class="role-cards">
-                        <button class="role-card" onclick="selectRole('student')">
+                        <button class="role-card" id="roleFacultyBtn">
                             <div class="role-icon">
                                 <i class="fa-solid fa-chalkboard-teacher"></i>
                             </div>
                             <h3>Faculty</h3>
                             <p>Borrow equipment & reserve rooms</p>
                         </button>
-                        <button class="role-card" onclick="window.location.href='student-dashboard.php'">
+                        <button class="role-card" id="roleStudentBtn">
                             <div class="role-icon">
                                 <i class="fa-solid fa-graduation-cap"></i>
                             </div>
                             <h3>Student</h3>
                             <p>No account needed — borrow & reserve</p>
                         </button>
-                        <button class="role-card" onclick="selectRole('admin')">
+                        <button class="role-card" id="roleAdminBtn">
                             <div class="role-icon">
                                 <i class="fa-solid fa-user-shield"></i>
                             </div>
@@ -568,15 +562,15 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
                 <!-- FACULTY LOGIN/REGISTER -->
                 <div class="auth-section" id="studentSection">
-                    <button class="back-btn" onclick="backToRoleSelector()">
+                    <button class="back-btn" id="studentBackBtn">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </button>
 
                     <div class="auth-tabs" role="tablist">
-                        <button class="auth-tab-btn active" id="student-tab-login" onclick="switchStudentTab('login')">
+                        <button class="auth-tab-btn active" id="student-tab-login">
                             <i class="fa-solid fa-arrow-right-to-bracket"></i> Login
                         </button>
-                        <button class="auth-tab-btn" id="student-tab-register" onclick="switchStudentTab('register')">
+                        <button class="auth-tab-btn" id="student-tab-register">
                             <i class="fa-solid fa-user-plus"></i> Register
                         </button>
                     </div>
@@ -611,7 +605,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                         placeholder="Enter your password"
                                         autocomplete="current-password" required>
                                     <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" onclick="toggleEye('student-login-pass', this)" tabindex="-1" aria-label="Show password">
+                                    <button type="button" class="eye-toggle" data-target="student-login-pass" tabindex="-1" aria-label="Show password">
                                         <i class="fa-regular fa-eye-slash"></i>
                                     </button>
                                 </div>
@@ -648,7 +642,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                         minlength="5" maxlength="70"
                                         placeholder="Juan Dela Cruz"
                                         value="<?= htmlspecialchars($reg_fullname_val) ?>"
-                                        oninput="validateLettersName(this)"
+
                                         autocomplete="name" required>
                                     <i class="fa-solid fa-user input-icon-left"></i>
                                 </div>
@@ -660,7 +654,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                         minlength="15" maxlength="15"
                                         placeholder="20XX-00XXX-BN-X"
                                         value="<?= htmlspecialchars($reg_studentid_val) ?>"
-                                        oninput="validateLettersStudentID(this)"
+
                                         title="Format: YYYY-XXXXX-BN-X"
                                         autocomplete="off" required>
                                     <i class="fa-solid fa-id-card input-icon-left"></i>
@@ -673,7 +667,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                         minlength="15" maxlength="254"
                                         placeholder="faculty@pup.edu.ph"
                                         value="<?= htmlspecialchars($reg_email_val) ?>"
-                                        oninput="validateLettersEmail(this)"
+
                                         autocomplete="email" required>
                                     <i class="fa-solid fa-envelope input-icon-left"></i>
                                 </div>
@@ -686,7 +680,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                             minlength="4" placeholder="Min. 4 characters"
                                             autocomplete="new-password" required>
                                         <i class="fa-solid fa-lock input-icon-left"></i>
-                                        <button type="button" class="eye-toggle" onclick="toggleEye('reg-pass', this)" tabindex="-1" aria-label="Show password">
+                                        <button type="button" class="eye-toggle" data-target="reg-pass" tabindex="-1" aria-label="Show password">
                                             <i class="fa-regular fa-eye-slash"></i>
                                         </button>
                                     </div>
@@ -698,7 +692,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                             minlength="4" placeholder="Re-enter password"
                                             autocomplete="new-password" required>
                                         <i class="fa-solid fa-lock input-icon-left"></i>
-                                        <button type="button" class="eye-toggle" onclick="toggleEye('reg-cpass', this)" tabindex="-1" aria-label="Show password">
+                                        <button type="button" class="eye-toggle" data-target="reg-cpass" tabindex="-1" aria-label="Show password">
                                             <i class="fa-regular fa-eye-slash"></i>
                                         </button>
                                     </div>
@@ -714,7 +708,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
 
                 <!-- ADMIN LOGIN -->
                 <div class="auth-section" id="adminSection">
-                    <button class="back-btn" onclick="backToRoleSelector()">
+                    <button class="back-btn" id="adminBackBtn">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </button>
 
@@ -746,7 +740,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                                         placeholder="Enter your password"
                                         autocomplete="current-password" required>
                                     <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" onclick="toggleEye('admin-login-pass', this)" tabindex="-1" aria-label="Show password">
+                                    <button type="button" class="eye-toggle" data-target="admin-login-pass" tabindex="-1" aria-label="Show password">
                                         <i class="fa-regular fa-eye-slash"></i>
                                     </button>
                                 </div>
@@ -778,24 +772,6 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
             }, 2200);
         <?php endif; ?>
     </script>
-
-
-</body>
-
-</html>
-</script>
-<script nonce="<?php echo $csp_nonce; ?>">
-    /* ================================================================
-           INIT — PHP-generated values injected here
-        ================================================================ */
-    switchTab('<?= $open_tab ?>');
-    <?php if ($auto_open_modal): ?>
-        window.addEventListener('DOMContentLoaded', () => openModal('<?= $open_tab ?>'));
-    <?php endif; ?>
-    <?php if (!empty($register_success)): ?>
-        setTimeout(() => switchTab('login'), 2200);
-    <?php endif; ?>
-</script>
 
 
 </body>
