@@ -2643,6 +2643,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
 
                 <form id="changePasswordForm">
+                    <?= csrf_field() ?>
                     <div class="form-group">
                         <label>Current Password</label>
                         <input type="password" name="current_password" class="form-control-custom" required>
