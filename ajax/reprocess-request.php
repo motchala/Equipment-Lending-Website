@@ -34,7 +34,7 @@ function send_error(int $http_status, string $message): never
 }
 
 // ── Session guard — require active faculty session ────────────────────────────
-session_start();
+require_once __DIR__ . '/../includes/session-config.php';
 
 if (empty($_SESSION['faculty_id'])) {
     send_error(401, 'Unauthorized. Please log in.');

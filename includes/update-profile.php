@@ -6,7 +6,7 @@
  * academic info, contact details, and emergency contact.
  * Place this file inside: includes/update-profile.php
  */
-session_start();
+require_once __DIR__ . '/session-config.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['faculty_id'])) {

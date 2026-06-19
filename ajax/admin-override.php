@@ -40,7 +40,7 @@ function send_json(int $http_status, string $status, string $message): void
 }
 
 // ── Session guard — require active admin session ──────────────────────────────
-session_start();
+require_once __DIR__ . '/../includes/session-config.php';
 
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     send_json(401, 'error', 'Unauthorized. Admin access required.');

@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/session-config.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -15,15 +15,23 @@ $room          = trim($body['room']            ?? '');
 $borrow_date   = trim($body['borrow_date']     ?? '');
 $return_date   = trim($body['return_date']     ?? '');
 
-if (!$code_db_id || !$faculty_id || !$student_name || !$student_id ||
-    !$equipment || !$room || !$borrow_date || !$return_date) {
+if (
+    !$code_db_id || !$faculty_id || !$student_name || !$student_id ||
+    !$equipment || !$room || !$borrow_date || !$return_date
+) {
     echo json_encode(['error' => 'All fields are required.']);
     exit();
 }
 
 $today = date('Y-m-d');
-if ($borrow_date < $today)       { echo json_encode(['error' => 'Borrow date cannot be in the past.']);         exit(); }
-if ($return_date < $borrow_date) { echo json_encode(['error' => 'Return date cannot be before borrow date.']); exit(); }
+if ($borrow_date < $today) {
+    echo json_encode(['error' => 'Borrow date cannot be in the past.']);
+    exit();
+}
+if ($return_date < $borrow_date) {
+    echo json_encode(['error' => 'Return date cannot be before borrow date.']);
+    exit();
+}
 
 require_once __DIR__ . '/db.php';
 $conn = getDB();
@@ -34,7 +42,8 @@ $chk->bind_param('i', $code_db_id);
 $chk->execute();
 $chk->store_result();
 if ($chk->num_rows === 0) {
-    $chk->close(); $conn->close();
+    $chk->close();
+    $conn->close();
     echo json_encode(['error' => 'This code was just used by someone else. Ask your faculty for a new code.']);
     exit();
 }
@@ -68,13 +77,21 @@ $ins = $conn->prepare(
 );
 $ins->bind_param(
     'ssssssssss',
-    $faculty_name, $faculty_id, $equipment, $faculty_name, $room,
-    $borrow_date, $return_date,
-    $return_token, $student_name, $student_id
+    $faculty_name,
+    $faculty_id,
+    $equipment,
+    $faculty_name,
+    $room,
+    $borrow_date,
+    $return_date,
+    $return_token,
+    $student_name,
+    $student_id
 );
 
 if (!$ins->execute()) {
-    $ins->close(); $conn->close();
+    $ins->close();
+    $conn->close();
     echo json_encode(['error' => 'Failed to save request. Please try again.']);
     exit();
 }

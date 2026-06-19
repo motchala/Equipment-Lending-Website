@@ -13,7 +13,7 @@ $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 
 // admin-dashboard-functions.php
-session_start();
+require_once __DIR__ . '/session-config.php';
 // Ensure server uses local timezone for displaying login timestamps
 date_default_timezone_set('Asia/Manila');
 if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {

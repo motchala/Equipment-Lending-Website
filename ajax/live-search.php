@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/session-config.php';
 if (!isset($_SESSION['faculty_id']) && !isset($_SESSION['admin'])) {
     http_response_code(401);
     echo json_encode([]);
