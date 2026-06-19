@@ -10,7 +10,7 @@ ini_set('log_errors', '1');
 $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 
-session_start();
+require_once __DIR__ . '/includes/session-config.php';
 require_once __DIR__ . '/includes/csrf.php';
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: ../Equipment-Lending-Website/landing-page.php");
@@ -3286,21 +3286,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     <div class="form-row-2">
                         <div class="form-group">
                             <label class="form-label">Borrow Date</label>
-                            <input type="date" 
-                                   name="borrow_date" 
-                                   id="borrow_date" 
-                                   class="form-input" 
-                                   min="<?php echo date('Y-m-d'); ?>"
-                                   required>
+                            <input type="date"
+                                name="borrow_date"
+                                id="borrow_date"
+                                class="form-input"
+                                min="<?php echo date('Y-m-d'); ?>"
+                                required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Return Date</label>
-                            <input type="date" 
-                                   name="return_date" 
-                                   id="return_date"
-                                   class="form-input" 
-                                   min="<?php echo date('Y-m-d'); ?>"
-                                   required>
+                            <input type="date"
+                                name="return_date"
+                                id="return_date"
+                                class="form-input"
+                                min="<?php echo date('Y-m-d'); ?>"
+                                required>
                         </div>
                     </div>
                     <div class="form-group">

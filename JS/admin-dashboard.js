@@ -1,6 +1,13 @@
 (function () {
     'use strict';
 
+    /* ── CSRF — reads the token already embedded in the page (emitted by
+       PHP's csrf_field()) for fetch() calls that don't submit a real <form> ── */
+    function getCsrfToken() {
+        const el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+
     /* ── localStorage helper ─────────────────────────────────── */
     const LS = {
         get: k => { try { return localStorage.getItem('adm_' + k); } catch (e) { return null; } },
@@ -917,6 +924,7 @@
             formData.append('request_id', requestId);
             formData.append('new_status', newStatus);
             formData.append('override_reason', reason);
+            formData.append('csrf_token', getCsrfToken());
 
             fetch('ajax/admin-override.php', { method: 'POST', body: formData })
                 .then(function (r) {

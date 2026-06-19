@@ -4,7 +4,7 @@ $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 
 // return_confirm.php — Admin scans QR → marks equipment as Returned
-session_start();
+require_once __DIR__ . '/includes/session-config.php';
 date_default_timezone_set('Asia/Manila');
 
 // Only accessible to logged-in admins

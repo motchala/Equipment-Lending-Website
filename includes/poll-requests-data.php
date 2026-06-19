@@ -3,7 +3,7 @@
 // Returns current request data as JSON for live re-rendering.
 // No page reload needed — the JS reads this and updates the DOM directly.
 
-session_start();
+require_once __DIR__ . '/session-config.php';
 date_default_timezone_set('Asia/Manila');
 
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
@@ -35,15 +35,17 @@ $conn->query("
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 $stats = [];
-foreach ([
-    'waiting'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Waiting'",
-    'approved'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Approved'",
-    'declined'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined'",
-    'overdue'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'",
-    'inv_total' => "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0",
-    'inv_low'   => "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0",
-    'total_req' => "SELECT COUNT(*) c FROM tbl_requests",
-] as $key => $sql) {
+foreach (
+    [
+        'waiting'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Waiting'",
+        'approved'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Approved'",
+        'declined'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined'",
+        'overdue'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'",
+        'inv_total' => "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0",
+        'inv_low'   => "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0",
+        'total_req' => "SELECT COUNT(*) c FROM tbl_requests",
+    ] as $key => $sql
+) {
     $stats[$key] = (int) mysqli_fetch_assoc(mysqli_query($conn, $sql))['c'];
 }
 
@@ -68,7 +70,8 @@ $r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_d
 while ($row = mysqli_fetch_assoc($r)) $activity[] = $row;
 
 // ── High-water mark for change detection ──────────────────────────────────
-$hw = mysqli_fetch_assoc(mysqli_query($conn,
+$hw = mysqli_fetch_assoc(mysqli_query(
+    $conn,
     "SELECT MAX(returned_at) AS last_return FROM tbl_requests"
 ))['last_return'] ?? null;
 

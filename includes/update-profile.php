@@ -6,13 +6,16 @@
  * academic info, contact details, and emergency contact.
  * Place this file inside: includes/update-profile.php
  */
-session_start();
+require_once __DIR__ . '/session-config.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['faculty_id'])) {
     echo json_encode(['success' => false, 'msg' => 'Unauthorized. Please log in again.']);
     exit;
 }
+
+require_once __DIR__ . '/csrf.php';
+csrf_verify();
 
 require_once __DIR__ . '/db.php';
 $conn = getDB();

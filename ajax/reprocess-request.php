@@ -1,4 +1,5 @@
 <?php
+
 /**
  * ajax/reprocess-request.php
  *
@@ -33,10 +34,17 @@ function send_error(int $http_status, string $message): never
 }
 
 // ── Session guard — require active faculty session ────────────────────────────
-session_start();
+require_once __DIR__ . '/../includes/session-config.php';
 
 if (empty($_SESSION['faculty_id'])) {
     send_error(401, 'Unauthorized. Please log in.');
+}
+
+// ── CSRF guard ─────────────────────────────────────────────────────────────
+require_once __DIR__ . '/../includes/csrf.php';
+$csrf_token = $_POST['csrf_token'] ?? '';
+if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
+    send_error(403, 'Invalid or expired session. Please refresh the page and try again.');
 }
 
 $logged_in_faculty_id = (string)$_SESSION['faculty_id'];
