@@ -971,11 +971,11 @@
    Works on phones, laptops, and desktop PCs with a webcam.
 ================================================================ */
     (function initQrScanner() {
-        const openBtn    = document.getElementById('openQrScannerBtn');
-        const modal      = document.getElementById('qrScannerModal');
-        const closeBtn   = document.getElementById('closeQrScanner');
-        const video      = document.getElementById('qrVideo');
-        const status     = document.getElementById('qrScanStatus');
+        const openBtn = document.getElementById('openQrScannerBtn');
+        const modal = document.getElementById('qrScannerModal');
+        const closeBtn = document.getElementById('closeQrScanner');
+        const video = document.getElementById('qrVideo');
+        const status = document.getElementById('qrScanStatus');
         if (!openBtn || !modal || !video) return;
 
         let stream = null;
@@ -993,11 +993,21 @@
         function processFrame(canvas, ctx) {
             if (!scanning) return;
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                canvas.width  = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = window.jsQR(imageData.data, imageData.width, imageData.height);
+                // Downscale to max 640px — jsQR doesn't need full camera resolution
+                const MAX_W = 640;
+                const scale = Math.min(1, MAX_W / video.videoWidth);
+                const w = Math.floor(video.videoWidth * scale);
+                const h = Math.floor(video.videoHeight * scale);
+
+                // Only reset canvas dimensions when they actually change (not every frame)
+                if (canvas.width !== w || canvas.height !== h) {
+                    canvas.width = w;
+                    canvas.height = h;
+                }
+
+                ctx.drawImage(video, 0, 0, w, h);
+                const imageData = ctx.getImageData(0, 0, w, h);
+                const code = window.jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
                 if (code) {
                     scanning = false;
                     status.textContent = '✅ QR detected — confirming return...';
@@ -1021,33 +1031,31 @@
 
                     // Hit return_confirm.php via fetch — no page reload
                     fetch('return_confirm.php?token=' + encodeURIComponent(token), {
-                        credentials: 'same-origin'
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     })
-                    .then(r => r.text())
-                    .then(html => {
-                        // Check if PHP returned success
-                        const isSuccess = html.includes('Return Confirmed');
-                        if (isSuccess) {
-                            status.textContent = '✅ Return confirmed! Updating tables...';
-                            status.style.color = '#22c55e';
-                            showToast('✅ Equipment return confirmed via QR.');
-                            setTimeout(stopScanner, 1800);
-                            // admin-live-render.js will auto-update the tables on next poll
-                        } else {
-                            status.textContent = '❌ Invalid or already-used QR token.';
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                status.textContent = '✅ Return confirmed! Updating tables...';
+                                status.style.color = '#22c55e';
+                                showToast('✅ Equipment return confirmed via QR.');
+                                setTimeout(stopScanner, 1800);
+                            } else {
+                                status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
+                                status.style.color = '#e53e3e';
+                                setTimeout(() => {
+                                    status.textContent = 'Point camera at a valid QR code.';
+                                    status.style.color = '#888';
+                                    scanning = true;
+                                    tick();
+                                }, 2500);
+                            }
+                        })
+                        .catch(() => {
+                            status.textContent = '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
-                            setTimeout(() => {
-                                status.textContent = 'Point camera at a valid QR code.';
-                                status.style.color = '#888';
-                                scanning = true;
-                                tick();
-                            }, 2500);
-                        }
-                    })
-                    .catch(() => {
-                        status.textContent = '❌ Network error. Please try again.';
-                        status.style.color = '#e53e3e';
-                    });
+                        });
                     return;
                 }
             }
@@ -1055,7 +1063,7 @@
         }
 
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         function tick() {
             animFrame = requestAnimationFrame(() => processFrame(canvas, ctx));
@@ -1069,22 +1077,27 @@
 
             // Load jsQR once
             function beginScan() {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    status.textContent = '❌ Camera not available on HTTP. Open the admin dashboard via the ngrok HTTPS URL instead.';
+                    status.style.color = '#e53e3e';
+                    return;
+                }
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' } // rear cam on phone, webcam on laptop
                 })
-                .then(s => {
-                    stream = s;
-                    video.srcObject = s;
-                    video.play();
-                    scanning = true;
-                    status.textContent = 'Point camera at the QR code.';
-                    tick();
-                })
-                .catch(err => {
-                    status.textContent = '❌ Camera access denied. Please allow camera permission.';
-                    status.style.color = '#e53e3e';
-                    console.warn('Camera error:', err);
-                });
+                    .then(s => {
+                        stream = s;
+                        video.srcObject = s;
+                        video.play();
+                        scanning = true;
+                        status.textContent = 'Point camera at the QR code.';
+                        tick();
+                    })
+                    .catch(err => {
+                        status.textContent = '❌ Camera access denied. Please allow camera permission.';
+                        status.style.color = '#e53e3e';
+                        console.warn('Camera error:', err);
+                    });
             }
 
             if (window.jsQR) {

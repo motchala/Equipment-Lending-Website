@@ -1984,7 +1984,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     "SELECT * FROM tbl_requests
                      WHERE faculty_id='$uid_safe'
                      AND status IN ('Waiting','Approved')
-                     AND borrow_date > '$today'
+                     AND borrow_date >= '$today'
                      ORDER BY borrow_date ASC LIMIT 10"
                 );
 
@@ -3286,11 +3286,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
                     <div class="form-row-2">
                         <div class="form-group">
                             <label class="form-label">Borrow Date</label>
-                            <input type="date" name="borrow_date" id="borrow_date" class="form-input" required>
+                            <input type="date" 
+                                   name="borrow_date" 
+                                   id="borrow_date" 
+                                   class="form-input" 
+                                   min="<?php echo date('Y-m-d'); ?>"
+                                   required>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Return Date</label>
-                            <input type="date" name="return_date" id="return_date" class="form-input" required>
+                            <input type="date" 
+                                   name="return_date" 
+                                   id="return_date"
+                                   class="form-input" 
+                                   min="<?php echo date('Y-m-d'); ?>"
+                                   required>
                         </div>
                     </div>
                     <div class="form-group">

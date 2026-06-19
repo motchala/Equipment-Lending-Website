@@ -5,7 +5,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     $req_id = intval($_GET['id']);
     $res = $conn->query("SELECT equipment_name FROM tbl_requests WHERE id = $req_id LIMIT 1");
     if ($res && $row_rc = $res->fetch_assoc()) {
-        $conn->query("UPDATE tbl_requests SET status = 'Returned' WHERE id = $req_id");
+        $conn->query("UPDATE tbl_requests SET status = 'Returned', return_token = NULL, returned_at = NOW() WHERE id = $req_id");
         $eq = $conn->real_escape_string($row_rc['equipment_name']);
         $conn->query("UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name = '$eq'");
     }

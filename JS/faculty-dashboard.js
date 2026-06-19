@@ -2487,7 +2487,7 @@
             _renderQr(url);
         } else {
             const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+            script.src = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
             script.onload = () => { window._qrLoaded = true; _renderQr(url); };
             document.head.appendChild(script);
         }
@@ -2496,13 +2496,13 @@
     function _renderQr(url) {
         const container = document.getElementById('returnQrCanvas');
         if (!container || typeof QRCode === 'undefined') return;
-        new QRCode(container, {
-            text: url,
-            width: 200,
-            height: 200,
-            colorDark: '#600302',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
+        container.innerHTML = '';
+        const canvasEl = document.createElement('canvas');
+        canvasEl.style.cssText = 'border-radius:8px;display:block;margin:0 auto;';
+        container.appendChild(canvasEl);
+        QRCode.toCanvas(canvasEl, url, {
+            width: 300, margin: 2,
+            color: { dark: '#600302', light: '#ffffff' }
         });
     }
 

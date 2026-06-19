@@ -19,6 +19,7 @@ $conn = getDB();
 $token = trim($_GET['token'] ?? '');
 $message = '';
 $success = false;
+$is_ajax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 
 if ($token) {
     $conn->begin_transaction();
@@ -70,7 +71,7 @@ if ($token) {
 
             $conn->commit();
             $success = true;
-            $message = "✅ Return confirmed for <strong>" . htmlspecialchars($eq_name) . "</strong> borrowed by <strong>" . htmlspecialchars($row['faculty_name']) . "</strong>.";
+            $message = "Return confirmed for {$row['equipment_name']} borrowed by {$row['faculty_name']}.";
         }
     } catch (Exception $e) {
         $conn->rollback();
@@ -78,6 +79,13 @@ if ($token) {
     }
 } else {
     $message = 'No token provided.';
+}
+
+// Ajax callers (the admin QR scanner) get JSON — no HTML overhead, no redirect issues
+if ($is_ajax) {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => $success, 'message' => $message]);
+    exit();
 }
 ?>
 <!DOCTYPE html>
