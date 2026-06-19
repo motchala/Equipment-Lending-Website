@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -43,6 +44,13 @@ session_start();
 
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     send_json(401, 'error', 'Unauthorized. Admin access required.');
+}
+
+// ── CSRF guard ─────────────────────────────────────────────────────────────
+require_once __DIR__ . '/../includes/csrf.php';
+$csrf_token = $_POST['csrf_token'] ?? '';
+if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
+    send_json(403, 'error', 'Invalid or expired session. Please refresh the page and try again.');
 }
 
 $admin_name = isset($_SESSION['admin_name']) ? (string)$_SESSION['admin_name'] : 'Admin';
@@ -187,7 +195,7 @@ try {
 
     $upd_stmt->close();
 
-     // ── If approving, generate a unique return token ──────────────────────────
+    // ── If approving, generate a unique return token ──────────────────────────
     if ($new_status === 'Approved') {
         $return_token = bin2hex(random_bytes(32)); // 64-char hex token
         $tok_stmt = $conn->prepare(
@@ -293,7 +301,6 @@ try {
     if (!$conn->commit()) {
         throw new RuntimeException('Transaction commit failed.');
     }
-
 } catch (RuntimeException $e) {
     $conn->rollback();
     error_log('[admin-override] ' . $e->getMessage());

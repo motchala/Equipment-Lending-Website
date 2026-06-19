@@ -14,6 +14,9 @@ if (!isset($_SESSION['faculty_id'])) {
     exit;
 }
 
+require_once __DIR__ . '/csrf.php';
+csrf_verify();
+
 require_once __DIR__ . '/db.php';
 $conn = getDB();
 

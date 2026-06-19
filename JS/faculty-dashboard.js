@@ -4,6 +4,16 @@
     const todayStr = new Date().toISOString().split('T')[0];
 
     /* ══════════════════════════════════════════════════════════════════
+       CSRF — reads the token already embedded in the page (emitted by
+       PHP's csrf_field()) so it can be attached to fetch() requests that
+       build their own FormData instead of submitting an actual <form>.
+    ══════════════════════════════════════════════════════════════════ */
+    function getCsrfToken() {
+        const el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
        CRITICAL: Close all overlays on page load to prevent stuck modals
     ══════════════════════════════════════════════════════════════════ */
     if (document.readyState === 'loading') {
@@ -601,6 +611,7 @@
         // Collect values from visible inputs
         const fd = new FormData();
         fd.append('action', 'save_profile');
+        fd.append('csrf_token', getCsrfToken());
 
         document.querySelectorAll('[data-input]').forEach(input => {
             const key = input.dataset.input;
@@ -734,6 +745,7 @@
 
         const fd = new FormData();
         fd.append('action', 'change_password');
+        fd.append('csrf_token', getCsrfToken());
         fd.append('current_password', current);
         fd.append('new_password', newPw);
         fd.append('confirm_password', confirm);
@@ -818,6 +830,7 @@
 
         const fd = new FormData();
         fd.append('action', 'verify_email_for_password');
+        fd.append('csrf_token', getCsrfToken());
         fd.append('email', email);
 
         fetch('includes/update-profile.php', { method: 'POST', body: fd })
@@ -878,6 +891,7 @@
 
         const fd = new FormData();
         fd.append('action', 'update_backup_email');
+        fd.append('csrf_token', getCsrfToken());
         fd.append('backup_email', email);
 
         fetch('includes/update-profile.php', { method: 'POST', body: fd })
@@ -929,6 +943,7 @@
 
         const fd = new FormData();
         fd.append('action', 'remove_profile_picture');
+        fd.append('csrf_token', getCsrfToken());
 
         fetch('includes/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
@@ -1008,6 +1023,7 @@
 
             const fd = new FormData();
             fd.append('action', 'upload_profile_picture');
+            fd.append('csrf_token', getCsrfToken());
             fd.append('profile_picture', file);
 
             fetch('includes/update-profile.php', { method: 'POST', body: fd })
@@ -1811,7 +1827,7 @@
         fetch('includes/update-profile.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=get_completion_status'
+            body: 'action=get_completion_status&csrf_token=' + encodeURIComponent(getCsrfToken())
         })
             .then(r => r.json())
             .then(data => {
@@ -1916,6 +1932,7 @@
 
             const formData = new FormData();
             formData.append('action', 'save_academic');
+            formData.append('csrf_token', getCsrfToken());
             formData.append('program', program);
             formData.append('year_level', year_level);
 
@@ -2001,6 +2018,7 @@
         saveBtn.addEventListener('click', function () {
             const formData = new FormData();
             formData.append('action', 'save_contact');
+            formData.append('csrf_token', getCsrfToken());
             formData.append('phone', document.querySelector('[data-input="phone"]')?.value || '');
             formData.append('present_address', document.querySelector('[data-input="present_address"]')?.value || '');
             formData.append('permanent_address', document.querySelector('[data-input="permanent_address"]')?.value || '');
@@ -2086,6 +2104,7 @@
         saveBtn.addEventListener('click', function () {
             const formData = new FormData();
             formData.append('action', 'save_emergency');
+            formData.append('csrf_token', getCsrfToken());
             formData.append('emergency_name', document.querySelector('[data-input="emergency_name"]')?.value || '');
             formData.append('emergency_relationship', document.querySelector('[data-input="emergency_relationship"]')?.value || '');
             formData.append('emergency_phone', document.querySelector('[data-input="emergency_phone"]')?.value || '');
@@ -2170,6 +2189,7 @@
         const { section, data } = pendingConfirmation;
         const formData = new FormData();
         formData.append('action', `confirm_save_${section}`);
+        formData.append('csrf_token', getCsrfToken());
 
         // Add all data fields
         Object.keys(data).forEach(key => {
@@ -2252,6 +2272,7 @@
 
             const formData = new FormData();
             formData.append('action', 'save_profile');
+            formData.append('csrf_token', getCsrfToken());
             formData.append('fullname', fullname);
             formData.append('dob', dob);
             formData.append('gender', gender);
@@ -2370,6 +2391,7 @@
                 // Upload file
                 const formData = new FormData();
                 formData.append('action', 'upload_profile_picture');
+                formData.append('csrf_token', getCsrfToken());
                 formData.append('profile_picture', file);
 
                 fetch('includes/update-profile.php', {
@@ -2410,7 +2432,7 @@
                 fetch('includes/update-profile.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'action=remove_profile_picture'
+                    body: 'action=remove_profile_picture&csrf_token=' + encodeURIComponent(getCsrfToken())
                 })
                     .then(r => r.json())
                     .then(data => {
@@ -2695,7 +2717,8 @@
 
             fetch('includes/generate-faculty-code.php', {
                 method: 'POST',
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                headers: { 'X-CSRF-Token': getCsrfToken() }
             })
                 .then(r => r.json())
                 .then(data => {

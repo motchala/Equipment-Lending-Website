@@ -6,6 +6,9 @@ if (!isset($_SESSION['faculty_id'])) {
     exit();
 }
 
+require_once __DIR__ . '/csrf.php';
+csrf_verify();
+
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -43,7 +46,8 @@ $del->execute();
 $del->close();
 
 // Generate a unique code in the format: abc-123-xy4
-function makeCode(): string {
+function makeCode(): string
+{
     $pool = 'abcdefghjkmnpqrstuvwxyz23456789'; // no confusing chars (0,1,i,l,o)
     $len  = strlen($pool);
     $code = '';
@@ -65,12 +69,18 @@ while (!$unique && $tries < 15) {
     $chk->bind_param('s', $candidate);
     $chk->execute();
     $chk->store_result();
-    if ($chk->num_rows === 0) { $code = $candidate; $unique = true; }
+    if ($chk->num_rows === 0) {
+        $code = $candidate;
+        $unique = true;
+    }
     $chk->close();
     $tries++;
 }
 
-if (!$unique) { echo json_encode(['error' => 'Could not generate unique code. Try again.']); exit(); }
+if (!$unique) {
+    echo json_encode(['error' => 'Could not generate unique code. Try again.']);
+    exit();
+}
 
 $ins = $conn->prepare("INSERT INTO tbl_faculty_codes (faculty_id, faculty_name, code) VALUES (?, ?, ?)");
 $ins->bind_param('sss', $faculty_id, $faculty_name, $code);
