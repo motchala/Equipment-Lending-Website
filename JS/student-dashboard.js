@@ -592,7 +592,7 @@ function initDashboard(sessionArg, receiptArg) {
             const stockText = low ? qty + ' left — limited' : qty + ' available';
 
             const imgHtml = item.image_path
-                ? `<img src="/Equipment-Lending-Website/${escAttr(item.image_path)}" alt="${escAttr(item.item_name)}" class="eq-card-img-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                ? `<img src="${escAttr(item.image_path)}" alt="${escAttr(item.item_name)}" class="eq-card-img-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
                    <span class="material-symbols-outlined eq-card-img-fallback" style="display:none;">inventory_2</span>`
                 : `<span class="material-symbols-outlined">inventory_2</span>`;
 
