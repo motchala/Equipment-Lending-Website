@@ -294,15 +294,20 @@ function initPortal() {
 
     function _renderStudentQr(url) {
         function doRender() {
-            new QRCode(document.getElementById('studentReceiptQr'), {
-                text: url, width: 160, height: 160,
-                colorDark: '#800000', colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H,
+            const container = document.getElementById('studentReceiptQr');
+            if (!container) return;
+            container.innerHTML = '';
+            const canvasEl = document.createElement('canvas');
+            canvasEl.style.cssText = 'display:block;margin:0 auto;';
+            container.appendChild(canvasEl);
+            QRCode.toCanvas(canvasEl, url, {
+                width: 160, margin: 2,
+                color: { dark: '#800000', light: '#ffffff' }
             });
         }
         if (window._qrStudentLoaded) { doRender(); return; }
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
         s.onload = () => { window._qrStudentLoaded = true; doRender(); };
         document.head.appendChild(s);
     }
@@ -798,15 +803,18 @@ function initDashboard(sessionArg, receiptArg) {
         function doRender() {
             const target = document.getElementById('receiptQrTarget');
             if (!target) return;
-            new QRCode(target, {
-                text: url, width: 160, height: 160,
-                colorDark: '#a32020', colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H,
+            target.innerHTML = '';
+            const canvasEl = document.createElement('canvas');
+            canvasEl.style.cssText = 'display:block;margin:0 auto;';
+            target.appendChild(canvasEl);
+            QRCode.toCanvas(canvasEl, url, {
+                width: 160, margin: 2,
+                color: { dark: '#a32020', light: '#ffffff' }
             });
         }
         if (window._sdQrLoaded) { doRender(); return; }
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
         s.onload = () => { window._sdQrLoaded = true; doRender(); };
         document.head.appendChild(s);
     }
