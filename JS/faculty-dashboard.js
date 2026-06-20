@@ -2715,10 +2715,13 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;animation:spin 1s linear infinite;">sync</span> Generating...';
 
+            const fd = new FormData();
+            fd.append('csrf_token', getCsrfToken());
+
             fetch('includes/generate-faculty-code.php', {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'X-CSRF-Token': getCsrfToken() }
+                body: fd
             })
                 .then(r => r.json())
                 .then(data => {

@@ -16,7 +16,8 @@ function csrf_verify(): void {
     // Fallback: JSON-body requests carry it in a header instead of $_POST
     if ($token === null) {
         $headers = function_exists('getallheaders') ? getallheaders() : [];
-        $token = $headers['X-CSRF-Token'] ?? $headers['X-Csrf-Token'] ?? null;
+        $headers = array_change_key_case($headers, CASE_UPPER);
+        $token = $headers['X-CSRF-TOKEN'] ?? null;
     }
 
     if (
