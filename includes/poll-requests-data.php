@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/security-headers.php';
 // ajax/poll-requests-data.php
 // Returns current request data as JSON for live re-rendering.
 // No page reload needed — the JS reads this and updates the DOM directly.

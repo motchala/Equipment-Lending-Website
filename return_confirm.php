@@ -2,6 +2,7 @@
 // fix for csp vulnerability. nonce is generated per request and is unique.
 $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+header("X-Frame-Options: DENY");
 
 // return_confirm.php — Admin scans QR → marks equipment as Returned
 require_once __DIR__ . '/includes/session-config.php';
