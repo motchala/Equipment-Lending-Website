@@ -11,6 +11,7 @@ ini_set('log_errors', '1');
 // style-src to avoid breaking the 150+ inline style attributes already in use.
 $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
+header("X-Frame-Options: DENY");
 
 // admin-dashboard-functions.php
 require_once __DIR__ . '/session-config.php';

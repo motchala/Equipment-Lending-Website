@@ -337,7 +337,7 @@ body {
     align-items: flex-start;
     gap: 20px;
     overflow: hidden;
-    cursor: pointer;
+    cursor: default;
     transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
     box-shadow: var(--shadow-sm);
 }
@@ -487,6 +487,7 @@ body {
     align-items: center;
     justify-content: center;
     color: var(--color-secondary);
+    cursor: pointer;
     transition: background var(--transition), color var(--transition), transform var(--transition);
 }
 
