@@ -14,7 +14,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 
 // admin-dashboard-functions.php
-require_once __DIR__ . '/session-config.php';
+require_once __DIR__ . '/../config/session.php';
 // Ensure server uses local timezone for displaying login timestamps
 date_default_timezone_set('Asia/Manila');
 if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
@@ -22,9 +22,9 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     exit();
 }
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
-require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/../config/csrf.php';
 
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {

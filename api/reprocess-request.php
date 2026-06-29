@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/security-headers.php';
+require_once __DIR__ . '/../config/security-headers.php';
 
 /**
  * ajax/reprocess-request.php
@@ -35,14 +35,14 @@ function send_error(int $http_status, string $message): never
 }
 
 // ── Session guard — require active faculty session ────────────────────────────
-require_once __DIR__ . '/../includes/session-config.php';
+require_once __DIR__ . '/../config/session.php';
 
 if (empty($_SESSION['faculty_id'])) {
     send_error(401, 'Unauthorized. Please log in.');
 }
 
 // ── CSRF guard ─────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../config/csrf.php';
 $csrf_token = $_POST['csrf_token'] ?? '';
 if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
     send_error(403, 'Invalid or expired session. Please refresh the page and try again.');
@@ -51,10 +51,10 @@ if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSI
 $logged_in_faculty_id = (string)$_SESSION['faculty_id'];
 
 // ── Require ArbitrationEngine ─────────────────────────────────────────────────
-require_once __DIR__ . '/../includes/arbitration-engine.php';
+require_once __DIR__ . '/../core/arbitration-engine.php';
 
 // ── Database connection ───────────────────────────────────────────────────────
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $conn->set_charset('utf8mb4');

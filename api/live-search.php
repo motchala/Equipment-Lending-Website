@@ -1,12 +1,12 @@
 <?php
-require_once __DIR__ . '/../includes/security-headers.php';
-require_once __DIR__ . '/../includes/session-config.php';
+require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../config/session.php';
 if (!isset($_SESSION['faculty_id']) && !isset($_SESSION['admin'])) {
     http_response_code(401);
     echo json_encode([]);
     exit();
 }
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $search = $_GET['q'] ?? '';

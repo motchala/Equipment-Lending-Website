@@ -1,19 +1,19 @@
 <?php
-require_once __DIR__ . '/security-headers.php';
-require_once __DIR__ . '/session-config.php';
+require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../config/session.php';
 if (!isset($_SESSION['faculty_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit();
 }
 
-require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/../config/csrf.php';
 csrf_verify();
 
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $faculty_id   = $_SESSION['faculty_id'];

@@ -625,7 +625,7 @@
         if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
         if (cancelBtn) cancelBtn.disabled = true;
 
-        fetch('includes/update-profile.php', { method: 'POST', body: fd })
+        fetch('api/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -750,7 +750,7 @@
         fd.append('new_password', newPw);
         fd.append('confirm_password', confirm);
 
-        fetch('includes/update-profile.php', { method: 'POST', body: fd })
+        fetch('api/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -833,7 +833,7 @@
         fd.append('csrf_token', getCsrfToken());
         fd.append('email', email);
 
-        fetch('includes/update-profile.php', { method: 'POST', body: fd })
+        fetch('api/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -894,7 +894,7 @@
         fd.append('csrf_token', getCsrfToken());
         fd.append('backup_email', email);
 
-        fetch('includes/update-profile.php', { method: 'POST', body: fd })
+        fetch('api/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -945,7 +945,7 @@
         fd.append('action', 'remove_profile_picture');
         fd.append('csrf_token', getCsrfToken());
 
-        fetch('includes/update-profile.php', { method: 'POST', body: fd })
+        fetch('api/update-profile.php', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
@@ -1026,7 +1026,7 @@
             fd.append('csrf_token', getCsrfToken());
             fd.append('profile_picture', file);
 
-            fetch('includes/update-profile.php', { method: 'POST', body: fd })
+            fetch('api/update-profile.php', { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     if (loadingEl) loadingEl.classList.remove('active');
@@ -1339,7 +1339,7 @@
                 }
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'includes/logout.php';
+                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
             }
         } catch (err) {
@@ -1824,7 +1824,7 @@
        ACCOUNT COMPLETION PROGRESS BAR - INLINE VERSION
     ══════════════════════════════════════════════════════════════════ */
     function updateCompletionProgress() {
-        fetch('includes/update-profile.php', {
+        fetch('api/update-profile.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'action=get_completion_status&csrf_token=' + encodeURIComponent(getCsrfToken())
@@ -1936,7 +1936,7 @@
             formData.append('program', program);
             formData.append('year_level', year_level);
 
-            fetch('includes/update-profile.php', {
+            fetch('api/update-profile.php', {
                 method: 'POST',
                 body: formData
             })
@@ -2024,7 +2024,7 @@
             formData.append('permanent_address', document.querySelector('[data-input="permanent_address"]')?.value || '');
             formData.append('landline', document.querySelector('[data-input="landline"]')?.value || '');
 
-            fetch('includes/update-profile.php', {
+            fetch('api/update-profile.php', {
                 method: 'POST',
                 body: formData
             })
@@ -2109,7 +2109,7 @@
             formData.append('emergency_relationship', document.querySelector('[data-input="emergency_relationship"]')?.value || '');
             formData.append('emergency_phone', document.querySelector('[data-input="emergency_phone"]')?.value || '');
 
-            fetch('includes/update-profile.php', {
+            fetch('api/update-profile.php', {
                 method: 'POST',
                 body: formData
             })
@@ -2196,7 +2196,7 @@
             formData.append(key, data[key]);
         });
 
-        fetch('includes/update-profile.php', {
+        fetch('api/update-profile.php', {
             method: 'POST',
             body: formData
         })
@@ -2278,7 +2278,7 @@
             formData.append('gender', gender);
             formData.append('nationality', nationality);
 
-            fetch('includes/update-profile.php', {
+            fetch('api/update-profile.php', {
                 method: 'POST',
                 body: formData
             })
@@ -2394,7 +2394,7 @@
                 formData.append('csrf_token', getCsrfToken());
                 formData.append('profile_picture', file);
 
-                fetch('includes/update-profile.php', {
+                fetch('api/update-profile.php', {
                     method: 'POST',
                     body: formData
                 })
@@ -2429,7 +2429,7 @@
                     return;
                 }
 
-                fetch('includes/update-profile.php', {
+                fetch('api/update-profile.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: 'action=remove_profile_picture&csrf_token=' + encodeURIComponent(getCsrfToken())
@@ -2548,7 +2548,7 @@
         const INTERVAL = 8000;
 
         function doPoll() {
-            fetch('includes/poll-inventory.php', { method: 'GET' })
+            fetch('api/poll-inventory.php', { method: 'GET' })
                 .then(r => r.json())
                 .then(items => {
                     if (!Array.isArray(items)) return;
@@ -2595,7 +2595,7 @@
         });
 
         setInterval(function () {
-            fetch('includes/poll-requests.php', { method: 'GET' })
+            fetch('api/poll-requests.php', { method: 'GET' })
                 .then(r => r.json())
                 .then(fresh => {
                     if (!Array.isArray(fresh)) return;
@@ -2700,7 +2700,7 @@
 
     function initCodePanel() {
         // Load initial state
-        fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
+        fetch('api/poll-faculty-codes.php', { credentials: 'same-origin' })
             .then(r => r.json())
             .then(data => { renderCodePanel(data); })
             .catch(() => {
@@ -2718,7 +2718,7 @@
             const fd = new FormData();
             fd.append('csrf_token', getCsrfToken());
 
-            fetch('includes/generate-faculty-code.php', {
+            fetch('api/generate-faculty-code.php', {
                 method: 'POST',
                 credentials: 'same-origin',
                 body: fd
@@ -2752,7 +2752,7 @@
 
     function startCodePolling() {
         function doPoll() {
-            fetch('includes/poll-faculty-codes.php', { credentials: 'same-origin' })
+            fetch('api/poll-faculty-codes.php', { credentials: 'same-origin' })
                 .then(function (r) { if (!r.ok) return null; return r.json(); })
                 .then(function (data) { if (data) renderCodePanel(data); })
                 .catch(function () { });

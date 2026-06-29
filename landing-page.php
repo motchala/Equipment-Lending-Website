@@ -10,8 +10,8 @@ ini_set('log_errors', '1');
 $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-{$csp_nonce}' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 header("X-Frame-Options: DENY");
-require_once __DIR__ . '/includes/session-config.php';
-require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/config/session.php';
+require_once __DIR__ . '/config/csrf.php';
 // Ensure server uses local timezone for login timestamps
 date_default_timezone_set('Asia/Manila');
 
@@ -34,7 +34,7 @@ if (isset($_SESSION['user_id'])) {
     // (fall through to show the page normally)
 }
 
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/config/db.php';
 $conn = getDB();
 $login_error = $register_error = $register_success = "";
 $login_email_val = $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
@@ -219,12 +219,12 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- Preload first hero image for faster LCP -->
-    <link rel="preload" as="image" href="css/images-design/7-hero-page.jpg">
+    <link rel="preload" as="image" href="assets/images/landing-page/7-hero-page.jpg">
     <!-- Fonts with display=swap to avoid FOIT -->
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
 
-    <link rel="stylesheet" href="css/landing-page.css">
+    <link rel="stylesheet" href="assets/css/landing-page.css">
 </head>
 
 <body>
@@ -758,7 +758,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
         </div><!-- /modal-card -->
     </div><!-- /modal-overlay -->
 
-    <script src="JS/landing-page.js"></script>
+    <script src="assets/js/landing-page.js"></script>
     <script nonce="<?php echo $csp_nonce; ?>">
         /* ================================================================
            INIT — PHP-generated values injected here

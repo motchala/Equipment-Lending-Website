@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/includes/admin-dashboard-functions.php'; ?>
+<?php require_once __DIR__ . '/core/admin-functions.php'; ?>
 <?php
 // ── CONFIRM RETURN ─────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
@@ -23,7 +23,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <title>PUP Sync | Admin Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="css/admin-dashboard.css">
+    <link rel="stylesheet" href="assets/css/admin-dashboard.css">
 </head>
 
 <body>
@@ -2731,8 +2731,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
-    <script src="JS/admin-dashboard.js"></script>
-    <script src="JS/admin-live-render.js"></script>
+    <script src="assets/js/admin-dashboard.js"></script>
+    <script src="assets/js/admin-live-render.js"></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast">

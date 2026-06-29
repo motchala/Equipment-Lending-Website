@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../includes/security-headers.php';
+require_once __DIR__ . '/../config/security-headers.php';
 
 /**
  * ajax/save-arbitration-config.php
@@ -39,14 +39,14 @@ function send_json(int $http_status, string $status, string $message): never
 }
 
 // ── Session guard — require active admin session ──────────────────────────────
-require_once __DIR__ . '/../includes/session-config.php';
+require_once __DIR__ . '/../config/session-config.php';
 
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     send_json(401, 'error', 'Unauthorized. Admin access required.');
 }
 
 // ── CSRF guard ─────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../config/csrf.php';
 $csrf_token = $_POST['csrf_token'] ?? '';
 if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
     send_json(403, 'error', 'Invalid or expired session. Please refresh the page and try again.');
@@ -96,7 +96,7 @@ foreach (array_keys($raw_config) as $key) {
 }
 
 // ── Database connection ───────────────────────────────────────────────────────
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $conn->set_charset('utf8mb4');

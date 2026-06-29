@@ -11,8 +11,8 @@ $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 header("X-Frame-Options: DENY");
 
-require_once __DIR__ . '/includes/session-config.php';
-require_once __DIR__ . '/includes/csrf.php';
+require_once __DIR__ . '/config/session.php';
+require_once __DIR__ . '/config/csrf.php';;
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: ../Equipment-Lending-Website/landing-page.php");
     exit();
@@ -20,12 +20,12 @@ if (!isset($_SESSION['faculty_id'])) {
 $fullname = $_SESSION['faculty_name'];
 $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/config/db.php';
 $conn = getDB();
 
 $base_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
 
-require_once __DIR__ . '/includes/arbitration-engine.php';
+require_once __DIR__ . '/core/arbitration-engine.php';
 
 function maskEmail($email)
 {
@@ -220,21 +220,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         rel="stylesheet">
     <!-- Font Awesome (kept for existing icon references in JS) -->
-    <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
 
-    <link rel="stylesheet" href="css/faculty-dashboard.css">
+    <link rel="stylesheet" href="assets/css/faculty-dashboard.css">
 
     <!-- Faculty Code Card -->
-    <link rel="stylesheet" href="css/faculty-code-card.css">
+    <link rel="stylesheet" href="assets/css/faculty-code-card.css">
 
     <!-- Responsive System -->
-    <link rel="stylesheet" href="css/faculty-dashboard-responsive.css">
+    <link rel="stylesheet" href="assets/css/faculty-dashboard-responsive.css">
 
     <!-- Dashboard Redesign v3 — Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
-    <link rel="stylesheet" href="css/fcty-facilities.css">
+    <link rel="stylesheet" href="assets/css/fcty-facilities.css">
 
     <style nonce="<?php echo $csp_nonce; ?>">
         /* fix for csp vulnerability. inline styles */
@@ -3514,8 +3514,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? 'uploads/profile_pictures/' . $d
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
 
-    <script src="JS/faculty-dashboard.js"></script>
-    <script src="JS/fcty-facilities.js"></script>
+    <script src="assets/js/faculty-dashboard.js"></script>
+    <script src="assets/js/fcty-facilities.js"></script>
 </body>
 
 </html>

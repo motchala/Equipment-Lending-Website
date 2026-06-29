@@ -463,7 +463,7 @@
         if (!input || !tbody) return;
         input.addEventListener('keyup', function () {
             const q = this.value.trim();
-            fetch(`ajax/live-search.php?q=${encodeURIComponent(q)}&section=${section}`)
+            fetch(`api/live-search.php?q=${encodeURIComponent(q)}&section=${section}`)
                 .then(r => r.text())
                 .then(data => { tbody.innerHTML = data; })
                 .catch(() => { tbody.innerHTML = "<tr><td colspan='10' class='text-muted' style='text-align:center;padding:1.5rem;'>Error fetching data.</td></tr>"; });
@@ -568,7 +568,7 @@
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'includes/logout.php';
+                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
@@ -782,7 +782,7 @@
                 });
                 saveArbConfigBtn.disabled = true;
                 saveArbConfigBtn.textContent = 'Saving...';
-                fetch('ajax/save-arbitration-config.php', {
+                fetch('api/save-arbitration-config.php', {
                     method: 'POST',
                     body: formData
                 })
@@ -926,7 +926,7 @@
             formData.append('override_reason', reason);
             formData.append('csrf_token', getCsrfToken());
 
-            fetch('ajax/admin-override.php', { method: 'POST', body: formData })
+            fetch('api/admin-override.php', { method: 'POST', body: formData })
                 .then(function (r) {
                     if (r.status === 409) {
                         return r.json().then(function (d) {
@@ -1113,7 +1113,7 @@
             } else {
                 const script = document.createElement('script');
                 // script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
-                script.src = 'JS/jsQR.min.js';
+                script.src = 'assets/js/vendor/jsQR.min.js';
                 script.onload = beginScan;
                 script.onerror = () => {
                     status.textContent = '❌ Failed to load QR library. Check your internet connection.';

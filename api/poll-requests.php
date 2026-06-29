@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/security-headers.php';
-require_once __DIR__ . '/session-config.php';
+require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../config/session.php';
 if (!isset($_SESSION['faculty_id'])) {
     http_response_code(401);
     echo json_encode([]);
@@ -9,7 +9,7 @@ if (!isset($_SESSION['faculty_id'])) {
 
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $uid = $_SESSION['faculty_id'];

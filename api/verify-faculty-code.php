@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/security-headers.php';
-require_once __DIR__ . '/session-config.php';
+require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../config/session.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -14,7 +14,7 @@ if (!$code || !$student_name || !$student_id) {
     exit();
 }
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 // Look up the code
@@ -69,7 +69,7 @@ $fac_mail_row = $fac_mail_stmt->get_result()->fetch_assoc();
 $fac_mail_stmt->close();
 
 if ($fac_mail_row && !empty($fac_mail_row['email'])) {
-    require_once __DIR__ . '/mailer.php';
+    require_once __DIR__ . '/../core/mailer.php';
     $email_subject = 'PUPSync: ' . $student_name . ' is about to borrow equipment';
     $email_body = '
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">

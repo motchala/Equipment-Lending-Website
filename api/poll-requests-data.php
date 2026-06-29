@@ -1,10 +1,10 @@
 <?php
-require_once __DIR__ . '/security-headers.php';
+require_once __DIR__ . '/../config/security-headers.php';
 // ajax/poll-requests-data.php
 // Returns current request data as JSON for live re-rendering.
 // No page reload needed — the JS reads this and updates the DOM directly.
 
-require_once __DIR__ . '/session-config.php';
+require_once __DIR__ . '/../config/session.php';
 date_default_timezone_set('Asia/Manila');
 
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
@@ -15,7 +15,7 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $today = date('Y-m-d');

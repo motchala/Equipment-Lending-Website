@@ -1,7 +1,7 @@
 <?php
 
 /**
- * session-config.php
+ * session.php
  *
  * Centralized session bootstrap. Configures the PHPSESSID cookie with
  * security flags BEFORE calling session_start(), so the Set-Cookie header
@@ -12,8 +12,8 @@
  *   Secure    — sent over HTTPS only (applied when the request is HTTPS)
  *
  * USAGE: replace every bare `session_start();` with:
- *   require_once __DIR__ . '/session-config.php';
- *   (or require_once '<path>/includes/session-config.php';)
+ *   require_once __DIR__ . '/session.php';
+ *   (or require_once '<path>/config/session.php';)
  * Do NOT call session_start() separately afterwards; this file does it.
  */
 

@@ -2,10 +2,10 @@
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require_once __DIR__ . '/PHPMailer/src/Exception.php';
-require_once __DIR__ . '/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/PHPMailer/src/SMTP.php';
-require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/../includes/PHPMailer/src/Exception.php';
+require_once __DIR__ . '/../includes/PHPMailer/src/PHPMailer.php';
+require_once __DIR__ . '/../includes/PHPMailer/src/SMTP.php';
+require_once __DIR__ . '/../config/env.php';
 
 // Load .env variables into $_ENV
 load_env();
