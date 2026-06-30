@@ -30,7 +30,7 @@
 
                 <!-- Background image — swap src for a real PUP MAIN photo -->
                 <div class="fcty-card-bg"
-                    style="background-image: url('css/images-design-faculty/pup-main-image.jpg');">
+                    style="background-image: url('assets/images/faculty/pup-main-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 
@@ -60,7 +60,7 @@
 
                 <!-- Background image — swap src for a real PUP CITE photo -->
                 <div class="fcty-card-bg"
-                    style="background-image: url('css/images-design-faculty/pup-cite-image.jpg');">
+                    style="background-image: url('assets/images/faculty/pup-cite-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 

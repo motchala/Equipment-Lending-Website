@@ -14,7 +14,7 @@ header("X-Frame-Options: DENY");
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/csrf.php';;
 if (!isset($_SESSION['faculty_id'])) {
-    header("Location: ../Equipment-Lending-Website/landing-page.php");
+    header("Location: landing-page.php");
     exit();
 }
 $fullname = $_SESSION['faculty_name'];

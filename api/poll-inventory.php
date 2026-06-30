@@ -1,3 +1,4 @@
+<?php
 require_once __DIR__ . '/../config/security-headers.php';
 require_once __DIR__ . '/../config/session.php';
 if (!isset($_SESSION['faculty_id'])) {

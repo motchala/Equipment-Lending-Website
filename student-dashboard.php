@@ -92,6 +92,7 @@ header("X-Frame-Options: DENY");
 
                 <!-- Borrow Equipment -->
                 <div class="student-choice-card"
+                    data-bs-toggle="modal" data-bs-target="#facultyCodeModal"
                     data-action="borrow">
                     <div class="choice-glow borrow-glow"></div>
                     <div class="choice-icon-wrap borrow-icon">
@@ -115,6 +116,7 @@ header("X-Frame-Options: DENY");
 
                 <!-- Reserve a Room -->
                 <div class="student-choice-card"
+                    data-bs-toggle="modal" data-bs-target="#facultyCodeModal"
                     data-action="room">
                     <div class="choice-glow room-glow"></div>
                     <div class="choice-icon-wrap room-icon">
@@ -406,7 +408,7 @@ header("X-Frame-Options: DENY");
 
                                 <!-- Background image — swap src for a real PUP MAIN photo -->
                                 <div class="fcty-card-bg"
-                                    style="background-image: url('css/images-design-faculty/pup-main-image.jpg');">
+                                    style="background-image: url('assets/images/faculty/pup-main-image.jpg');">
                                 </div>
                                 <div class="fcty-card-overlay"></div>
 
@@ -436,7 +438,7 @@ header("X-Frame-Options: DENY");
 
                                 <!-- Background image — swap src for a real PUP CITE photo -->
                                 <div class="fcty-card-bg"
-                                    style="background-image: url('css/images-design-faculty/pup-cite-image.jpg');">
+                                    style="background-image: url('assets/images/faculty/pup-cite-image.jpg');">
                                 </div>
                                 <div class="fcty-card-overlay"></div>
 

@@ -858,7 +858,7 @@ function initDashboard(sessionArg, receiptArg) {
                     desc: 'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.',
                     rooms: 22,
                     floors: 5,
-                    image: 'css/images-design-faculty/pup-main-building-a-image.jpg'
+                    image: 'assets/images/faculty/pup-main-building-a-image.jpg'
                 },
                 {
                     id: 'main-building-b',
@@ -868,7 +868,7 @@ function initDashboard(sessionArg, receiptArg) {
                     desc: 'Modern laboratories, smart classrooms, and collaborative study spaces.',
                     rooms: 68,
                     floors: 6,
-                    image: 'css/images-design-faculty/pup-main-building-b-image.jpg'
+                    image: 'assets/images/faculty/pup-main-building-b-image.jpg'
                 }
                 /* ── Add Building C / D / etc. below when ready ──
                 ,{
