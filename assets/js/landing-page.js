@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Role selector cards
     document.getElementById('roleFacultyBtn')?.addEventListener('click', () => selectRole('student'));
     document.getElementById('roleStudentBtn')?.addEventListener('click', () => {
-        window.location.href = 'student-dashboard.php';
+        window.location.href = 'equipment-booking/student-dashboard.php';
     });
     document.getElementById('roleAdminBtn')?.addEventListener('click', () => selectRole('admin'));
 

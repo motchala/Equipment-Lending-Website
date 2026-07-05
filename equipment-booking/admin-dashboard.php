@@ -1046,7 +1046,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <input type="file" name="item_image" id="itemImageInput" accept="image/*"
                                             style="display:none;">
                                         <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                            <img src="<?php echo htmlspecialchars($edit_item['image_path']); ?>"
+                                            <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
                                                 class="drop-zone-preview" id="imagePreview" style="display:block;">
                                         <?php else: ?>
                                             <img id="imagePreview" class="drop-zone-preview" style="display:none;">
@@ -1129,8 +1129,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                         <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
                                             <tr>
-                                                <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>"
-                                                        class="item-img" onerror="this.src='uploads/default.png'"></td>
+                                                <td><img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                        class="item-img" onerror="this.src='../uploads/default.png'"></td>
                                                 <td class="fw-bold">
                                                     <?php echo htmlspecialchars($item['item_name']); ?>
                                                 </td>
@@ -1209,8 +1209,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                         <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
                                             <tr>
-                                                <td><img src="<?php echo htmlspecialchars($item['image_path']); ?>"
-                                                        class="item-img" onerror="this.src='uploads/default.png'"></td>
+                                                <td><img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                        class="item-img" onerror="this.src='../uploads/default.png'"></td>
                                                 <td class="fw-bold">
                                                     <?php echo htmlspecialchars($item['item_name']); ?>
                                                 </td>

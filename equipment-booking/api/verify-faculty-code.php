@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../config/security-headers.php';
-require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../../config/security-headers.php';
+require_once __DIR__ . '/../../config/session.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -14,7 +14,7 @@ if (!$code || !$student_name || !$student_id) {
     exit();
 }
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 // Look up the code

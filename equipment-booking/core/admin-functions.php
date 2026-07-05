@@ -14,17 +14,22 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 
 // admin-dashboard-functions.php
-require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../../config/session.php';
 // Ensure server uses local timezone for displaying login timestamps
 date_default_timezone_set('Asia/Manila');
 if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
-    header("Location: landing-page.php");
+    header("Location: ../../landing-page.php");
     exit();
 }
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
-require_once __DIR__ . '/../config/csrf.php';
+
+// Root URL: SCRIPT_NAME for admin-dashboard.php is /Equipment-Lending-Website/equipment-booking/admin-dashboard.php
+// dirname() once gives /Equipment-Lending-Website/equipment-booking — go up one more to reach project root.
+// Used so upload image paths (stored as 'uploads/filename.jpg' in DB) resolve correctly.
+$root_url = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/\\') . '/';
+require_once __DIR__ . '/../../config/csrf.php';
 
 // ================= AJAX CHANGE PASSWORD =================
 if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password') {
@@ -129,10 +134,10 @@ if (isset($_POST['add_item'])) {
         }
 
         $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
-        $target = "uploads/" . $image_name;
+        $target = __DIR__ . '/../../uploads/' . $image_name;
 
         if (move_uploaded_file($_FILES['item_image']['tmp_name'], $target)) {
-            $image_path = $target;
+            $image_path = "uploads/" . $image_name;
         }
     }
 
@@ -141,7 +146,8 @@ if (isset($_POST['add_item'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
-        header("Location: admin-dashboard.php?view=inventory&added=1");
+        $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+        header("Location: {$base}/admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
         error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
@@ -178,10 +184,10 @@ if (isset($_POST['update_item'])) {
         }
 
         $image_name = time() . "_" . $_FILES['item_image']['name'];
-        $target = "uploads/" . $image_name;
+        $target = __DIR__ . '/../../uploads/' . $image_name;
 
         move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
-        $image_path = $target;
+        $image_path = "uploads/" . $image_name;
     }
 
     $sql = "UPDATE tbl_inventory
@@ -193,7 +199,8 @@ if (isset($_POST['update_item'])) {
 
     mysqli_query($conn, $sql);
 
-    header("Location: admin-dashboard.php?view=inventory&updated=1");
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();
 }
 
@@ -213,7 +220,8 @@ if (isset($_GET['delete_item'])) {
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);
-    header("Location: admin-dashboard.php#sec-inventory");
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    header("Location: {$base}/admin-dashboard.php?view=inventory");
     exit();
 }
 
@@ -227,7 +235,8 @@ if (isset($_GET['restore_item'])) {
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
 
-    header("Location: admin-dashboard.php?view=archive");
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    header("Location: {$base}/admin-dashboard.php?view=archive");
     exit();
 }
 
@@ -241,7 +250,8 @@ if (isset($_GET['force_delete'])) {
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
 
-    header("Location: admin-dashboard.php?view=archive");
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    header("Location: {$base}/admin-dashboard.php?view=archive");
     exit();
 }
 

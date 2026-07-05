@@ -1339,7 +1339,7 @@
                 }
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
+                    if (confirm('Confirm Logout?')) window.location.href = '../api/logout.php';
                     break;
             }
         } catch (err) {
@@ -1641,7 +1641,7 @@
             const ctrl = new AbortController();
             currentXhr = ctrl;
 
-            fetch('live-search.php?section=user_inventory&q=' + encodeURIComponent(q), {
+            fetch('api/live-search.php?section=user_inventory&q=' + encodeURIComponent(q), {
                 signal: ctrl.signal
             })
                 .then(res => {
@@ -2604,17 +2604,24 @@
 
                     // Check for any status changes
                     fresh.forEach(r => {
-                        if (lastStatuses[r.id] !== r.status) {
+                        const prev = lastStatuses[r.id];
+
+                        if (prev !== r.status) {
                             changed = true;
                             lastStatuses[r.id] = r.status;
 
-                            // Show toast for specific transitions
-                            if (r.status === 'Returned') {
-                                showToast(r.equipment_name + ' has been marked as Returned.', 'success');
-                            } else if (r.status === 'Approved') {
-                                showToast(r.equipment_name + ' request has been Approved!', 'success');
-                            } else if (r.status === 'Declined') {
-                                showToast(r.equipment_name + ' request was Declined.', 'error');
+                            // Only show a toast when the status genuinely transitioned
+                            // from a previously-known value. If prev is undefined the
+                            // request simply wasn't in the initial snapshot (e.g. it was
+                            // already in a terminal state on page load) — no toast needed.
+                            if (prev !== undefined) {
+                                if (r.status === 'Returned') {
+                                    showToast(r.equipment_name + ' has been marked as Returned.', 'success');
+                                } else if (r.status === 'Approved') {
+                                    showToast(r.equipment_name + ' request has been Approved!', 'success');
+                                } else if (r.status === 'Declined') {
+                                    showToast(r.equipment_name + ' request was Declined.', 'error');
+                                }
                             }
                         }
                     });

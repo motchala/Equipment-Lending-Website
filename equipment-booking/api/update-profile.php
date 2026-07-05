@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../../config/security-headers.php';
 
 /**
  * update-profile.php
@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/security-headers.php';
  * academic info, contact details, and emergency contact.
  * Place this file inside: includes/update-profile.php
  */
-require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../../config/session.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['faculty_id'])) {
@@ -15,10 +15,10 @@ if (!isset($_SESSION['faculty_id'])) {
     exit;
 }
 
-require_once __DIR__ . '/../config/csrf.php';
+require_once __DIR__ . '/../../config/csrf.php';
 csrf_verify();
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 $uid = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
@@ -744,7 +744,7 @@ if ($action === 'upload_profile_picture') {
     }
 
     // Create upload directory if it doesn't exist
-    $upload_dir = '../uploads/profile_pictures/';
+    $upload_dir = __DIR__ . '/../../uploads/profile_pictures/';
     if (!is_dir($upload_dir)) {
         mkdir($upload_dir, 0755, true);
     }
@@ -796,7 +796,7 @@ if ($action === 'remove_profile_picture') {
     ));
 
     if (!empty($user['profile_picture'])) {
-        $file_path = '../uploads/profile_pictures/' . $user['profile_picture'];
+        $file_path = __DIR__ . '/../../uploads/profile_pictures/' . $user['profile_picture'];
         if (file_exists($file_path)) {
             unlink($file_path);
         }

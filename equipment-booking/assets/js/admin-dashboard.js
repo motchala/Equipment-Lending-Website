@@ -568,7 +568,7 @@
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
+                    if (confirm('Confirm Logout?')) window.location.href = '../api/logout.php';
                     break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
@@ -1112,8 +1112,7 @@
                 beginScan();
             } else {
                 const script = document.createElement('script');
-                // script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js';
-                script.src = 'assets/js/vendor/jsQR.min.js';
+                script.src = '../assets/js/vendor/jsQR.min.js';
                 script.onload = beginScan;
                 script.onerror = () => {
                     status.textContent = '❌ Failed to load QR library. Check your internet connection.';
