@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../config/security-headers.php';
-require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../../config/security-headers.php';
+require_once __DIR__ . '/../../config/session.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
@@ -29,12 +29,12 @@ if ($borrow_date < $today) {
     echo json_encode(['error' => 'Borrow date cannot be in the past.']);
     exit();
 }
-if ($return_date < $borrow_date) {
-    echo json_encode(['error' => 'Return date cannot be before borrow date.']);
+if ($return_date <= $borrow_date) {
+    echo json_encode(['error' => 'Return date must be after the borrow date.']);
     exit();
 }
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 
 $conn = getDB();
 

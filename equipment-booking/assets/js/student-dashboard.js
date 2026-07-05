@@ -371,7 +371,7 @@ function initPortal() {
         if (!room) { showPortalError('Please enter the room / location.'); return; }
         if (!borrow) { showPortalError('Please select a borrow date.'); return; }
         if (!ret) { showPortalError('Please select a return date.'); return; }
-        if (ret < borrow) { showPortalError('Return date cannot be before borrow date.'); return; }
+        if (ret <= borrow) { showPortalError('Return date must be after the borrow date.'); return; }
 
         const btn = document.getElementById('btnSubmitBorrow');
         btn.disabled = true;
@@ -597,7 +597,7 @@ function initDashboard(sessionArg, receiptArg) {
             const stockText = low ? qty + ' left — limited' : qty + ' available';
 
             const imgHtml = item.image_path
-                ? `<img src="${escAttr(item.image_path)}" alt="${escAttr(item.item_name)}" class="eq-card-img-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                ? `<img src="../${escAttr(item.image_path)}" alt="${escAttr(item.item_name)}" class="eq-card-img-photo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
                    <span class="material-symbols-outlined eq-card-img-fallback" style="display:none;">inventory_2</span>`
                 : `<span class="material-symbols-outlined">inventory_2</span>`;
 
@@ -682,7 +682,7 @@ function initDashboard(sessionArg, receiptArg) {
         if (!room) { showBorrowError('Please enter the room or location.'); return; }
         if (!borrow) { showBorrowError('Please select a borrow date.'); return; }
         if (!ret) { showBorrowError('Please select a return date.'); return; }
-        if (ret < borrow) { showBorrowError('Return date cannot be before the borrow date.'); return; }
+        if (ret <= borrow) { showBorrowError('Return date must be after the borrow date.'); return; }
 
         const btn = document.getElementById('borrowSubmitBtn');
         btn.disabled = true;

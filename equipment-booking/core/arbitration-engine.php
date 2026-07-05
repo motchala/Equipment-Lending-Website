@@ -618,8 +618,8 @@ class ArbitrationEngine
             return 0;
         }
 
-        // Step 2: Build absolute path (file lives in includes/, project root is one level up).
-        $absolute_path = __DIR__ . '/../' . $document_path;
+        // Step 2: Build absolute path (document_path is relative to project root).
+        $absolute_path = __DIR__ . '/../../' . $document_path;
 
         if (!file_exists($absolute_path)) {
             return 0;

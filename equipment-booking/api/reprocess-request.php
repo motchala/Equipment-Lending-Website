@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/security-headers.php';
+require_once __DIR__ . '/../../config/security-headers.php';
 
 /**
  * ajax/reprocess-request.php
@@ -35,14 +35,14 @@ function send_error(int $http_status, string $message): never
 }
 
 // ── Session guard — require active faculty session ────────────────────────────
-require_once __DIR__ . '/../config/session.php';
+require_once __DIR__ . '/../../config/session.php';
 
 if (empty($_SESSION['faculty_id'])) {
     send_error(401, 'Unauthorized. Please log in.');
 }
 
 // ── CSRF guard ─────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../config/csrf.php';
+require_once __DIR__ . '/../../config/csrf.php';
 $csrf_token = $_POST['csrf_token'] ?? '';
 if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrf_token)) {
     send_error(403, 'Invalid or expired session. Please refresh the page and try again.');
@@ -51,10 +51,10 @@ if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSI
 $logged_in_faculty_id = (string)$_SESSION['faculty_id'];
 
 // ── Require ArbitrationEngine ─────────────────────────────────────────────────
-require_once __DIR__ . '/../core/arbitration-engine.php';
+require_once __DIR__ . '/../../core/arbitration-engine.php';
 
 // ── Database connection ───────────────────────────────────────────────────────
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 $conn->set_charset('utf8mb4');
@@ -108,7 +108,7 @@ if ($mime_type === false || !in_array($mime_type, $allowed_mime_types, true)) {
 
 // ── Verify request exists and belongs to the logged-in faculty member ─────────
 $stmt = $conn->prepare(
-    "SELECT id, student_id, status
+    "SELECT id, faculty_id, status
        FROM tbl_requests
       WHERE id = ?
       LIMIT 1"
@@ -134,22 +134,22 @@ if ($request === null || $request === false) {
 }
 
 // Ownership check — the request must belong to the logged-in faculty member
-if ((string)$request['student_id'] !== $logged_in_faculty_id) {
+if ((string)$request['faculty_id'] !== $logged_in_faculty_id) {
     send_error(403, 'You do not have permission to modify this request.');
 }
 
 // ── Task 5.3: Store file and update document_path ─────────────────────────────
 
-// Build destination filename: {timestamp}_{student_id}_{safe_original_name}
+// Build destination filename: {timestamp}_{faculty_id}_{safe_original_name}
 $timestamp      = time();
-$student_id     = (string)$request['student_id'];
+$student_id     = (string)$request['faculty_id'];
 $original_name  = basename($file['name']);
 
 // Sanitise the original filename — keep only alphanumerics, dots, dashes, underscores
 $safe_name      = preg_replace('/[^a-zA-Z0-9._\-]/', '_', $original_name);
 $dest_filename  = $timestamp . '_' . $student_id . '_' . $safe_name;
 
-$upload_dir     = __DIR__ . '/../uploads/request_letters/';
+$upload_dir     = __DIR__ . '/../../uploads/request_letters/';
 $dest_path      = $upload_dir . $dest_filename;
 
 // Relative path stored in the DB (relative to project root)

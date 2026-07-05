@@ -5,16 +5,16 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 
 // return_confirm.php — Admin scans QR → marks equipment as Returned
-require_once __DIR__ . '/config/session.php';
+require_once __DIR__ . '/../config/session.php';
 date_default_timezone_set('Asia/Manila');
 
 // Only accessible to logged-in admins
 if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
-    header("Location: landing-page.php");
+    header("Location: ../landing-page.php");
     exit();
 }
 
-require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
 
 $token = trim($_GET['token'] ?? '');
