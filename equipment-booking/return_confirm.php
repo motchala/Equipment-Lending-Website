@@ -149,7 +149,7 @@ if ($is_ajax) {
         <p>
             <?php echo $message; ?>
         </p>
-        <a href="admin-dashboard.php">Back to Dashboard</a>
+        <a href="../admin-dashboard.php">Back to Dashboard</a>
     </div>
 </body>
 

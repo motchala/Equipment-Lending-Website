@@ -1,23 +1,6 @@
 <?php
-require_once __DIR__ . '/../../config/security-headers.php';
-
-/**
- * ajax/reprocess-request.php
- *
- * AJAX endpoint — Document upload + re-evaluation for a held Waiting request.
- *
- * Accepts:
- *   POST request_id  (int)   — PK of the tbl_requests row to re-evaluate
- *   POST document    (file)  — Signed request letter (PDF, JPG, PNG, WEBP; max 5 MB)
- *
- * Response: JSON { status: 'success'|'error', decision: string, message: string }
- *
- * Requirement 8.4 — When a required document is subsequently uploaded for a held
- * Waiting request, the Arbitration Engine SHALL immediately and automatically
- * re-evaluate the request using the full priority scoring rules.
- */
-
 declare(strict_types=1);
+require_once __DIR__ . '/../../config/security-headers.php';
 
 date_default_timezone_set('Asia/Manila');
 

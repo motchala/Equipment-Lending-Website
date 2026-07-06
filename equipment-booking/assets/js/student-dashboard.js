@@ -1,4 +1,4 @@
-/* ================================================================
+﻿/* ================================================================
    student-dashboard.js
    Covers two screens rendered in student-dashboard.php:
 
@@ -327,7 +327,7 @@ function initPortal() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Verifying…';
 
-        fetch('api/verify-faculty-code.php', {
+        fetch('equipment-booking/api/verify-faculty-code.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code, student_name: name, student_id: id }),
@@ -377,7 +377,7 @@ function initPortal() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…';
 
-        fetch('api/submit-student-borrow.php', {
+        fetch('equipment-booking/api/submit-student-borrow.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -688,7 +688,7 @@ function initDashboard(sessionArg, receiptArg) {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…';
 
-        fetch('api/submit-student-borrow.php', {
+        fetch('equipment-booking/api/submit-student-borrow.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

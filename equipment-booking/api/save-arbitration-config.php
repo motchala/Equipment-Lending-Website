@@ -1,27 +1,6 @@
 <?php
-require_once __DIR__ . '/../../config/security-headers.php';
-
-/**
- * ajax/save-arbitration-config.php
- *
- * AJAX endpoint — Persist Config Panel changes to tbl_arbitration_config.
- *
- * Accepts:
- *   POST config[]          (array)  — Associative array of config_key => config_value pairs.
- *                                     Keys must be one of the eight whitelisted config keys.
- *   POST config[high_value_items][] (array, optional) — List of item IDs to mark as
- *                                     high-value. All other items will be set to is_high_value = 0.
- *
- * Response: JSON { status: 'success'|'error', message: string }
- *
- * Requirements:
- *   11.5 — Persist updated configuration to tbl_arbitration_config.
- *   11.6 — Display confirmation message "Arbitration settings saved."
- *   14.5 — tbl_arbitration_config schema.
- *   14.6 — Seeded default config keys.
- */
-
 declare(strict_types=1);
+require_once __DIR__ . '/../../config/security-headers.php';
 
 date_default_timezone_set('Asia/Manila');
 
