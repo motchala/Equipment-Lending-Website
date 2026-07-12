@@ -25,10 +25,10 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
-// Root URL: SCRIPT_NAME for admin-dashboard.php is /Equipment-Lending-Website/equipment-booking/admin-dashboard.php
-// dirname() once gives /Equipment-Lending-Website/equipment-booking — go up one more to reach project root.
+// Root URL: SCRIPT_NAME for admin-dashboard.php is now /Equipment-Lending-Website/admin-dashboard.php
+// dirname() once gives /Equipment-Lending-Website — the project root.
 // Used so upload image paths (stored as 'uploads/filename.jpg' in DB) resolve correctly.
-$root_url = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/\\') . '/';
+$root_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
 require_once __DIR__ . '/../../config/csrf.php';
 
 // ================= AJAX CHANGE PASSWORD =================

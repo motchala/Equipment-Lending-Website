@@ -463,7 +463,7 @@
         if (!input || !tbody) return;
         input.addEventListener('keyup', function () {
             const q = this.value.trim();
-            fetch(`api/live-search.php?q=${encodeURIComponent(q)}&section=${section}`)
+            fetch(`equipment-booking/api/live-search.php?q=${encodeURIComponent(q)}&section=${section}`)
                 .then(r => r.text())
                 .then(data => { tbody.innerHTML = data; })
                 .catch(() => { tbody.innerHTML = "<tr><td colspan='10' class='text-muted' style='text-align:center;padding:1.5rem;'>Error fetching data.</td></tr>"; });
@@ -568,7 +568,7 @@
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = '../api/logout.php';
+                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
@@ -782,7 +782,7 @@
                 });
                 saveArbConfigBtn.disabled = true;
                 saveArbConfigBtn.textContent = 'Saving...';
-                fetch('api/save-arbitration-config.php', {
+                fetch('equipment-booking/api/save-arbitration-config.php', {
                     method: 'POST',
                     body: formData
                 })
@@ -926,7 +926,7 @@
             formData.append('override_reason', reason);
             formData.append('csrf_token', getCsrfToken());
 
-            fetch('api/admin-override.php', { method: 'POST', body: formData })
+            fetch('equipment-booking/api/admin-override.php', { method: 'POST', body: formData })
                 .then(function (r) {
                     if (r.status === 409) {
                         return r.json().then(function (d) {
@@ -1038,7 +1038,7 @@
                     }
 
                     // Hit return_confirm.php via fetch — no page reload
-                    fetch('return_confirm.php?token=' + encodeURIComponent(token), {
+                    fetch('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), {
                         credentials: 'same-origin',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     })
@@ -1112,7 +1112,7 @@
                 beginScan();
             } else {
                 const script = document.createElement('script');
-                script.src = '../assets/js/vendor/jsQR.min.js';
+                script.src = 'assets/js/vendor/jsQR.min.js';
                 script.onload = beginScan;
                 script.onerror = () => {
                     status.textContent = '❌ Failed to load QR library. Check your internet connection.';

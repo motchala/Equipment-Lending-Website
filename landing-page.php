@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 // fix for application disclosure vulnerability.
 ini_set('display_errors', '0');
@@ -22,11 +22,11 @@ function validateStudentIDYear($student_id)
 }
 
 if (isset($_SESSION['faculty_id'])) {
-    header("Location: equipment-booking/faculty-dashboard.php");
+    header("Location: faculty-dashboard.php");
     exit();
 }
 if (isset($_SESSION['admin'])) {
-    header("Location: equipment-booking/admin-dashboard.php");
+    header("Location: admin-dashboard.php");
     exit();
 }
 if (isset($_SESSION['user_id'])) {
@@ -110,7 +110,7 @@ if (isset($_POST['login'])) {
 
                         $_SESSION['admin_name'] = $admin_name_db;
                         $_SESSION['admin_email'] = $email;
-                        header("Location: equipment-booking/admin-dashboard.php");
+                        header("Location: admin-dashboard.php");
                         exit();
                     } else {
                         $login_error = "Invalid admin credentials.";
@@ -138,7 +138,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['faculty_name'] = $user['fullname'];
                 $_SESSION['faculty_email'] = $email;
                 $_SESSION['login_time'] = time();
-                header("Location: equipment-booking/faculty-dashboard.php");
+                header("Location: faculty-dashboard.php");
                 exit();
             } else {
                 $login_error = "Incorrect password.";
@@ -354,9 +354,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         <ul class="footer-links">
                             <li><a href="#" id="footerSignInBtn"><i class="fa-solid fa-chevron-right"></i> Sign In</a></li>
                             <li><a href="#" id="footerRegisterBtn"><i class="fa-solid fa-chevron-right"></i> Create Account</a></li>
-                            <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
-                            <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
-                            <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
+                            <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
                         </ul>
                     </div>
 
@@ -441,9 +441,9 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                         <div class="fmb-col">
                             <p class="footer-col-title">Portal</p>
                             <ul class="footer-links">
-                                <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
-                                <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
-                                <li><a href="equipment-booking/faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Dashboard</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> Borrow Equipment</a></li>
+                                <li><a href="faculty-dashboard.php"><i class="fa-solid fa-chevron-right"></i> My Requests</a></li>
                             </ul>
                         </div>
                         <div class="fmb-col">

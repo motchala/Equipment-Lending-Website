@@ -11,26 +11,26 @@ $csp_nonce = base64_encode(random_bytes(16));
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$csp_nonce}' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';");
 header("X-Frame-Options: DENY");
 
-require_once __DIR__ . '/../config/session.php';
-require_once __DIR__ . '/../config/csrf.php';;
+require_once __DIR__ . '/config/session.php';
+require_once __DIR__ . '/config/csrf.php';
 if (!isset($_SESSION['faculty_id'])) {
-    header("Location: ../landing-page.php");
+    header("Location: landing-page.php");
     exit();
 }
 $fullname = $_SESSION['faculty_name'];
 $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/config/db.php';
 $conn = getDB();
 
 $base_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
-// Root URL: one level up from equipment-booking/ — used for uploads and other root assets.
-$root_url = rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'])), '/\\') . '/';
-// Uploads live one level up at the project root — use a root-relative prefix
+// Root URL: now at project root — SCRIPT_NAME dirname IS the project root.
+$root_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
+// Uploads live at the project root — use a root-relative prefix
 // so image src values resolve correctly regardless of nesting depth.
 $uploads_url = $root_url . 'uploads/';
 
-require_once __DIR__ . '/core/arbitration-engine.php';
+require_once __DIR__ . '/equipment-booking/core/arbitration-engine.php';
 
 function maskEmail($email)
 {
@@ -95,7 +95,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
             $orig_name   = basename($_FILES['request_document']['name']);
             $safe_name   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
             $dest_name   = time() . '_' . $faculty_id . '_' . $safe_name;
-            $dest_dir    = __DIR__ . '/../uploads/request_letters/';
+            $dest_dir    = __DIR__ . '/uploads/request_letters/';
             $dest_path   = $dest_dir . $dest_name;
             $rel_path    = 'uploads/request_letters/' . $dest_name;
 
@@ -225,21 +225,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
         href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         rel="stylesheet">
     <!-- Font Awesome (kept for existing icon references in JS) -->
-    <link rel="stylesheet" href="../assets/fonts/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
 
-    <link rel="stylesheet" href="assets/css/faculty-dashboard.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard.css">
 
     <!-- Faculty Code Card -->
-    <link rel="stylesheet" href="assets/css/faculty-code-card.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-code-card.css">
 
     <!-- Responsive System -->
-    <link rel="stylesheet" href="assets/css/faculty-dashboard-responsive.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css">
 
     <!-- Dashboard Redesign v3 — Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
-    <link rel="stylesheet" href="../room-reservation/assets/css/fcty-facilities.css">
+    <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
 
     <style nonce="<?php echo $csp_nonce; ?>">
         /* fix for csp vulnerability. inline styles */
@@ -1955,7 +1955,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             <!-- ============================================================
          TAB: FACILITIES (ROOMS)
     ============================================================ -->
-            <?php include __DIR__ . '/../room-reservation/fcty-facilities.php'; ?>
+            <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
 
             <!-- ============================================================
          TAB: MY ACTIVITY (Timeline)
@@ -3519,8 +3519,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
 
-    <script src="assets/js/faculty-dashboard.js"></script>
-    <script src="../room-reservation/assets/js/fcty-facilities.js"></script>
+    <script src="equipment-booking/assets/js/faculty-dashboard.js"></script>
+    <script src="room-reservation/assets/js/fcty-facilities.js"></script>
 </body>
 
 </html>
