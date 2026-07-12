@@ -264,7 +264,7 @@
     /* ── Polling loop ────────────────────────────────────────────────────── */
     function startPolling() {
         function doPoll() {
-            fetch('api/poll-requests-data.php', {
+            fetch('equipment-booking/api/poll-requests-data.php', {
                 method: 'GET',
                 credentials: 'same-origin'
             })
