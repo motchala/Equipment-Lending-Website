@@ -373,6 +373,33 @@ ALTER TABLE `tbl_room_reservations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 COMMIT;
 
+-- ── CREATE-FACULTY-ACCOUNT MIGRATION ──────────────────────────────────────
+-- Run this block once on any existing lending_db that was created before
+-- this feature was added. A full re-import of lending_db.sql also works.
+
+-- 1. New table: tbl_organizations
+CREATE TABLE IF NOT EXISTS `tbl_organizations` (
+  `id`         INT(11)      NOT NULL AUTO_INCREMENT,
+  `name`       VARCHAR(100) NOT NULL,
+  `created_at` DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_org_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO `tbl_organizations` (`name`) VALUES
+  ('IBITS'),
+  ('YES'),
+  ('ACES');
+
+-- 2. Extend tbl_users with adviser and organization columns
+ALTER TABLE `tbl_users`
+  ADD COLUMN `is_org_adviser`  TINYINT(1) DEFAULT 0 NULL  AFTER `role`,
+  ADD COLUMN `organization_id` INT(11)    DEFAULT NULL     AFTER `is_org_adviser`,
+  ADD CONSTRAINT `fk_users_org`
+      FOREIGN KEY (`organization_id`)
+      REFERENCES `tbl_organizations` (`id`)
+      ON DELETE RESTRICT;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
