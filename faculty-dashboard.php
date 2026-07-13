@@ -54,11 +54,12 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if (!isset($_SESSION['faculty_id'])) die("Unauthorized access");
     csrf_verify();
     $user_id = $_SESSION['faculty_id'];
-    $user_query = mysqli_query($conn, "SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
+    $user_query = mysqli_query($conn, "SELECT fullname, faculty_id, role FROM tbl_users WHERE faculty_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
     $user = mysqli_fetch_assoc($user_query);
     if (!$user) die("User profile not found.");
-    $faculty_name   = $user['fullname'];
-    $faculty_id     = $user['faculty_id'];
+    $faculty_name       = $user['fullname'];
+    $faculty_id         = $user['faculty_id'];
+    $submitter_is_adviser = ($user['role'] ?? '') === 'Organization Adviser';
     $borrow_date    = mysqli_real_escape_string($conn, $_POST['borrow_date']);
     $return_date    = mysqli_real_escape_string($conn, $_POST['return_date']);
     $equipment_name = mysqli_real_escape_string($conn, trim($_POST['equipment_name']));
@@ -68,6 +69,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
     if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
     if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
     // ── Document upload validation ─────────────────────────────────────────────
+    // ── Adviser document requirement (server-side gate, before INSERT) ─────────
+    if ($submitter_is_adviser && (!isset($_FILES['request_document']) || $_FILES['request_document']['error'] === UPLOAD_ERR_NO_FILE)) {
+        die("Error: A signed request letter is required for organization borrowing.");
+    }
     $document_path = null;
     if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
         if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
@@ -178,7 +183,7 @@ $profile_row = mysqli_fetch_assoc(mysqli_query(
     $conn,
     "SELECT email, backup_email, profile_picture, dob, gender, nationality, 
      department, faculty_rank, phone, present_address, permanent_address, landline,
-     emergency_name, emergency_relationship, emergency_phone 
+     emergency_name, emergency_relationship, emergency_phone, role
      FROM tbl_users WHERE faculty_id='$uid_safe' LIMIT 1"
 )) ?: [];
 $db_email             = $profile_row['email']             ?? '';
@@ -196,6 +201,7 @@ $db_landline          = $profile_row['landline']          ?? '';
 $db_emergency_name    = $profile_row['emergency_name']        ?? '';
 $db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
 $db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
+$is_org_adviser       = ($profile_row['role'] ?? '') === 'Organization Adviser';
 
 $masked_email       = maskEmail($db_email);
 $masked_backup      = maskEmail($db_backup_email);
@@ -3309,14 +3315,18 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 required>
                         </div>
                     </div>
+                    <?php if ($is_org_adviser): ?>
                     <div class="form-group">
                         <label for="request_document">Request Letter
-                            <span style="font-size:0.8em;color:var(--color-on-surface-variant);">(Optional — PDF, JPG, PNG, WEBP; max 5 MB)</span>
+                            <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
                         </label>
                         <input type="file" id="request_document" name="request_document"
-                            accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom">
-                        <small style="color:var(--color-on-surface-variant);font-size:0.75rem;">Required for high-value equipment or organization borrowing.</small>
+                            accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
+                        <small id="documentError" role="alert" style="color:var(--color-error);font-size:0.75rem;display:none;">
+                            Please attach a signed request letter before submitting.
+                        </small>
                     </div>
+                    <?php endif; ?>
                     <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
                         <span class="material-symbols-outlined">send</span> Submit Borrow Request
                     </button>

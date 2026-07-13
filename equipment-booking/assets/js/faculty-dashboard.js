@@ -1195,6 +1195,21 @@
                 alert('The return date cannot be earlier than the borrow date.');
                 return;
             }
+            // ── Adviser: require document attachment ──────────────────────────
+            const fileInp = document.getElementById('request_document');
+            const docErr  = document.getElementById('documentError');
+            if (fileInp) {
+                if (!fileInp.files || fileInp.files.length === 0) {
+                    e.preventDefault();
+                    if (docErr) {
+                        docErr.style.display = 'block';
+                        docErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    return;
+                }
+                // File attached — hide any previous error
+                if (docErr) docErr.style.display = 'none';
+            }
             e.preventDefault();
             document.getElementById('loading-overlay').classList.add('active');
             const hidden = document.createElement('input');

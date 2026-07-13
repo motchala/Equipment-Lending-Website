@@ -17,7 +17,7 @@ declare(strict_types=1);
  *  2.  Fetch request + borrower data
  *  3.  Pre-flight: overdue block
  *  4.  Pre-flight: duplicate block
- *  5.  Document / high-value check (missing doc → hold as Waiting)
+ *  5.  Document check (missing doc for Adviser → hold as Waiting)
  *  6.  Archived item check
  *  7.  Stock check (quantity = 0 → Declined)
  *  8.  Acquire stock lock (BEGIN + SELECT FOR UPDATE)
@@ -457,7 +457,6 @@ class ArbitrationEngine
     {
         $stmt = $conn->prepare(
             'SELECT tbl_requests.*, tbl_users.role,
-                    tbl_inventory.is_high_value,
                     tbl_inventory.is_archived,
                     tbl_inventory.quantity
              FROM tbl_requests
@@ -581,22 +580,14 @@ class ArbitrationEngine
             return null;
         }
 
-        // Step 4: No document — evaluate which hold note applies.
-        $is_high_value        = isset($request['is_high_value']) && $request['is_high_value'] == 1;
-        $is_organization_req  = isset($request['role']) && $request['role'] === 'Adviser';
+        // Step 4: No document — check if borrower is an organisation adviser.
+        $is_organization_req = isset($request['role']) && $request['role'] === 'Organization Adviser';
 
-        // Requirement 8.3: High_Value + Organization → use organization message.
-        // Requirement 8.2: Organization only → organization message.
         if ($is_organization_req) {
             return 'A signed request letter is required for organization borrowing.';
         }
 
-        // Requirement 8.1: High_Value only (not Organization) → director message.
-        if ($is_high_value) {
-            return 'A signed request letter from the Director is required for this equipment.';
-        }
-
-        // Neither condition applies — no hold.
+        // No hold required.
         return null;
     }
 
@@ -686,7 +677,7 @@ class ArbitrationEngine
             case 'Director':
                 $role = (int)($config['role_priority_director'] ?? 4);
                 break;
-            case 'Adviser':
+            case 'Organization Adviser':
                 $role = (int)($config['role_priority_adviser'] ?? 3);
                 break;
             case 'Regular Faculty':

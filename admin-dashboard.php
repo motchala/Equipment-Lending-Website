@@ -1462,7 +1462,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <path
                                 d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                         </svg>Config Panel</h2>
-                    <p>Configure arbitration rules, role priorities, and high-value item designations.</p>
+                    <p>Configure arbitration rules and role priorities.</p>
                 </div>
 
                 <div class="eq-card form-card">
@@ -1512,28 +1512,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     value="<?php echo htmlspecialchars($arb_config['tie_break_window_seconds'] ?? 5); ?>">
                             </div>
 
-                            <!-- High-Value Items -->
-                            <h3
-                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
-                                High-Value Items</h3>
-                            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Items checked
-                                here require a signed request letter.</p>
-                            <div class="form-group">
-                                <?php
-                                mysqli_data_seek($inventory_result, 0);
-                                while ($item = mysqli_fetch_assoc($inventory_result)):
-                                    $checked = ($item['is_high_value'] == 1) ? 'checked' : '';
-                                ?>
-                                    <label
-                                        style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;font-size:0.88rem;cursor:pointer;">
-                                        <input type="checkbox" name="config[high_value_items][]"
-                                            value="<?php echo htmlspecialchars($item['item_id']); ?>" <?php echo $checked;
-                                                                                                        ?>>
-                                        <?php echo htmlspecialchars($item['item_name']); ?>
-                                    </label>
-                                <?php endwhile; ?>
-                            </div>
-
                             <!-- Rule Toggles -->
                             <h3
                                 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
@@ -1572,7 +1550,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Missing Document Block
                                     </h4>
                                     <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Hold requests for
-                                        high-value items or organization borrowing without a signed letter.</p>
+                                        organization borrowing (Adviser role) without a signed letter.</p>
                                 </div>
                                 <label class="toggle-sw">
                                     <input type="checkbox" name="config[rule_missing_doc_block_enabled]" value="1" <?php
