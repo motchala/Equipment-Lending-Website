@@ -3398,3 +3398,149 @@ input[type="range"] {
     z-index: 9999;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
+
+
+/* ── FACULTY MANAGEMENT PANEL ─────────────────────────────────── */
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Password field wrapper — positions the show/hide button inside */
+.fac-pw-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.fac-pw-wrap .form-control-custom {
+    padding-right: 42px; /* make room for the toggle button */
+}
+
+.fac-pw-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 0.2s;
+}
+
+.fac-pw-toggle:hover {
+    color: var(--accent-maroon);
+}
+
+/* Two-column layout: form (fixed 400px) left, list (fluid) right */
+.faculty-layout {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+/* Form card uses eq-card base — just needs body padding fix */
+.faculty-form-card .eq-card-body {
+    padding: 1.5rem;
+}
+
+/* Required-field asterisk */
+.req-star {
+    color: var(--danger);
+}
+
+/* Inline field-level error message */
+.faculty-field-error {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--danger);
+    margin-top: 4px;
+}
+
+/* Wrapper that holds the adviser toggle label + track together */
+.faculty-adviser-toggle-wrap {
+    display: flex;
+    align-items: center;
+}
+
+/* Clickable label that wraps checkbox + track + text */
+.faculty-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    user-select: none;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* Visually hidden but accessible checkbox */
+.faculty-toggle-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Toggle track (pill shape) */
+.faculty-toggle-track {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 24px;
+    background: var(--khaki-border);
+    border-radius: 12px;
+    flex-shrink: 0;
+    transition: background 0.25s ease;
+}
+
+/* Toggle thumb (circular knob) */
+.faculty-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.25s ease;
+}
+
+/* Checked state — track turns accent-maroon */
+.faculty-toggle-input:checked + .faculty-toggle-track {
+    background: var(--accent-maroon);
+}
+
+/* Checked state — thumb slides right */
+.faculty-toggle-input:checked + .faculty-toggle-track::after {
+    transform: translateX(18px);
+}
+
+/* Focus-visible ring for keyboard accessibility */
+.faculty-toggle-input:focus-visible + .faculty-toggle-track {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+/* ── RESPONSIVE: stack to single column below 900 px ─────────── */
+@media (max-width: 900px) {
+    .faculty-layout {
+        grid-template-columns: 1fr;
+    }
+}
