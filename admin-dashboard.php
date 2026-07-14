@@ -1999,13 +1999,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <th>PUPSync Email</th>
                                     <th>Role</th>
                                     <th>Organization</th>
+                                    <th>Allow Org Borrowing</th>
                                 </tr>
                             </thead>
                             <tbody id="faculty-list-tbody">
                             <?php
+                            // Guard: check whether allow_org_borrowing column exists before querying it.
+                            // If the dual-borrowing-mode migration hasn't been run yet the column is absent
+                            // and the query would throw a fatal error. Fall back to 0 for all rows.
+                            $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
+                            $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
                             $fac_res = $conn->query(
                                 "SELECT u.fullname, u.email, u.role,
-                                        o.name AS org_name
+                                        u.faculty_id,"
+                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
+                                . "     o.name AS org_name
                                    FROM tbl_users u
                                    LEFT JOIN tbl_organizations o
                                      ON u.organization_id = o.id
@@ -2030,11 +2038,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <span style="color:var(--text-light);">&mdash;</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td>
+                                        <label class="faculty-toggle-label">
+                                            <input type="checkbox"
+                                                   class="faculty-toggle-input org-borrowing-toggle"
+                                                   data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                                                   <?= $frow['allow_org_borrowing'] == 1 ? 'checked' : '' ?>>
+                                            <span class="faculty-toggle-track"></span>
+                                        </label>
+                                    </td>
                                 </tr>
                             <?php endwhile;
                             else: ?>
                                 <tr id="fac-empty-row">
-                                    <td colspan="4" class="text-muted" style="text-align:center;padding:3rem;">
+                                    <td colspan="5" class="text-muted" style="text-align:center;padding:3rem;">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                              stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                              stroke-linejoin="round" width="40" height="40"

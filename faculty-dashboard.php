@@ -50,31 +50,58 @@ $stmt_expired->execute();
 mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
-if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
+if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($_POST['submitted_as'])) {
     if (!isset($_SESSION['faculty_id'])) die("Unauthorized access");
-    csrf_verify();
-    $user_id = $_SESSION['faculty_id'];
-    $user_query = mysqli_query($conn, "SELECT fullname, faculty_id, role FROM tbl_users WHERE faculty_id='" . mysqli_real_escape_string($conn, $user_id) . "'");
-    $user = mysqli_fetch_assoc($user_query);
-    if (!$user) die("User profile not found.");
-    $faculty_name       = $user['fullname'];
-    $faculty_id         = $user['faculty_id'];
-    $submitter_is_adviser = ($user['role'] ?? '') === 'Organization Adviser';
-    $borrow_date    = mysqli_real_escape_string($conn, $_POST['borrow_date']);
-    $return_date    = mysqli_real_escape_string($conn, $_POST['return_date']);
-    $equipment_name = mysqli_real_escape_string($conn, trim($_POST['equipment_name']));
-    $room           = mysqli_real_escape_string($conn, $_POST['room']);
-    $instructor     = mysqli_real_escape_string($conn, $faculty_name); // auto-filled from account name
-    $current_date   = date('Y-m-d');
-    if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
-    if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
-    // ── Document upload validation ─────────────────────────────────────────────
-    // ── Adviser document requirement (server-side gate, before INSERT) ─────────
-    if ($submitter_is_adviser && (!isset($_FILES['request_document']) || $_FILES['request_document']['error'] === UPLOAD_ERR_NO_FILE)) {
-        die("Error: A signed request letter is required for organization borrowing.");
-    }
-    $document_path = null;
-    if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
+
+    $submitted_as_post = $_POST['submitted_as'] ?? '';
+
+    // ── ADVISER BRANCH ────────────────────────────────────────────────────
+    if ($submitted_as_post === 'adviser') {
+
+        // Re-read allow_org_borrowing from DB — server-side gate (Requirement 1.5, 1.6)
+        // Guard: if migration hasn't run yet the column may not exist; treat as 0.
+        $_gate_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
+        if (!$_gate_col || $_gate_col->num_rows === 0) {
+            die("Error: Organisation borrowing not permitted for this account.");
+        }
+        $stmt_gate = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+        $stmt_gate->bind_param('s', $_SESSION['faculty_id']);
+        $stmt_gate->execute();
+        $gate_row = $stmt_gate->get_result()->fetch_assoc();
+        $stmt_gate->close();
+        if ((int)($gate_row['allow_org_borrowing'] ?? 0) !== 1) {
+            die("Error: Organisation borrowing not permitted for this account.");
+        }
+
+        // CSRF check before reading any $_POST / $_FILES (Requirement 10.2)
+        csrf_verify();
+
+        // Collect faculty info via prepared statement
+        $user_id = $_SESSION['faculty_id'];
+        $stmt_usr = $conn->prepare("SELECT fullname, faculty_id FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+        $stmt_usr->bind_param('s', $user_id);
+        $stmt_usr->execute();
+        $adv_user = $stmt_usr->get_result()->fetch_assoc();
+        $stmt_usr->close();
+        if (!$adv_user) die("User profile not found.");
+        $faculty_name = $adv_user['fullname'];
+        $faculty_id   = $adv_user['faculty_id'];
+
+        // Collect and validate shared fields
+        $borrow_date  = trim($_POST['borrow_date'] ?? '');
+        $return_date  = trim($_POST['return_date'] ?? '');
+        $room         = trim($_POST['room'] ?? '');
+        $instructor   = $faculty_name; // auto-filled from account name
+        $current_date = date('Y-m-d');
+        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
+        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+
+        // Validate document is present (Requirement 4.6)
+        if (!isset($_FILES['request_document']) || $_FILES['request_document']['error'] === UPLOAD_ERR_NO_FILE) {
+            die("Error: A signed request letter is required for organisation borrowing.");
+        }
+
+        // File upload validation (Requirement 10.6)
         if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
             die("File upload error. Please try again.");
         }
@@ -88,62 +115,190 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name'])) {
         if (!in_array($mime, $allowed_mimes, true)) {
             die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
         }
-        // $document_path will be set in the next step after successful INSERT
-    }
-    $insert = "INSERT INTO tbl_requests (faculty_name,faculty_id,equipment_name,instructor,room,borrow_date,return_date,status,request_date)
-               VALUES ('$faculty_name','$faculty_id','$equipment_name','$instructor','$room','$borrow_date','$return_date','Waiting',NOW())";
-    if (mysqli_query($conn, $insert)) {
-        $new_request_id = mysqli_insert_id($conn);
 
-        // ── Move uploaded document and update document_path ────────────────────
-        if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] === UPLOAD_ERR_OK) {
-            $orig_name   = basename($_FILES['request_document']['name']);
-            $safe_name   = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
-            $dest_name   = time() . '_' . $faculty_id . '_' . $safe_name;
-            $dest_dir    = __DIR__ . '/uploads/request_letters/';
-            $dest_path   = $dest_dir . $dest_name;
-            $rel_path    = 'uploads/request_letters/' . $dest_name;
-
-            if (move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
-                $stmt_doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
-                if ($stmt_doc) {
-                    $stmt_doc->bind_param('si', $rel_path, $new_request_id);
-                    $stmt_doc->execute();
-                    $stmt_doc->close();
-                }
-            }
+        // Move uploaded file to uploads/request_letters/ (Requirement 10.7)
+        $orig_name = basename($_FILES['request_document']['name']);
+        $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
+        $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
+        $dest_dir  = __DIR__ . '/uploads/request_letters/';
+        $dest_path = $dest_dir . $dest_name;
+        $rel_path  = 'uploads/request_letters/' . $dest_name;
+        if (!move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
+            die("Error: Could not save uploaded document.");
         }
 
-        ArbitrationEngine::process($conn, $new_request_id);
+        // Collect items array (Requirement 4.4, 5.1)
+        $items = $_POST['items'] ?? [];
+        if (empty($items)) die("Error: At least one item must be selected.");
 
-        // ── Generate return token if engine approved the request ──────────────
-        $check_approved = $conn->prepare(
-            "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
+        // Generate batch UUID (Requirement 4.5)
+        $batch_id = sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
         );
-        if ($check_approved) {
-            $check_approved->bind_param('i', $new_request_id);
-            $check_approved->execute();
-            $check_approved->get_result(); // consume result
-            if ($check_approved->affected_rows > 0 || $conn->affected_rows > 0) {
-                // Simpler: just always try to stamp it, the NULL guard prevents double-write
-                $auto_token = bin2hex(random_bytes(32));
-                $tok = $conn->prepare(
-                    "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
-                );
-                if ($tok) {
-                    $tok->bind_param('si', $auto_token, $new_request_id);
-                    $tok->execute();
-                    $tok->close();
+
+        // Loop: one INSERT per selected item (Requirement 4.5, 3.3)
+        foreach ($items as $item) {
+            $item_name = trim($item);
+            if ($item_name === '') continue;
+
+            $stmt_ins = $conn->prepare(
+                "INSERT INTO tbl_requests
+                 (faculty_name, faculty_id, equipment_name, instructor, room,
+                  borrow_date, return_date, status, request_date,
+                  submitted_as, batch_id, document_path)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'adviser', ?, ?)"
+            );
+            $stmt_ins->bind_param(
+                'sssssssss',
+                $faculty_name, $faculty_id, $item_name, $instructor, $room,
+                $borrow_date, $return_date, $batch_id, $rel_path
+            );
+            $stmt_ins->execute();
+            $new_request_id = $conn->insert_id;
+            $stmt_ins->close();
+            ArbitrationEngine::process($conn, $new_request_id);
+
+            // ── Generate return token if engine approved this item ────────────
+            $chk = $conn->prepare(
+                "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
+            );
+            if ($chk) {
+                $chk->bind_param('i', $new_request_id);
+                $chk->execute();
+                $chk->store_result();
+                if ($chk->num_rows > 0) {
+                    $auto_token = bin2hex(random_bytes(32));
+                    $tok = $conn->prepare(
+                        "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
+                    );
+                    if ($tok) {
+                        $tok->bind_param('si', $auto_token, $new_request_id);
+                        $tok->execute();
+                        $tok->close();
+                    }
                 }
+                $chk->close();
             }
-            $check_approved->close();
         }
 
         header("Location: faculty-dashboard.php?success=1");
         exit();
+
     } else {
-        error_log('[PUPSync] faculty-dashboard borrow insert failed: ' . mysqli_error($conn));
-        die("Error processing request. Please try again later.");
+        // ── PERSONAL BRANCH (submitted_as = 'personal' OR absent — backwards-compat) ──
+
+        csrf_verify();
+
+        $user_id  = $_SESSION['faculty_id'];
+        $stmt_usr = $conn->prepare("SELECT fullname, faculty_id, role FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+        $stmt_usr->bind_param('s', $user_id);
+        $stmt_usr->execute();
+        $user = $stmt_usr->get_result()->fetch_assoc();
+        $stmt_usr->close();
+        if (!$user) die("User profile not found.");
+        $faculty_name   = $user['fullname'];
+        $faculty_id     = $user['faculty_id'];
+
+        $borrow_date    = trim($_POST['borrow_date'] ?? '');
+        $return_date    = trim($_POST['return_date'] ?? '');
+        $equipment_name = trim($_POST['equipment_name'] ?? '');
+        $room           = trim($_POST['room'] ?? '');
+        $instructor     = $faculty_name; // auto-filled from account name
+        $current_date   = date('Y-m-d');
+        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
+        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+
+        // ── Document upload validation ─────────────────────────────────────────
+        $document_path = null;
+        if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
+            if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
+                die("File upload error. Please try again.");
+            }
+            if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
+                die("File too large. Maximum size is 5 MB.");
+            }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
+            finfo_close($finfo);
+            $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+            if (!in_array($mime, $allowed_mimes, true)) {
+                die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
+            }
+            // $document_path will be set after INSERT
+        }
+
+        // Prepared INSERT — includes submitted_as = 'personal' (Requirement 3.2)
+        $stmt_ins_p = $conn->prepare(
+            "INSERT INTO tbl_requests
+             (faculty_name, faculty_id, equipment_name, instructor, room,
+              borrow_date, return_date, status, request_date, submitted_as)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'personal')"
+        );
+        $stmt_ins_p->bind_param(
+            'sssssss',
+            $faculty_name, $faculty_id, $equipment_name,
+            $instructor, $room, $borrow_date, $return_date
+        );
+        if ($stmt_ins_p->execute()) {
+            $new_request_id = $conn->insert_id;
+            $stmt_ins_p->close();
+
+            // ── Move uploaded document and update document_path ────────────────
+            if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] === UPLOAD_ERR_OK) {
+                $orig_name = basename($_FILES['request_document']['name']);
+                $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
+                $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
+                $dest_dir  = __DIR__ . '/uploads/request_letters/';
+                $dest_path = $dest_dir . $dest_name;
+                $rel_path  = 'uploads/request_letters/' . $dest_name;
+
+                if (move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
+                    $stmt_doc = $conn->prepare('UPDATE tbl_requests SET document_path = ? WHERE id = ?');
+                    if ($stmt_doc) {
+                        $stmt_doc->bind_param('si', $rel_path, $new_request_id);
+                        $stmt_doc->execute();
+                        $stmt_doc->close();
+                    }
+                }
+            }
+
+            ArbitrationEngine::process($conn, $new_request_id);
+
+            // ── Generate return token if engine approved the request ──────────
+            $check_approved = $conn->prepare(
+                "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
+            );
+            if ($check_approved) {
+                $check_approved->bind_param('i', $new_request_id);
+                $check_approved->execute();
+                $check_approved->get_result(); // consume result
+                if ($check_approved->affected_rows > 0 || $conn->affected_rows > 0) {
+                    // NULL guard in the UPDATE prevents double-write
+                    $auto_token = bin2hex(random_bytes(32));
+                    $tok = $conn->prepare(
+                        "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
+                    );
+                    if ($tok) {
+                        $tok->bind_param('si', $auto_token, $new_request_id);
+                        $tok->execute();
+                        $tok->close();
+                    }
+                }
+                $check_approved->close();
+            }
+
+            header("Location: faculty-dashboard.php?success=1");
+            exit();
+        } else {
+            error_log('[PUPSync] faculty-dashboard borrow insert failed: ' . $conn->error);
+            $stmt_ins_p->close();
+            die("Error processing request. Please try again later.");
+        }
     }
 }
 
@@ -202,6 +357,32 @@ $db_emergency_name    = $profile_row['emergency_name']        ?? '';
 $db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
 $db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
 $is_org_adviser       = ($profile_row['role'] ?? '') === 'Organization Adviser';
+
+// ── Dual-mode gate — read allow_org_borrowing fresh on every page load ────
+// (Requirements 1.3, 1.4, 1.5 — never sourced from a hidden field)
+// Guard: if the migration hasn't been run yet the column may not exist;
+// fall back to 0 (single-mode) so the dashboard doesn't crash.
+$is_dual_mode = false;
+$_col_check = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
+if ($_col_check && $_col_check->num_rows > 0) {
+    $stmt_dm = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+    $stmt_dm->bind_param('s', $uid_safe);
+    $stmt_dm->execute();
+    $dm_row = $stmt_dm->get_result()->fetch_assoc();
+    $stmt_dm->close();
+    $is_dual_mode = (int)($dm_row['allow_org_borrowing'] ?? 0) === 1;
+}
+
+// ── Adviser-mode inventory checklist — only loaded if dual mode active ────
+$avail_items = [];
+if ($is_dual_mode) {
+    $avail_result = $conn->query(
+        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE quantity >= 1 AND is_archived = 0 ORDER BY category, item_name"
+    );
+    if ($avail_result) {
+        while ($av_row = $avail_result->fetch_assoc()) $avail_items[] = $av_row;
+    }
+}
 
 $masked_email       = maskEmail($db_email);
 $masked_backup      = maskEmail($db_backup_email);
@@ -1723,10 +1904,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     mysqli_data_seek($inventory_result, 0);
                     $all_items = [];
                     while ($row = mysqli_fetch_assoc($inventory_result)) $all_items[] = $row;
-                    $avail_items = array_filter($all_items, fn($r) => $r['quantity'] > 0);
-                    usort($avail_items, fn($a, $b) => $b['quantity'] - $a['quantity']);
-                    $featured_hero = $avail_items[0] ?? null;
-                    $featured_sec  = $avail_items[1] ?? null;
+                    $featured_avail = array_filter($all_items, fn($r) => $r['quantity'] > 0);
+                    usort($featured_avail, fn($a, $b) => $b['quantity'] - $a['quantity']);
+                    $featured_hero = $featured_avail[0] ?? null;
+                    $featured_sec  = $featured_avail[1] ?? null;
                     if ($featured_hero || $featured_sec):
                     ?>
                         <div class="featured-section">
@@ -1948,6 +2129,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                         <th>Return Date</th>
                                         <th>Status</th>
                                         <th>Notes</th>
+                                        <th>Return QR</th>
                                     </tr>
                                 </thead>
                                 <tbody id="requestsTbody"></tbody>
@@ -3271,6 +3453,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 ================================================================ -->
 
     <!-- ── Borrow Request Modal ───────────────────────────────────────── -->
+    <?php if (!$is_dual_mode): ?>
+    <!-- SINGLE-MODE: existing form unchanged (Requirement 4.1, 11.4) -->
     <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
         <div class="modal-box borrow-modal-box">
             <div class="modal-header">
@@ -3334,6 +3518,341 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             </div>
         </div>
     </div><!-- /borrowModal -->
+    <?php else: ?>
+    <!-- DUAL-MODE: two-tab layout (Requirement 4.2, 4.3, 4.4) -->
+    <style nonce="<?= $csp_nonce ?>">
+        /* ── Dual-mode borrow modal sub-tabs ─────────────────────────── */
+        .borrow-subtab-bar {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 18px;
+            border-bottom: 2px solid var(--color-outline-variant);
+            padding-bottom: 0;
+        }
+        .borrow-subtab-btn {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--color-secondary);
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            cursor: pointer;
+            transition: color var(--transition), border-bottom-color var(--transition), background var(--transition);
+            margin-bottom: -2px;
+        }
+        .borrow-subtab-btn:hover {
+            color: var(--color-primary);
+            background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+        }
+        .borrow-subtab-btn.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+        }
+        .borrow-subtab-panel {
+            display: none;
+        }
+        .borrow-subtab-panel.active {
+            display: block;
+        }
+        /* ── Adviser checklist ───────────────────────────────────────── */
+        .adv-checklist-wrap {
+            max-height: 220px;
+            overflow-y: auto;
+            border: 1px solid var(--color-outline-variant);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            background: var(--color-surface-container);
+        }
+        .adv-checklist-category {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--color-secondary);
+            margin: 10px 0 4px;
+        }
+        .adv-checklist-category:first-child {
+            margin-top: 0;
+        }
+        .adv-checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 2px;
+            font-size: 0.875rem;
+            color: var(--color-on-surface);
+        }
+        .adv-checklist-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-primary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .adv-validation-msg {
+            font-size: 0.8rem;
+            color: var(--color-error);
+            margin-bottom: 8px;
+            display: none;
+        }
+    </style>
+    <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
+        <div class="modal-box borrow-modal-box">
+            <div class="modal-header">
+                <h3 id="borrowModalTitle">
+                    <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
+                    Borrow Request
+                </h3>
+                <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Sub-tab controls -->
+                <div class="borrow-subtab-bar" role="tablist" aria-label="Borrowing mode">
+                    <button class="borrow-subtab-btn active" id="subtab-personal-btn" role="tab"
+                        aria-selected="true" aria-controls="subtab-personal" type="button"
+                        data-action="borrow-subtab" data-tab="personal">
+                        <span class="material-symbols-outlined" style="font-size:16px;">person</span>
+                        Personal
+                    </button>
+                    <button class="borrow-subtab-btn" id="subtab-adviser-btn" role="tab"
+                        aria-selected="false" aria-controls="subtab-adviser" type="button"
+                        data-action="borrow-subtab" data-tab="adviser">
+                        <span class="material-symbols-outlined" style="font-size:16px;">groups</span>
+                        Adviser
+                    </button>
+                </div>
+
+                <!-- ── Personal Tab ──────────────────────────────────── -->
+                <div class="borrow-subtab-panel active" id="subtab-personal" role="tabpanel" aria-labelledby="subtab-personal-btn">
+                    <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        <span id="selectedItemLabel">No item selected</span>
+                    </div>
+                    <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="equipment_name" id="selectedItem">
+                        <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
+                        <input type="hidden" name="submitted_as" value="personal">
+                        <div class="form-group">
+                            <label class="form-label">Room / Laboratory</label>
+                            <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label">Borrow Date</label>
+                                <input type="date"
+                                    name="borrow_date"
+                                    id="borrow_date"
+                                    class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Return Date</label>
+                                <input type="date"
+                                    name="return_date"
+                                    id="return_date"
+                                    class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>"
+                                    required>
+                            </div>
+                        </div>
+                        <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
+                        <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
+                            <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                        </button>
+                    </form>
+                </div><!-- /subtab-personal -->
+
+                <!-- ── Adviser Tab ───────────────────────────────────── -->
+                <div class="borrow-subtab-panel" id="subtab-adviser" role="tabpanel" aria-labelledby="subtab-adviser-btn">
+                    <form id="adviserBorrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="submitted_as" value="adviser">
+
+                        <!-- Multi-item checklist (Requirement 4.4, 5.1) -->
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="margin-bottom:6px;">Select Equipment Items</label>
+                            <p id="advChecklistValidation" class="adv-validation-msg" role="alert">
+                                Please select at least one item before submitting.
+                            </p>
+                            <div class="adv-checklist-wrap" role="group" aria-label="Available equipment">
+                                <?php if (empty($avail_items)): ?>
+                                    <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;">No available items at this time.</p>
+                                <?php else:
+                                    $current_category = null;
+                                    foreach ($avail_items as $av_item):
+                                        if ($av_item['category'] !== $current_category):
+                                            $current_category = $av_item['category'];
+                                ?>
+                                        <div class="adv-checklist-category"><?= htmlspecialchars($current_category) ?></div>
+                                <?php      endif; ?>
+                                        <label class="adv-checklist-item">
+                                            <input type="checkbox"
+                                                name="items[]"
+                                                value="<?= htmlspecialchars($av_item['item_name']) ?>"
+                                                data-category="<?= htmlspecialchars($av_item['category']) ?>">
+                                            <?= htmlspecialchars($av_item['item_name']) ?>
+                                            <span style="font-size:0.75rem;color:var(--color-secondary);margin-left:auto;">
+                                                (<?= (int)$av_item['quantity'] ?> available)
+                                            </span>
+                                        </label>
+                                <?php   endforeach;
+                                endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Shared fields -->
+                        <div class="form-group" style="margin-top:14px;">
+                            <label class="form-label">Room / Laboratory</label>
+                            <input type="text" name="room" id="adv_room" class="form-input" placeholder="e.g. Lab 301" required>
+                        </div>
+                        <div class="form-row-2">
+                            <div class="form-group">
+                                <label class="form-label">Borrow Date</label>
+                                <input type="date"
+                                    name="borrow_date"
+                                    id="adv_borrow_date"
+                                    class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Return Date</label>
+                                <input type="date"
+                                    name="return_date"
+                                    id="adv_return_date"
+                                    class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>"
+                                    required>
+                            </div>
+                        </div>
+
+                        <!-- Document upload — required for adviser mode (Requirement 4.6) -->
+                        <div class="form-group">
+                            <label for="adv_request_document">Request Letter
+                                <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
+                            </label>
+                            <input type="file" id="adv_request_document" name="request_document"
+                                accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
+                        </div>
+
+                        <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
+                            <span class="material-symbols-outlined">send</span> Submit Adviser Request
+                        </button>
+                    </form>
+                </div><!-- /subtab-adviser -->
+
+            </div>
+        </div>
+    </div><!-- /borrowModal -->
+
+    <script nonce="<?= $csp_nonce ?>">
+    (function () {
+        'use strict';
+
+        /* ── Sub-tab switching ──────────────────────────────────────── */
+        var btnPersonal  = document.getElementById('subtab-personal-btn');
+        var btnAdviser   = document.getElementById('subtab-adviser-btn');
+        var panelPersonal = document.getElementById('subtab-personal');
+        var panelAdviser  = document.getElementById('subtab-adviser');
+
+        function activateTab(tab) {
+            if (tab === 'personal') {
+                btnPersonal.classList.add('active');
+                btnPersonal.setAttribute('aria-selected', 'true');
+                btnAdviser.classList.remove('active');
+                btnAdviser.setAttribute('aria-selected', 'false');
+                panelPersonal.classList.add('active');
+                panelAdviser.classList.remove('active');
+            } else {
+                btnAdviser.classList.add('active');
+                btnAdviser.setAttribute('aria-selected', 'true');
+                btnPersonal.classList.remove('active');
+                btnPersonal.setAttribute('aria-selected', 'false');
+                panelAdviser.classList.add('active');
+                panelPersonal.classList.remove('active');
+            }
+        }
+
+        // NOTE: click switching is handled via data-action="borrow-subtab" in faculty-dashboard.js
+        // activateTab() below is used only by the MutationObserver reset on modal close.
+
+        /* ── Adviser form: client-side "at least one item" guard ────── */
+        var advForm = document.getElementById('adviserBorrowForm');
+        var advValidationMsg = document.getElementById('advChecklistValidation');
+
+        if (advForm) {
+            advForm.addEventListener('submit', function (e) {
+                var checked = advForm.querySelectorAll('input[type="checkbox"][name="items[]"]:checked');
+                if (checked.length === 0) {
+                    e.preventDefault();
+                    if (advValidationMsg) {
+                        advValidationMsg.style.display = 'block';
+                    }
+                } else {
+                    if (advValidationMsg) {
+                        advValidationMsg.style.display = 'none';
+                    }
+                }
+            });
+        }
+
+        /* ── Reset adviser form fields on modal close / re-open ─────── */
+        function resetAdviserForm() {
+            if (!advForm) return;
+            // Uncheck all checkboxes
+            advForm.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                cb.checked = false;
+            });
+            // Clear text/date/file inputs
+            var roomInp = document.getElementById('adv_room');
+            var borrowInp = document.getElementById('adv_borrow_date');
+            var returnInp = document.getElementById('adv_return_date');
+            var fileInp  = document.getElementById('adv_request_document');
+            if (roomInp)   roomInp.value = '';
+            if (borrowInp) borrowInp.value = '';
+            if (returnInp) returnInp.value = '';
+            if (fileInp)   fileInp.value = '';
+            if (advValidationMsg) advValidationMsg.style.display = 'none';
+        }
+
+        /* Hook into the existing closeBorrowModal / openBorrowForm cycle.
+           The modal close button and backdrop click already call
+           closeBorrowModal() in faculty-dashboard.js which sets
+           display:none on #borrowModal — we just need to reset
+           state when the modal is hidden. We observe the modal
+           element for style changes. */
+        var borrowModal = document.getElementById('borrowModal');
+        if (borrowModal && window.MutationObserver) {
+            var _modalObserver = new MutationObserver(function (mutations) {
+                mutations.forEach(function (m) {
+                    if (m.attributeName === 'style') {
+                        var hidden = borrowModal.style.display === 'none' || borrowModal.style.display === '';
+                        if (hidden) {
+                            resetAdviserForm();
+                            // Reset to Personal tab on close
+                            activateTab('personal');
+                        }
+                    }
+                });
+            });
+            _modalObserver.observe(borrowModal, { attributes: true });
+        }
+
+    }());
+    </script>
+    <?php endif; ?><!-- /dual-mode borrowModal -->
 
     <!-- Confirmation Modal -->
     <div class="modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true">

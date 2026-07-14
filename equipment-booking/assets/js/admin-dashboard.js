@@ -606,7 +606,7 @@
     }
 
     function _buildFacultyRow(data) {
-        // data = { fullname, email, role, org_name }
+        // data = { fullname, email, role, org_name, faculty_id, allow_org_borrowing }
         const tr = document.createElement('tr');
         const roleClass = data.role === 'Organization Adviser' ? 'pill-approved' : 'pill-info';
         const orgCell = data.org_name
@@ -616,7 +616,12 @@
             '<td class="fw-bold">' + _esc(data.fullname)  + '</td>' +
             '<td>' + _esc(data.email)     + '</td>' +
             '<td><span class="status-pill ' + roleClass + '">' + _esc(data.role) + '</span></td>' +
-            '<td>' + orgCell + '</td>';
+            '<td>' + orgCell + '</td>' +
+            '<td><label class="faculty-toggle-label">' +
+            '<input type="checkbox" class="faculty-toggle-input org-borrowing-toggle"' +
+            ' data-faculty-id="' + _esc(data.faculty_id || '') + '"' +
+            (data.allow_org_borrowing === 1 ? ' checked' : '') +
+            '><span class="faculty-toggle-track"></span></label></td>';
         return tr;
     }
 
@@ -723,7 +728,9 @@
                     if (tbody) {
                         const newRow = _buildFacultyRow({
                             fullname, email, role,
-                            org_name: orgName
+                            org_name:            orgName,
+                            faculty_id:          data.faculty_id || '',
+                            allow_org_borrowing: 0
                         });
                         tbody.prepend(newRow);
                     }
@@ -1321,4 +1328,48 @@
         closeBtn.addEventListener('click', stopScanner);
         modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
     })();
+
+    /* ── Faculty: org-borrowing toggle ───────────────────────────────── */
+    document.addEventListener('change', function (e) {
+        const toggle = e.target.closest('.org-borrowing-toggle');
+        if (!toggle) return;
+
+        const facultyId       = toggle.dataset.facultyId;
+        const newValue        = toggle.checked ? 1 : 0;
+        const previousChecked = !toggle.checked;   // save for revert on error
+
+        const formData = new FormData();
+        formData.append('csrf_token',          getCsrfToken());
+        formData.append('faculty_id',          facultyId);
+        formData.append('allow_org_borrowing', newValue);
+
+        fetch('equipment-booking/api/toggle-org-borrowing.php', {
+            method: 'POST',
+            body:   formData
+        })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { status: res.status, data };
+            });
+        })
+        .then(function ({ status, data }) {
+            if (status === 200 && data.status === 'success') {
+                // Update checked state to the value confirmed by the server
+                toggle.checked = data.allow_org_borrowing === 1;
+                showToast(
+                    data.allow_org_borrowing === 1
+                        ? 'Org borrowing enabled.'
+                        : 'Org borrowing disabled.'
+                );
+            } else {
+                // Revert the toggle
+                toggle.checked = previousChecked;
+                showToast('Error: ' + (data.message || 'Could not update permission.'));
+            }
+        })
+        .catch(function () {
+            toggle.checked = previousChecked;
+            showToast('Network error. Please try again.');
+        });
+    });
 })();

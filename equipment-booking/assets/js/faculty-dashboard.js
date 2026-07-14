@@ -1098,7 +1098,7 @@
         });
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
             return;
         }
 
@@ -1109,7 +1109,7 @@
                     ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
                     : '—';
 
-            // Show QR button for Approved and Overdue rows that have a return token
+            // Dedicated Return QR column — shown for Approved/Overdue rows with a token
             const qrBtn = (r.status === 'Approved' || r.status === 'Overdue') && r.return_token
                 ? `<button class="btn-show-qr" data-action="show-return-qr"
                        data-token="${_escHtml(r.return_token)}"
@@ -1117,7 +1117,7 @@
                        title="Show return QR code">
                        <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">qr_code_2</span>Return QR
                    </button>`
-                : '';
+                : '—';
 
             return `<tr class="${r.status === 'Overdue' ? 'row-overdue' : ''}">
                         <td><strong>${_escHtml(r.equipment_name)}</strong></td>
@@ -1126,7 +1126,8 @@
                         <td>${_escHtml(r.borrow_date)}</td>
                         <td>${_escHtml(r.return_date)}</td>
                         <td>${_statusPill(r.status)}</td>
-                        <td>${noteCol}${qrBtn}</td>
+                        <td>${noteCol}</td>
+                        <td>${qrBtn}</td>
                     </tr>`;
         }).join('');
     }
@@ -1269,6 +1270,24 @@
                 case 'close-borrow-modal':
                     closeBorrowModal();
                     break;
+                case 'borrow-subtab': {
+                    var tab = el.dataset.tab;
+                    var btnP  = document.getElementById('subtab-personal-btn');
+                    var btnA  = document.getElementById('subtab-adviser-btn');
+                    var panP  = document.getElementById('subtab-personal');
+                    var panA  = document.getElementById('subtab-adviser');
+                    if (!btnP || !btnA || !panP || !panA) break;
+                    if (tab === 'personal') {
+                        btnP.classList.add('active');    btnP.setAttribute('aria-selected', 'true');
+                        btnA.classList.remove('active'); btnA.setAttribute('aria-selected', 'false');
+                        panP.classList.add('active');    panA.classList.remove('active');
+                    } else {
+                        btnA.classList.add('active');    btnA.setAttribute('aria-selected', 'true');
+                        btnP.classList.remove('active'); btnP.setAttribute('aria-selected', 'false');
+                        panA.classList.add('active');    panP.classList.remove('active');
+                    }
+                    break;
+                }
                 case 'lending-back':
                     switchLendingSub('browse');
                     break;

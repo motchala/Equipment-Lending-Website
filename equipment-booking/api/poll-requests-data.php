@@ -51,24 +51,50 @@ foreach (
 }
 
 // ── Waiting requests ───────────────────────────────────────────────────────
+// Guard: check if dual-borrowing-mode migration columns exist.
+$_sa_col = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'submitted_as'");
+$_has_sa = $_sa_col && $_sa_col->num_rows > 0;
+$_bid_col = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'batch_id'");
+$_has_bid = $_bid_col && $_bid_col->num_rows > 0;
+
+$_extra_cols = '';
+if ($_has_sa)  $_extra_cols .= ', submitted_as';
+if ($_has_bid) $_extra_cols .= ', batch_id';
+
 $waiting = [];
-$r = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC");
-while ($row = mysqli_fetch_assoc($r)) $waiting[] = $row;
+$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC");
+while ($row = mysqli_fetch_assoc($r)) {
+    if (!$_has_sa) $row['submitted_as'] = null;
+    if (!$_has_bid) $row['batch_id'] = null;
+    $waiting[] = $row;
+}
 
 // ── Approved/Overdue (for return-body and approved-list) ───────────────────
 $approved = [];
-$r = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status IN ('Approved','Overdue') ORDER BY request_date DESC");
-while ($row = mysqli_fetch_assoc($r)) $approved[] = $row;
+$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status IN ('Approved','Overdue') ORDER BY request_date DESC");
+while ($row = mysqli_fetch_assoc($r)) {
+    if (!$_has_sa) $row['submitted_as'] = null;
+    if (!$_has_bid) $row['batch_id'] = null;
+    $approved[] = $row;
+}
 
 // ── Declined ───────────────────────────────────────────────────────────────
 $declined = [];
-$r = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Declined' ORDER BY request_date DESC");
-while ($row = mysqli_fetch_assoc($r)) $declined[] = $row;
+$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Declined' ORDER BY request_date DESC");
+while ($row = mysqli_fetch_assoc($r)) {
+    if (!$_has_sa) $row['submitted_as'] = null;
+    if (!$_has_bid) $row['batch_id'] = null;
+    $declined[] = $row;
+}
 
 // ── Recent activity (dashboard feed) ──────────────────────────────────────
 $activity = [];
-$r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
-while ($row = mysqli_fetch_assoc($r)) $activity[] = $row;
+$_sa_activity = $_has_sa ? ', submitted_as' : '';
+$r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date{$_sa_activity} FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
+while ($row = mysqli_fetch_assoc($r)) {
+    if (!$_has_sa) $row['submitted_as'] = null;
+    $activity[] = $row;
+}
 
 // ── High-water mark for change detection ──────────────────────────────────
 $hw = mysqli_fetch_assoc(mysqli_query(

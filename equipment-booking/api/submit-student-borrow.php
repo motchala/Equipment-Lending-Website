@@ -74,8 +74,8 @@ $ins = $conn->prepare(
     "INSERT INTO tbl_requests
         (faculty_name, faculty_id, equipment_name, instructor, room,
          borrow_date, return_date, status, request_date,
-         return_token, submitted_by_name, submitted_by_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?)"
+         return_token, submitted_by_name, submitted_by_id, submitted_as)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, 'student')"
 );
 $ins->bind_param(
     'ssssssssss',
