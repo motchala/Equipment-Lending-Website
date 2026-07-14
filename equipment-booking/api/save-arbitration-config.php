@@ -50,23 +50,6 @@ if (!is_array($raw_config)) {
     send_json(400, 'error', 'Invalid request. config[] array is required.');
 }
 
-// Separate high_value_items from the regular config keys
-$high_value_item_ids = null;
-
-if (array_key_exists('high_value_items', $raw_config)) {
-    $raw_high_value = $raw_config['high_value_items'];
-    // Normalise: may be an array of IDs or an empty string when nothing is selected
-    if (is_array($raw_high_value)) {
-        $high_value_item_ids = array_map('intval', $raw_high_value);
-        // Filter out any non-positive IDs
-        $high_value_item_ids = array_values(array_filter($high_value_item_ids, fn(int $id) => $id > 0));
-    } else {
-        // Submitted as empty / scalar — treat as "no items selected"
-        $high_value_item_ids = [];
-    }
-    unset($raw_config['high_value_items']);
-}
-
 // ── Task 6.2: Validate that all submitted keys are whitelisted ────────────────
 foreach (array_keys($raw_config) as $key) {
     if (!in_array($key, VALID_CONFIG_KEYS, true)) {
@@ -111,67 +94,6 @@ try {
     }
 
     $upsert_stmt->close();
-
-    // ── Handle high_value_items if submitted ──────────────────────────────────
-    if ($high_value_item_ids !== null) {
-        if (count($high_value_item_ids) > 0) {
-            // Mark selected items as high-value
-            $mark_stmt = $conn->prepare(
-                'UPDATE tbl_inventory SET is_high_value = 1 WHERE item_id = ?'
-            );
-
-            if ($mark_stmt === false) {
-                throw new RuntimeException('Failed to prepare high-value mark statement.');
-            }
-
-            foreach ($high_value_item_ids as $item_id) {
-                $mark_stmt->bind_param('i', $item_id);
-
-                if (!$mark_stmt->execute()) {
-                    throw new RuntimeException("Failed to mark item {$item_id} as high-value.");
-                }
-            }
-
-            $mark_stmt->close();
-
-            // Clear high-value flag for all items NOT in the submitted list
-            // Build a parameterised NOT IN clause
-            $placeholders = implode(',', array_fill(0, count($high_value_item_ids), '?'));
-            $clear_sql    = "UPDATE tbl_inventory
-                                SET is_high_value = 0
-                              WHERE item_id NOT IN ({$placeholders})";
-
-            $clear_stmt = $conn->prepare($clear_sql);
-
-            if ($clear_stmt === false) {
-                throw new RuntimeException('Failed to prepare high-value clear statement.');
-            }
-
-            $types = str_repeat('i', count($high_value_item_ids));
-            $clear_stmt->bind_param($types, ...$high_value_item_ids);
-
-            if (!$clear_stmt->execute()) {
-                throw new RuntimeException('Failed to clear high-value flags.');
-            }
-
-            $clear_stmt->close();
-        } else {
-            // No items selected — clear the flag on all inventory items
-            $clear_all_stmt = $conn->prepare(
-                'UPDATE tbl_inventory SET is_high_value = 0'
-            );
-
-            if ($clear_all_stmt === false) {
-                throw new RuntimeException('Failed to prepare clear-all high-value statement.');
-            }
-
-            if (!$clear_all_stmt->execute()) {
-                throw new RuntimeException('Failed to clear all high-value flags.');
-            }
-
-            $clear_all_stmt->close();
-        }
-    }
 
     // ── Task 6.3: Commit the transaction ─────────────────────────────────────
     if (!$conn->commit()) {

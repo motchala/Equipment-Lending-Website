@@ -3709,10 +3709,17 @@ body {
 /* ── Borrow Modal specifics ────────────────────────────────── */
 .borrow-modal-box {
     max-width: 560px;
+    /* Allow the box to scroll when dual-mode adviser content is taller
+       than the viewport — without this the adviser tab panel is clipped
+       by the parent .modal-box overflow:hidden rule.               */
+    overflow-y: auto;
+    max-height: 92vh;
 }
 
 .borrow-modal-box .modal-body {
     padding: 24px 24px 20px;
+    /* Prevent modal-body itself from hiding overflowing adviser content */
+    overflow: visible;
 }
 
 .borrow-modal-box .form-group {

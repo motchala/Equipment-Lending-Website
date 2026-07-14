@@ -57,6 +57,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
             <button class="nav-tab" data-tab="lending">Lending</button>
             <button class="nav-tab" data-tab="rooms">Rooms</button>
+            <button class="nav-tab" data-tab="faculty">Faculty</button>
         </nav>
 
         <div class="header-right">
@@ -1461,7 +1462,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <path
                                 d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                         </svg>Config Panel</h2>
-                    <p>Configure arbitration rules, role priorities, and high-value item designations.</p>
+                    <p>Configure arbitration rules and role priorities.</p>
                 </div>
 
                 <div class="eq-card form-card">
@@ -1511,28 +1512,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     value="<?php echo htmlspecialchars($arb_config['tie_break_window_seconds'] ?? 5); ?>">
                             </div>
 
-                            <!-- High-Value Items -->
-                            <h3
-                                style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
-                                High-Value Items</h3>
-                            <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:0.75rem;">Items checked
-                                here require a signed request letter.</p>
-                            <div class="form-group">
-                                <?php
-                                mysqli_data_seek($inventory_result, 0);
-                                while ($item = mysqli_fetch_assoc($inventory_result)):
-                                    $checked = ($item['is_high_value'] == 1) ? 'checked' : '';
-                                ?>
-                                    <label
-                                        style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;font-size:0.88rem;cursor:pointer;">
-                                        <input type="checkbox" name="config[high_value_items][]"
-                                            value="<?php echo htmlspecialchars($item['item_id']); ?>" <?php echo $checked;
-                                                                                                        ?>>
-                                        <?php echo htmlspecialchars($item['item_name']); ?>
-                                    </label>
-                                <?php endwhile; ?>
-                            </div>
-
                             <!-- Rule Toggles -->
                             <h3
                                 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text-light);margin-bottom:1rem;margin-top:1.5rem;">
@@ -1571,7 +1550,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <h4 style="font-size:0.88rem;font-weight:600;margin:0 0 2px;">Missing Document Block
                                     </h4>
                                     <p style="font-size:0.78rem;color:var(--text-light);margin:0;">Hold requests for
-                                        high-value items or organization borrowing without a signed letter.</p>
+                                        organization borrowing (Adviser role) without a signed letter.</p>
                                 </div>
                                 <label class="toggle-sw">
                                     <input type="checkbox" name="config[rule_missing_doc_block_enabled]" value="1" <?php
@@ -1811,6 +1790,286 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
             </div>
         </div><!-- /panel-rooms -->
+
+
+        <!-- ============================================================
+         TAB: FACULTY
+    ============================================================ -->
+        <div class="tab-panel" id="panel-faculty">
+
+            <!-- Section header -->
+            <div class="section-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="8.5" cy="7" r="4" />
+                        <line x1="20" y1="8" x2="20" y2="14" />
+                        <line x1="23" y1="11" x2="17" y2="11" />
+                    </svg>
+                    Faculty Management
+                </h2>
+                <p>Create and manage faculty accounts.</p>
+            </div>
+
+            <!-- Two-column layout: form left, list right -->
+            <div class="faculty-layout">
+
+                <!-- ── CREATE FORM ──────────────────────────────────── -->
+                <div class="eq-card faculty-form-card">
+                    <div class="eq-card-header">
+                        <h2>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round" width="18" height="18"
+                                 style="margin-right:8px;vertical-align:middle;">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="8.5" cy="7" r="4"/>
+                                <line x1="20" y1="8" x2="20" y2="14"/>
+                                <line x1="23" y1="11" x2="17" y2="11"/>
+                            </svg>
+                            Create Faculty Account
+                        </h2>
+                    </div>
+                    <div class="eq-card-body">
+
+                    <!-- CSRF token -->
+                    <?= csrf_field() ?>
+
+                    <!-- PUPSync Email -->
+                    <div class="form-group">
+                        <label for="fac-email">PUPSync Email <span class="req-star">*</span></label>
+                        <input type="email" id="fac-email" name="pupsync_email"
+                               class="form-control-custom" maxlength="254" required
+                               placeholder="e.g. juan.delacruz@pup.edu.ph">
+                    </div>
+
+                    <!-- Backup Email -->
+                    <div class="form-group">
+                        <label for="fac-backup">Google Account / Backup Email</label>
+                        <input type="email" id="fac-backup" name="backup_email"
+                               class="form-control-custom" maxlength="254"
+                               placeholder="Optional">
+                    </div>
+
+                    <!-- First Name + Middle Name (side-by-side) -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fac-first">First Name <span class="req-star">*</span></label>
+                            <input type="text" id="fac-first" name="first_name"
+                                   class="form-control-custom" maxlength="100" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fac-middle">Middle Name</label>
+                            <input type="text" id="fac-middle" name="middle_name"
+                                   class="form-control-custom" maxlength="100"
+                                   placeholder="Optional">
+                        </div>
+                    </div>
+
+                    <!-- Last Name -->
+                    <div class="form-group">
+                        <label for="fac-last">Last Name <span class="req-star">*</span></label>
+                        <input type="text" id="fac-last" name="last_name"
+                               class="form-control-custom" maxlength="100" required>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fac-password">Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="fac-password" name="password"
+                                       class="form-control-custom" maxlength="128" required
+                                       placeholder="Min. 8 characters">
+                                <button type="button" class="fac-pw-toggle" data-target="fac-password" aria-label="Show password">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" width="16" height="16">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="fac-confirm">Confirm Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="fac-confirm" name="confirm_password"
+                                       class="form-control-custom" maxlength="128" required
+                                       placeholder="Re-enter password">
+                                <button type="button" class="fac-pw-toggle" data-target="fac-confirm" aria-label="Show password">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                         stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" width="16" height="16">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Adviser toggle -->
+                    <div class="form-group faculty-adviser-toggle-wrap">
+                        <label class="faculty-toggle-label">
+                            <input type="checkbox" id="fac-adviser" name="is_org_adviser"
+                                   value="1" class="faculty-toggle-input">
+                            <span class="faculty-toggle-track"></span>
+                            Is this faculty an organization adviser?
+                        </label>
+                    </div>
+
+                    <!-- Organization dropdown (hidden by default) -->
+                    <div class="form-group" id="fac-org-group" style="display:none;">
+                        <label for="fac-org">Organization <span class="req-star">*</span></label>
+                        <?php
+                        $org_opts_res = $conn->query(
+                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                        );
+                        if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
+                            <select id="fac-org" name="organization_id"
+                                    class="form-control-custom">
+                                <option value="">— Select Organization —</option>
+                                <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
+                                    <option value="<?= (int)$org_row['id'] ?>">
+                                        <?= htmlspecialchars($org_row['name']) ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
+                        <?php else: ?>
+                            <select id="fac-org" name="organization_id"
+                                    class="form-control-custom" disabled>
+                                <option value="">— Organizations unavailable —</option>
+                            </select>
+                            <small class="faculty-field-error">
+                                Could not load organizations. Please refresh after applying the DB migration.
+                            </small>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Inline feedback area -->
+                    <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
+
+                    <!-- Submit -->
+                    <button type="button" id="fac-submit-btn"
+                            class="btn-submit-form">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round" width="16" height="16"
+                             style="vertical-align:middle;margin-right:6px;">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                        Create Account
+                    </button>
+
+                    </div><!-- /eq-card-body -->
+                </div><!-- /faculty-form-card -->
+
+
+                <!-- ── FACULTY LIST ─────────────────────────────────── -->
+                <div class="eq-card">
+                    <div class="eq-card-header">
+                        <h2>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round" width="18" height="18"
+                                 style="margin-right:8px;vertical-align:middle;">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            Faculty Accounts
+                        </h2>
+                        <span class="status-pill pill-info" style="font-size:0.72rem;">
+                            <?php
+                            $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
+                            echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
+                            ?> total
+                        </span>
+                    </div>
+                    <div class="tbl-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Full Name</th>
+                                    <th>PUPSync Email</th>
+                                    <th>Role</th>
+                                    <th>Organization</th>
+                                    <th>Allow Org Borrowing</th>
+                                </tr>
+                            </thead>
+                            <tbody id="faculty-list-tbody">
+                            <?php
+                            // Guard: check whether allow_org_borrowing column exists before querying it.
+                            // If the dual-borrowing-mode migration hasn't been run yet the column is absent
+                            // and the query would throw a fatal error. Fall back to 0 for all rows.
+                            $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
+                            $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
+                            $fac_res = $conn->query(
+                                "SELECT u.fullname, u.email, u.role,
+                                        u.faculty_id,"
+                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
+                                . "     o.name AS org_name
+                                   FROM tbl_users u
+                                   LEFT JOIN tbl_organizations o
+                                     ON u.organization_id = o.id
+                                   ORDER BY u.fullname ASC"
+                            );
+                            if ($fac_res && $fac_res->num_rows > 0):
+                                while ($frow = $fac_res->fetch_assoc()):
+                                    $roleClass = ($frow['role'] === 'Organization Adviser') ? 'pill-approved' : 'pill-info';
+                            ?>
+                                <tr>
+                                    <td class="fw-bold"><?= htmlspecialchars($frow['fullname']) ?></td>
+                                    <td><?= htmlspecialchars($frow['email']) ?></td>
+                                    <td>
+                                        <span class="status-pill <?= $roleClass ?>">
+                                            <?= htmlspecialchars($frow['role']) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php if ($frow['org_name']): ?>
+                                            <span class="status-pill pill-info"><?= htmlspecialchars($frow['org_name']) ?></span>
+                                        <?php else: ?>
+                                            <span style="color:var(--text-light);">&mdash;</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <label class="faculty-toggle-label">
+                                            <input type="checkbox"
+                                                   class="faculty-toggle-input org-borrowing-toggle"
+                                                   data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                                                   <?= $frow['allow_org_borrowing'] == 1 ? 'checked' : '' ?>>
+                                            <span class="faculty-toggle-track"></span>
+                                        </label>
+                                    </td>
+                                </tr>
+                            <?php endwhile;
+                            else: ?>
+                                <tr id="fac-empty-row">
+                                    <td colspan="5" class="text-muted" style="text-align:center;padding:3rem;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round" width="40" height="40"
+                                             style="display:block;margin:0 auto 10px;opacity:0.3;">
+                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                            <circle cx="9" cy="7" r="4"/>
+                                        </svg>
+                                        No faculty accounts yet.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div><!-- /faculty-list-card -->
+
+            </div><!-- /faculty-layout -->
+        </div><!-- /panel-faculty -->
 
     </main><!-- /app-main -->
 

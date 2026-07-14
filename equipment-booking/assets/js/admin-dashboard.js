@@ -574,6 +574,205 @@
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
     });
 
+    /* ── Faculty: adviser toggle show/hide ───────────────────── */
+    const facAdviserChk = document.getElementById('fac-adviser');
+    const facOrgGroup   = document.getElementById('fac-org-group');
+    const facOrgSelect  = document.getElementById('fac-org');
+
+    function _syncAdviserToggle() {
+        if (!facAdviserChk || !facOrgGroup) return;
+        const on = facAdviserChk.checked;
+        facOrgGroup.style.display = on ? '' : 'none';
+        if (facOrgSelect) {
+            if (on) {
+                facOrgSelect.setAttribute('required', 'required');
+            } else {
+                facOrgSelect.removeAttribute('required');
+                facOrgSelect.value = '';
+            }
+        }
+    }
+
+    if (facAdviserChk) {
+        facAdviserChk.addEventListener('change', _syncAdviserToggle);
+        _syncAdviserToggle(); // run once on page load to sync initial state
+    }
+
+    /* ── Faculty: XSS helper and row builder ─────────────────── */
+    function _esc(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    function _buildFacultyRow(data) {
+        // data = { fullname, email, role, org_name, faculty_id, allow_org_borrowing }
+        const tr = document.createElement('tr');
+        const roleClass = data.role === 'Organization Adviser' ? 'pill-approved' : 'pill-info';
+        const orgCell = data.org_name
+            ? '<span class="status-pill pill-info">' + _esc(data.org_name) + '</span>'
+            : '<span style="color:var(--text-light);">&mdash;</span>';
+        tr.innerHTML =
+            '<td class="fw-bold">' + _esc(data.fullname)  + '</td>' +
+            '<td>' + _esc(data.email)     + '</td>' +
+            '<td><span class="status-pill ' + roleClass + '">' + _esc(data.role) + '</span></td>' +
+            '<td>' + orgCell + '</td>' +
+            '<td><label class="faculty-toggle-label">' +
+            '<input type="checkbox" class="faculty-toggle-input org-borrowing-toggle"' +
+            ' data-faculty-id="' + _esc(data.faculty_id || '') + '"' +
+            (data.allow_org_borrowing === 1 ? ' checked' : '') +
+            '><span class="faculty-toggle-track"></span></label></td>';
+        return tr;
+    }
+
+    /* ── Faculty: create-account submit ──────────────────────── */
+    const facSubmitBtn   = document.getElementById('fac-submit-btn');
+    const facFormAlert   = document.getElementById('fac-form-alert');
+
+    function _showFacAlert(msg, isError) {
+        if (!facFormAlert) return;
+        facFormAlert.className = 'alert-banner ' +
+            (isError ? 'alert-danger' : 'alert-success');
+        facFormAlert.textContent = msg;
+        facFormAlert.classList.remove('hidden');
+    }
+
+    function _clearFacAlert() {
+        if (!facFormAlert) return;
+        facFormAlert.classList.add('hidden');
+        facFormAlert.textContent = '';
+    }
+
+    if (facSubmitBtn) {
+        facSubmitBtn.addEventListener('click', function () {
+            _clearFacAlert();
+
+            const email      = (document.getElementById('fac-email')?.value  || '').trim();
+            const backup     = (document.getElementById('fac-backup')?.value || '').trim();
+            const firstName  = (document.getElementById('fac-first')?.value  || '').trim();
+            const middleName = (document.getElementById('fac-middle')?.value || '').trim();
+            const lastName   = (document.getElementById('fac-last')?.value   || '').trim();
+            const password   = document.getElementById('fac-password')?.value || '';
+            const confirm    = document.getElementById('fac-confirm')?.value  || '';
+            const isAdviser  = facAdviserChk?.checked ? '1' : '0';
+            const orgId      = facOrgSelect?.value || '';
+
+            // Client-side pre-checks (mirror server validation for immediate UX feedback)
+            if (!email) {
+                _showFacAlert('PUPSync email is required.', true); return;
+            }
+            if (!firstName) {
+                _showFacAlert('First name is required.', true); return;
+            }
+            if (!lastName) {
+                _showFacAlert('Last name is required.', true); return;
+            }
+            if (!password) {
+                _showFacAlert('Password is required.', true); return;
+            }
+            if (password.length < 8) {
+                _showFacAlert('Password must be at least 8 characters.', true); return;
+            }
+            if (password !== confirm) {
+                _showFacAlert('Passwords do not match.', true); return;
+            }
+            if (isAdviser === '1' && !orgId) {
+                _showFacAlert('An organization must be selected for an adviser.', true);
+                return;
+            }
+
+            facSubmitBtn.disabled = true;
+            facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;animation:spin 0.8s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Creating...';
+
+            const body = new URLSearchParams({
+                csrf_token:       getCsrfToken(),
+                pupsync_email:    email,
+                backup_email:     backup,
+                first_name:       firstName,
+                middle_name:      middleName,
+                last_name:        lastName,
+                password:         password,
+                confirm_password: confirm,
+                is_org_adviser:   isAdviser,
+                organization_id:  orgId
+            });
+
+            fetch('equipment-booking/api/create-faculty-account.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body:    body.toString()
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    _showFacAlert(
+                        'Account created. Faculty ID: ' + data.faculty_id, false
+                    );
+                    showToast('Faculty account created successfully.');
+
+                    // Build fullname for the new DOM row
+                    const parts = [firstName, middleName, lastName].filter(Boolean);
+                    const fullname = parts.join(' ');
+                    const role = isAdviser === '1'
+                        ? 'Organization Adviser'
+                        : 'Regular Faculty';
+                    const orgName = isAdviser === '1'
+                        ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
+                        : '';
+
+                    // DOM prepend: remove empty-state row if present, then prepend new row
+                    const emptyRow = document.getElementById('fac-empty-row');
+                    if (emptyRow) emptyRow.remove();
+
+                    const tbody = document.getElementById('faculty-list-tbody');
+                    if (tbody) {
+                        const newRow = _buildFacultyRow({
+                            fullname, email, role,
+                            org_name:            orgName,
+                            faculty_id:          data.faculty_id || '',
+                            allow_org_borrowing: 0
+                        });
+                        tbody.prepend(newRow);
+                    }
+
+                    // Reset form
+                    ['fac-email','fac-backup','fac-first','fac-middle','fac-last','fac-password','fac-confirm']
+                        .forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
+                    if (facAdviserChk) facAdviserChk.checked = false;
+                    _syncAdviserToggle();
+
+                } else {
+                    _showFacAlert(data.message || 'An error occurred.', true);
+                }
+            })
+            .catch(() => {
+                _showFacAlert('Network error. Please try again.', true);
+            })
+            .finally(() => {
+                facSubmitBtn.disabled = false;
+                facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
+            });
+        });
+    }
+
+    /* ── Faculty: password show/hide toggles ────────────────── */
+    document.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const targetId = this.dataset.target;
+            const input = document.getElementById(targetId);
+            if (!input) return;
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            // Swap the eye icon
+            this.innerHTML = isHidden
+                ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+                : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        });
+    });
+
     /* ── Avatar button ───────────────────────────────────────── */
     const avatarBtn = document.getElementById('avatarBtn');
     if (avatarBtn) avatarBtn.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
@@ -706,6 +905,9 @@
             _switchTabDOM('lending', false);
             switchLendingSub(hash, false);
             history.replaceState({ tab: 'lending', sub: hash }, '');
+        } else if (view === 'faculty') {
+            _switchTabDOM('faculty');
+            history.replaceState({ tab: 'faculty' }, '');
         } else {
             history.replaceState({ tab: 'dashboard' }, '');
         }
@@ -1126,4 +1328,48 @@
         closeBtn.addEventListener('click', stopScanner);
         modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
     })();
+
+    /* ── Faculty: org-borrowing toggle ───────────────────────────────── */
+    document.addEventListener('change', function (e) {
+        const toggle = e.target.closest('.org-borrowing-toggle');
+        if (!toggle) return;
+
+        const facultyId       = toggle.dataset.facultyId;
+        const newValue        = toggle.checked ? 1 : 0;
+        const previousChecked = !toggle.checked;   // save for revert on error
+
+        const formData = new FormData();
+        formData.append('csrf_token',          getCsrfToken());
+        formData.append('faculty_id',          facultyId);
+        formData.append('allow_org_borrowing', newValue);
+
+        fetch('equipment-booking/api/toggle-org-borrowing.php', {
+            method: 'POST',
+            body:   formData
+        })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { status: res.status, data };
+            });
+        })
+        .then(function ({ status, data }) {
+            if (status === 200 && data.status === 'success') {
+                // Update checked state to the value confirmed by the server
+                toggle.checked = data.allow_org_borrowing === 1;
+                showToast(
+                    data.allow_org_borrowing === 1
+                        ? 'Org borrowing enabled.'
+                        : 'Org borrowing disabled.'
+                );
+            } else {
+                // Revert the toggle
+                toggle.checked = previousChecked;
+                showToast('Error: ' + (data.message || 'Could not update permission.'));
+            }
+        })
+        .catch(function () {
+            toggle.checked = previousChecked;
+            showToast('Network error. Please try again.');
+        });
+    });
 })();
