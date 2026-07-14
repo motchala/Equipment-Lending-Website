@@ -9,6 +9,8 @@
 
 DROP DATABASE IF EXISTS lending_db;
 CREATE DATABASE IF NOT EXISTS lending_db;
+USE `lending_db`;
+
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -178,7 +180,9 @@ CREATE TABLE `tbl_requests` (
   `document_path` varchar(255) DEFAULT NULL,
   `arbitration_rule` varchar(50) DEFAULT NULL,
   `submitted_by_name` varchar(255) DEFAULT NULL,
-  `submitted_by_id` varchar(50) DEFAULT NULL
+  `submitted_by_id` varchar(50) DEFAULT NULL,
+  `submitted_as` varchar(20) DEFAULT NULL,
+  `batch_id` char(36) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -233,6 +237,27 @@ CREATE TABLE `tbl_room_reservations` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_organizations`
+--
+
+CREATE TABLE `tbl_organizations` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tbl_organizations`
+--
+
+INSERT INTO `tbl_organizations` (`id`, `name`) VALUES
+(1, 'IBITS'),
+(2, 'YES'),
+(3, 'ACES');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_users`
 --
 
@@ -256,7 +281,10 @@ CREATE TABLE `tbl_users` (
   `emergency_name` varchar(120) DEFAULT NULL,
   `emergency_relationship` varchar(50) DEFAULT NULL,
   `emergency_phone` varchar(20) DEFAULT NULL,
-  `role` varchar(50) DEFAULT 'Regular Faculty'
+  `role` varchar(50) DEFAULT 'Regular Faculty',
+  `is_org_adviser` tinyint(1) DEFAULT 0,
+  `organization_id` int(11) DEFAULT NULL,
+  `allow_org_borrowing` tinyint(1) NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -326,11 +354,24 @@ ALTER TABLE `tbl_room_reservations`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `tbl_organizations`
+--
+ALTER TABLE `tbl_organizations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_org_name` (`name`);
+
+--
 -- Indexes for table `tbl_users`
 --
 ALTER TABLE `tbl_users`
   ADD PRIMARY KEY (`faculty_id`),
   ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Constraints for table `tbl_users`
+--
+ALTER TABLE `tbl_users`
+  ADD CONSTRAINT `fk_users_org` FOREIGN KEY (`organization_id`) REFERENCES `tbl_organizations` (`id`) ON DELETE RESTRICT;
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -371,6 +412,12 @@ ALTER TABLE `tbl_requests`
 --
 ALTER TABLE `tbl_room_reservations`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `tbl_organizations`
+--
+ALTER TABLE `tbl_organizations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 COMMIT;
 
 -- ── CREATE-FACULTY-ACCOUNT MIGRATION ──────────────────────────────────────
@@ -391,15 +438,83 @@ INSERT IGNORE INTO `tbl_organizations` (`name`) VALUES
   ('YES'),
   ('ACES');
 
--- 2. Extend tbl_users with adviser and organization columns
-ALTER TABLE `tbl_users`
-  ADD COLUMN `is_org_adviser`  TINYINT(1) DEFAULT 0 NULL  AFTER `role`,
-  ADD COLUMN `organization_id` INT(11)    DEFAULT NULL     AFTER `is_org_adviser`,
-  ADD CONSTRAINT `fk_users_org`
-      FOREIGN KEY (`organization_id`)
-      REFERENCES `tbl_organizations` (`id`)
-      ON DELETE RESTRICT;
+-- Columns `is_org_adviser`, `organization_id`, and FK `fk_users_org` are now
+-- defined directly in CREATE TABLE tbl_users above; no ALTER TABLE needed here.
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- DUAL BORROWING MODE MIGRATION
+-- Run this block on any existing lending_db to add the dual-borrowing-mode
+-- columns. The block is fully idempotent: running it a second time on a DB
+-- that already has the columns produces no error and leaves existing data
+-- unchanged. Uses a stored-procedure guard (MariaDB 10.4 compatible).
+
+-- ── 1a. allow_org_borrowing on tbl_users (AFTER is_org_adviser) ──────────
+DROP PROCEDURE IF EXISTS `_dbm_add_allow_org_borrowing`;
+DELIMITER $$
+CREATE PROCEDURE `_dbm_add_allow_org_borrowing`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM   information_schema.COLUMNS
+        WHERE  TABLE_SCHEMA = DATABASE()
+          AND  TABLE_NAME   = 'tbl_users'
+          AND  COLUMN_NAME  = 'allow_org_borrowing'
+    ) THEN
+        ALTER TABLE `tbl_users`
+            ADD COLUMN `allow_org_borrowing` TINYINT(1) NOT NULL DEFAULT 0
+            AFTER `is_org_adviser`;
+    END IF;
+END$$
+DELIMITER ;
+CALL `_dbm_add_allow_org_borrowing`();
+DROP PROCEDURE IF EXISTS `_dbm_add_allow_org_borrowing`;
+
+-- ── 1b. Backfill existing Organisation Advisers ──────────────────────────
+UPDATE `tbl_users`
+SET    `allow_org_borrowing` = 1
+WHERE  `role` = 'Organization Adviser';
+
+-- ── 2a. submitted_as on tbl_requests (AFTER submitted_by_id) ─────────────
+DROP PROCEDURE IF EXISTS `_dbm_add_submitted_as`;
+DELIMITER $$
+CREATE PROCEDURE `_dbm_add_submitted_as`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM   information_schema.COLUMNS
+        WHERE  TABLE_SCHEMA = DATABASE()
+          AND  TABLE_NAME   = 'tbl_requests'
+          AND  COLUMN_NAME  = 'submitted_as'
+    ) THEN
+        ALTER TABLE `tbl_requests`
+            ADD COLUMN `submitted_as` VARCHAR(20) DEFAULT NULL
+            AFTER `submitted_by_id`;
+    END IF;
+END$$
+DELIMITER ;
+CALL `_dbm_add_submitted_as`();
+DROP PROCEDURE IF EXISTS `_dbm_add_submitted_as`;
+
+-- ── 2b. batch_id on tbl_requests (AFTER submitted_as) ────────────────────
+DROP PROCEDURE IF EXISTS `_dbm_add_batch_id`;
+DELIMITER $$
+CREATE PROCEDURE `_dbm_add_batch_id`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM   information_schema.COLUMNS
+        WHERE  TABLE_SCHEMA = DATABASE()
+          AND  TABLE_NAME   = 'tbl_requests'
+          AND  COLUMN_NAME  = 'batch_id'
+    ) THEN
+        ALTER TABLE `tbl_requests`
+            ADD COLUMN `batch_id` CHAR(36) DEFAULT NULL
+            AFTER `submitted_as`;
+    END IF;
+END$$
+DELIMITER ;
+CALL `_dbm_add_batch_id`();
+DROP PROCEDURE IF EXISTS `_dbm_add_batch_id`;

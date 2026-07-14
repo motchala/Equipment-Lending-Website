@@ -456,6 +456,8 @@ class ArbitrationEngine
     private static function fetchRequest(mysqli $conn, int $id): ?array
     {
         $stmt = $conn->prepare(
+            // tbl_requests.* includes submitted_as (added by the dual-borrowing-mode migration);
+            // NULL for legacy rows — used by computePriorityScore() and checkMissingDocument().
             'SELECT tbl_requests.*, tbl_users.role,
                     tbl_inventory.is_archived,
                     tbl_inventory.quantity
@@ -580,10 +582,17 @@ class ArbitrationEngine
             return null;
         }
 
-        // Step 4: No document — check if borrower is an organisation adviser.
-        $is_organization_req = isset($request['role']) && $request['role'] === 'Organization Adviser';
+        // Step 4: No document — check if this is an adviser-mode request.
+        // Two paths qualify:
+        //   (a) submitted_as = 'adviser'  → new explicit mode (Requirements 7.1)
+        //   (b) submitted_as = NULL AND role = 'Organization Adviser' → legacy path (Requirement 7.2)
+        // Personal-mode submissions (submitted_as = 'personal') do NOT trigger this hold
+        // based on allow_org_borrowing alone (Requirement 7.3).
+        $submitted_as    = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
+        $is_adviser_mode = ($submitted_as === 'adviser')
+                           || ($submitted_as === null && isset($request['role']) && $request['role'] === 'Organization Adviser');
 
-        if ($is_organization_req) {
+        if ($is_adviser_mode) {
             return 'A signed request letter is required for organization borrowing.';
         }
 
@@ -671,24 +680,45 @@ class ArbitrationEngine
         $signatory = $signatory_level;
 
         // ── Role_Priority: map borrower role to a numeric rank ────────────────
-        $role_name = $request['role'] ?? null;
+        //
+        // Primary path: use submitted_as when it is present (non-NULL).
+        // Fallback path: use the legacy u.role switch for Legacy_Request rows
+        // (submitted_as = NULL) so their behaviour is entirely unchanged.
+        $submitted_as = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
 
-        switch ($role_name) {
-            case 'Director':
-                $role = (int)($config['role_priority_director'] ?? 4);
-                break;
-            case 'Organization Adviser':
+        if ($submitted_as !== null) {
+            // submitted_as-first branch (Requirements 6.1, 6.2, 6.4, 6.6)
+            if ($submitted_as === 'adviser') {
                 $role = (int)($config['role_priority_adviser'] ?? 3);
-                break;
-            case 'Regular Faculty':
+            } elseif ($submitted_as === 'personal' || $submitted_as === 'student') {
                 $role = (int)($config['role_priority_faculty'] ?? 2);
-                break;
-            case 'Student Representative':
-                $role = (int)($config['role_priority_student'] ?? 1);
-                break;
-            default:
-                $role = 1; // lowest priority for any unknown/null role
-                break;
+            } else {
+                // Unknown value — treat as personal and log for investigation.
+                $role = (int)($config['role_priority_faculty'] ?? 2);
+                error_log('ArbitrationEngine: unknown submitted_as value: ' . $submitted_as . ' for request_id=' . $request['id']);
+            }
+        } else {
+            // Legacy fallback: u.role switch (Requirement 6.3 — NULL submitted_as rows
+            // must produce the same decision as before this feature shipped).
+            $role_name = $request['role'] ?? null;
+
+            switch ($role_name) {
+                case 'Director':
+                    $role = (int)($config['role_priority_director'] ?? 4);
+                    break;
+                case 'Organization Adviser':
+                    $role = (int)($config['role_priority_adviser'] ?? 3);
+                    break;
+                case 'Regular Faculty':
+                    $role = (int)($config['role_priority_faculty'] ?? 2);
+                    break;
+                case 'Student Representative':
+                    $role = (int)($config['role_priority_student'] ?? 1);
+                    break;
+                default:
+                    $role = 1; // lowest priority for any unknown/null role
+                    break;
+            }
         }
 
         // ── has_overdue: use pre-populated flag from the request array ─────────

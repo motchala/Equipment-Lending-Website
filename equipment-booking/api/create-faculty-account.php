@@ -38,6 +38,7 @@ $last_name     = trim($_POST['last_name'] ?? '');
 $password_raw  = $_POST['password'] ?? '';
 $confirm_raw   = $_POST['confirm_password'] ?? '';
 $is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
+$allow_org_borrowing = (($_POST['allow_org_borrowing'] ?? '0') === '1') ? 1 : 0;
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
 // ── Validation: pupsync_email ─────────────────────────────────────────────────
@@ -149,13 +150,13 @@ $role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
 $backup_val = ($backup_email === '') ? null : $backup_email;
 
 // ── Insert ───────────────────────────────────────────────────────────────────
-$ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+$ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 if (!$ins_stmt) {
     $conn->rollback();
     error_log('[create-faculty-account] INSERT prepare failed: ' . $conn->error);
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
-$ins_stmt->bind_param('ssssssii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id);
+$ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
 if (!$ins_stmt->execute()) {
     $conn->rollback();
     error_log('[create-faculty-account] INSERT execute failed: ' . $conn->error);
