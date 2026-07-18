@@ -292,7 +292,7 @@ CREATE TABLE `tbl_users` (
 --
 
 INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `password`, `last_password_change`, `dob`, `gender`, `nationality`, `profile_picture`, `department`, `faculty_rank`, `phone`, `present_address`, `permanent_address`, `landline`, `emergency_name`, `emergency_relationship`, `emergency_phone`, `role`) VALUES
-('Sandy Napiza', '2023-00004-BN-0', 'napizasandy@gmail.com', NULL, '$2y$10$LkK0vynd6.4zdgxJmlqJVOhjVAg7ZTm8uE8S1L/se4ihE1YOUHEWe', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
+('Sandy Napiza', '2023-00004-BN-0', 'napiza.sandy.lsei@gmail.com', NULL, '$2y$10$LkK0vynd6.4zdgxJmlqJVOhjVAg7ZTm8uE8S1L/se4ihE1YOUHEWe', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
 ('Philip San Jose', '2023-00111-BN-0', 'philip@gmail.com', NULL, '$2y$10$9R40gACxJd27H2pxjk1tD.wo4Gsrl3dhxTAIK82rRwYouxNu/FJKu', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
 ('Mendoza', '2023-00230-BN-0', 'elainejoyamendoza@iskolarngbayan.pup.edu', NULL, '$2y$10$6DLhVRPsBCHxBPqpeuenc.GJDhp1pq3aiW9RDnS.FH2Nn/k/jDyUq', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'Regular Faculty'),
 ('Frederick Rosales', '2023-00251-BN-0', 'iamfrederickr@gmail.com', 'frederick@gmail.com', '$2y$10$haZe66NIfJD5N5SEqNNTm.j9kYKYa/sJgcB7mSDBWqClftRV49okW', '2026-03-12 19:08:17', '2003-06-21', 'Male', 'Filipino', '2023-00251-BN-0_1773344427.JPG', 'BSIT', '3rd Year', '639662668443', '', '', '', NULL, NULL, NULL, 'Regular Faculty'),
@@ -518,3 +518,250 @@ END$$
 DELIMITER ;
 CALL `_dbm_add_batch_id`();
 DROP PROCEDURE IF EXISTS `_dbm_add_batch_id`;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ROOM REGISTRY MIGRATION  (Phase 1)
+-- Tables: tbl_campuses, tbl_buildings, tbl_rooms
+-- Adds room_id FK column to existing tbl_room_reservations.
+-- Fully idempotent — safe to run on an existing lending_db.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- ── tbl_campuses ────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `tbl_campuses` (
+  `campus_id`   int(11)      NOT NULL AUTO_INCREMENT,
+  `campus_key`  varchar(50)  NOT NULL,
+  `campus_name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `created_at`  datetime     DEFAULT current_timestamp(),
+  PRIMARY KEY (`campus_id`),
+  UNIQUE KEY `uq_campus_key` (`campus_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ── tbl_buildings ────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `tbl_buildings` (
+  `building_id`  int(11)      NOT NULL AUTO_INCREMENT,
+  `campus_id`    int(11)      NOT NULL,
+  `building_key` varchar(50)  NOT NULL,
+  `name`         varchar(100) NOT NULL,
+  `wing`         varchar(100) DEFAULT NULL,
+  `floor_count`  tinyint(3)   NOT NULL DEFAULT 1,
+  `image_path`   varchar(255) DEFAULT NULL,
+  `icon`         varchar(50)  NOT NULL DEFAULT 'domain',
+  `description`  varchar(255) DEFAULT NULL,
+  `sort_order`   tinyint(3)   NOT NULL DEFAULT 0,
+  `created_at`   datetime     DEFAULT current_timestamp(),
+  PRIMARY KEY (`building_id`),
+  UNIQUE KEY `uq_building_key` (`building_key`),
+  CONSTRAINT `fk_buildings_campus`
+    FOREIGN KEY (`campus_id`) REFERENCES `tbl_campuses` (`campus_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ── tbl_rooms ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `tbl_rooms` (
+  `room_id`          int(11)      NOT NULL AUTO_INCREMENT,
+  `building_id`      int(11)      NOT NULL,
+  `room_name`        varchar(100) NOT NULL,
+  `floor_number`     tinyint(3)   NOT NULL DEFAULT 1,
+  `floor_label`      varchar(50)  DEFAULT NULL,
+  `seating_capacity` smallint(5)  DEFAULT NULL,
+  `amenities`        varchar(500) DEFAULT NULL,
+  `status`           enum('Available','Maintenance','Not Bookable')
+                                  NOT NULL DEFAULT 'Available',
+  `is_archived`      tinyint(1)   NOT NULL DEFAULT 0,
+  `sort_order`       smallint(5)  NOT NULL DEFAULT 0,
+  `created_at`       datetime     DEFAULT current_timestamp(),
+  PRIMARY KEY (`room_id`),
+  CONSTRAINT `fk_rooms_building`
+    FOREIGN KEY (`building_id`) REFERENCES `tbl_buildings` (`building_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ── Add room_id FK to tbl_room_reservations (idempotent) ─────────────────
+DROP PROCEDURE IF EXISTS `_rrm_add_room_id_col`;
+DELIMITER $$
+CREATE PROCEDURE `_rrm_add_room_id_col`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME   = 'tbl_room_reservations'
+          AND COLUMN_NAME  = 'room_id'
+    ) THEN
+        ALTER TABLE `tbl_room_reservations`
+            ADD COLUMN `room_id` int(11) DEFAULT NULL AFTER `id`,
+            ADD CONSTRAINT `fk_reservations_room`
+                FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`);
+    END IF;
+END$$
+DELIMITER ;
+CALL `_rrm_add_room_id_col`();
+DROP PROCEDURE IF EXISTS `_rrm_add_room_id_col`;
+
+-- ── SEED DATA ─────────────────────────────────────────────────────────────
+
+-- Campuses
+INSERT IGNORE INTO `tbl_campuses` (`campus_id`, `campus_key`, `campus_name`, `description`) VALUES
+(1, 'main', 'PUP MAIN', 'Manage academic buildings, administrative offices, and central university facilities.'),
+(2, 'cite', 'PUP CITE', 'Manage technical laboratories, engineering workshops, and specialized equipment facilities.');
+
+-- Buildings
+INSERT IGNORE INTO `tbl_buildings`
+    (`building_id`, `campus_id`, `building_key`, `name`, `wing`, `floor_count`, `image_path`, `icon`, `description`, `sort_order`)
+VALUES
+(1, 1, 'main-building-a', 'Building A (Old)', 'South Wing', 5,
+ 'assets/images/faculty/pup-main-building-a-image.jpg', 'domain',
+ 'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.', 1),
+(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 6,
+ 'assets/images/faculty/pup-main-building-b-image.jpg', 'business',
+ 'Modern laboratories, smart classrooms, and collaborative study spaces.', 2),
+(3, 2, 'cite-main', 'PUP CITE Building', 'Main Block', 4,
+ 'assets/images/faculty/pup-cite-image.jpg', 'engineering',
+ 'Technical laboratories, computer labs, and specialized engineering facilities spread across 4 floors.', 1);
+
+-- ── Building A (Old) — PUP MAIN  (building_id = 1) ───────────────────────
+INSERT IGNORE INTO `tbl_rooms`
+    (`building_id`, `room_name`, `floor_number`, `floor_label`, `status`, `sort_order`)
+VALUES
+-- 1st Floor
+(1, 'Admin Office',         1, '1st Floor', 'Not Bookable', 1),
+(1, 'Registration Office',  1, '1st Floor', 'Not Bookable', 2),
+(1, 'OSAS Office',          1, '1st Floor', 'Not Bookable', 3),
+(1, 'Office 1',             1, '1st Floor', 'Not Bookable', 4),
+(1, 'Clinic',               1, '1st Floor', 'Not Bookable', 5),
+(1, 'Staff Room',           1, '1st Floor', 'Not Bookable', 6),
+-- 2nd Floor
+(1, 'Room 201', 2, '2nd Floor', 'Available', 1),
+(1, 'Room 202', 2, '2nd Floor', 'Available', 2),
+(1, 'Room 203', 2, '2nd Floor', 'Available', 3),
+(1, 'Room 204', 2, '2nd Floor', 'Available', 4),
+(1, 'Room 205', 2, '2nd Floor', 'Available', 5),
+-- 3rd Floor
+(1, 'Room 301', 3, '3rd Floor', 'Available', 1),
+(1, 'Room 302', 3, '3rd Floor', 'Available', 2),
+(1, 'Room 303', 3, '3rd Floor', 'Available', 3),
+(1, 'Room 304', 3, '3rd Floor', 'Available', 4),
+(1, 'Room 305', 3, '3rd Floor', 'Available', 5),
+-- 4th Floor
+(1, 'Org Room',              4, '4th Floor', 'Not Bookable', 1),
+(1, 'CSC Room',              4, '4th Floor', 'Not Bookable', 2),
+(1, 'AVR 2',                 4, '4th Floor', 'Available',    3),
+(1, 'Computer Laboratory 1', 4, '4th Floor', 'Available',    4),
+(1, 'Computer Laboratory 2', 4, '4th Floor', 'Available',    5),
+-- 5th Floor
+(1, 'Chemistry Laboratory', 5, '5th Floor', 'Available', 1);
+
+-- ── Building B (New) — PUP MAIN  (building_id = 2) ───────────────────────
+INSERT IGNORE INTO `tbl_rooms`
+    (`building_id`, `room_name`, `floor_number`, `floor_label`, `status`, `sort_order`)
+VALUES
+-- 1st Floor
+(2, 'Library',          1, '1st Floor', 'Not Bookable', 1),
+(2, 'Directors Office', 1, '1st Floor', 'Not Bookable', 2),
+(2, 'Faculty Room',     1, '1st Floor', 'Not Bookable', 3),
+(2, 'DO Office',        1, '1st Floor', 'Not Bookable', 4),
+(2, 'Guidance Office',  1, '1st Floor', 'Not Bookable', 5),
+-- 2nd Floor
+(2, 'Research Room', 2, '2nd Floor', 'Available', 1),
+(2, 'Room 202',      2, '2nd Floor', 'Available', 2),
+(2, 'Room 203',      2, '2nd Floor', 'Available', 3),
+(2, 'Room 204',      2, '2nd Floor', 'Available', 4),
+(2, 'Room 205',      2, '2nd Floor', 'Available', 5),
+-- 3rd Floor
+(2, 'Room 301', 3, '3rd Floor', 'Available', 1),
+(2, 'Room 302', 3, '3rd Floor', 'Available', 2),
+(2, 'Room 303', 3, '3rd Floor', 'Available', 3),
+(2, 'Room 304', 3, '3rd Floor', 'Available', 4),
+(2, 'Room 305', 3, '3rd Floor', 'Available', 5),
+-- 4th Floor
+(2, 'Room 401', 4, '4th Floor', 'Available', 1),
+(2, 'Room 402', 4, '4th Floor', 'Available', 2),
+(2, 'AVR 1',    4, '4th Floor', 'Available', 3),
+(2, 'Room 405', 4, '4th Floor', 'Available', 4),
+-- 5th Floor
+(2, 'Room 501', 5, '5th Floor', 'Available', 1),
+(2, 'Room 502', 5, '5th Floor', 'Available', 2),
+(2, 'Room 503', 5, '5th Floor', 'Available', 3),
+(2, 'Room 504', 5, '5th Floor', 'Available', 4),
+(2, 'Room 505', 5, '5th Floor', 'Available', 5),
+(2, 'Room 506', 5, '5th Floor', 'Available', 6),
+(2, 'Room 507', 5, '5th Floor', 'Available', 7),
+(2, 'Room 508', 5, '5th Floor', 'Available', 8),
+(2, 'Room 509', 5, '5th Floor', 'Available', 9),
+-- 6th Floor
+(2, 'Room 601', 6, '6th Floor', 'Available', 1),
+(2, 'Room 602', 6, '6th Floor', 'Available', 2),
+(2, 'Room 603', 6, '6th Floor', 'Available', 3),
+(2, 'Room 604', 6, '6th Floor', 'Available', 4),
+(2, 'Room 605', 6, '6th Floor', 'Available', 5),
+(2, 'Room 606', 6, '6th Floor', 'Available', 6),
+(2, 'Room 607', 6, '6th Floor', 'Available', 7),
+(2, 'Room 608', 6, '6th Floor', 'Available', 8),
+(2, 'Room 609', 6, '6th Floor', 'Available', 9),
+(2, 'Room 610', 6, '6th Floor', 'Available', 10),
+(2, 'Room 611', 6, '6th Floor', 'Available', 11),
+(2, 'Room 612', 6, '6th Floor', 'Available', 12),
+(2, 'Room 613', 6, '6th Floor', 'Available', 13),
+(2, 'Room 614', 6, '6th Floor', 'Available', 14),
+(2, 'Room 615', 6, '6th Floor', 'Available', 15),
+(2, 'Room 616', 6, '6th Floor', 'Available', 16),
+(2, 'Room 617', 6, '6th Floor', 'Available', 17),
+(2, 'Room 618', 6, '6th Floor', 'Available', 18),
+(2, 'Room 619', 6, '6th Floor', 'Available', 19),
+(2, 'Room 620', 6, '6th Floor', 'Available', 20);
+
+-- ── PUP CITE Building  (building_id = 3) ─────────────────────────────────
+INSERT IGNORE INTO `tbl_rooms`
+    (`building_id`, `room_name`, `floor_number`, `floor_label`, `status`, `sort_order`)
+VALUES
+-- 1st Floor
+(3, 'Prayer Room',                  1, '1st Floor', 'Not Bookable', 1),
+(3, 'Audiovisual Room',             1, '1st Floor', 'Available',    2),
+(3, 'Testing Area',                 1, '1st Floor', 'Not Bookable', 3),
+(3, 'Student Organization Room',    1, '1st Floor', 'Not Bookable', 4),
+(3, 'Clinic Room',                  1, '1st Floor', 'Not Bookable', 5),
+(3, 'Industrial Engineering Room',  1, '1st Floor', 'Not Bookable', 6),
+(3, 'Director''s Office',           1, '1st Floor', 'Not Bookable', 7),
+(3, 'Basketball Court',             1, '1st Floor', 'Not Bookable', 8),
+(3, 'Room 103',                     1, '1st Floor', 'Available',    9),
+(3, 'Room 105',                     1, '1st Floor', 'Available',    10),
+(3, 'Room 106',                     1, '1st Floor', 'Available',    11),
+(3, 'Room 116',                     1, '1st Floor', 'Available',    12),
+(3, 'Room 118',                     1, '1st Floor', 'Available',    13),
+(3, 'Room 119',                     1, '1st Floor', 'Available',    14),
+-- 2nd Floor
+(3, 'Admin Office',                   2, '2nd Floor', 'Not Bookable', 1),
+(3, 'Faculty Lounge',                 2, '2nd Floor', 'Not Bookable', 2),
+(3, 'AutoCAD & Multimedia Laboratory',2, '2nd Floor', 'Available',    3),
+(3, 'Computer Laboratory 1',          2, '2nd Floor', 'Available',    4),
+(3, 'Computer Laboratory 2',          2, '2nd Floor', 'Available',    5),
+(3, 'Computer Laboratory 3',          2, '2nd Floor', 'Available',    6),
+(3, 'Ergonomics Room',                2, '2nd Floor', 'Available',    7),
+(3, 'Digital Laboratory Room',        2, '2nd Floor', 'Available',    8),
+(3, 'Dispensing Room',                2, '2nd Floor', 'Not Bookable', 9),
+(3, 'Microprocessing Laboratory Room',2, '2nd Floor', 'Available',    10),
+(3, 'Room 203',                       2, '2nd Floor', 'Available',    11),
+(3, 'Room 210',                       2, '2nd Floor', 'Available',    12),
+(3, 'Room 212',                       2, '2nd Floor', 'Available',    13),
+(3, 'Room 218',                       2, '2nd Floor', 'Available',    14),
+-- 3rd Floor
+(3, 'Library Room',           3, '3rd Floor', 'Not Bookable', 1),
+(3, 'Library Extension Room', 3, '3rd Floor', 'Not Bookable', 2),
+(3, 'Physics Room',           3, '3rd Floor', 'Available',    3),
+(3, 'Room 301',               3, '3rd Floor', 'Available',    4),
+(3, 'Room 302',               3, '3rd Floor', 'Available',    5),
+(3, 'Room 303',               3, '3rd Floor', 'Available',    6),
+(3, 'Room 304',               3, '3rd Floor', 'Available',    7),
+(3, 'Room 305',               3, '3rd Floor', 'Available',    8),
+(3, 'Room 307',               3, '3rd Floor', 'Available',    9),
+(3, 'Room 308',               3, '3rd Floor', 'Available',    10),
+(3, 'Room 309',               3, '3rd Floor', 'Available',    11),
+(3, 'Room 310',               3, '3rd Floor', 'Available',    12),
+-- 4th Floor
+(3, 'Chemistry Laboratory Room', 4, '4th Floor', 'Available',    1),
+(3, 'Student Lounge',            4, '4th Floor', 'Not Bookable', 2),
+(3, 'Room 401',                  4, '4th Floor', 'Available',    3),
+(3, 'Room 402',                  4, '4th Floor', 'Available',    4),
+(3, 'Room 403',                  4, '4th Floor', 'Available',    5),
+(3, 'Room 405',                  4, '4th Floor', 'Available',    6),
+(3, 'Room 406',                  4, '4th Floor', 'Available',    7),
+(3, 'Room 415',                  4, '4th Floor', 'Available',    8);

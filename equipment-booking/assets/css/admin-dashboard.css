@@ -3544,3 +3544,118 @@ input[type="range"] {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── ROOMS REGISTRY sub-panels (mirrors .history-panel pattern) ── */
+.rooms-sub-panel {
+    display: none;
+}
+
+.rooms-sub-panel.active {
+    display: block;
+    animation: slideIn 0.2s ease;
+}
+
+/* ── ROOM FORM — accessibility & readability improvements ────────────────
+   All rules are scoped to #room-form-wrap so they have zero effect on any
+   other form in the admin dashboard (inventory, faculty creation, etc.).
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Slightly larger labels for reduced near-vision legibility */
+#room-form-wrap .form-group label {
+    font-size: 0.9rem;
+    letter-spacing: 0;          /* override the global 0.5px uppercase tracking */
+    margin-bottom: 5px;
+}
+
+/* Slightly larger, more padded inputs */
+#room-form-wrap .form-control-custom {
+    font-size: 0.925rem;
+    padding: 11px 14px;
+}
+
+/* Helper text under fields */
+.form-field-hint {
+    margin: 5px 0 0;
+    font-size: 0.78rem;
+    color: var(--text-light);
+    line-height: 1.45;
+    font-weight: 400;
+}
+
+/* Required field asterisk */
+.req-star {
+    color: var(--accent-maroon);
+    margin-left: 2px;
+    font-weight: 700;
+}
+
+/* Optional tag — consistent style, replaces per-field inline <small> */
+.field-optional {
+    color: var(--text-light);
+    font-weight: 400;
+    font-size: 0.8rem;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-left: 3px;
+}
+
+/* ── ROOM FORM — field tooltip (ⓘ icon) ─────────────────────────────────
+   All rules scoped to #room-form-wrap. Zero impact on any other form.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Inline info icon container — sits right of the label text */
+#room-form-wrap .field-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 5px;
+    cursor: pointer;
+    color: var(--text-light);
+    transition: color 0.15s;
+    /* Expand tap target without changing visual size */
+    padding: 2px;
+}
+
+#room-form-wrap .field-tip:hover,
+#room-form-wrap .field-tip:focus {
+    color: var(--accent-maroon);
+    outline: none;
+}
+
+/* Tooltip box — hidden by default, shown on hover OR .tip-open */
+#room-form-wrap .field-tip-box {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    width: 300px;
+    max-width: 90vw;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--khaki-border);
+    border-left: 3px solid var(--accent-maroon);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1.55;
+    color: var(--text-dark);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: normal;
+    pointer-events: none;   /* won't block mouse events on the form below */
+}
+
+/* Show on CSS hover (mouse users) */
+#room-form-wrap .field-tip:hover .field-tip-box {
+    display: block;
+}
+
+/* Show on JS-toggled class (tap/click users) */
+#room-form-wrap .field-tip.tip-open .field-tip-box {
+    display: block;
+    pointer-events: auto;   /* allow text selection when pinned open */
+}

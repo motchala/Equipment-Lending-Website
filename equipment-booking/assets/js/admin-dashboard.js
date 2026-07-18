@@ -253,7 +253,20 @@
         if (btn) btn.classList.add('active');
     }
 
-    /* ── Notification card expand & dismiss ──────────────────── */
+    /* ── Rooms Registry toggle (scoped to #panel-rooms) ─────────
+       Separate from switchHistoryTab to avoid cross-tab interference —
+       equipment and rooms live on different tabs so using global
+       querySelectorAll('.history-panel') would deactivate the wrong panels. */
+    function switchRoomsTab(tabName) {
+        const roomsPanel = document.getElementById('panel-rooms');
+        if (!roomsPanel) return;
+        roomsPanel.querySelectorAll('.rooms-sub-panel').forEach(p => p.classList.remove('active'));
+        roomsPanel.querySelectorAll('[data-rooms-tab]').forEach(b => b.classList.remove('active'));
+        const activePanel = document.getElementById(tabName + '-panel');
+        const activeBtn   = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
+        if (activePanel) activePanel.classList.add('active');
+        if (activeBtn)   activeBtn.classList.add('active');
+    }
     function _getUnreadCount() {
         return document.querySelectorAll('.notif-item.unread').length;
     }
@@ -550,6 +563,28 @@
                     }
                     break;
                 }
+                case 'show-room-form': {
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) {
+                        rfw.classList.remove('hidden');
+                        if (addRoomBtn) addRoomBtn.style.display = 'none';
+                        rfw.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    break;
+                }
+                case 'hide-room-form': {
+                    const editRoomParam = new URLSearchParams(window.location.search).get('edit_room');
+                    if (editRoomParam) {
+                        window.location.href = 'admin-dashboard.php?tab=rooms';
+                    } else {
+                        const rfw = document.getElementById('room-form-wrap');
+                        const addRoomBtn = document.getElementById('addRoomBtn');
+                        if (rfw) rfw.classList.add('hidden');
+                        if (addRoomBtn) addRoomBtn.style.display = '';
+                    }
+                    break;
+                }
                 case 'apply-theme':
                     applyTheme(el.dataset.theme); break;
                 case 'apply-accent':
@@ -793,6 +828,59 @@
         btn.addEventListener('click', function () { switchHistoryTab(this.dataset.historyTab); });
     });
 
+    /* ── Rooms Registry toggle ───────────────────────────────── */
+    document.querySelectorAll('[data-rooms-tab]').forEach(btn => {
+        btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
+    });
+
+    /* ── Room form field-tip icons: toggle on click/tap ────────
+       Hover is handled by pure CSS (:hover). This JS layer adds
+       click/tap toggling for older users who can't hover precisely.
+       One delegated listener on #room-form-wrap keeps it scoped.   */
+    (function () {
+        const wrap = document.getElementById('room-form-wrap');
+        if (!wrap) return;
+
+        wrap.addEventListener('click', function (e) {
+            const tip = e.target.closest('.field-tip');
+
+            if (tip) {
+                e.stopPropagation();
+                const isOpen = tip.classList.contains('tip-open');
+                /* Close any other open tips first */
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+                if (!isOpen) tip.classList.add('tip-open');
+                return;
+            }
+
+            /* Click anywhere outside a tip closes all open tips */
+            wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+        });
+
+        /* Keyboard support: Enter/Space toggles the tip; Escape closes all */
+        wrap.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const tip = e.target.closest('.field-tip');
+                if (tip) {
+                    e.preventDefault();
+                    const isOpen = tip.classList.contains('tip-open');
+                    wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+                    if (!isOpen) tip.classList.add('tip-open');
+                }
+            }
+            if (e.key === 'Escape') {
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+            }
+        });
+
+        /* Close tips when clicking outside the form entirely */
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) {
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+            }
+        });
+    }());
+
     /* ── Account sub-nav ─────────────────────────────────────── */
     document.querySelectorAll('.acc-nav-btn').forEach(btn => {
         btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
@@ -909,12 +997,34 @@
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
         } else {
-            history.replaceState({ tab: 'dashboard' }, '');
+            // Check for rooms tab param
+            const tab = params.get('tab');
+            const editRoom = params.get('edit_room');
+            if (tab === 'rooms') {
+                _switchTabDOM('rooms', false);
+                if (editRoom) {
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) { rfw.classList.remove('hidden'); }
+                    if (addRoomBtn) addRoomBtn.style.display = 'none';
+                }
+                // Auto-open archived sub-panel when redirected back from archive/restore
+                const roomArchived = params.get('room_archived');
+                const roomRestored = params.get('room_restored');
+                if (roomArchived || roomRestored) {
+                    switchRoomsTab('rooms-archived');
+                }
+                history.replaceState({ tab: 'rooms' }, '');
+            } else {
+                history.replaceState({ tab: 'dashboard' }, '');
+            }
         }
 
         // Auto-dismiss alerts after 5s
         setTimeout(() => {
-            ['added-alert', 'updated-alert'].forEach(id => {
+            ['added-alert', 'updated-alert',
+             'room-added-alert', 'room-updated-alert',
+             'room-archived-alert', 'room-restored-alert'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             });

@@ -1,4 +1,5 @@
 <?php require_once __DIR__ . '/equipment-booking/core/admin-functions.php'; ?>
+<?php require_once __DIR__ . '/room-reservation/core/admin-rooms-functions.php'; ?>
 <?php
 // ── CONFIRM RETURN ─────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
@@ -181,6 +182,57 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </svg>
                 <strong>Updated!</strong> Item has been updated successfully.
                 <button class="alert-close" data-action="dismiss-alert" data-target="updated-alert">✕</button>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['room_added'])): ?>
+            <div class="alert-banner alert-success" id="room-added-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <strong>Room added!</strong> The room has been added to the registry.
+                <button class="alert-close" data-action="dismiss-alert" data-target="room-added-alert">✕</button>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['room_updated'])): ?>
+            <div class="alert-banner alert-success" id="room-updated-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <strong>Room updated!</strong> Changes saved successfully.
+                <button class="alert-close" data-action="dismiss-alert" data-target="room-updated-alert">✕</button>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['room_archived'])): ?>
+            <div class="alert-banner alert-success" id="room-archived-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <strong>Room archived.</strong> It has been removed from the active registry.
+                <button class="alert-close" data-action="dismiss-alert" data-target="room-archived-alert">✕</button>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['room_restored'])): ?>
+            <div class="alert-banner alert-success" id="room-restored-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                <strong>Room restored.</strong> It is now back in the active registry.
+                <button class="alert-close" data-action="dismiss-alert" data-target="room-restored-alert">✕</button>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($_GET['room_error'])): ?>
+            <div class="alert-banner alert-danger" id="room-error-alert">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <strong>Error:</strong> Could not save room. Please check required fields and try again.
+                <button class="alert-close" data-action="dismiss-alert" data-target="room-error-alert">✕</button>
             </div>
         <?php endif; ?>
         <?php if ($stat_overdue > 0): ?>
@@ -1594,49 +1646,267 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
          TAB: ROOMS
     ============================================================ -->
         <div class="tab-panel" id="panel-rooms">
-            <div class="section-header">
-                <h2>
+
+            <!-- ── Page header + Add Room button ──────────────────── -->
+            <div class="page-header inv-page-header">
+                <div>
+                    <h2 style="display:flex;align-items:center;gap:8px;margin:0 0 4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
+                            <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                        </svg>
+                        Room Registry
+                    </h2>
+                    <p>Manage rooms across all campuses and buildings. <?php echo $stat_rooms_total; ?> active room<?php echo $stat_rooms_total !== 1 ? 's' : ''; ?> — <?php echo $stat_rooms_available; ?> Available, <?php echo $stat_rooms_maintenance; ?> Maintenance, <?php echo $stat_rooms_notbookable; ?> Not Bookable.</p>
+                </div>
+                <button class="btn-add-item" data-action="show-room-form" id="addRoomBtn">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <line x1="9" y1="3" x2="9" y2="21" />
-                        <circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" />
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                     </svg>
-                    Room Management
-                </h2>
-                <p>Oversee room reservations and availability across the campus.</p>
+                    Add Room
+                </button>
             </div>
 
-            <div class="coming-soon-banner">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="40" height="40"
-                    style="color:var(--accent-maroon);margin-bottom:0.5rem;">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                </svg>
-                <h3>Room Reservation Management — Coming Soon</h3>
-                <p>Admin controls for room scheduling, conflict detection, and approval workflows are under development.
-                </p>
+            <!-- ── Add / Edit Room form (hidden by default) ────────── -->
+            <div id="room-form-wrap" class="<?php echo $edit_room ? '' : 'hidden'; ?>" style="margin-bottom:1.5rem;">
+                <div class="eq-card form-card">
+
+                    <!-- Header — matches equipment form exactly -->
+                    <div class="form-card-header">
+                        <h2>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <line x1="9" y1="3" x2="9" y2="21" />
+                            </svg>
+                            <span id="room-form-title"><?php echo $edit_room ? 'Edit Room' : 'Add New Room'; ?></span>
+                        </h2>
+                        <button type="button" class="btn-close-custom" data-action="hide-room-form" aria-label="Close form">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Body wrapper — matches equipment form padding -->
+                    <div class="form-card-body">
+                    <form method="POST" id="roomForm">
+                        <?= csrf_field() ?>
+                        <?php if ($edit_room): ?>
+                            <input type="hidden" name="room_id" value="<?php echo (int)$edit_room['room_id']; ?>">
+                        <?php endif; ?>
+
+                        <!-- Row 1: Building | Room Name -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Building <span class="req-star" aria-label="required">*</span></label>
+                                <select name="building_id" class="form-control-custom" required>
+                                    <option value="">— Select building —</option>
+                                    <?php foreach ($rooms_buildings as $bid => $b): ?>
+                                        <option value="<?php echo (int)$bid; ?>"
+                                            <?php echo ($edit_room && (int)$edit_room['building_id'] === $bid) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($b['campus_name'] . ' › ' . $b['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Room Name <span class="req-star" aria-label="required">*</span></label>
+                                <input type="text" name="room_name" class="form-control-custom"
+                                    value="<?php echo $edit_room ? htmlspecialchars($edit_room['room_name']) : ''; ?>"
+                                    placeholder="e.g. Computer Laboratory 1" required>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Floor Number | Display Name for Floor -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>
+                                    Floor Number <span class="req-star" aria-label="required">*</span>
+                                    <span class="field-tip" data-tip="The floor this room is on (e.g. enter 2 for 2nd Floor)." aria-label="More information" tabindex="0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span class="field-tip-box" role="tooltip">The floor this room is on (e.g. enter 2 for 2nd Floor).</span>
+                                    </span>
+                                </label>
+                                <input type="number" name="floor_number" class="form-control-custom" min="1" max="20"
+                                    value="<?php echo $edit_room ? (int)$edit_room['floor_number'] : 1; ?>" required>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Display Name for Floor <small class="field-optional">(optional)</small>
+                                    <span class="field-tip" data-tip="Only needed if this floor has a special name, like &#39;Ground Floor&#39; or &#39;Mezzanine&#39;. Leave blank to use the floor number automatically." aria-label="More information" tabindex="0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span class="field-tip-box" role="tooltip">Only needed if this floor has a special name, like &lsquo;Ground Floor&rsquo; or &lsquo;Mezzanine&rsquo;. Leave blank to use the floor number automatically.</span>
+                                    </span>
+                                </label>
+                                <input type="text" name="floor_label" class="form-control-custom"
+                                    value="<?php echo $edit_room ? htmlspecialchars($edit_room['floor_label'] ?? '') : ''; ?>"
+                                    placeholder="e.g. Ground Floor">
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Seating Capacity | Room Status -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>
+                                    Seating Capacity <small class="field-optional">(optional)</small>
+                                    <span class="field-tip" data-tip="How many people this room can hold. Leave blank if unknown." aria-label="More information" tabindex="0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span class="field-tip-box" role="tooltip">How many people this room can hold. Leave blank if unknown.</span>
+                                    </span>
+                                </label>
+                                <input type="number" name="seating_capacity" class="form-control-custom" min="1"
+                                    value="<?php echo ($edit_room && $edit_room['seating_capacity'] !== null) ? (int)$edit_room['seating_capacity'] : ''; ?>"
+                                    placeholder="e.g. 40">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    Room Status <span class="req-star" aria-label="required">*</span>
+                                    <span class="field-tip" data-tip="Available = open for booking. Maintenance = temporarily closed. Not Bookable = this room cannot be reserved." aria-label="More information" tabindex="0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span class="field-tip-box" role="tooltip">Available = open for booking. Maintenance = temporarily closed. Not Bookable = this room cannot be reserved.</span>
+                                    </span>
+                                </label>
+                                <select name="status" class="form-control-custom">
+                                    <?php foreach (['Available','Maintenance','Not Bookable'] as $s): ?>
+                                        <option value="<?php echo $s; ?>"
+                                            <?php echo ($edit_room && $edit_room['status'] === $s) ? 'selected' : (!$edit_room && $s === 'Available' ? 'selected' : ''); ?>>
+                                            <?php echo htmlspecialchars($s); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Display Position (left only, right empty — mirrors Quantity row in equipment form) -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>
+                                    Display Position <small class="field-optional">(optional)</small>
+                                    <span class="field-tip" data-tip="Controls which room appears first when browsing this floor. Leave as 0 if you don&#39;t have a preference — rooms will sort by the order they were added." aria-label="More information" tabindex="0">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                        <span class="field-tip-box" role="tooltip">Controls which room appears first when browsing this floor. Leave as 0 if you don&rsquo;t have a preference &mdash; rooms will sort by the order they were added.</span>
+                                    </span>
+                                </label>
+                                <input type="number" name="sort_order" class="form-control-custom" min="0"
+                                    value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
+                            </div>
+                            <div class="form-group"><!-- empty right column --></div>
+                        </div>
+
+                        <!-- Row 5: Room Features (full width) -->
+                        <div class="form-group">
+                            <label>
+                                Room Features <small class="field-optional">(optional)</small>
+                                <span class="field-tip" data-tip="Tick everything this room has. These details appear on the room information screen." aria-label="More information" tabindex="0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                    <span class="field-tip-box" role="tooltip">Tick everything this room has. These details appear on the room information screen.</span>
+                                </span>
+                            </label>
+                            <?php
+                            $preset_amenities = ['WiFi','A/C','Projector','PA System','Running Water','Safety Kit','Whiteboard','Smart TV'];
+                            $checked_amenities = [];
+                            if ($edit_room && !empty($edit_room['amenities'])) {
+                                $decoded = json_decode($edit_room['amenities'], true);
+                                $checked_amenities = is_array($decoded) ? $decoded : [];
+                            }
+                            ?>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                                <?php foreach ($preset_amenities as $am): ?>
+                                    <label style="display:flex;align-items:center;gap:4px;font-weight:400;cursor:pointer;font-size:0.85rem;background:var(--surface-alt);padding:4px 10px;border-radius:20px;border:1px solid var(--border);">
+                                        <input type="checkbox" name="amenities[]" value="<?php echo htmlspecialchars($am); ?>"
+                                            <?php echo in_array($am, $checked_amenities, true) ? 'checked' : ''; ?>>
+                                        <?php echo htmlspecialchars($am); ?>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Row 6: Submit button -->
+                        <button type="submit" name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
+                            class="btn-submit-form">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <?php echo $edit_room ? 'Update Room' : 'Add Room'; ?>
+                        </button>
+                    </form>
+                    </div><!-- /.form-card-body -->
+
+                </div>
+            </div><!-- /#room-form-wrap -->
+
+            <!-- ── Active / Archived toggle (mirrors Equipment Registry pattern) ── -->
+            <div class="history-toggle-wrap" id="rooms-toggle-wrap">
+                <button class="history-toggle-btn active" data-rooms-tab="rooms-active">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                    </svg>
+                    Active Rooms
+                </button>
+                <button class="history-toggle-btn" data-rooms-tab="rooms-archived">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <polyline points="21 8 21 21 3 21 3 8" />
+                        <rect x="1" y="3" width="22" height="5" />
+                        <line x1="10" y1="12" x2="14" y2="12" />
+                    </svg>
+                    Archived Rooms
+                    <?php if (!empty($rooms_archived)): ?>
+                        <span class="lnb-badge"><?php echo count($rooms_archived); ?></span>
+                    <?php endif; ?>
+                </button>
             </div>
 
-            <!-- Room Preview Cards -->
+            <!-- ── Active rooms sub-panel ──────────────────────────────── -->
+            <div class="rooms-sub-panel active" id="rooms-active-panel">
+
+            <!-- ── Live room list ───────────────────────────────────── -->
             <div class="room-list">
-                <!-- Room 1 -->
+<?php if (empty($rooms_list)): ?>
+                <p style="color:var(--text-light);font-size:0.87rem;padding:1.5rem 0;text-align:center;">
+                    No rooms in the registry yet. Click <strong>Add Room</strong> to get started.
+                </p>
+<?php else:
+    $prev_building_id = null;
+    foreach ($rooms_list as $room):
+        // Group header when building changes
+        if ($room['building_id'] !== $prev_building_id):
+            if ($prev_building_id !== null) echo '</div><!-- /.room-building-group -->';
+            $prev_building_id = $room['building_id'];
+?>
+                <div class="room-building-group" style="margin-bottom:1.5rem;">
+                    <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-light);margin:0 0 0.6rem;">
+                        <?php echo htmlspecialchars($room['campus_name'] . ' — ' . $room['building_name']); ?>
+                    </p>
+<?php   endif; ?>
+                <!-- Room card -->
                 <div class="room-card">
                     <div class="room-img">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <line x1="9" y1="3" x2="9" y2="21" />
                         </svg>
                     </div>
                     <div class="room-info">
                         <div class="room-header">
                             <div>
-                                <h3>Computer Laboratory 301</h3>
-                                <p>3rd Floor, Main Building</p>
+                                <h3><?php echo htmlspecialchars($room['room_name']); ?></h3>
+                                <p><?php
+                                    $fl = !empty($room['floor_label']) ? $room['floor_label'] : $room['floor_number'] . 'F';
+                                    echo htmlspecialchars($fl . ', ' . $room['building_name']);
+                                ?></p>
                             </div>
+                            <?php if ($room['seating_capacity'] !== null): ?>
                             <span class="capacity-badge">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -1644,151 +1914,128 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     style="margin-right:5px;vertical-align:middle;">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                                     <circle cx="9" cy="7" r="4" />
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                                 </svg>
-                                40 seats
+                                <?php echo (int)$room['seating_capacity']; ?> seats
                             </span>
+                            <?php endif; ?>
                         </div>
+                        <?php
+                        $amenities_arr = [];
+                        if (!empty($room['amenities'])) {
+                            $dec = json_decode($room['amenities'], true);
+                            if (is_array($dec)) $amenities_arr = $dec;
+                        }
+                        if (!empty($amenities_arr)): ?>
                         <div class="amenities" style="margin-top:8px;">
-                            <span>WiFi</span><span>A/C</span><span>Projector</span>
+                            <?php foreach ($amenities_arr as $am): ?>
+                                <span><?php echo htmlspecialchars($am); ?></span>
+                            <?php endforeach; ?>
                         </div>
-                        <div
-                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                            <span class="room-avail">
+                        <?php endif; ?>
+                        <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                            <?php
+                            $status_class = 'room-avail';
+                            if ($room['status'] === 'Maintenance')  $status_class = 'room-occupied';
+                            if ($room['status'] === 'Not Bookable') $status_class = 'room-occupied';
+                            ?>
+                            <span class="<?php echo $status_class; ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
                                     style="vertical-align:middle;margin-right:5px;">
                                     <circle cx="4" cy="4" r="4" fill="currentColor" />
                                 </svg>
-                                Available
+                                <?php echo htmlspecialchars($room['status']); ?>
                             </span>
-                            <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="14" height="14">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                </svg>
-                                Manage Schedule
-                            </button>
+                            <div style="display:flex;gap:6px;">
+                                <a href="admin-dashboard.php?tab=rooms&edit_room=<?php echo (int)$room['room_id']; ?>"
+                                    class="room-btn" style="text-decoration:none;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="14" height="14">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                    </svg>
+                                    Edit
+                                </a>
+                                <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
+                                    class="room-btn"
+                                    style="text-decoration:none;color:var(--danger);"
+                                    onclick="return confirm('Archive this room? It will be hidden from the registry.')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="14" height="14">
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6l-1 14H6L5 6" />
+                                        <path d="M10 11v6" /><path d="M14 11v6" />
+                                        <path d="M9 6V4h6v2" />
+                                    </svg>
+                                    Archive
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
+<?php endforeach;
+    if ($prev_building_id !== null) echo '</div><!-- /.room-building-group -->';
+endif; ?>
+            </div><!-- /.room-list -->
 
-                <!-- Room 2 -->
-                <div class="room-card">
-                    <div class="room-img">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
-                            <path d="M9 3h6" />
-                            <path d="M10 3v7l-5 11h14L14 10V3" />
-                        </svg>
-                    </div>
-                    <div class="room-info">
-                        <div class="room-header">
-                            <div>
-                                <h3>Science Laboratory</h3>
-                                <p>2nd Floor, Science Wing</p>
-                            </div>
-                            <span class="capacity-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="13" height="13"
-                                    style="margin-right:5px;vertical-align:middle;">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                    <circle cx="9" cy="7" r="4" />
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                </svg>
-                                30 seats
-                            </span>
-                        </div>
-                        <div class="amenities" style="margin-top:8px;">
-                            <span>A/C</span><span>Running Water</span><span>Safety Kit</span>
-                        </div>
-                        <div
-                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                            <span class="room-occupied">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
-                                    style="vertical-align:middle;margin-right:5px;">
-                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
-                                </svg>
-                                Occupied until 3 PM
-                            </span>
-                            <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="14" height="14">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                </svg>
-                                Manage Schedule
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            </div><!-- /#rooms-active-panel -->
 
-                <!-- Room 3 -->
-                <div class="room-card">
-                    <div class="room-img">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36">
-                            <rect x="2" y="3" width="20" height="14" rx="2" />
-                            <line x1="8" y1="21" x2="16" y2="21" />
-                            <line x1="12" y1="17" x2="12" y2="21" />
-                            <path d="M9 10l2 2 4-4" />
-                        </svg>
-                    </div>
-                    <div class="room-info">
-                        <div class="room-header">
-                            <div>
-                                <h3>Lecture Hall A</h3>
-                                <p>Ground Floor, Academic Building</p>
-                            </div>
-                            <span class="capacity-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="13" height="13"
-                                    style="margin-right:5px;vertical-align:middle;">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                    <circle cx="9" cy="7" r="4" />
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                </svg>
-                                80 seats
-                            </span>
-                        </div>
-                        <div class="amenities" style="margin-top:8px;">
-                            <span>WiFi</span><span>A/C</span><span>PA System</span><span>Projector</span>
-                        </div>
-                        <div
-                            style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                            <span class="room-avail">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8" width="7" height="7"
-                                    style="vertical-align:middle;margin-right:5px;">
-                                    <circle cx="4" cy="4" r="4" fill="currentColor" />
-                                </svg>
-                                Available
-                            </span>
-                            <button class="room-btn" data-action="toast" data-msg="Room management coming soon!">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="14" height="14">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                                    <line x1="16" y1="2" x2="16" y2="6" />
-                                    <line x1="8" y1="2" x2="8" y2="6" />
-                                    <line x1="3" y1="10" x2="21" y2="10" />
-                                </svg>
-                                Manage Schedule
-                            </button>
-                        </div>
+            <!-- ── Archived rooms sub-panel ────────────────────────────── -->
+            <div class="rooms-sub-panel" id="rooms-archived-panel">
+                <div class="eq-card">
+                    <div class="tbl-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Room Name</th>
+                                    <th>Location</th>
+                                    <th>Status (at archive)</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($rooms_archived)): ?>
+                                    <tr>
+                                        <td colspan="4" class="text-muted"
+                                            style="text-align:center;padding:2.5rem;">
+                                            No archived rooms.
+                                        </td>
+                                    </tr>
+                                <?php else: foreach ($rooms_archived as $ar):
+                                    $ar_floor = !empty($ar['floor_label']) ? $ar['floor_label'] : $ar['floor_number'] . 'F';
+                                ?>
+                                    <tr>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($ar['room_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($ar_floor . ', ' . $ar['building_name'] . ' — ' . $ar['campus_name']); ?></td>
+                                        <td>
+                                            <span class="stock-badge <?php echo $ar['status'] === 'Available' ? 'stock-avail' : 'stock-low'; ?>">
+                                                <?php echo htmlspecialchars($ar['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="action-cell">
+                                            <div class="action-btns">
+                                                <a href="admin-dashboard.php?restore_room=<?php echo (int)$ar['room_id']; ?>"
+                                                    class="btn-action btn-restore" title="Restore to active">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round"
+                                                        width="14" height="14">
+                                                        <polyline points="1 4 1 10 7 10" />
+                                                        <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                    </svg>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
+            </div><!-- /#rooms-archived-panel -->
+
         </div><!-- /panel-rooms -->
 
 

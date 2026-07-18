@@ -3,302 +3,18 @@
    Handles: campus selection, building carousel, building rooms view.
    Companion to fcty-facilities.php + fcty-facilities.css.
 
-   To add a building: push a new object into CAMPUS_DATA[key].buildings
-                      and add a matching entry in BUILDING_ROOMS.
-   To add a campus:   add a new key to CAMPUS_DATA and a card in the PHP.
+   Data source: room-reservation/api/get-facilities.php
+   CAMPUS_DATA and BUILDING_ROOMS are built from the API response
+   at runtime instead of being hardcoded.
 ================================================================ */
 (function () {
     'use strict';
 
     /* ══════════════════════════════════════════════════════════════
-       CAMPUS + BUILDING DATA
-       Each building entry references a key in BUILDING_ROOMS below.
+       CAMPUS + BUILDING DATA  — populated from API in loadFacilities()
     ══════════════════════════════════════════════════════════════ */
-    var CAMPUS_DATA = {
-
-        main: {
-            label: 'PUP MAIN',
-            buildings: [
-                {
-                    id: 'main-building-a',
-                    wing: 'South Wing',
-                    icon: 'domain',
-                    name: 'Building A (Old)',
-                    desc: 'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.',
-                    rooms: 22,
-                    floors: 5,
-                    image: 'assets/images/faculty/pup-main-building-a-image.jpg'
-                },
-                {
-                    id: 'main-building-b',
-                    wing: 'North Wing',
-                    icon: 'business',
-                    name: 'Building B (New)',
-                    desc: 'Modern laboratories, smart classrooms, and collaborative study spaces.',
-                    rooms: 68,
-                    floors: 6,
-                    image: 'assets/images/faculty/pup-main-building-b-image.jpg'
-                }
-                /* ── Add Building C / D / etc. below when ready ──
-                ,{
-                    id:     'main-building-c',
-                    wing:   'East Wing',
-                    icon:   'school',
-                    name:   'Building C',
-                    desc:   'Description here.',
-                    rooms:  0,
-                    floors: 0,
-                    image:  'assets/images/building-c.jpg'
-                }
-                */
-            ]
-        },
-
-        cite: {
-            label: 'PUP CITE',
-            buildings: [
-                {
-                    id: 'cite-main',
-                    wing: 'Main Block',
-                    icon: 'engineering',
-                    name: 'PUP CITE Building',
-                    desc: 'Technical laboratories, computer labs, and specialized engineering facilities spread across 4 floors.',
-                    rooms: 48,
-                    floors: 4,
-                    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDtmIfzajhkJcIVcLVAYPDyA499CI1o5QU8mNgrJN3N_7x6y-FDAz_IJ3WceWqelnR3N-2SPabLr_roNxvEt7_x7jCp8oqrqfasU0yRX8YhaTPzRRt2t8Xi-mjIkGsK-MPBqrdlZNZQ33UKvUCyyU8iHiD4622bQ1BeGiA6wExvcX_QXyzJvP3HoqLK8pzmTphoc-ZFxnFIHbvO0HE17vuxuO3fgVq2xBhQ6f79V8NYMAZxwmt5icsYW71bVKYSZHOXLi2FLYpcYg'
-                }
-                /* ── Add more CITE buildings here when ready ──
-                ,{
-                    id:     'cite-annex',
-                    wing:   'Annex',
-                    icon:   'science',
-                    name:   'CITE Annex',
-                    desc:   'Description here.',
-                    rooms:  0,
-                    floors: 0,
-                    image:  'assets/images/cite-annex.jpg'
-                }
-                */
-            ]
-        }
-
-    };
-
-    /* ══════════════════════════════════════════════════════════════
-       BUILDING ROOMS DATA
-       Keyed by building id (must match CAMPUS_DATA building.id).
-       metrics.total  — total room count
-       metrics.occupied   — rooms currently in use  (0 = none / TBD)
-       metrics.maintenance — rooms under maintenance (0 = none / TBD)
-       floors[].expanded  — true = accordion open on first load
-    ══════════════════════════════════════════════════════════════ */
-    var BUILDING_ROOMS = {
-
-        'cite-main': {
-            name: 'PUP CITE Building',
-            metrics: {
-                total: 48,
-                occupied: 0,
-                maintenance: 0
-            },
-            floors: [
-                {
-                    label: '1st Floor',
-                    expanded: true,
-                    rooms: [
-                        'Prayer Room',
-                        'Audiovisual Room',
-                        'Testing Area',
-                        'Student Organization Room',
-                        'Clinic Room',
-                        'Industrial Engineering Room',
-                        "Director's Office",
-                        'Basketball Court',
-                        'Room 103',
-                        'Room 105',
-                        'Room 106',
-                        'Room 116',
-                        'Room 118',
-                        'Room 119'
-                    ]
-                },
-                {
-                    label: '2nd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Admin Office',
-                        'Faculty Lounge',
-                        'AutoCAD & Multimedia Laboratory',
-                        'Computer Laboratory 1',
-                        'Computer Laboratory 2',
-                        'Computer Laboratory 3',
-                        'Ergonomics Room',
-                        'Digital Laboratory Room',
-                        'Dispensing Room',
-                        'Microprocessing Laboratory Room',
-                        'Room 203',
-                        'Room 210',
-                        'Room 212',
-                        'Room 218'
-                    ]
-                },
-                {
-                    label: '3rd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Library Room',
-                        'Library Extension Room',
-                        'Physics Room',
-                        'Room 301',
-                        'Room 302',
-                        'Room 303',
-                        'Room 304',
-                        'Room 305',
-                        'Room 307',
-                        'Room 308',
-                        'Room 309',
-                        'Room 310'
-                    ]
-                },
-                {
-                    label: '4th Floor',
-                    expanded: false,
-                    rooms: [
-                        'Chemistry Laboratory Room',
-                        'Student Lounge',
-                        'Room 401',
-                        'Room 402',
-                        'Room 403',
-                        'Room 405',
-                        'Room 406',
-                        'Room 415'
-                    ]
-                }
-            ]
-        }
-
-        ,
-
-        'main-building-a': {
-            name: 'Building A (Old)',
-            metrics: {
-                total: 22,
-                occupied: 0,
-                maintenance: 0
-            },
-            floors: [
-                {
-                    label: '1st Floor',
-                    expanded: true,
-                    rooms: [
-                        'Admin Office',
-                        'Registration Office',
-                        'OSAS Office',
-                        'Office 1',
-                        'Clinic',
-                        'Staff Room'
-                    ]
-                },
-                {
-                    label: '2nd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Room 201',
-                        'Room 202',
-                        'Room 203',
-                        'Room 204',
-                        'Room 205'
-                    ]
-                },
-                {
-                    label: '3rd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Room 301',
-                        'Room 302',
-                        'Room 303',
-                        'Room 304',
-                        'Room 305'
-                    ]
-                },
-                {
-                    label: '4th Floor',
-                    expanded: false,
-                    rooms: [
-                        'Org Room',
-                        'CSC Room',
-                        'AVR 2',
-                        'Computer Laboratory 1',
-                        'Computer Laboratory 2'
-                    ]
-                },
-                {
-                    label: '5th Floor',
-                    expanded: false,
-                    rooms: [
-                        'Chemistry Laboratory'
-                    ]
-                }
-            ]
-        }
-
-        ,
-
-        'main-building-b': {
-            name: 'Building A (Old)',
-            metrics: {
-                total: 17,
-                occupied: 0,
-                maintenance: 0
-            },
-            floors: [
-                {
-                    label: '1st Floor',
-                    expanded: true,
-                    rooms: [
-                        'Library',
-                        'Directors Office',
-                        'Faculty Room',
-                        'DO Office',
-                        'Guidance Office'
-                    ]
-                },
-                {
-                    label: '2nd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Research Room',
-                        'Room 202',
-                        'Room 203',
-                        'Room 204',
-                        'Room 205'
-                    ]
-                },
-                {
-                    label: '3rd Floor',
-                    expanded: false,
-                    rooms: [
-                        'Room 301',
-                        'Room 302',
-                        'Room 303',
-                        'Room 304',
-                        'Room 305'
-                    ]
-                },
-                {
-                    label: '4th Floor',
-                    expanded: false,
-                    rooms: [
-                        'Room 401',
-                        'Room 402',
-                        'AVR 1',
-                        'Room 405'
-                    ]
-                },
-            ]
-        }
-
-    };
+    var CAMPUS_DATA   = {};   // keyed by campus_key, e.g. 'main', 'cite'
+    var BUILDING_ROOMS = {};  // keyed by building_key, e.g. 'main-building-a'
 
     /* ══════════════════════════════════════════════════════════════
        ROOM SCHEDULE CONSTANTS
@@ -400,6 +116,7 @@
     var totalSlides = 0;
     var autoSlideTimer = null;
     var activeCampusKey = null;
+    var activeBuildingKey = null;   /* tracks which building is shown in VIEW 3 */
     var AUTO_SLIDE_MS = 5000;
 
     /* ── Build slide HTML string ─────────────────────────────────── */
@@ -468,24 +185,18 @@
 
     /* ── Single floor accordion HTML ────────────────────────────── */
 
-    /* DEMO-ONLY status pattern — for visual reference only.
-       Cycles through the five statuses from the Status Guide so every
-       floor shows a mix of colors. Replace with real reservation data
-       later by giving each room object in BUILDING_ROOMS a real
-       `status` field and reading it here instead of the cycle. */
-    var DEMO_ROOM_STATUS_CYCLE = [
-        'status-available',
-        'status-available',
-        'status-unavailable',
-        'status-pending',
-        'status-maintenance',
-        'status-static'
-    ];
+    /* Map DB status values to CSS chip classes */
+    var STATUS_CLASS_MAP = {
+        'Available':    'status-available',
+        'Maintenance':  'status-maintenance',
+        'Not Bookable': 'status-static'
+    };
 
     function buildFloorAccordionHTML(floor) {
-        var chipsHTML = floor.rooms.map(function (room, index) {
-            var statusClass = DEMO_ROOM_STATUS_CYCLE[index % DEMO_ROOM_STATUS_CYCLE.length];
-            return '<span class="fcty-room-chip ' + statusClass + '">' + room + '</span>';
+        var chipsHTML = floor.rooms.map(function (room) {
+            /* room is an object: { room_id, name, status, seating_capacity } */
+            var statusClass = STATUS_CLASS_MAP[room.status] || 'status-available';
+            return '<span class="fcty-room-chip ' + statusClass + '" data-room-id="' + room.room_id + '">' + room.name + '</span>';
         }).join('');
 
         var bodyClass = 'fcty-floor-body' + (floor.expanded ? ' open' : '');
@@ -665,7 +376,7 @@
     }
 
     /* ── Open the modal for a given room ──────────────────────────── */
-    function openRoomModal(roomName, locationLabel) {
+    function openRoomModal(roomName, locationLabel, roomObj) {
         var data = getRoomData(roomName);
         var today = new Date();
         var dayKey = DAY_KEYS[today.getDay()];
@@ -675,15 +386,24 @@
         modalLocation.textContent = locationLabel;
         modalTitle.textContent = roomName;
 
-        /* Availability indicator */
+        /* Availability indicator — use DB status when schedule data is absent */
         var available = isRoomAvailableNow(daySchedule);
-        modalAvailabilityBadge.className = 'fcty-availability-badge ' + (available ? 'available' : 'occupied');
-        modalAvailabilityText.textContent = available ? 'Available' : 'Occupied';
+        if (roomObj && roomObj.status === 'Maintenance') {
+            modalAvailabilityBadge.className = 'fcty-availability-badge occupied';
+            modalAvailabilityText.textContent = 'Maintenance';
+        } else if (roomObj && roomObj.status === 'Not Bookable') {
+            modalAvailabilityBadge.className = 'fcty-availability-badge occupied';
+            modalAvailabilityText.textContent = 'Not Bookable';
+        } else {
+            modalAvailabilityBadge.className = 'fcty-availability-badge ' + (available ? 'available' : 'occupied');
+            modalAvailabilityText.textContent = available ? 'Available' : 'Occupied';
+        }
 
-        /* Capacity */
-        modalCapacityValue.textContent = (data.capacity !== null && data.capacity !== undefined)
-            ? data.capacity
-            : '\u2014'; /* em dash placeholder */
+        /* Capacity — prefer DB value over ROOM_SCHEDULES */
+        var cap = (roomObj && roomObj.seating_capacity !== null && roomObj.seating_capacity !== undefined)
+            ? roomObj.seating_capacity
+            : (data.capacity !== null && data.capacity !== undefined ? data.capacity : null);
+        modalCapacityValue.textContent = cap !== null ? cap : '\u2014';
 
         /* Daily schedule */
         modalDayLabel.textContent = 'Today \u2014 ' + DAY_LABELS[today.getDay()];
@@ -905,6 +625,7 @@
 
     /* VIEW 3 — Floor + rooms view */
     function showRoomsView(buildingId, campusKey) {
+        activeBuildingKey = buildingId;
         var buildingData = BUILDING_ROOMS[buildingId];
 
         /* If no room data exists yet, fall back gracefully */
@@ -953,6 +674,72 @@
     }
 
     /* ══════════════════════════════════════════════════════════════
+       LOAD FACILITIES FROM API
+       Fetches campus/building/room data from get-facilities.php and
+       populates CAMPUS_DATA and BUILDING_ROOMS in the same shape the
+       rendering functions already expect.
+    ══════════════════════════════════════════════════════════════ */
+    function loadFacilities(callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'room-reservation/api/get-facilities.php', true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== 4) return;
+            if (xhr.status !== 200) {
+                console.error('[PUPSync Facilities] API error ' + xhr.status);
+                if (callback) callback(false);
+                return;
+            }
+            try {
+                var campuses = JSON.parse(xhr.responseText);
+                campuses.forEach(function (campus) {
+                    CAMPUS_DATA[campus.key] = {
+                        label:     campus.label,
+                        buildings: []
+                    };
+
+                    campus.buildings.forEach(function (b) {
+                        /* Shape expected by buildSlideHTML */
+                        CAMPUS_DATA[campus.key].buildings.push({
+                            id:     b.id,
+                            wing:   b.wing,
+                            icon:   b.icon,
+                            name:   b.name,
+                            desc:   b.desc,
+                            rooms:  b.rooms,
+                            floors: b.floors,
+                            image:  b.image
+                        });
+
+                        /* Shape expected by showRoomsView / renderMetrics / renderFloors */
+                        var maintenanceCount = 0;
+                        b.floor_data.forEach(function (f) {
+                            f.rooms.forEach(function (r) {
+                                if (r.status === 'Maintenance') maintenanceCount++;
+                            });
+                        });
+
+                        BUILDING_ROOMS[b.id] = {
+                            name: b.name,
+                            metrics: {
+                                total:       b.rooms,
+                                occupied:    0,          /* Phase 2: computed from reservations */
+                                maintenance: maintenanceCount
+                            },
+                            floors: b.floor_data   /* already { label, expanded, rooms:[{room_id,name,status,seating_capacity}] } */
+                        };
+                    });
+                });
+                if (callback) callback(true);
+            } catch (e) {
+                console.error('[PUPSync Facilities] JSON parse error', e);
+                if (callback) callback(false);
+            }
+        };
+        xhr.send();
+    }
+
+    /* ══════════════════════════════════════════════════════════════
        INIT
     ══════════════════════════════════════════════════════════════ */
     function init() {
@@ -995,6 +782,8 @@
         /* Guard — element not found means we're on a different page */
         if (!campusView) return;
 
+        /* ── Load live data from API, then wire campus card clicks ── */
+        loadFacilities(function () {
         /* ── Campus card clicks → VIEW 2 ─────────────────────── */
         document.querySelectorAll('[data-fcty-campus]').forEach(function (card) {
             card.addEventListener('click', function (e) {
@@ -1002,6 +791,7 @@
                 showBuildingView(this.dataset.fctyCampus);
             });
         });
+        }); /* end loadFacilities callback */
 
         /* ── Breadcrumb back (VIEW 2) → VIEW 1 ──────────────── */
         breadcrumbBack.addEventListener('click', function (e) {
@@ -1068,7 +858,19 @@
                 var buildingName = roomsHeroTitle.textContent.trim();
                 var locationLabel = buildingName + (floorLabel ? ' \u00b7 ' + floorLabel : '');
 
-                openRoomModal(chip.textContent.trim(), locationLabel);
+                /* Resolve room object from BUILDING_ROOMS for DB-sourced capacity/status */
+                var roomObj = null;
+                var roomId = parseInt(chip.dataset.roomId, 10);
+                if (activeBuildingKey && BUILDING_ROOMS[activeBuildingKey]) {
+                    var bData = BUILDING_ROOMS[activeBuildingKey];
+                    bData.floors.forEach(function (f) {
+                        f.rooms.forEach(function (r) {
+                            if (r.room_id === roomId) roomObj = r;
+                        });
+                    });
+                }
+
+                openRoomModal(chip.textContent.trim(), locationLabel, roomObj);
                 return;
             }
 
