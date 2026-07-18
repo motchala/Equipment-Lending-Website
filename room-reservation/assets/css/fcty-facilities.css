@@ -2302,3 +2302,130 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Inline Reservation Form Panel ───────────────────────────────────────── */
+#fcty-reservation-panel {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.fcty-res-form-wrap {
+    background: var(--color-surface, #fff);
+    border: 1px solid var(--color-outline-variant, #e5dbd8);
+    border-radius: var(--radius-xl, 16px);
+    overflow: hidden;
+}
+
+.fcty-res-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--color-primary-container, #800000) 0%, #5a0000 100%);
+}
+
+.fcty-res-form-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.fcty-res-close-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,.8);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    transition: color .15s;
+}
+.fcty-res-close-btn:hover { color: #fff; }
+
+.fcty-res-form-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.fcty-res-room-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .9rem;
+    color: var(--color-on-surface-variant);
+    margin: 0;
+}
+
+.fcty-res-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.fcty-res-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.fcty-res-label {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    color: var(--color-on-surface-variant);
+}
+
+.fcty-res-req {
+    color: var(--color-primary, #800000);
+}
+
+.fcty-res-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-outline-variant, #e5dbd8);
+    border-radius: 10px;
+    font-size: .9rem;
+    color: var(--color-on-surface);
+    background: var(--color-surface-container, #f5f0ef);
+    outline: none;
+    font-family: inherit;
+    transition: border-color .2s;
+    box-sizing: border-box;
+}
+.fcty-res-input:focus {
+    border-color: var(--color-primary, #800000);
+    box-shadow: 0 0 0 3px rgba(128,0,0,.12);
+}
+
+.fcty-res-form-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--color-outline-variant, #e5dbd8);
+    gap: 10px;
+}
+
+.fcty-res-error {
+    background: #fce4ec;
+    color: #c62828;
+    border-radius: 8px;
+    padding: 9px 13px;
+    font-size: .85rem;
+}
+
+.fcty-res-success {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-radius: 8px;
+    padding: 9px 13px;
+    font-size: .85rem;
+}

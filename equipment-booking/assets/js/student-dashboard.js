@@ -318,6 +318,7 @@ function initPortal() {
         const code = (document.getElementById('facultyCode')?.value || '').trim();
         const name = (document.getElementById('studentName')?.value || '').trim();
         const id = (document.getElementById('studentId')?.value || '').trim();
+        const actionType = (document.getElementById('actionType')?.value || 'borrow').trim();
 
         if (!code) { showPortalError('Please enter the faculty code.'); return; }
         if (!name) { showPortalError('Please enter your name.'); return; }
@@ -327,7 +328,12 @@ function initPortal() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Verifying…';
 
-        fetch('equipment-booking/api/verify-faculty-code.php', {
+        // Route to the correct verify endpoint based on action type
+        const verifyUrl = actionType === 'room'
+            ? 'room-reservation/api/verify-room-code.php'
+            : 'equipment-booking/api/verify-faculty-code.php';
+
+        fetch(verifyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code, student_name: name, student_id: id }),
@@ -340,15 +346,15 @@ function initPortal() {
                     showPortalError(data.error);
                     return;
                 }
-                // Store session and switch to dashboard (no redirect needed)
+                _verified = { ...data, student_name: name, student_id: id };
                 try {
-                    sessionStorage.setItem('pup_student_session', JSON.stringify({
-                        ...data, student_name: name, student_id: id,
-                    }));
+                    sessionStorage.setItem('pup_student_session', JSON.stringify(_verified));
                 } catch (e) { }
-                // Close modal, then flip screen
-                bootstrap.Modal.getOrCreateInstance(facultyCodeModal).hide();
-                window._pupShowDashboard();
+                if (actionType === 'room') {
+                    showStep2Room(_verified);
+                } else {
+                    showStep2(_verified);
+                }
             })
             .catch(() => {
                 btn.disabled = false;
@@ -415,6 +421,207 @@ function initPortal() {
                 btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
                 showPortalError('Network error. Please try again.');
             });
+    }
+            .then(data => {
+                if (data.error) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
+                    showPortalError(data.error);
+                    return;
+                }
+                const receipt = {
+                    student_name: _verified.student_name, student_id: _verified.student_id,
+                    faculty_name: _verified.faculty_name, equipment, room,
+                    borrow_date: borrow, return_date: ret,
+                    request_id: data.request_id, return_token: data.return_token,
+                };
+                _lastReceipt = receipt;
+                try { sessionStorage.setItem('pup_last_receipt', JSON.stringify(receipt)); } catch (e) { }
+                _verified = null;
+                showReceiptBanner(receipt);
+                showStep3(receipt);
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
+                showPortalError('Network error. Please try again.');
+            });
+    }
+
+    // ── Step 2 (Room): reservation form ─────────────────────────
+    function showStep2Room(data) {
+        clearPortalError();
+        const today   = new Date().toISOString().split('T')[0];
+        const roomOptions = data.rooms && data.rooms.length
+            ? data.rooms.map(r =>
+                `<option value="${escAttr(String(r.room_id))}"
+                    data-name="${escAttr(r.room_name)}"
+                    data-building="${escAttr(r.building_name)}"
+                    data-campus="${escAttr(r.campus_name)}"
+                    data-floor="${escAttr(r.floor_label)}">
+                    ${escHTML(r.campus_name)} › ${escHTML(r.building_name)} — ${escHTML(r.room_name)} (${escHTML(r.floor_label)})
+                </option>`
+              ).join('')
+            : '<option disabled>No rooms currently available</option>';
+
+        document.querySelector('.modal-header').innerHTML = `
+            <div>
+                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Reserve a Room</h5>
+                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Authorized by: <strong>${escHTML(data.faculty_name)}</strong></p>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
+
+        document.querySelector('.modal-body').innerHTML = `
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Room <span style="color:#c62828;">*</span></label>
+                <select class="form-select" id="reserveRoomId"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                    <option value="" disabled selected>Choose a room…</option>
+                    ${roomOptions}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Date <span style="color:#c62828;">*</span></label>
+                <input type="date" class="form-control" id="reserveDate" min="${today}" value="${today}"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col">
+                    <label class="form-label" style="font-weight:600;font-size:.875rem;">Start Time <span style="color:#c62828;">*</span></label>
+                    <input type="time" class="form-control" id="reserveStart" min="07:00" max="20:00" value="08:00"
+                        style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                </div>
+                <div class="col">
+                    <label class="form-label" style="font-weight:600;font-size:.875rem;">End Time <span style="color:#c62828;">*</span></label>
+                    <input type="time" class="form-control" id="reserveEnd" min="07:00" max="20:00" value="10:00"
+                        style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Purpose <span style="color:#c62828;">*</span></label>
+                <input type="text" class="form-control" id="reservePurpose" placeholder="e.g. Lecture, Lab Session, Group Study"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Number of Attendees</label>
+                <input type="number" class="form-control" id="reserveAttendees" min="1" value="1"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+            </div>`;
+
+        document.querySelector('.modal-footer').innerHTML = `
+            <button type="button" id="btnBackRoomStep1"
+                style="padding:10px 20px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;cursor:pointer;">
+                ← Back
+            </button>
+            <button type="button" id="btnSubmitRoom"
+                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;cursor:pointer;">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>
+                Reserve Room
+            </button>`;
+
+        document.getElementById('btnBackRoomStep1').addEventListener('click', showStep1);
+        document.getElementById('btnSubmitRoom').addEventListener('click', () => handleSubmitRoom(data));
+    }
+
+    // ── Step 3 (Room): success / decline receipt ─────────────────
+    function showStep3Room(result, formData) {
+        const isApproved = result.status === 'Approved';
+        const iconColor  = isApproved ? '#2e7d32' : '#c62828';
+        const iconName   = isApproved ? 'check_circle' : 'cancel';
+        const statusText = isApproved ? 'Reservation Approved!' : 'Reservation Declined';
+
+        document.querySelector('.modal-header').innerHTML = `
+            <div>
+                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">${escHTML(statusText)}</h5>
+                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Room reservation #${escHTML(String(result.reservation_id))}</p>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
+
+        document.querySelector('.modal-body').innerHTML = `
+            <div style="text-align:center;padding:12px 0 16px;">
+                <span class="material-symbols-outlined" style="font-size:44px;color:${iconColor};display:block;margin-bottom:8px;">${iconName}</span>
+                <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">${escHTML(statusText)}</p>
+                ${result.reason ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">${escHTML(result.reason)}</p>` : ''}
+            </div>
+            <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;line-height:2;">
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Student</span><strong>${escHTML(formData.student_name)} · ${escHTML(formData.student_id)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Authorized by</span><strong>${escHTML(formData.faculty_name)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Room</span><strong>${escHTML(result.room_name)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Date</span><strong>${escHTML(formData.reservation_date)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Time</span><strong>${escHTML(formData.start_time)} – ${escHTML(formData.end_time)}</strong></div>
+                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Purpose</span><strong>${escHTML(formData.purpose)}</strong></div>
+            </div>`;
+
+        document.querySelector('.modal-footer').innerHTML = `
+            <button type="button" class="btn" data-bs-dismiss="modal"
+                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;width:100%;">
+                Done
+            </button>`;
+    }
+
+    // ── Submit room reservation (student portal) ─────────────────
+    function handleSubmitRoom(verifiedData) {
+        clearPortalError();
+        if (!_verified) { showPortalError('Session expired. Please go back and verify again.'); return; }
+
+        const roomIdStr  = (document.getElementById('reserveRoomId')?.value  || '').trim();
+        const date       = (document.getElementById('reserveDate')?.value     || '').trim();
+        const start      = (document.getElementById('reserveStart')?.value    || '').trim();
+        const end        = (document.getElementById('reserveEnd')?.value      || '').trim();
+        const purpose    = (document.getElementById('reservePurpose')?.value  || '').trim();
+        const attendees  = parseInt(document.getElementById('reserveAttendees')?.value || '1', 10);
+
+        if (!roomIdStr)   { showPortalError('Please select a room.');          return; }
+        if (!date)        { showPortalError('Please select a date.');           return; }
+        if (!start)       { showPortalError('Please select a start time.');     return; }
+        if (!end)         { showPortalError('Please select an end time.');      return; }
+        if (end <= start) { showPortalError('End time must be after start time.'); return; }
+        if (!purpose)     { showPortalError('Please enter the purpose.');       return; }
+
+        // Get room_name from selected option
+        const roomSel  = document.getElementById('reserveRoomId');
+        const selOpt   = roomSel?.options[roomSel.selectedIndex];
+        const roomName = selOpt?.dataset.name || '';
+
+        const btn = document.getElementById('btnSubmitRoom');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…'; }
+
+        fetch('room-reservation/api/submit-student-reserve.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code_db_id:       _verified.code_db_id,
+                faculty_id:       _verified.faculty_id,
+                faculty_name:     _verified.faculty_name,
+                student_name:     _verified.student_name,
+                student_id:       _verified.student_id,
+                room_id:          parseInt(roomIdStr, 10),
+                reservation_date: date,
+                start_time:       start,
+                end_time:         end,
+                purpose,
+                attendees,
+            }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>Reserve Room'; }
+            if (data.error) { showPortalError(data.error); return; }
+            _verified = null;
+            showStep3Room(data, {
+                student_name:     _verified?.student_name  || verifiedData.student_name,
+                student_id:       _verified?.student_id    || verifiedData.student_id,
+                faculty_name:     verifiedData.faculty_name,
+                reservation_date: date,
+                start_time:       start,
+                end_time:         end,
+                purpose,
+            });
+        })
+        .catch(() => {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>Reserve Room'; }
+            showPortalError('Network error. Please try again.');
+        });
     }
 } // end initPortal
 

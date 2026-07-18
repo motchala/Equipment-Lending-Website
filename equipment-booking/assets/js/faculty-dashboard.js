@@ -1480,6 +1480,35 @@
         });
     });
 
+    /* ── Rooms sub-nav (Browse Facilities | My Reservations) ─────────── */
+    function switchRoomsSub(subName) {
+        const sub = document.getElementById('rooms-' + subName);
+        if (sub) sub.classList.add('active');
+        document.querySelectorAll('[data-rooms-nav]').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('[data-rooms-nav="' + subName + '"]');
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#panel-rooms .lending-sub').forEach(s => {
+            if (s !== sub) s.classList.remove('active');
+        });
+    }
+
+    document.querySelectorAll('[data-rooms-nav]').forEach(btn => {
+        btn.addEventListener('click', function () {
+            switchRoomsSub(this.dataset.roomsNav);
+        });
+    });
+
+    /* ── Room reservations status filter ─────────────────────────────── */
+    const roomResFilter = document.getElementById('roomResStatusFilter');
+    if (roomResFilter) {
+        roomResFilter.addEventListener('change', function () {
+            const val = this.value;
+            document.querySelectorAll('#roomReservationsTbody tr[data-rr-status]').forEach(row => {
+                row.style.display = (val === 'All' || row.dataset.rrStatus === val) ? '' : 'none';
+            });
+        });
+    }
+
     /* ── Account sub-nav — removed in unified settings card layout ──────── */
     // document.querySelectorAll('.acc-nav-btn').forEach(btn => {
     //     btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });

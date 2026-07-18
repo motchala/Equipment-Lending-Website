@@ -987,4 +987,309 @@ class ArbitrationEngine
             );
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ROOM RESERVATION ARBITRATION
+    // Same engine, different entry point. Reuses all private helpers above.
+    // No inventory to decrement — conflict is determined by time overlap.
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Evaluate a single room reservation and write the decision.
+     *
+     * Called synchronously after a new tbl_room_reservations row is inserted
+     * (status defaults to 'Approved' — this method may flip it to 'Declined').
+     *
+     * Decision flow:
+     *  1.  Load config
+     *  2.  Fetch reservation + room + borrower data
+     *  3.  Pre-flight: overdue block (checks tbl_requests for equipment overdue)
+     *  4.  Pre-flight: room status check (Maintenance / Not Bookable → Declined)
+     *  5.  Document check (Adviser without doc → Declined immediately for rooms,
+     *      unlike equipment where it holds as Waiting — rooms have no stock queue)
+     *  6.  Time conflict check + FIFO/priority scoring
+     *  7.  Write decision + log
+     *
+     * @param mysqli $conn           Active DB connection
+     * @param int    $reservation_id PK of the tbl_room_reservations row
+     */
+    public static function processRoomReservation(mysqli $conn, int $reservation_id): void
+    {
+        try {
+            // ── Step 1: Load config ──────────────────────────────────────────
+            $config = self::loadConfig($conn);
+
+            // ── Step 2: Fetch reservation + room + borrower ──────────────────
+            $stmt = $conn->prepare(
+                "SELECT rr.*,
+                        r.room_name, r.status AS room_status,
+                        u.role
+                   FROM tbl_room_reservations rr
+                   JOIN tbl_rooms r ON r.room_id = rr.room_id
+                   LEFT JOIN tbl_users u ON u.faculty_id = rr.faculty_id
+                  WHERE rr.id = ?
+                  LIMIT 1"
+            );
+            if ($stmt === false) return;
+            $stmt->bind_param('i', $reservation_id);
+            $stmt->execute();
+            $reservation = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if ($reservation === null) {
+                error_log('ArbitrationEngine::processRoomReservation — not found: id=' . $reservation_id);
+                return;
+            }
+
+            $faculty_id   = (string)$reservation['faculty_id'];
+            $room_id      = (int)$reservation['room_id'];
+            $room_name    = (string)$reservation['room_name'];
+            $res_date     = (string)$reservation['reservation_date'];
+            $start_time   = (string)$reservation['start_time'];
+            $end_time     = (string)$reservation['end_time'];
+
+            // ── Step 3: Overdue block ────────────────────────────────────────
+            // Checks tbl_requests (equipment overdue) — same rule applies to rooms.
+            if (($config['rule_overdue_block_enabled'] ?? '0') === '1') {
+                if (self::checkOverdueBlock($conn, $faculty_id)) {
+                    self::writeRoomDecision(
+                        $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                        (string)$reservation['faculty_name'],
+                        'Declined', self::RULE_OVERDUE_BLOCK,
+                        'You have an overdue equipment item. Please return it before making a room reservation.'
+                    );
+                    return;
+                }
+            }
+
+            // ── Step 4: Room status check ────────────────────────────────────
+            $room_status = (string)$reservation['room_status'];
+            if ($room_status === 'Maintenance') {
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', self::RULE_ARCHIVED,
+                    'This room is currently under maintenance and cannot be reserved.'
+                );
+                return;
+            }
+            if ($room_status === 'Not Bookable') {
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', self::RULE_ARCHIVED,
+                    'This room is not available for reservation.'
+                );
+                return;
+            }
+
+            // ── Step 4b: Operating hours check ──────────────────────────────
+            if (!self::checkOperatingHours($start_time, $end_time)) {
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', self::RULE_ARCHIVED,
+                    'Reservations must be within operating hours: 7:00 AM to 8:00 PM.'
+                );
+                return;
+            }
+
+            // ── Step 5: Missing document check ───────────────────────────────
+            // Rooms have no stock queue — Adviser without document → Declined immediately            // (unlike equipment, which holds as Waiting until the document arrives).
+            $hold_note = self::checkMissingDocument($reservation, $config);
+            if ($hold_note !== null) {
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', self::RULE_MISSING_DOC_HOLD,
+                    $hold_note
+                );
+                return;
+            }
+
+            // ── Step 6: Time conflict check + FIFO/priority scoring ──────────
+            // Fetch all Approved reservations for this room/date that overlap
+            // the requested time window (strict inequality — adjacency is allowed).
+            $conflict_stmt = $conn->prepare(
+                "SELECT rr.*, u.role
+                   FROM tbl_room_reservations rr
+                   LEFT JOIN tbl_users u ON u.faculty_id = rr.faculty_id
+                  WHERE rr.room_id          = ?
+                    AND rr.reservation_date = ?
+                    AND rr.start_time       < ?
+                    AND rr.end_time         > ?
+                    AND rr.status           = 'Approved'
+                    AND rr.id              != ?
+                  ORDER BY rr.request_date ASC, rr.id ASC"
+            );
+            if ($conflict_stmt === false) return;
+            $conflict_stmt->bind_param('isssi', $room_id, $res_date, $end_time, $start_time, $reservation_id);
+            $conflict_stmt->execute();
+            $conflict_result = $conflict_stmt->get_result();
+            $conflicts       = [];
+            while ($row = $conflict_result->fetch_assoc()) {
+                $conflicts[] = $row;
+            }
+            $conflict_stmt->close();
+
+            if (empty($conflicts)) {
+                // No conflict — approve immediately.
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Approved', self::RULE_1_FIFO,
+                    'Room reservation approved — no time conflict.'
+                );
+                return;
+            }
+
+            // Conflict exists — run FIFO + priority scoring to decide winner.
+            $tie_break_window = (int)($config['tie_break_window_seconds'] ?? 5);
+
+            // Build competing set: all Approved conflicts + this new reservation.
+            $competing = $conflicts;
+            $competing[] = $reservation; // add the new one
+
+            foreach ($competing as &$req) {
+                $req['has_overdue']  = self::checkOverdueBlock($conn, (string)$req['faculty_id']);
+                $doc_path            = (string)($req['document_path'] ?? '');
+                $signatory_level     = $doc_path !== '' ? self::validateDocument($doc_path) : 0;
+                $req['_score']       = self::computePriorityScore($req, $config, $signatory_level);
+            }
+            unset($req);
+
+            $earliest_date = !empty($competing) ? strtotime((string)$competing[0]['request_date']) : 0;
+
+            usort($competing, function (array $a, array $b) use ($earliest_date, $tie_break_window): int {
+                $a_time = strtotime((string)$a['request_date']);
+                $b_time = strtotime((string)$b['request_date']);
+                $a_in   = ($a_time - $earliest_date) <= $tie_break_window;
+                $b_in   = ($b_time - $earliest_date) <= $tie_break_window;
+
+                if ($a_in && $b_in) {
+                    $sa = $a['_score'];
+                    $sb = $b['_score'];
+                    if ($sa['signatory'] !== $sb['signatory']) return $sb['signatory'] - $sa['signatory'];
+                    if ($sa['role']      !== $sb['role'])      return $sb['role']      - $sa['role'];
+                    $ao = $sa['has_overdue'] ? 1 : 0;
+                    $bo = $sb['has_overdue'] ? 1 : 0;
+                    if ($ao !== $bo) return $ao - $bo;
+                    return $sa['id'] - $sb['id'];
+                }
+                if ($a_in && !$b_in) return -1;
+                if (!$a_in && $b_in) return 1;
+                if ($a_time !== $b_time) return $a_time - $b_time;
+                return (int)$a['id'] - (int)$b['id'];
+            });
+
+            $winner = !empty($competing) ? $competing[0] : null;
+
+            // Determine applied rule
+            $applied_rule = self::RULE_1_FIFO;
+            if ($winner !== null && count($competing) > 1) {
+                $second    = $competing[1];
+                $w_time    = strtotime((string)$winner['request_date']);
+                $s_time    = strtotime((string)$second['request_date']);
+                $in_window = abs($w_time - $s_time) <= $tie_break_window;
+                if ($in_window) {
+                    $ws = $winner['_score'];
+                    $ss = $second['_score'];
+                    if ($ws['signatory'] !== $ss['signatory'])                             $applied_rule = self::RULE_2_SIGNATORY;
+                    elseif ($ws['role'] !== $ss['role'])                                   $applied_rule = self::RULE_3_ROLE;
+                    elseif (($ws['has_overdue'] ? 1 : 0) !== ($ss['has_overdue'] ? 1 : 0)) $applied_rule = self::RULE_4_RETURN_HISTORY;
+                    else                                                                    $applied_rule = self::RULE_5_ID_ORDER;
+                }
+            }
+
+            $current_is_winner = ($winner !== null && (int)$winner['id'] === $reservation_id);
+
+            if ($current_is_winner) {
+                // This reservation beats all conflicts — decline the losers.
+                foreach ($conflicts as $loser) {
+                    self::writeRoomDecision(
+                        $conn, (int)$loser['id'], $room_id, $room_name,
+                        (string)$loser['faculty_id'], (string)$loser['faculty_name'],
+                        'Declined', $applied_rule,
+                        'A higher-priority reservation was submitted for the same time slot.'
+                    );
+                }
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Approved', $applied_rule,
+                    'Room reservation approved via priority scoring.'
+                );
+            } else {
+                // A higher-priority reservation already holds this slot.
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', $applied_rule,
+                    'This time slot is already reserved by a higher-priority request.'
+                );
+            }
+
+        } catch (\Throwable $e) {
+            error_log(
+                'ArbitrationEngine::processRoomReservation — unexpected error for reservation_id='
+                . $reservation_id . ': ' . $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Return true if both times fall within operating hours (07:00–20:00).
+     * Uses string comparison — valid for 'HH:MM' or 'HH:MM:SS' TIME values.
+     *
+     * @param  string $start_time  'HH:MM' or 'HH:MM:SS'
+     * @param  string $end_time    'HH:MM' or 'HH:MM:SS'
+     * @return bool
+     */
+    private static function checkOperatingHours(string $start_time, string $end_time): bool
+    {
+        // Normalise to 'HH:MM' for reliable string comparison
+        $start = substr($start_time, 0, 5);
+        $end   = substr($end_time,   0, 5);
+        return $start >= '07:00' && $end <= '20:00';
+    }
+
+    /**
+     * Write a room reservation decision: UPDATE tbl_room_reservations + INSERT log.
+     */
+    private static function writeRoomDecision(
+        mysqli $conn,
+        int    $reservation_id,
+        int    $room_id,
+        string $room_name,
+        string $borrower_id,
+        string $borrower_name,
+        string $decision,
+        string $rule,
+        string $reason
+    ): void {
+        $upd = $conn->prepare(
+            "UPDATE tbl_room_reservations SET status = ?, reason = ? WHERE id = ?"
+        );
+        if ($upd !== false) {
+            $upd->bind_param('ssi', $decision, $reason, $reservation_id);
+            $upd->execute();
+            $upd->close();
+        }
+
+        $log = $conn->prepare(
+            "INSERT INTO tbl_room_arbitration_log
+               (reservation_id, room_id, room_name, borrower_id, borrower_name,
+                decision, rule_applied, reason)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+        if ($log !== false) {
+            $log->bind_param('iissssss',
+                $reservation_id, $room_id, $room_name,
+                $borrower_id, $borrower_name,
+                $decision, $rule, $reason
+            );
+            $log->execute();
+            $log->close();
+        }
+    }
 }

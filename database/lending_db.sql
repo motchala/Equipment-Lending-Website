@@ -765,3 +765,57 @@ VALUES
 (3, 'Room 405',                  4, '4th Floor', 'Available',    6),
 (3, 'Room 406',                  4, '4th Floor', 'Available',    7),
 (3, 'Room 415',                  4, '4th Floor', 'Available',    8);
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ROOM RESERVATION PHASE 2 MIGRATION
+-- Replaces the placeholder tbl_room_reservations with a schema that supports:
+--   - room_id FK, start_time/end_time (TIME), submitted_as, document_path
+--   - Approved/Declined only (no Waiting/Pending)
+-- Adds tbl_room_arbitration_log for engine audit trail.
+-- Fully idempotent — safe to run on an existing lending_db.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Drop placeholder table (no live data in Phase 1)
+DROP TABLE IF EXISTS `tbl_room_reservations`;
+
+-- ── tbl_room_reservations (Phase 2 schema) ────────────────────────────────
+CREATE TABLE `tbl_room_reservations` (
+  `id`                int(11)       NOT NULL AUTO_INCREMENT,
+  `room_id`           int(11)       NOT NULL,
+  `faculty_id`        varchar(50)   NOT NULL,
+  `faculty_name`      varchar(100)  NOT NULL,
+  `submitted_as`      varchar(20)   NOT NULL DEFAULT 'personal',
+  `submitted_by_name` varchar(100)  DEFAULT NULL,
+  `submitted_by_id`   varchar(50)   DEFAULT NULL,
+  `purpose`           varchar(200)  NOT NULL,
+  `attendees`         smallint(5)   NOT NULL DEFAULT 1,
+  `reservation_date`  date          NOT NULL,
+  `start_time`        time          NOT NULL,
+  `end_time`          time          NOT NULL,
+  `notes`             text          DEFAULT NULL,
+  `document_path`     varchar(255)  DEFAULT NULL,
+  `status`            enum('Approved','Declined') NOT NULL DEFAULT 'Approved',
+  `reason`            varchar(255)  DEFAULT NULL,
+  `request_date`      datetime      DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_room_date` (`room_id`, `reservation_date`),
+  CONSTRAINT `fk_rr_room`
+    FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ── tbl_room_arbitration_log ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `tbl_room_arbitration_log` (
+  `id`              int(11)       NOT NULL AUTO_INCREMENT,
+  `reservation_id`  int(11)       NOT NULL,
+  `room_id`         int(11)       NOT NULL,
+  `room_name`       varchar(100)  NOT NULL,
+  `borrower_id`     varchar(50)   NOT NULL,
+  `borrower_name`   varchar(100)  NOT NULL,
+  `decision`        varchar(20)   NOT NULL,
+  `rule_applied`    varchar(60)   NOT NULL,
+  `reason`          varchar(255)  DEFAULT NULL,
+  `created_at`      datetime      DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_reservation_id` (`reservation_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
