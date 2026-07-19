@@ -1842,7 +1842,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
             </div><!-- /#room-form-wrap -->
 
-            <!-- ── Active / Archived toggle (mirrors Equipment Registry pattern) ── -->
+            <!-- ── Active / Archived / Reservations toggle ─────────────── -->
             <div class="history-toggle-wrap" id="rooms-toggle-wrap">
                 <button class="history-toggle-btn active" data-rooms-tab="rooms-active">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1862,6 +1862,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     Archived Rooms
                     <?php if (!empty($rooms_archived)): ?>
                         <span class="lnb-badge"><?php echo count($rooms_archived); ?></span>
+                    <?php endif; ?>
+                </button>
+                <button class="history-toggle-btn" data-rooms-tab="rooms-reservations">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    Reservations
+                    <?php if (!empty($admin_room_reservations)): ?>
+                        <span class="lnb-badge"><?php echo count($admin_room_reservations); ?></span>
                     <?php endif; ?>
                 </button>
             </div>
@@ -2035,6 +2048,65 @@ endif; ?>
                     </div>
                 </div>
             </div><!-- /#rooms-archived-panel -->
+
+            <!-- ── All Reservations sub-panel (read-only) ──────────────────── -->
+            <div class="rooms-sub-panel" id="rooms-reservations-panel">
+                <div class="eq-card">
+                    <div class="page-header-block" style="padding:1rem 1.2rem .5rem;">
+                        <p class="page-subtitle">All room reservations across all faculty and rooms. Read-only — override and cancellation controls are planned for Phase 3.</p>
+                    </div>
+                    <div class="tbl-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Room</th>
+                                    <th>Location</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Faculty</th>
+                                    <th>Submitted As</th>
+                                    <th>Purpose</th>
+                                    <th>Status</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($admin_room_reservations)): ?>
+                                    <tr>
+                                        <td colspan="10" class="text-muted" style="text-align:center;padding:2.5rem;">No reservations yet.</td>
+                                    </tr>
+                                <?php else: foreach ($admin_room_reservations as $ar):
+                                    $ar_pill = 'pill-approved';
+                                    if ($ar['status'] === 'Declined') $ar_pill = 'pill-declined';
+
+                                    $ar_submitted = match($ar['submitted_as']) {
+                                        'adviser' => 'Adviser',
+                                        'student' => 'Student (via code)',
+                                        default   => 'Personal',
+                                    };
+                                    $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
+                                        ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
+                                        : htmlspecialchars($ar['faculty_name']);
+                                ?>
+                                    <tr>
+                                        <td class="text-muted" style="font-size:.78rem;">#<?php echo (int)$ar['id']; ?></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($ar['room_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($ar['floor_label'] . ', ' . $ar['building_name']); ?></td>
+                                        <td><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></td>
+                                        <td style="white-space:nowrap;"><?php echo htmlspecialchars($ar['start_fmt'] . ' – ' . $ar['end_fmt']); ?></td>
+                                        <td><?php echo $ar_who; ?></td>
+                                        <td><?php echo htmlspecialchars($ar_submitted); ?></td>
+                                        <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
+                                        <td><span class="status-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
+                                        <td style="color:var(--text-light);font-size:.78rem;"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /#rooms-reservations-panel -->
 
         </div><!-- /panel-rooms -->
 

@@ -309,8 +309,7 @@ foreach ($rooms_list as $r) {
 }
 
 // Archived rooms (for the Archived sub-panel)
-$rooms_archived_result = $conn->query(
-    "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label,
+$rooms_archived_result = $conn->query(    "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label,
             r.status, b.name AS building_name, c.campus_name
      FROM tbl_rooms r
      JOIN tbl_buildings b ON b.building_id = r.building_id
@@ -323,5 +322,30 @@ $rooms_archived = [];
 if ($rooms_archived_result) {
     while ($row = $rooms_archived_result->fetch_assoc()) {
         $rooms_archived[] = $row;
+    }
+}
+
+// ── All room reservations (admin read-only view) ──────────────────────────
+$admin_room_reservations_result = $conn->query(
+    "SELECT rr.id, rr.reservation_date,
+            TIME_FORMAT(rr.start_time, '%h:%i %p') AS start_fmt,
+            TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,
+            rr.faculty_name, rr.submitted_as, rr.submitted_by_name,
+            rr.purpose, rr.attendees, rr.status, rr.reason,
+            rr.request_date,
+            r.room_name,
+            b.name AS building_name,
+            COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label,
+            c.campus_name
+       FROM tbl_room_reservations rr
+       JOIN tbl_rooms     r ON r.room_id     = rr.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+       JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
+      ORDER BY rr.reservation_date DESC, rr.start_time ASC"
+);
+$admin_room_reservations = [];
+if ($admin_room_reservations_result) {
+    while ($row = $admin_room_reservations_result->fetch_assoc()) {
+        $admin_room_reservations[] = $row;
     }
 }

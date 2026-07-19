@@ -2205,7 +2205,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                     <select id="roomResStatusFilter" class="req-filter-select"
                                         data-action="filter-room-reservations">
                                         <option value="All">All Statuses</option>
-                                        <option value="Approved">Approved</option>
+                                        <option value="Approved" selected>Approved</option>
                                         <option value="Declined">Declined</option>
                                     </select>
                                 </div>

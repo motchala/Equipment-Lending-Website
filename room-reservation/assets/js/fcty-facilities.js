@@ -119,6 +119,11 @@
     var activeBuildingKey = null;   /* tracks which building is shown in VIEW 3 */
     var AUTO_SLIDE_MS = 5000;
 
+    /* ── Current room context — set in openRoomModal so the Reserve
+       button click handler in init() can read the full roomObj even
+       after openRoomModal() has returned.                             */
+    var _currentRoomObj = null;
+
     /* ── Build slide HTML string ─────────────────────────────────── */
     function buildSlideHTML(building, index) {
         return [
@@ -377,6 +382,10 @@
 
     /* ── Open the modal for a given room ──────────────────────────── */
     function openRoomModal(roomName, locationLabel, roomObj) {
+        /* Store in module-level variable so the Reserve button handler
+           in init() can access the full roomObj after this call returns. */
+        _currentRoomObj = roomObj || null;
+
         /* Header */
         modalLocation.textContent = locationLabel;
         modalTitle.textContent = roomName;
@@ -728,13 +737,29 @@
        Shown after clicking "Reserve Room" in the modal.
        Injected into #fcty-reservation-panel (added in fcty-facilities.php).
     ══════════════════════════════════════════════════════════════ */
-    function openReservationForm(roomId, roomName) {
+    function openReservationForm(roomId, roomName, roomObj, prefill) {
+        /* roomObj  — the full room object (has room_id, status, etc.) — passed
+                      through so the Back button can reopen the modal correctly.
+           prefill  — { date, start, end, purpose, attendees } or null (first open) */
         var panel = document.getElementById('fcty-reservation-panel');
         if (!panel) return;
 
-        var today    = new Date().toISOString().split('T')[0];
-        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var today     = new Date().toISOString().split('T')[0];
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+        /* Capture current modal location label so Back can reopen with correct header */
+        var locationLabel = (modalLocation && modalLocation.textContent) ? modalLocation.textContent : '';
+
+        /* Pre-fill values — use previous input if provided, otherwise defaults */
+        var pDate      = (prefill && prefill.date)      ? prefill.date      : today;
+        var pStart     = (prefill && prefill.start)     ? prefill.start     : '08:00';
+        var pEnd       = (prefill && prefill.end)       ? prefill.end       : '10:00';
+        var pPurpose   = (prefill && prefill.purpose)   ? prefill.purpose   : '';
+        var pAttendees = (prefill && prefill.attendees) ? prefill.attendees : '1';
+
+        /* Track last submission outcome for Back-button prefill logic */
+        var lastSubmitWasDeclined = false;
 
         panel.innerHTML = [
             '<div class="fcty-res-form-wrap">',
@@ -757,25 +782,25 @@
 
             '  <div class="fcty-res-field">',
             '    <label class="fcty-res-label">Date <span class="fcty-res-req">*</span></label>',
-            '    <input type="date" id="fcty-res-date" class="fcty-res-input" min="' + today + '" value="' + today + '">',
+            '    <input type="date" id="fcty-res-date" class="fcty-res-input" min="' + today + '" value="' + escFcty(pDate) + '">',
             '  </div>',
             '  <div class="fcty-res-row">',
             '    <div class="fcty-res-field">',
             '      <label class="fcty-res-label">Start Time <span class="fcty-res-req">*</span></label>',
-            '      <input type="time" id="fcty-res-start" class="fcty-res-input" min="07:00" max="20:00" value="08:00">',
+            '      <input type="time" id="fcty-res-start" class="fcty-res-input" min="07:00" max="20:00" value="' + escFcty(pStart) + '">',
             '    </div>',
             '    <div class="fcty-res-field">',
             '      <label class="fcty-res-label">End Time <span class="fcty-res-req">*</span></label>',
-            '      <input type="time" id="fcty-res-end" class="fcty-res-input" min="07:00" max="20:00" value="10:00">',
+            '      <input type="time" id="fcty-res-end" class="fcty-res-input" min="07:00" max="20:00" value="' + escFcty(pEnd) + '">',
             '    </div>',
             '  </div>',
             '  <div class="fcty-res-field">',
             '    <label class="fcty-res-label">Purpose <span class="fcty-res-req">*</span></label>',
-            '    <input type="text" id="fcty-res-purpose" class="fcty-res-input" placeholder="e.g. Lecture, Lab Session, Meeting">',
+            '    <input type="text" id="fcty-res-purpose" class="fcty-res-input" placeholder="e.g. Lecture, Lab Session, Meeting" value="' + escFcty(pPurpose) + '">',
             '  </div>',
             '  <div class="fcty-res-field">',
             '    <label class="fcty-res-label">Number of Attendees</label>',
-            '    <input type="number" id="fcty-res-attendees" class="fcty-res-input" min="1" value="1">',
+            '    <input type="number" id="fcty-res-attendees" class="fcty-res-input" min="1" value="' + escFcty(pAttendees) + '">',
             '  </div>',
             '  <div class="fcty-res-field">',
             '    <label class="fcty-res-label">Notes <span style="font-size:.75rem;font-weight:400;">(optional)</span></label>',
@@ -794,16 +819,39 @@
         ].join('');
 
         panel.style.display = '';
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        /* Defer scroll until the next frame so the browser has committed
+           the layout change (display:none → block) before measuring position.
+           scrollIntoView fired synchronously can miss the element if the
+           scroll container (.app-main) hasn't reflowed yet.               */
+        requestAnimationFrame(function () {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
 
         document.getElementById('fcty-res-close').addEventListener('click', closeReservationForm);
+
         document.getElementById('fcty-res-back').addEventListener('click', function () {
+            /* Capture current form values before closing */
+            var currentPrefill = {
+                date:      document.getElementById('fcty-res-date')?.value      || '',
+                start:     document.getElementById('fcty-res-start')?.value     || '',
+                end:       document.getElementById('fcty-res-end')?.value       || '',
+                purpose:   document.getElementById('fcty-res-purpose')?.value   || '',
+                attendees: document.getElementById('fcty-res-attendees')?.value || '1',
+            };
             closeReservationForm();
-            openRoomModal(roomName, '', null);
+            /* Reopen modal with the original roomObj so the schedule fetch works */
+            openRoomModal(roomName, locationLabel, roomObj);
+            /* After a Decline, immediately reopen the form pre-filled so the
+               user can adjust the time and try again without retyping */
+            if (lastSubmitWasDeclined) {
+                openReservationForm(roomId, roomName, roomObj, currentPrefill);
+            }
         });
 
         document.getElementById('fcty-res-submit').addEventListener('click', function () {
-            _submitFacultyReservation(roomId, roomName, csrfToken);
+            _submitFacultyReservation(roomId, roomName, roomObj, csrfToken, function (wasDeclined) {
+                lastSubmitWasDeclined = wasDeclined;
+            });
         });
     }
 
@@ -812,7 +860,9 @@
         if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
     }
 
-    function _submitFacultyReservation(roomId, roomName, csrfToken) {
+    function _submitFacultyReservation(roomId, roomName, roomObj, csrfToken, onResult) {
+        /* onResult(wasDeclined) — called after server responds so the caller
+           can track whether the last submit was a Decline for prefill logic. */
         var date      = (document.getElementById('fcty-res-date')?.value     || '').trim();
         var start     = (document.getElementById('fcty-res-start')?.value    || '').trim();
         var end       = (document.getElementById('fcty-res-end')?.value      || '').trim();
@@ -866,12 +916,24 @@
                 sucEl.style.display = '';
                 sucEl.className = 'fcty-res-' + (data.status === 'Approved' ? 'success' : 'error');
             }
-            /* Disable form after submission */
-            ['fcty-res-date','fcty-res-start','fcty-res-end','fcty-res-purpose','fcty-res-attendees','fcty-res-notes'].forEach(function (id) {
-                var el = document.getElementById(id);
-                if (el) el.disabled = true;
-            });
-            if (btn) btn.style.display = 'none';
+            /* Notify caller whether this was a Decline (for Back-button prefill) */
+            if (typeof onResult === 'function') {
+                onResult(data.status === 'Declined');
+            }
+
+            /* Signal faculty-dashboard.js to immediately refresh the
+               My Reservations table so the new row appears without waiting
+               for the next 10-second poll tick.                            */
+            document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
+            /* Disable form after submission — approved reservations are locked;
+               declined ones can be retried via the Back button */
+            if (data.status === 'Approved') {
+                ['fcty-res-date','fcty-res-start','fcty-res-end','fcty-res-purpose','fcty-res-attendees','fcty-res-notes'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.disabled = true;
+                });
+                if (btn) btn.style.display = 'none';
+            }
         })
         .catch(function () {
             if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined">event_available</span> Confirm Reservation'; }
@@ -887,6 +949,55 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ROOM STATUS POLLING  (visual chip colours only)
+       Polls every 30 s to refresh chip status classes in place.
+       Has NO effect on ArbitrationEngine conflict detection —
+       the engine always queries live DB data when processRoomReservation()
+       runs, completely independent of this polling interval.
+    ══════════════════════════════════════════════════════════════ */
+    var _roomStatusPollTimer = null;
+    var ROOM_STATUS_POLL_MS  = 30000;   /* 30 seconds */
+
+    function startRoomStatusPolling() {
+        function doPoll() {
+            var apiBase = _resolveApiBase();
+            fetch(apiBase + 'room-reservation/api/poll-room-status.php', {
+                method: 'GET',
+                credentials: 'same-origin',
+            })
+            .then(function (r) { if (!r.ok) return null; return r.json(); })
+            .then(function (statuses) {
+                if (!statuses) return;
+                /* Update chip CSS classes in place without rebuilding the DOM */
+                document.querySelectorAll('.fcty-room-chip[data-room-id]').forEach(function (chip) {
+                    var rid = chip.dataset.roomId;
+                    var newStatus = statuses[rid];
+                    if (!newStatus) return;
+                    var newClass = STATUS_CLASS_MAP[newStatus] || 'status-available';
+                    /* Only repaint if something actually changed */
+                    var current = chip.className.replace('fcty-room-chip', '').trim();
+                    if (current !== newClass) {
+                        chip.className = 'fcty-room-chip ' + newClass;
+                        /* Keep Not Bookable rooms non-interactive */
+                        chip.style.pointerEvents = (newStatus === 'Not Bookable') ? 'none' : '';
+                    }
+                });
+            })
+            .catch(function () { /* silent — polling failure must not break the UI */ });
+        }
+
+        doPoll();   /* run immediately on page load */
+        _roomStatusPollTimer = setInterval(doPoll, ROOM_STATUS_POLL_MS);
+    }
+
+    function stopRoomStatusPolling() {
+        if (_roomStatusPollTimer) {
+            clearInterval(_roomStatusPollTimer);
+            _roomStatusPollTimer = null;
+        }
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -1000,6 +1111,7 @@
 
         /* ── Load live data from API, then wire campus card clicks ── */
         loadFacilities(function () {
+            startRoomStatusPolling();
         /* ── Campus card clicks → VIEW 2 ─────────────────────── */
         document.querySelectorAll('[data-fcty-campus]').forEach(function (card) {
             card.addEventListener('click', function (e) {
@@ -1125,8 +1237,11 @@
                 var roomName   = this.dataset.roomName;
                 var roomStatus = this.dataset.roomStatus || 'Available';
                 if (!roomId || roomStatus === 'Maintenance' || roomStatus === 'Not Bookable') return;
+                /* Use module-level _currentRoomObj — openRoomModal() stores it
+                   there so it remains accessible after the modal call returns. */
+                var roomObjSnap = _currentRoomObj;
                 closeRoomModal();
-                openReservationForm(parseInt(roomId, 10), roomName);
+                openReservationForm(parseInt(roomId, 10), roomName, roomObjSnap, null);
             });
         }
 
@@ -1139,6 +1254,7 @@
                         if (!panelRooms.classList.contains('active')) {
                             /* Panel deactivated — silently reset without animation */
                             stopAutoSlide();
+                            stopRoomStatusPolling();
                             hideAllViews();
                             closeRoomModal();
                             campusView.style.display = '';

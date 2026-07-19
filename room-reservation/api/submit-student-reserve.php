@@ -42,10 +42,12 @@ if (!$code_db_id || !$faculty_id || !$student_name || !$student_id ||
     echo json_encode(['error' => 'All required fields must be filled in.']);
     exit();
 }
-
-$today = date('Y-m-d');
-if ($res_date < $today) {
-    echo json_encode(['error' => 'Reservation date cannot be in the past.']);
+// Past datetime check — compare full date+time in Asia/Manila timezone
+$now_manila   = new DateTime('now', new DateTimeZone('Asia/Manila'));
+$req_datetime = DateTime::createFromFormat('Y-m-d H:i', $res_date . ' ' . $start_time,
+                    new DateTimeZone('Asia/Manila'));
+if ($req_datetime === false || $req_datetime <= $now_manila) {
+    echo json_encode(['error' => 'Reservation date and time cannot be in the past.']);
     exit();
 }
 if ($end_time <= $start_time) {

@@ -39,6 +39,7 @@ class ArbitrationEngine
     public const RULE_MISSING_DOC_HOLD = 'rule_missing_doc_hold';
     public const RULE_ARCHIVED         = 'rule_archived';
     public const RULE_OUT_OF_STOCK     = 'rule_out_of_stock';
+    public const RULE_PAST_DATETIME    = 'rule_past_datetime';
     public const RULE_1_FIFO           = 'rule_1_fifo';
     public const RULE_2_SIGNATORY      = 'rule_2_signatory';
     public const RULE_3_ROLE           = 'rule_3_role';
@@ -1047,6 +1048,25 @@ class ArbitrationEngine
             $res_date     = (string)$reservation['reservation_date'];
             $start_time   = (string)$reservation['start_time'];
             $end_time     = (string)$reservation['end_time'];
+
+            // ── Step 2b: Past datetime check ────────────────────────────────
+            // Reject any reservation whose date+start_time is already in the past
+            // (Asia/Manila timezone, matching the project's timezone convention).
+            $now_manila   = new \DateTime('now', new \DateTimeZone('Asia/Manila'));
+            $req_datetime = \DateTime::createFromFormat(
+                'Y-m-d H:i',
+                $res_date . ' ' . substr($start_time, 0, 5),
+                new \DateTimeZone('Asia/Manila')
+            );
+            if ($req_datetime === false || $req_datetime <= $now_manila) {
+                self::writeRoomDecision(
+                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined', self::RULE_PAST_DATETIME,
+                    'This reservation date and time has already passed.'
+                );
+                return;
+            }
 
             // ── Step 3: Overdue block ────────────────────────────────────────
             // Checks tbl_requests (equipment overdue) — same rule applies to rooms.

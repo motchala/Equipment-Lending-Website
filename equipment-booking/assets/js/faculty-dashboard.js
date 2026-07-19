@@ -347,10 +347,12 @@
     function switchLendingSub(subName) {
         const sub = document.getElementById('lending-' + subName);
         if (sub) sub.classList.add('active');
-        document.querySelectorAll('.lending-nav-btn').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector('.lending-nav-btn[data-lending-nav="' + subName + '"]');
+        /* Scope to #panel-lending only — prevents wiping the active state of
+           the Facilities sub-nav buttons/panes which share the same CSS classes. */
+        document.querySelectorAll('#panel-lending .lending-nav-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('#panel-lending .lending-nav-btn[data-lending-nav="' + subName + '"]');
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('.lending-sub').forEach(s => {
+        document.querySelectorAll('#panel-lending .lending-sub').forEach(s => {
             if (s !== sub) s.classList.remove('active');
         });
     }
@@ -1502,10 +1504,7 @@
     const roomResFilter = document.getElementById('roomResStatusFilter');
     if (roomResFilter) {
         roomResFilter.addEventListener('change', function () {
-            const val = this.value;
-            document.querySelectorAll('#roomReservationsTbody tr[data-rr-status]').forEach(row => {
-                row.style.display = (val === 'All' || row.dataset.rrStatus === val) ? '' : 'none';
-            });
+            _applyResFilter();
         });
     }
 
@@ -1828,6 +1827,7 @@
         startRequestsPolling();
         initCodePanel();
         startInventoryPolling();
+        startReservationsPolling();
 
         // Password strength meter
         const pwNewInput = document.getElementById('pwNew');
@@ -2700,6 +2700,158 @@
                 })
                 .catch(() => { }); // silently ignore network errors
         }, INTERVAL);
+    }
+
+    /* ── Room Reservations Live Polling ────────────────────────────────── */
+
+    /**
+     * Format a "HH:MM:SS" or "HH:MM" time string to "h:mm AM/PM".
+     * Mirrors the PHP $fmt_time closure used when rendering server-side.
+     */
+    function _fmtResTime(t) {
+        if (!t) return '';
+        var parts = t.split(':');
+        var h = parseInt(parts[0], 10);
+        var m = parts[1] || '00';
+        var period = h >= 12 ? 'PM' : 'AM';
+        var h12 = h % 12 || 12;
+        return h12 + ':' + m + ' ' + period;
+    }
+
+    /** Build a single <tr> string from a reservation row object. */
+    function _buildResRow(rr) {
+        var pillClass = 'pill-waiting';
+        if (rr.status === 'Approved') pillClass = 'pill-approved';
+        if (rr.status === 'Declined') pillClass = 'pill-declined';
+
+        var submittedLabel = 'Personal';
+        if (rr.submitted_as === 'adviser') submittedLabel = 'Adviser';
+        if (rr.submitted_as === 'student') submittedLabel = 'Student (via code)';
+
+        // Format date: "2025-07-19" → "Jul 19, 2025"
+        var dateStr = rr.reservation_date || '';
+        try {
+            // Split manually to avoid timezone shifting with new Date()
+            var dp = dateStr.split('-');
+            if (dp.length === 3) {
+                var months = ['Jan','Feb','Mar','Apr','May','Jun',
+                              'Jul','Aug','Sep','Oct','Nov','Dec'];
+                dateStr = months[parseInt(dp[1], 10) - 1] + ' '
+                    + parseInt(dp[2], 10) + ', ' + dp[0];
+            }
+        } catch (e) { /* keep raw string */ }
+
+        var timeStr = _fmtResTime(rr.start_time) + ' \u2013 ' + _fmtResTime(rr.end_time);
+        var location = _escHtml((rr.floor_label || '') + ', ' + (rr.building_name || ''));
+        var reason   = rr.reason ? _escHtml(rr.reason) : '\u2014';
+
+        return '<tr data-rr-status="' + _escHtml(rr.status) + '">'
+            + '<td class="fw-bold">' + _escHtml(rr.room_name)    + '</td>'
+            + '<td>'                 + location                   + '</td>'
+            + '<td>'                 + _escHtml(dateStr)          + '</td>'
+            + '<td style="white-space:nowrap;">' + _escHtml(timeStr) + '</td>'
+            + '<td>'                 + _escHtml(rr.purpose)       + '</td>'
+            + '<td>'                 + _escHtml(submittedLabel)   + '</td>'
+            + '<td><span class="status-pill ' + pillClass + '">'
+                + _escHtml(rr.status) + '</span></td>'
+            + '<td style="color:var(--color-on-surface-variant);font-size:.8rem;">'
+                + reason + '</td>'
+            + '</tr>';
+    }
+
+    /**
+     * Re-render the reservations tbody from a fresh array of row objects.
+     * Respects the current status-filter selection.
+     */
+    function renderReservationsTable(rows) {
+        var tbody = document.getElementById('roomReservationsTbody');
+        if (!tbody) return;
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;'
+                + 'padding:2.5rem;color:var(--color-on-surface-variant);'
+                + 'font-size:.875rem;">No room reservations yet.</td></tr>';
+            _applyResFilter();
+            return;
+        }
+
+        tbody.innerHTML = rows.map(_buildResRow).join('');
+        _applyResFilter();
+
+        // Keep the badge count on the "My Reservations" nav button in sync
+        var badge = document.querySelector('[data-rooms-nav="history"] .lnb-badge');
+        if (badge) {
+            badge.textContent = rows.length;
+            badge.style.display = rows.length ? '' : 'none';
+        }
+    }
+
+    /** Apply the current dropdown filter to visible rows (non-destructive). */
+    function _applyResFilter() {
+        var filter = document.getElementById('roomResStatusFilter');
+        var val = filter ? filter.value : 'All';
+        document.querySelectorAll('#roomReservationsTbody tr[data-rr-status]').forEach(function (row) {
+            row.style.display = (val === 'All' || row.dataset.rrStatus === val) ? '' : 'none';
+        });
+    }
+
+    /**
+     * Poll room-reservation/api/poll-reservations.php every 10 seconds.
+     * Shows a toast when a reservation status changes (e.g. Approved→Declined
+     * after a conflict is detected by a later admin action).
+     * Runs an immediate fetch on call so the table is populated before the
+     * first interval fires.
+     */
+    function startReservationsPolling() {
+        const INTERVAL = 10000; // 10 seconds — reservations change less often than equipment requests
+        var lastStatuses = {};
+
+        function doPoll() {
+            fetch('room-reservation/api/poll-reservations.php', {
+                method: 'GET',
+                credentials: 'same-origin',
+            })
+            .then(function (r) { if (!r.ok) return null; return r.json(); })
+            .then(function (rows) {
+                if (!Array.isArray(rows)) return;
+
+                var changed = false;
+
+                rows.forEach(function (rr) {
+                    var prev = lastStatuses[rr.id];
+                    if (prev !== rr.status) {
+                        changed = true;
+                        if (prev !== undefined) {
+                            // Status transitioned after initial load — notify user
+                            if (rr.status === 'Approved') {
+                                showToast('Room reservation for ' + rr.room_name + ' was Approved!', 'success');
+                            } else if (rr.status === 'Declined') {
+                                showToast('Room reservation for ' + rr.room_name + ' was Declined.', 'error');
+                            }
+                        }
+                        lastStatuses[rr.id] = rr.status;
+                    }
+                });
+
+                // Always re-render on first poll (prev is empty) so the table
+                // reflects server state even if PHP rendered stale data on page load.
+                if (changed || Object.keys(lastStatuses).length === 0) {
+                    // Populate initial snapshot on the very first pass
+                    if (Object.keys(lastStatuses).length === 0) {
+                        rows.forEach(function (rr) { lastStatuses[rr.id] = rr.status; });
+                    }
+                    renderReservationsTable(rows);
+                }
+            })
+            .catch(function () { /* silently ignore network errors */ });
+        }
+
+        doPoll();                       // fire immediately on call
+        setInterval(doPoll, INTERVAL);  // then every 10 seconds
+
+        /* Immediate refresh when the user submits a reservation — fired by
+           fcty-facilities.js after a successful submit-faculty-reserve call. */
+        document.addEventListener('pupsync:reservation-submitted', doPoll);
     }
 
     /* ── Faculty Code Panel ─────────────────────────────────────────────── */
