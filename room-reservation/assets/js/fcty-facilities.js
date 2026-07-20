@@ -760,6 +760,8 @@
 
         /* Track last submission outcome for Back-button prefill logic */
         var lastSubmitWasDeclined = false;
+        var _availDebounceTimer = null;
+        var _availController    = null;
 
         panel.innerHTML = [
             '<div class="fcty-res-form-wrap">',
@@ -794,6 +796,7 @@
             '      <input type="time" id="fcty-res-end" class="fcty-res-input" min="07:00" max="20:00" value="' + escFcty(pEnd) + '">',
             '    </div>',
             '  </div>',
+            '  <div id="fcty-res-avail-warn"></div>',
             '  <div class="fcty-res-field">',
             '    <label class="fcty-res-label">Purpose <span class="fcty-res-req">*</span></label>',
             '    <input type="text" id="fcty-res-purpose" class="fcty-res-input" placeholder="e.g. Lecture, Lab Session, Meeting" value="' + escFcty(pPurpose) + '">',
@@ -817,6 +820,61 @@
             '</div>',
             '</div>',
         ].join('');
+
+        var _clearAvailWarn = function() {
+            var w = document.getElementById('fcty-res-avail-warn');
+            if (w && w.parentNode) { w.parentNode.removeChild(w); }
+            if (_availController) { _availController.abort(); _availController = null; }
+            _availDebounceTimer = null;
+        };
+
+        var _setAvailWarn = function(state) {
+            var w = document.getElementById('fcty-res-avail-warn');
+            if (!w) { return; }
+            if (state === 'loading') {
+                w.className = 'fcty-res-avail-loading';
+                w.textContent = 'Checking availability\u2026';
+            } else if (state === 'conflict') {
+                w.className = 'fcty-res-avail-conflict';
+                w.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">warning</span> This time slot is already reserved \u2014 please choose a different time.';
+            } else if (state === 'unverified') {
+                w.className = 'fcty-res-avail-warn';
+                w.textContent = 'Availability could not be verified \u2014 please review before submitting.';
+            } else {
+                // 'clear' or any other value — remove from DOM
+                if (w.parentNode) { w.parentNode.removeChild(w); }
+            }
+        };
+
+        var _runAvailCheck = function() {
+            var dateEl  = document.getElementById('fcty-res-date');
+            var startEl = document.getElementById('fcty-res-start');
+            var endEl   = document.getElementById('fcty-res-end');
+            var date    = dateEl  ? dateEl.value  : '';
+            var start   = startEl ? startEl.value : '';
+            var end     = endEl   ? endEl.value   : '';
+            if (!date || !start || !end) {
+                _clearAvailWarn();
+                return;
+            }
+            if (_availController) { _availController.abort(); }
+            _availController = new AbortController();
+            _setAvailWarn('loading');
+            var url = _resolveApiBase() + 'room-reservation/api/check-room-availability.php'
+                    + '?room_id='           + roomId
+                    + '&reservation_date='  + encodeURIComponent(date)
+                    + '&start_time='        + encodeURIComponent(start)
+                    + '&end_time='          + encodeURIComponent(end);
+            fetch(url, { method: 'GET', credentials: 'same-origin', signal: _availController.signal })
+                .then(function(r) { return r.ok ? r.json() : Promise.reject(r); })
+                .then(function(data) {
+                    if (data.conflict) { _setAvailWarn('conflict'); } else { _clearAvailWarn(); }
+                })
+                .catch(function(err) {
+                    if (err && err.name === 'AbortError') { return; }
+                    _setAvailWarn('unverified');
+                });
+        };
 
         panel.style.display = '';
         /* Defer scroll until the next frame so the browser has committed
@@ -852,6 +910,14 @@
             _submitFacultyReservation(roomId, roomName, roomObj, csrfToken, function (wasDeclined) {
                 lastSubmitWasDeclined = wasDeclined;
             });
+        });
+
+        ['fcty-res-date', 'fcty-res-start', 'fcty-res-end'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) { el.addEventListener('change', function() {
+                clearTimeout(_availDebounceTimer);
+                _availDebounceTimer = setTimeout(_runAvailCheck, 500);
+            }); }
         });
     }
 
