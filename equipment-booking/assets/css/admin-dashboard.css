@@ -991,6 +991,11 @@ main#app-main {
     color: var(--danger);
 }
 
+.pill-cancelled {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
 .pill-overdue {
     background: #fff3e0;
     color: #e65100;

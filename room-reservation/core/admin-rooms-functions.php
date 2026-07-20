@@ -349,3 +349,37 @@ if ($admin_room_reservations_result) {
         $admin_room_reservations[] = $row;
     }
 }
+
+// ── Room Issues (admin review queue) ─────────────────────────────────────
+// Guard: table may not exist yet if migration hasn't been run.
+$_issues_tbl = $conn->query(
+    "SELECT 1 FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tbl_room_issues' LIMIT 1"
+);
+$admin_room_issues       = [];
+$admin_room_issues_open  = 0;
+
+if ($_issues_tbl && $_issues_tbl->num_rows > 0) {
+    $issues_result = $conn->query(
+        "SELECT ri.id, ri.room_id, ri.reported_by_id, ri.reported_by_name,
+                ri.description, ri.status, ri.admin_notes,
+                ri.created_at, ri.resolved_at,
+                r.room_name,
+                b.name                                               AS building_name,
+                COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label,
+                c.campus_name
+           FROM tbl_room_issues ri
+           JOIN tbl_rooms     r ON r.room_id     = ri.room_id
+           JOIN tbl_buildings b ON b.building_id = r.building_id
+           JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
+          ORDER BY
+                FIELD(ri.status, 'Open', 'Resolved', 'Dismissed'),
+                ri.created_at DESC"
+    );
+    if ($issues_result) {
+        while ($row = $issues_result->fetch_assoc()) {
+            $admin_room_issues[] = $row;
+            if ($row['status'] === 'Open') $admin_room_issues_open++;
+        }
+    }
+}

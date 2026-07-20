@@ -1877,6 +1877,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <span class="lnb-badge"><?php echo count($admin_room_reservations); ?></span>
                     <?php endif; ?>
                 </button>
+                <button class="history-toggle-btn" data-rooms-tab="rooms-issues">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Issues
+                    <?php if (!empty($admin_room_issues_open)): ?>
+                        <span class="lnb-badge"><?php echo (int)$admin_room_issues_open; ?></span>
+                    <?php endif; ?>
+                </button>
             </div>
 
             <!-- ── Active rooms sub-panel ──────────────────────────────── -->
@@ -2049,11 +2061,11 @@ endif; ?>
                 </div>
             </div><!-- /#rooms-archived-panel -->
 
-            <!-- ── All Reservations sub-panel (read-only) ──────────────────── -->
+            <!-- ── All Reservations sub-panel ──────────────────────────── -->
             <div class="rooms-sub-panel" id="rooms-reservations-panel">
                 <div class="eq-card">
                     <div class="page-header-block" style="padding:1rem 1.2rem .5rem;">
-                        <p class="page-subtitle">All room reservations across all faculty and rooms. Read-only — override and cancellation controls are planned for Phase 3.</p>
+                        <p class="page-subtitle">All room reservations across all faculty and rooms. Admin can cancel any Approved reservation.</p>
                     </div>
                     <div class="tbl-wrap">
                         <table class="admin-table">
@@ -2069,16 +2081,18 @@ endif; ?>
                                     <th>Purpose</th>
                                     <th>Status</th>
                                     <th>Reason</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (empty($admin_room_reservations)): ?>
                                     <tr>
-                                        <td colspan="10" class="text-muted" style="text-align:center;padding:2.5rem;">No reservations yet.</td>
+                                        <td colspan="11" class="text-muted" style="text-align:center;padding:2.5rem;">No reservations yet.</td>
                                     </tr>
                                 <?php else: foreach ($admin_room_reservations as $ar):
                                     $ar_pill = 'pill-approved';
-                                    if ($ar['status'] === 'Declined') $ar_pill = 'pill-declined';
+                                    if ($ar['status'] === 'Declined')  $ar_pill = 'pill-declined';
+                                    if ($ar['status'] === 'Cancelled') $ar_pill = 'pill-cancelled';
 
                                     $ar_submitted = match($ar['submitted_as']) {
                                         'adviser' => 'Adviser',
@@ -2088,6 +2102,10 @@ endif; ?>
                                     $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
                                         ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
                                         : htmlspecialchars($ar['faculty_name']);
+
+                                    // Cancel eligibility: Approved rows only — cutoff enforced server-side
+                                    // The PHP display of the cancel button is always shown for Approved;
+                                    // the 1-hour guard is enforced by cancel-reservation.php (RoomCancellation::cancel).
                                 ?>
                                     <tr>
                                         <td class="text-muted" style="font-size:.78rem;">#<?php echo (int)$ar['id']; ?></td>
@@ -2100,6 +2118,27 @@ endif; ?>
                                         <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
                                         <td><span class="status-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
                                         <td style="color:var(--text-light);font-size:.78rem;"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
+                                        <td>
+                                            <?php if ($ar['status'] === 'Approved'): ?>
+                                                <button class="btn-action btn-override-req btn-cancel-rr-admin"
+                                                    data-action="admin-cancel-reservation"
+                                                    data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                    data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                    data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
+                                                    title="Cancel this reservation">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" width="14" height="14">
+                                                        <circle cx="12" cy="12" r="10"/>
+                                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                                    </svg>
+                                                    Cancel
+                                                </button>
+                                            <?php else: ?>
+                                                <span style="color:var(--text-light);font-size:.78rem;">—</span>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                 <?php endforeach; endif; ?>
                             </tbody>
@@ -2107,6 +2146,78 @@ endif; ?>
                     </div>
                 </div>
             </div><!-- /#rooms-reservations-panel -->
+
+            <!-- ── Room Issues sub-panel ───────────────────────────────── -->
+            <div class="rooms-sub-panel" id="rooms-issues-panel">
+                <div class="eq-card">
+                    <div class="page-header-block" style="padding:1rem 1.2rem .5rem;">
+                        <p class="page-subtitle">Room issue reports submitted by faculty. Review and resolve each report — rooms are not automatically set to Maintenance.</p>
+                    </div>
+                    <div class="tbl-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Room</th>
+                                    <th>Location</th>
+                                    <th>Reported By</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th>Reported At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($admin_room_issues)): ?>
+                                    <tr>
+                                        <td colspan="8" class="text-muted" style="text-align:center;padding:2.5rem;">No issue reports yet.</td>
+                                    </tr>
+                                <?php else: foreach ($admin_room_issues as $issue):
+                                    $issue_pill = 'pill-waiting';
+                                    if ($issue['status'] === 'Resolved')  $issue_pill = 'pill-approved';
+                                    if ($issue['status'] === 'Dismissed') $issue_pill = 'pill-declined';
+                                ?>
+                                    <tr>
+                                        <td class="text-muted" style="font-size:.78rem;">#<?php echo (int)$issue['id']; ?></td>
+                                        <td class="fw-bold"><?php echo htmlspecialchars($issue['room_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($issue['floor_label'] . ', ' . $issue['building_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($issue['reported_by_name']); ?></td>
+                                        <td style="max-width:240px;font-size:.82rem;"><?php echo htmlspecialchars($issue['description']); ?></td>
+                                        <td><span class="status-pill <?php echo $issue_pill; ?>"><?php echo htmlspecialchars($issue['status']); ?></span></td>
+                                        <td style="font-size:.78rem;white-space:nowrap;"><?php echo date('M d, Y g:i A', strtotime($issue['created_at'])); ?></td>
+                                        <td>
+                                            <?php if ($issue['status'] === 'Open'): ?>
+                                                <button class="btn-action btn-override-req"
+                                                    data-action="open-issue-review"
+                                                    data-issue-id="<?php echo (int)$issue['id']; ?>"
+                                                    data-room-name="<?php echo htmlspecialchars($issue['room_name']); ?>"
+                                                    data-reporter="<?php echo htmlspecialchars($issue['reported_by_name']); ?>"
+                                                    data-description="<?php echo htmlspecialchars($issue['description']); ?>"
+                                                    title="Review this issue report">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                        stroke-linejoin="round" width="14" height="14">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                                    </svg>
+                                                    Review
+                                                </button>
+                                            <?php else: ?>
+                                                <span style="color:var(--text-light);font-size:.78rem;">
+                                                    <?php echo $issue['status']; ?>
+                                                    <?php if ($issue['admin_notes']): ?>
+                                                        <br><small><?php echo htmlspecialchars(mb_substr($issue['admin_notes'], 0, 60)); ?><?php echo strlen($issue['admin_notes']) > 60 ? '…' : ''; ?></small>
+                                                    <?php endif; ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /#rooms-issues-panel -->
 
         </div><!-- /panel-rooms -->
 
@@ -3247,6 +3358,97 @@ endif; ?>
                             style="margin-top: 0; width: auto; padding: 8px 16px;">Update</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Cancel Reservation Modal -->
+    <div class="modal-overlay" id="adminCancelRrModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center;">
+        <div class="modal-backdrop" id="adminCancelRrBackdrop" style="position:absolute;inset:0;"></div>
+        <div class="eq-card form-card" style="position:relative;width:100%;max-width:420px;margin:20px;z-index:100000;">
+            <div class="form-card-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                    Cancel Reservation
+                </h2>
+                <button type="button" class="btn-close-custom" id="closeAdminCancelRrModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="form-card-body">
+                <div id="admin-cancel-rr-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:.85rem;font-weight:500;"></div>
+                <p id="adminCancelRrDesc" style="font-size:.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <p style="font-size:.83rem;color:var(--text-light);margin-bottom:1rem;">
+                    The faculty member will be notified by email. All faculty on the waitlist for this slot will also be notified that the slot is now available.
+                </p>
+                <input type="hidden" id="adminCancelRrId">
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1rem;">
+                    <button type="button" class="btn-cancel-acc" id="cancelAdminCancelRrBtn" style="padding:8px 16px;width:auto;">Go Back</button>
+                    <button type="button" class="btn-submit-form" id="submitAdminCancelRrBtn"
+                        style="margin-top:0;width:auto;padding:8px 16px;background:var(--danger);">
+                        Confirm Cancellation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Issue Review Modal -->
+    <div class="modal-overlay" id="issueReviewModal"
+        style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:99999;align-items:center;justify-content:center;">
+        <div class="modal-backdrop" id="issueReviewModalBackdrop" style="position:absolute;inset:0;"></div>
+        <div class="eq-card form-card" style="position:relative;width:100%;max-width:460px;margin:20px;z-index:100000;">
+            <div class="form-card-header">
+                <h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                    Review Issue Report
+                </h2>
+                <button type="button" class="btn-close-custom" id="closeIssueReviewModal">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="form-card-body">
+                <div id="issue-review-alert" style="display:none;padding:10px;border-radius:6px;margin-bottom:15px;font-size:.85rem;font-weight:500;"></div>
+                <p id="issueReviewDesc" style="font-size:.85rem;color:var(--text-light);margin-bottom:1rem;"></p>
+                <div class="form-group">
+                    <label>Admin Notes <span style="font-size:.75rem;font-weight:400;">(optional)</span></label>
+                    <textarea id="issueAdminNotes" class="form-control-custom" rows="3"
+                        placeholder="Internal notes about this report or action taken…"
+                        style="resize:vertical;"></textarea>
+                </div>
+                <div class="form-group" style="margin-top:.75rem;">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
+                        <input type="checkbox" id="issueSetMaintenance" style="width:16px;height:16px;">
+                        Set room to <strong>Maintenance</strong> mode
+                    </label>
+                    <small style="color:var(--text-light);font-size:.75rem;margin-top:4px;display:block;">
+                        Only applies when resolving (not dismissing). You can change the room status back any time from the Rooms registry.
+                    </small>
+                </div>
+                <input type="hidden" id="issueReviewId">
+                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:1.25rem;">
+                    <button type="button" class="btn-cancel-acc" id="cancelIssueReviewBtn" style="padding:8px 16px;width:auto;">Cancel</button>
+                    <button type="button" class="btn-submit-form" id="dismissIssueBtn"
+                        style="margin-top:0;width:auto;padding:8px 16px;background:#6b7280;">Dismiss</button>
+                    <button type="button" class="btn-submit-form" id="resolveIssueBtn"
+                        style="margin-top:0;width:auto;padding:8px 16px;">Mark Resolved</button>
+                </div>
             </div>
         </div>
     </div>

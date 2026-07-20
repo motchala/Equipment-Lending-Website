@@ -819,3 +819,92 @@ CREATE TABLE IF NOT EXISTS `tbl_room_arbitration_log` (
   PRIMARY KEY (`id`),
   KEY `idx_reservation_id` (`reservation_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ROOM RESERVATION PHASE 3 MIGRATION
+-- Adds: Cancelled status to tbl_room_reservations,
+--       tbl_room_waitlist, tbl_room_issues
+-- Fully idempotent — safe to run on an existing lending_db.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- 1. Extend tbl_room_reservations status enum to include 'Cancelled'
+DROP PROCEDURE IF EXISTS `_p3_extend_status_enum`;
+DELIMITER $$
+CREATE PROCEDURE `_p3_extend_status_enum`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM   information_schema.COLUMNS
+        WHERE  TABLE_SCHEMA = DATABASE()
+          AND  TABLE_NAME   = 'tbl_room_reservations'
+          AND  COLUMN_NAME  = 'status'
+          AND  COLUMN_TYPE  LIKE '%Cancelled%'
+    ) THEN
+        ALTER TABLE `tbl_room_reservations`
+            MODIFY `status` enum('Approved','Declined','Cancelled')
+                            NOT NULL DEFAULT 'Approved';
+    END IF;
+END$$
+DELIMITER ;
+CALL `_p3_extend_status_enum`();
+DROP PROCEDURE IF EXISTS `_p3_extend_status_enum`;
+
+-- 2. Add cancelled_at column (idempotent)
+DROP PROCEDURE IF EXISTS `_p3_add_cancelled_at`;
+DELIMITER $$
+CREATE PROCEDURE `_p3_add_cancelled_at`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM   information_schema.COLUMNS
+        WHERE  TABLE_SCHEMA = DATABASE()
+          AND  TABLE_NAME   = 'tbl_room_reservations'
+          AND  COLUMN_NAME  = 'cancelled_at'
+    ) THEN
+        ALTER TABLE `tbl_room_reservations`
+            ADD COLUMN `cancelled_at` datetime DEFAULT NULL
+            AFTER `request_date`;
+    END IF;
+END$$
+DELIMITER ;
+CALL `_p3_add_cancelled_at`();
+DROP PROCEDURE IF EXISTS `_p3_add_cancelled_at`;
+
+-- 3. tbl_room_waitlist
+CREATE TABLE IF NOT EXISTS `tbl_room_waitlist` (
+  `id`               int(11)      NOT NULL AUTO_INCREMENT,
+  `room_id`          int(11)      NOT NULL,
+  `reservation_date` date         NOT NULL,
+  `start_time`       time         NOT NULL,
+  `end_time`         time         NOT NULL,
+  `faculty_id`       varchar(50)  NOT NULL,
+  `faculty_name`     varchar(100) NOT NULL,
+  `faculty_email`    varchar(255) NOT NULL,
+  `created_at`       datetime     DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_waitlist_faculty_slot`
+    (`room_id`, `reservation_date`, `start_time`, `end_time`, `faculty_id`),
+  KEY `idx_waitlist_slot`
+    (`room_id`, `reservation_date`, `start_time`, `end_time`),
+  CONSTRAINT `fk_wl_room`
+    FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 4. tbl_room_issues
+CREATE TABLE IF NOT EXISTS `tbl_room_issues` (
+  `id`               int(11)      NOT NULL AUTO_INCREMENT,
+  `room_id`          int(11)      NOT NULL,
+  `reported_by_id`   varchar(50)  NOT NULL,
+  `reported_by_name` varchar(100) NOT NULL,
+  `description`      text         NOT NULL,
+  `status`           enum('Open','Resolved','Dismissed')
+                                  NOT NULL DEFAULT 'Open',
+  `admin_notes`      text         DEFAULT NULL,
+  `created_at`       datetime     DEFAULT current_timestamp(),
+  `resolved_at`      datetime     DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_issues_room`   (`room_id`),
+  KEY `idx_issues_status` (`status`),
+  CONSTRAINT `fk_issue_room`
+    FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

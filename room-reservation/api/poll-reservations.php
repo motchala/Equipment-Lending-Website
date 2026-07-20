@@ -35,8 +35,11 @@ $conn = getDB();
 
 $faculty_id = $_SESSION['faculty_id'];
 
+date_default_timezone_set('Asia/Manila');
+
 $stmt = $conn->prepare(
     "SELECT rr.id,
+            rr.room_id,
             rr.reservation_date,
             rr.start_time,
             rr.end_time,
@@ -45,7 +48,7 @@ $stmt = $conn->prepare(
             rr.status,
             rr.reason,
             r.room_name,
-            b.name                                         AS building_name,
+            b.name                                               AS building_name,
             COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label
        FROM tbl_room_reservations rr
        JOIN tbl_rooms     r ON r.room_id     = rr.room_id
@@ -58,8 +61,24 @@ $stmt->bind_param('s', $faculty_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
+$now = new DateTime('now', new DateTimeZone('Asia/Manila'));
+
 $rows = [];
 while ($row = $result->fetch_assoc()) {
+    // Compute whether the Cancel button should be shown:
+    // only Approved reservations where start is > 1 hour away.
+    $canCancel = false;
+    if ($row['status'] === 'Approved') {
+        $resStart = DateTime::createFromFormat(
+            'Y-m-d H:i:s',
+            $row['reservation_date'] . ' ' . $row['start_time'],
+            new DateTimeZone('Asia/Manila')
+        );
+        if ($resStart && ($resStart->getTimestamp() - $now->getTimestamp()) > 3600) {
+            $canCancel = true;
+        }
+    }
+    $row['can_cancel'] = $canCancel;
     $rows[] = $row;
 }
 

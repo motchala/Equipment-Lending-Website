@@ -163,65 +163,6 @@ $status_stmt->close();
 $final_status = $status_row['status'] ?? 'Approved';
 $final_reason = $status_row['reason'] ?? '';
 
-// ── Email: Notify faculty of their own reservation result ─────────────────
-$fac_stmt = $conn->prepare("SELECT email FROM tbl_users WHERE faculty_id = ? LIMIT 1");
-$fac_stmt->bind_param('s', $faculty_id);
-$fac_stmt->execute();
-$fac_email_row = $fac_stmt->get_result()->fetch_assoc();
-$fac_stmt->close();
-
-if ($fac_email_row && !empty($fac_email_row['email'])) {
-    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
-    $status_color = $final_status === 'Approved' ? '#2e7d32' : '#c62828';
-    $status_icon  = $final_status === 'Approved' ? '&#10003; Approved' : '&#10007; Declined';
-    $subject      = 'PUPSync: Room Reservation ' . $final_status . ' — ' . $room_name;
-    $body_html    = '
-    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
-        <div style="background:#800000;padding:24px 28px;">
-            <h2 style="color:#fff;margin:0;font-size:1.2rem;">PUPSync &middot; Room Reservation ' . htmlspecialchars($final_status) . '</h2>
-        </div>
-        <div style="padding:28px;">
-            <p style="margin:0 0 16px;color:#333;font-size:.95rem;">
-                Hello <strong>' . htmlspecialchars($faculty_name) . '</strong>,
-            </p>
-            <p style="margin:0 0 20px;color:#333;font-size:.95rem;">
-                Your room reservation request has been automatically processed.
-            </p>
-            <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
-                <tr style="background:#f9f5f5;">
-                    <td style="padding:10px 14px;color:#666;width:40%;">Reservation ID</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">#' . $reservation_id . '</td>
-                </tr>
-                <tr>
-                    <td style="padding:10px 14px;color:#666;">Room</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($room_name) . '</td>
-                </tr>
-                <tr style="background:#f9f5f5;">
-                    <td style="padding:10px 14px;color:#666;">Date</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($res_date) . '</td>
-                </tr>
-                <tr>
-                    <td style="padding:10px 14px;color:#666;">Time</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($start_time) . ' &ndash; ' . htmlspecialchars($end_time) . '</td>
-                </tr>
-                <tr style="background:#f9f5f5;">
-                    <td style="padding:10px 14px;color:#666;">Purpose</td>
-                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($purpose) . '</td>
-                </tr>
-                <tr>
-                    <td style="padding:10px 14px;color:#666;">Status</td>
-                    <td style="padding:10px 14px;color:' . $status_color . ';font-weight:700;">' . $status_icon . '</td>
-                </tr>
-                ' . ($final_reason ? '<tr style="background:#f9f5f5;"><td style="padding:10px 14px;color:#666;">Reason</td><td style="padding:10px 14px;color:#666;">' . htmlspecialchars($final_reason) . '</td></tr>' : '') . '
-            </table>
-        </div>
-        <div style="background:#f5f5f5;padding:14px 28px;font-size:.75rem;color:#aaa;">
-            PUPSync &middot; Polytechnic University of the Philippines &ndash; Bi&ntilde;an Campus
-        </div>
-    </div>';
-    sendPupSyncEmail($fac_email_row['email'], $faculty_name, $subject, $body_html);
-}
-
 echo json_encode([
     'success'        => true,
     'reservation_id' => $reservation_id,

@@ -976,11 +976,60 @@
             if (errEl) errEl.style.display = 'none';
             if (sucEl) {
                 var icon = data.status === 'Approved' ? '\u2713' : '\u2717';
-                sucEl.innerHTML = '<strong>' + icon + ' ' + data.status + '</strong> — '
+                var sucHtml = '<strong>' + icon + ' ' + data.status + '</strong> — '
                     + escFcty(data.room_name)
                     + (data.reason ? '<br><small>' + escFcty(data.reason) + '</small>' : '');
+                // Offer waitlist join when Declined due to a conflict
+                if (data.status === 'Declined') {
+                    sucHtml += '<br><button type="button" id="fcty-join-waitlist-btn"'
+                        + ' class="fcty-modal-btn fcty-btn-reserve"'
+                        + ' style="margin-top:.75rem;font-size:.82rem;">'
+                        + '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span>'
+                        + ' Join Waitlist for this Slot'
+                        + '</button>';
+                }
+                sucEl.innerHTML = sucHtml;
                 sucEl.style.display = '';
                 sucEl.className = 'fcty-res-' + (data.status === 'Approved' ? 'success' : 'error');
+
+                // Wire waitlist button if rendered
+                var wlBtn = document.getElementById('fcty-join-waitlist-btn');
+                if (wlBtn) {
+                    wlBtn.addEventListener('click', function () {
+                        var csrfMeta2  = document.querySelector('meta[name="csrf-token"]');
+                        var csrfToken2 = csrfMeta2 ? csrfMeta2.getAttribute('content') : '';
+                        wlBtn.disabled = true;
+                        wlBtn.textContent = 'Joining\u2026';
+                        var apiBase2 = _resolveApiBase();
+                        fetch(apiBase2 + 'room-reservation/api/join-waitlist.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({
+                                room_id:          roomId,
+                                reservation_date: date,
+                                start_time:       start,
+                                end_time:         end,
+                                csrf_token:       csrfToken2,
+                            }),
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (wlData) {
+                            if (wlData.error) {
+                                wlBtn.disabled = false;
+                                wlBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Join Waitlist for this Slot';
+                                return;
+                            }
+                            wlBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications_active</span> '
+                                + (wlData.already ? 'Already on Waitlist' : 'Added to Waitlist \u2713');
+                            wlBtn.disabled = true;
+                        })
+                        .catch(function () {
+                            wlBtn.disabled = false;
+                            wlBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Join Waitlist for this Slot';
+                        });
+                    });
+                }
             }
             /* Notify caller whether this was a Decline (for Back-button prefill) */
             if (typeof onResult === 'function') {
@@ -1015,6 +1064,132 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       REPORT ISSUE FORM (inline panel, same pattern as reservation form)
+    ══════════════════════════════════════════════════════════════ */
+    function openReportIssueForm(roomId, roomName) {
+        var panel = document.getElementById('fcty-reservation-panel');
+        if (!panel) return;
+
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+        panel.innerHTML = [
+            '<div class="fcty-res-form-wrap">',
+            '<div class="fcty-res-form-header">',
+            '  <h2 class="fcty-res-form-title">',
+            '    <span class="material-symbols-outlined">flag</span>',
+            '    Report Issue',
+            '  </h2>',
+            '  <button type="button" class="fcty-res-close-btn" id="fcty-issue-close" aria-label="Close">',
+            '    <span class="material-symbols-outlined">close</span>',
+            '  </button>',
+            '</div>',
+            '<div class="fcty-res-form-body">',
+            '  <p class="fcty-res-room-label">',
+            '    <span class="material-symbols-outlined">meeting_room</span>',
+            '    <strong>' + escFcty(roomName) + '</strong>',
+            '  </p>',
+            '  <div id="fcty-issue-error"  class="fcty-res-error"   style="display:none;"></div>',
+            '  <div id="fcty-issue-success" class="fcty-res-success" style="display:none;"></div>',
+            '  <div class="fcty-res-field">',
+            '    <label class="fcty-res-label">',
+            '      Describe the issue <span class="fcty-res-req">*</span>',
+            '      <span style="font-size:.75rem;font-weight:400;">(10–1000 characters)</span>',
+            '    </label>',
+            '    <textarea id="fcty-issue-desc" class="fcty-res-input" rows="4"',
+            '      placeholder="e.g. Air conditioning not working, projector bulb out, broken chairs\u2026"',
+            '      maxlength="1000"></textarea>',
+            '  </div>',
+            '  <p style="font-size:.8rem;color:var(--color-on-surface-variant);margin-top:.25rem;">',
+            '    Your report will be reviewed by the admin. The room status will not change automatically.',
+            '  </p>',
+            '</div>',
+            '<div class="fcty-res-form-footer">',
+            '  <button type="button" class="fcty-modal-btn fcty-btn-report" id="fcty-issue-back">',
+            '    <span class="material-symbols-outlined">arrow_back</span> Back',
+            '  </button>',
+            '  <button type="button" class="fcty-modal-btn fcty-btn-reserve" id="fcty-issue-submit">',
+            '    <span class="material-symbols-outlined">send</span> Submit Report',
+            '  </button>',
+            '</div>',
+            '</div>',
+        ].join('');
+
+        panel.style.display = '';
+        requestAnimationFrame(function () {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+
+        document.getElementById('fcty-issue-close').addEventListener('click', closeReportIssueForm);
+
+        document.getElementById('fcty-issue-back').addEventListener('click', function () {
+            closeReportIssueForm();
+            // Re-open the room modal with the same room context
+            if (_currentRoomObj) {
+                var locLabel = '';
+                openRoomModal(roomName, locLabel, _currentRoomObj);
+            }
+        });
+
+        document.getElementById('fcty-issue-submit').addEventListener('click', function () {
+            var desc    = (document.getElementById('fcty-issue-desc').value || '').trim();
+            var errEl   = document.getElementById('fcty-issue-error');
+            var sucEl   = document.getElementById('fcty-issue-success');
+            var submitBtn = document.getElementById('fcty-issue-submit');
+
+            if (desc.length < 10) {
+                errEl.textContent = 'Please provide a description of at least 10 characters.';
+                errEl.style.display = '';
+                sucEl.style.display = 'none';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting\u2026';
+
+            var apiBase = _resolveApiBase();
+            fetch(apiBase + 'room-reservation/api/submit-room-issue.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    room_id:     roomId,
+                    description: desc,
+                    csrf_token:  csrfToken,
+                }),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Report';
+                if (data.error) {
+                    errEl.textContent = data.error;
+                    errEl.style.display = '';
+                    sucEl.style.display = 'none';
+                    return;
+                }
+                errEl.style.display = 'none';
+                sucEl.textContent = '\u2713 Report submitted. The admin will review it shortly.';
+                sucEl.style.display = '';
+                // Disable form after success
+                document.getElementById('fcty-issue-desc').disabled = true;
+                submitBtn.style.display = 'none';
+            })
+            .catch(function () {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Report';
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.style.display = '';
+            });
+        });
+    }
+
+    function closeReportIssueForm() {
+        var panel = document.getElementById('fcty-reservation-panel');
+        if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
     }
 
     /* ══════════════════════════════════════════════════════════════
@@ -1293,7 +1468,18 @@
         });
 
         /* ── Reserve / Report buttons ───────────────────────────────── */
-        /* Report button — not wired yet (Phase 3) */
+
+        /* Report Issue button — opens inline issue form */
+        var reportBtn = document.getElementById('fcty-modal-report');
+        if (reportBtn) {
+            reportBtn.addEventListener('click', function () {
+                var roomId   = document.getElementById('fcty-modal-reserve').dataset.roomId   || '';
+                var roomName = document.getElementById('fcty-modal-reserve').dataset.roomName || '';
+                if (!roomId) return;
+                closeRoomModal();
+                openReportIssueForm(parseInt(roomId, 10), roomName);
+            });
+        }
 
         /* Reserve button — opens inline reservation form */
         var reserveBtn = document.getElementById('fcty-modal-reserve');
