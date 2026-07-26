@@ -253,7 +253,20 @@
         if (btn) btn.classList.add('active');
     }
 
-    /* ── Notification card expand & dismiss ──────────────────── */
+    /* ── Rooms Registry toggle (scoped to #panel-rooms) ─────────
+       Separate from switchHistoryTab to avoid cross-tab interference —
+       equipment and rooms live on different tabs so using global
+       querySelectorAll('.history-panel') would deactivate the wrong panels. */
+    function switchRoomsTab(tabName) {
+        const roomsPanel = document.getElementById('panel-rooms');
+        if (!roomsPanel) return;
+        roomsPanel.querySelectorAll('.rooms-sub-panel').forEach(p => p.classList.remove('active'));
+        roomsPanel.querySelectorAll('[data-rooms-tab]').forEach(b => b.classList.remove('active'));
+        const activePanel = document.getElementById(tabName + '-panel');
+        const activeBtn   = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
+        if (activePanel) activePanel.classList.add('active');
+        if (activeBtn)   activeBtn.classList.add('active');
+    }
     function _getUnreadCount() {
         return document.querySelectorAll('.notif-item.unread').length;
     }
@@ -550,6 +563,28 @@
                     }
                     break;
                 }
+                case 'show-room-form': {
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) {
+                        rfw.classList.remove('hidden');
+                        if (addRoomBtn) addRoomBtn.style.display = 'none';
+                        rfw.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    break;
+                }
+                case 'hide-room-form': {
+                    const editRoomParam = new URLSearchParams(window.location.search).get('edit_room');
+                    if (editRoomParam) {
+                        window.location.href = 'admin-dashboard.php?tab=rooms';
+                    } else {
+                        const rfw = document.getElementById('room-form-wrap');
+                        const addRoomBtn = document.getElementById('addRoomBtn');
+                        if (rfw) rfw.classList.add('hidden');
+                        if (addRoomBtn) addRoomBtn.style.display = '';
+                    }
+                    break;
+                }
                 case 'apply-theme':
                     applyTheme(el.dataset.theme); break;
                 case 'apply-accent':
@@ -793,6 +828,244 @@
         btn.addEventListener('click', function () { switchHistoryTab(this.dataset.historyTab); });
     });
 
+    /* ── Rooms Registry toggle ───────────────────────────────── */
+    document.querySelectorAll('[data-rooms-tab]').forEach(btn => {
+        btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
+    });
+
+    /* ── Admin Cancel Reservation Modal ─────────────────────── */
+    function openAdminCancelRrModal(rrId, roomName, facultyName) {
+        const modal   = document.getElementById('adminCancelRrModal');
+        const desc    = document.getElementById('adminCancelRrDesc');
+        const alertEl = document.getElementById('admin-cancel-rr-alert');
+        document.getElementById('adminCancelRrId').value = rrId;
+        alertEl.style.display = 'none';
+        desc.textContent = 'Cancel reservation for ' + facultyName + ' in ' + roomName + '?';
+        modal.style.display = 'flex';
+    }
+
+    function closeAdminCancelRrModal() {
+        const modal = document.getElementById('adminCancelRrModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-action="admin-cancel-reservation"]');
+        if (!btn) return;
+        openAdminCancelRrModal(
+            btn.dataset.rrId,
+            btn.dataset.roomName,
+            btn.dataset.facultyName
+        );
+    });
+
+    const closeAdminCancelRrBtn = document.getElementById('closeAdminCancelRrModal');
+    if (closeAdminCancelRrBtn) closeAdminCancelRrBtn.addEventListener('click', closeAdminCancelRrModal);
+    const cancelAdminCancelRrBtn = document.getElementById('cancelAdminCancelRrBtn');
+    if (cancelAdminCancelRrBtn) cancelAdminCancelRrBtn.addEventListener('click', closeAdminCancelRrModal);
+    const adminCancelRrBackdrop = document.getElementById('adminCancelRrBackdrop');
+    if (adminCancelRrBackdrop) adminCancelRrBackdrop.addEventListener('click', closeAdminCancelRrModal);
+
+    const submitAdminCancelRrBtn = document.getElementById('submitAdminCancelRrBtn');
+    if (submitAdminCancelRrBtn) {
+        submitAdminCancelRrBtn.addEventListener('click', function () {
+            const rrId    = document.getElementById('adminCancelRrId').value;
+            const alertEl = document.getElementById('admin-cancel-rr-alert');
+            this.disabled = true;
+            this.textContent = 'Cancelling…';
+
+            fetch('room-reservation/api/cancel-reservation.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    reservation_id: parseInt(rrId, 10),
+                    csrf_token: getCsrfToken(),
+                }),
+            })
+            .then(r => r.json())
+            .then(data => {
+                this.disabled = false;
+                this.textContent = 'Confirm Cancellation';
+                if (data.error) {
+                    alertEl.style.display = 'block';
+                    alertEl.style.background = '#ffeaea';
+                    alertEl.style.color = 'var(--danger)';
+                    alertEl.textContent = data.error;
+                    return;
+                }
+                closeAdminCancelRrModal();
+                showToast('Reservation cancelled. Faculty and waitlist notified.');
+                setTimeout(() => location.reload(), 1200);
+            })
+            .catch(() => {
+                this.disabled = false;
+                this.textContent = 'Confirm Cancellation';
+                alertEl.style.display = 'block';
+                alertEl.style.background = '#ffeaea';
+                alertEl.style.color = 'var(--danger)';
+                alertEl.textContent = 'Network error. Please try again.';
+            });
+        });
+    }
+
+    /* ── Issue Review Modal ─────────────────────────────────── */
+    function openIssueReviewModal(issueId, roomName, reporter, description) {
+        const modal   = document.getElementById('issueReviewModal');
+        const desc    = document.getElementById('issueReviewDesc');
+        const alertEl = document.getElementById('issue-review-alert');
+        document.getElementById('issueReviewId').value = issueId;
+        document.getElementById('issueAdminNotes').value = '';
+        document.getElementById('issueSetMaintenance').checked = false;
+        alertEl.style.display = 'none';
+        desc.innerHTML = '<strong>' + _escAdm(roomName) + '</strong> — reported by '
+            + _escAdm(reporter) + '<br>'
+            + '<span style="font-size:.82rem;color:var(--text-light);">'
+            + _escAdm(description) + '</span>';
+        modal.style.display = 'flex';
+    }
+
+    function closeIssueReviewModal() {
+        const modal = document.getElementById('issueReviewModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function _escAdm(str) {
+        return String(str || '')
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function _submitIssueResolution(resolution) {
+        const issueId    = document.getElementById('issueReviewId').value;
+        const adminNotes = document.getElementById('issueAdminNotes').value.trim();
+        const setMaint   = document.getElementById('issueSetMaintenance').checked;
+        const alertEl    = document.getElementById('issue-review-alert');
+
+        fetch('room-reservation/api/resolve-room-issue.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                issue_id:        parseInt(issueId, 10),
+                resolution:      resolution,
+                admin_notes:     adminNotes,
+                set_maintenance: setMaint,
+                csrf_token:      getCsrfToken(),
+            }),
+        })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('resolveIssueBtn').disabled  = false;
+            document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
+            document.getElementById('dismissIssueBtn').disabled  = false;
+            document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
+            if (data.error) {
+                alertEl.style.display = 'block';
+                alertEl.style.background = '#ffeaea';
+                alertEl.style.color = 'var(--danger)';
+                alertEl.textContent = data.error;
+                return;
+            }
+            closeIssueReviewModal();
+            showToast('Issue report ' + resolution.toLowerCase() + '.');
+            setTimeout(() => location.reload(), 1200);
+        })
+        .catch(() => {
+            document.getElementById('resolveIssueBtn').disabled  = false;
+            document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
+            document.getElementById('dismissIssueBtn').disabled  = false;
+            document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
+            alertEl.style.display = 'block';
+            alertEl.style.background = '#ffeaea';
+            alertEl.style.color = 'var(--danger)';
+            alertEl.textContent = 'Network error. Please try again.';
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-action="open-issue-review"]');
+        if (!btn) return;
+        openIssueReviewModal(
+            btn.dataset.issueId,
+            btn.dataset.roomName,
+            btn.dataset.reporter,
+            btn.dataset.description
+        );
+    });
+
+    const closeIssueReviewBtn = document.getElementById('closeIssueReviewModal');
+    if (closeIssueReviewBtn) closeIssueReviewBtn.addEventListener('click', closeIssueReviewModal);
+    const cancelIssueReviewBtn = document.getElementById('cancelIssueReviewBtn');
+    if (cancelIssueReviewBtn) cancelIssueReviewBtn.addEventListener('click', closeIssueReviewModal);
+    const issueReviewBackdrop = document.getElementById('issueReviewModalBackdrop');
+    if (issueReviewBackdrop) issueReviewBackdrop.addEventListener('click', closeIssueReviewModal);
+
+    const resolveIssueBtn = document.getElementById('resolveIssueBtn');
+    if (resolveIssueBtn) {
+        resolveIssueBtn.addEventListener('click', function () {
+            this.disabled = true; this.textContent = 'Resolving…';
+            document.getElementById('dismissIssueBtn').disabled = true;
+            _submitIssueResolution('Resolved');
+        });
+    }
+    const dismissIssueBtn = document.getElementById('dismissIssueBtn');
+    if (dismissIssueBtn) {
+        dismissIssueBtn.addEventListener('click', function () {
+            this.disabled = true; this.textContent = 'Dismissing…';
+            document.getElementById('resolveIssueBtn').disabled = true;
+            _submitIssueResolution('Dismissed');
+        });
+    }
+
+    /* ── Room form field-tip icons: toggle on click/tap ────────
+       Hover is handled by pure CSS (:hover). This JS layer adds
+       click/tap toggling for older users who can't hover precisely.
+       One delegated listener on #room-form-wrap keeps it scoped.   */
+    (function () {
+        const wrap = document.getElementById('room-form-wrap');
+        if (!wrap) return;
+
+        wrap.addEventListener('click', function (e) {
+            const tip = e.target.closest('.field-tip');
+
+            if (tip) {
+                e.stopPropagation();
+                const isOpen = tip.classList.contains('tip-open');
+                /* Close any other open tips first */
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+                if (!isOpen) tip.classList.add('tip-open');
+                return;
+            }
+
+            /* Click anywhere outside a tip closes all open tips */
+            wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+        });
+
+        /* Keyboard support: Enter/Space toggles the tip; Escape closes all */
+        wrap.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const tip = e.target.closest('.field-tip');
+                if (tip) {
+                    e.preventDefault();
+                    const isOpen = tip.classList.contains('tip-open');
+                    wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+                    if (!isOpen) tip.classList.add('tip-open');
+                }
+            }
+            if (e.key === 'Escape') {
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+            }
+        });
+
+        /* Close tips when clicking outside the form entirely */
+        document.addEventListener('click', function (e) {
+            if (!wrap.contains(e.target)) {
+                wrap.querySelectorAll('.field-tip.tip-open').forEach(t => t.classList.remove('tip-open'));
+            }
+        });
+    }());
+
     /* ── Account sub-nav ─────────────────────────────────────── */
     document.querySelectorAll('.acc-nav-btn').forEach(btn => {
         btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
@@ -909,12 +1182,34 @@
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
         } else {
-            history.replaceState({ tab: 'dashboard' }, '');
+            // Check for rooms tab param
+            const tab = params.get('tab');
+            const editRoom = params.get('edit_room');
+            if (tab === 'rooms') {
+                _switchTabDOM('rooms', false);
+                if (editRoom) {
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) { rfw.classList.remove('hidden'); }
+                    if (addRoomBtn) addRoomBtn.style.display = 'none';
+                }
+                // Auto-open archived sub-panel when redirected back from archive/restore
+                const roomArchived = params.get('room_archived');
+                const roomRestored = params.get('room_restored');
+                if (roomArchived || roomRestored) {
+                    switchRoomsTab('rooms-archived');
+                }
+                history.replaceState({ tab: 'rooms' }, '');
+            } else {
+                history.replaceState({ tab: 'dashboard' }, '');
+            }
         }
 
         // Auto-dismiss alerts after 5s
         setTimeout(() => {
-            ['added-alert', 'updated-alert'].forEach(id => {
+            ['added-alert', 'updated-alert',
+             'room-added-alert', 'room-updated-alert',
+             'room-archived-alert', 'room-restored-alert'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.display = 'none';
             });

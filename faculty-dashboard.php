@@ -321,6 +321,31 @@ $requests_js = [];
 while ($row = mysqli_fetch_assoc($requests_raw)) $requests_js[] = $row;
 $requests_json = json_encode($requests_js, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
+// ── Room Reservations for My Reservations history panel ───────────────────
+$room_res_stmt = $conn->prepare(
+    "SELECT rr.id, rr.room_id, rr.reservation_date, rr.start_time, rr.end_time,
+            rr.purpose, rr.submitted_as, rr.status, rr.reason,
+            rr.request_date,
+            r.room_name,
+            b.name AS building_name,
+            COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label
+       FROM tbl_room_reservations rr
+       JOIN tbl_rooms     r ON r.room_id     = rr.room_id
+       JOIN tbl_buildings b ON b.building_id = r.building_id
+      WHERE rr.faculty_id = ?
+      ORDER BY rr.request_date DESC"
+);
+$room_reservations = [];
+if ($room_res_stmt) {
+    $room_res_stmt->bind_param('s', $uid_safe);
+    $room_res_stmt->execute();
+    $room_res_result = $room_res_stmt->get_result();
+    while ($row = $room_res_result->fetch_assoc()) {
+        $room_reservations[] = $row;
+    }
+    $room_res_stmt->close();
+}
+
 // ── Overdue for notifications ──────────────────────────────────────────────
 $overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
 $overdue_notifs = [];
@@ -400,6 +425,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token()); ?>">
     <title>PUPSync | Faculty Dashboard</title>
     <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2143,7 +2169,161 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             <!-- ============================================================
          TAB: FACILITIES (ROOMS)
     ============================================================ -->
-            <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
+            <div class="tab-panel" id="panel-rooms">
+
+                <!-- Rooms Sub-Nav — Browse | My Reservations -->
+                <div class="lending-subnav">
+                    <button class="lending-nav-btn active" data-rooms-nav="browse">
+                        <span class="material-symbols-outlined">apartment</span> Browse Facilities
+                    </button>
+                    <button class="lending-nav-btn" data-rooms-nav="history">
+                        <span class="material-symbols-outlined">event_note</span> My Reservations
+                        <?php if (!empty($room_reservations)): ?>
+                            <span class="lnb-badge"><?php echo count($room_reservations); ?></span>
+                        <?php endif; ?>
+                    </button>
+                </div>
+
+                <!-- ── Sub: Browse Facilities ─────────────────────────────── -->
+                <div class="lending-sub active" id="rooms-browse">
+                    <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
+                </div><!-- /rooms-browse -->
+
+                <!-- ── Sub: My Reservations ───────────────────────────────── -->
+                <div class="lending-sub" id="rooms-history">
+                    <div class="page-header-block">
+                        <h2 class="page-title-sm">My Room Reservations</h2>
+                        <p class="page-subtitle">All room reservations you or your students have submitted.</p>
+                    </div>
+                    <div class="table-surface">
+                        <div class="table-toolbar">
+                            <h3 class="table-toolbar-title">Reservation History</h3>
+                            <div class="table-toolbar-actions">
+                                <div class="req-filter-wrap">
+                                    <span class="material-symbols-outlined"
+                                        style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
+                                    <select id="roomResStatusFilter" class="req-filter-select"
+                                        data-action="filter-room-reservations">
+                                        <option value="All">All Statuses</option>
+                                        <option value="Approved" selected>Approved</option>
+                                        <option value="Declined">Declined</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="requests-table" id="roomReservationsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Room</th>
+                                        <th>Location</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Purpose</th>
+                                        <th>Submitted As</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="roomReservationsTbody">
+                                <?php if (empty($room_reservations)): ?>
+                                    <tr>
+                                        <td colspan="9" style="text-align:center;padding:2.5rem;color:var(--color-on-surface-variant);font-size:.875rem;">
+                                            No room reservations yet.
+                                        </td>
+                                    </tr>
+                                <?php else: foreach ($room_reservations as $rr):
+                                    $rr_pill = 'pill-waiting';
+                                    if ($rr['status'] === 'Approved')   $rr_pill = 'pill-approved';
+                                    if ($rr['status'] === 'Declined')   $rr_pill = 'pill-declined';
+                                    if ($rr['status'] === 'Cancelled')  $rr_pill = 'pill-cancelled';
+
+                                    // Submitted-as label
+                                    $rr_submitted = match($rr['submitted_as']) {
+                                        'adviser'  => 'Adviser',
+                                        'student'  => 'Student (via code)',
+                                        default    => 'Personal',
+                                    };
+
+                                    // Time display  08:00:00 → 8:00 AM
+                                    $fmt_time = function(string $t): string {
+                                        return date('g:i A', strtotime('1970-01-01 ' . $t));
+                                    };
+                                ?>
+                                    <tr data-rr-status="<?php echo htmlspecialchars($rr['status']); ?>"
+                                        data-rr-id="<?php echo (int)$rr['id']; ?>"
+                                        data-rr-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
+                                        data-rr-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
+                                        data-rr-start="<?php echo htmlspecialchars($rr['start_time']); ?>"
+                                        data-rr-end="<?php echo htmlspecialchars($rr['end_time']); ?>">
+                                        <td class="fw-bold"><?php echo htmlspecialchars($rr['room_name']); ?></td>
+                                        <td><?php echo htmlspecialchars($rr['floor_label'] . ', ' . $rr['building_name']); ?></td>
+                                        <td><?php echo date('M d, Y', strtotime($rr['reservation_date'])); ?></td>
+                                        <td style="white-space:nowrap;">
+                                            <?php echo $fmt_time($rr['start_time']) . ' – ' . $fmt_time($rr['end_time']); ?>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($rr['purpose']); ?></td>
+                                        <td><?php echo htmlspecialchars($rr_submitted); ?></td>
+                                        <td>
+                                            <span class="status-pill <?php echo $rr_pill; ?>">
+                                                <?php echo htmlspecialchars($rr['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td style="color:var(--color-on-surface-variant);font-size:.8rem;">
+                                            <?php echo $rr['reason'] ? htmlspecialchars($rr['reason']) : '—'; ?>
+                                        </td>
+                                        <td>
+                                            <?php
+                                            // Cancel button: only for Approved, > 1h before start
+                                            if ($rr['status'] === 'Approved') {
+                                                date_default_timezone_set('Asia/Manila');
+                                                $resStart = new DateTime(
+                                                    $rr['reservation_date'] . ' ' . $rr['start_time'],
+                                                    new DateTimeZone('Asia/Manila')
+                                                );
+                                                $nowPhp = new DateTime('now', new DateTimeZone('Asia/Manila'));
+                                                $canCancel = ($resStart->getTimestamp() - $nowPhp->getTimestamp()) > 3600;
+                                                if ($canCancel): ?>
+                                                    <button class="btn-action btn-cancel-rr"
+                                                        data-action="cancel-reservation"
+                                                        data-rr-id="<?php echo (int)$rr['id']; ?>"
+                                                        data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
+                                                        title="Cancel this reservation">
+                                                        <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
+                                                        Cancel
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span style="color:var(--color-on-surface-variant);font-size:.75rem;" title="Cannot cancel within 1 hour of start time">—</span>
+                                                <?php endif;
+                                            } elseif ($rr['status'] === 'Declined') {
+                                                // Offer waitlist join for Declined reservations
+                                            ?>
+                                                <button class="btn-action btn-waitlist-rr"
+                                                    data-action="join-waitlist"
+                                                    data-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
+                                                    data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
+                                                    data-res-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
+                                                    data-start-time="<?php echo htmlspecialchars($rr['start_time']); ?>"
+                                                    data-end-time="<?php echo htmlspecialchars($rr['end_time']); ?>"
+                                                    title="Join waitlist for this slot">
+                                                    <span class="material-symbols-outlined" style="font-size:15px;">notifications</span>
+                                                    Waitlist
+                                                </button>
+                                            <?php } else { ?>
+                                                <span style="color:var(--color-on-surface-variant);font-size:.75rem;">—</span>
+                                            <?php } ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div><!-- /rooms-history -->
+
+            </div><!-- /panel-rooms (wraps both sub-panels) -->
 
             <!-- ============================================================
          TAB: MY ACTIVITY (Timeline)

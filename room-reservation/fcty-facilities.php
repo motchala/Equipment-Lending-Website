@@ -12,8 +12,9 @@
 
 <!-- ============================================================
      TAB: FACILITIES (ROOMS)  — fcty-facilities partial
+     Note: The tab-panel#panel-rooms wrapper lives in faculty-dashboard.php.
+     This file renders only the inner content (views + modal).
 ============================================================ -->
-<div class="tab-panel" id="panel-rooms">
 
     <!-- ══════════════════════════════════════════════════════════
          VIEW 1 — Campus Selection (shown by default)
@@ -30,7 +31,7 @@
 
                 <!-- Background image — swap src for a real PUP MAIN photo -->
                 <div class="fcty-card-bg"
-                    style="background-image: url('../assets/images/faculty/pup-main-image.jpg');">
+                    style="background-image: url('assets/images/faculty/pup-main-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 
@@ -60,7 +61,7 @@
 
                 <!-- Background image — swap src for a real PUP CITE photo -->
                 <div class="fcty-card-bg"
-                    style="background-image: url('../assets/images/faculty/pup-cite-image.jpg');">
+                    style="background-image: url('assets/images/faculty/pup-cite-image.jpg');">
                 </div>
                 <div class="fcty-card-overlay"></div>
 
@@ -325,4 +326,5 @@
         </div><!-- /.fcty-modal -->
     </div><!-- /#fcty-room-modal -->
 
-</div><!-- /#panel-rooms -->
+    <!-- ── Inline reservation form panel (shown after clicking Reserve Room) ── -->
+    <div id="fcty-reservation-panel" style="display:none;margin-top:1.5rem;"></div>

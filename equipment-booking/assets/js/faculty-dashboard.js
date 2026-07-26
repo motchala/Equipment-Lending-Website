@@ -347,10 +347,12 @@
     function switchLendingSub(subName) {
         const sub = document.getElementById('lending-' + subName);
         if (sub) sub.classList.add('active');
-        document.querySelectorAll('.lending-nav-btn').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector('.lending-nav-btn[data-lending-nav="' + subName + '"]');
+        /* Scope to #panel-lending only — prevents wiping the active state of
+           the Facilities sub-nav buttons/panes which share the same CSS classes. */
+        document.querySelectorAll('#panel-lending .lending-nav-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('#panel-lending .lending-nav-btn[data-lending-nav="' + subName + '"]');
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('.lending-sub').forEach(s => {
+        document.querySelectorAll('#panel-lending .lending-sub').forEach(s => {
             if (s !== sub) s.classList.remove('active');
         });
     }
@@ -1480,6 +1482,32 @@
         });
     });
 
+    /* ── Rooms sub-nav (Browse Facilities | My Reservations) ─────────── */
+    function switchRoomsSub(subName) {
+        const sub = document.getElementById('rooms-' + subName);
+        if (sub) sub.classList.add('active');
+        document.querySelectorAll('[data-rooms-nav]').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('[data-rooms-nav="' + subName + '"]');
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#panel-rooms .lending-sub').forEach(s => {
+            if (s !== sub) s.classList.remove('active');
+        });
+    }
+
+    document.querySelectorAll('[data-rooms-nav]').forEach(btn => {
+        btn.addEventListener('click', function () {
+            switchRoomsSub(this.dataset.roomsNav);
+        });
+    });
+
+    /* ── Room reservations status filter ─────────────────────────────── */
+    const roomResFilter = document.getElementById('roomResStatusFilter');
+    if (roomResFilter) {
+        roomResFilter.addEventListener('change', function () {
+            _applyResFilter();
+        });
+    }
+
     /* ── Account sub-nav — removed in unified settings card layout ──────── */
     // document.querySelectorAll('.acc-nav-btn').forEach(btn => {
     //     btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
@@ -1799,6 +1827,7 @@
         startRequestsPolling();
         initCodePanel();
         startInventoryPolling();
+        startReservationsPolling();
 
         // Password strength meter
         const pwNewInput = document.getElementById('pwNew');
@@ -2672,6 +2701,283 @@
                 .catch(() => { }); // silently ignore network errors
         }, INTERVAL);
     }
+
+    /* ── Room Reservations Live Polling ────────────────────────────────── */
+
+    /**
+     * Format a "HH:MM:SS" or "HH:MM" time string to "h:mm AM/PM".
+     * Mirrors the PHP $fmt_time closure used when rendering server-side.
+     */
+    function _fmtResTime(t) {
+        if (!t) return '';
+        var parts = t.split(':');
+        var h = parseInt(parts[0], 10);
+        var m = parts[1] || '00';
+        var period = h >= 12 ? 'PM' : 'AM';
+        var h12 = h % 12 || 12;
+        return h12 + ':' + m + ' ' + period;
+    }
+
+    /** Build a single <tr> string from a reservation row object. */
+    function _buildResRow(rr) {
+        var pillClass = 'pill-waiting';
+        if (rr.status === 'Approved')  pillClass = 'pill-approved';
+        if (rr.status === 'Declined')  pillClass = 'pill-declined';
+        if (rr.status === 'Cancelled') pillClass = 'pill-cancelled';
+
+        var submittedLabel = 'Personal';
+        if (rr.submitted_as === 'adviser') submittedLabel = 'Adviser';
+        if (rr.submitted_as === 'student') submittedLabel = 'Student (via code)';
+
+        // Format date: "2025-07-19" → "Jul 19, 2025"
+        var dateStr = rr.reservation_date || '';
+        try {
+            var dp = dateStr.split('-');
+            if (dp.length === 3) {
+                var months = ['Jan','Feb','Mar','Apr','May','Jun',
+                              'Jul','Aug','Sep','Oct','Nov','Dec'];
+                dateStr = months[parseInt(dp[1], 10) - 1] + ' '
+                    + parseInt(dp[2], 10) + ', ' + dp[0];
+            }
+        } catch (e) { /* keep raw string */ }
+
+        var timeStr  = _fmtResTime(rr.start_time) + ' \u2013 ' + _fmtResTime(rr.end_time);
+        var location = _escHtml((rr.floor_label || '') + ', ' + (rr.building_name || ''));
+        var reason   = rr.reason ? _escHtml(rr.reason) : '\u2014';
+
+        // Actions cell
+        var actionCell = '\u2014';
+        if (rr.status === 'Approved' && rr.can_cancel) {
+            actionCell = '<button class="btn-action btn-cancel-rr"'
+                + ' data-action="cancel-reservation"'
+                + ' data-rr-id="' + _escHtml(String(rr.id)) + '"'
+                + ' data-room-name="' + _escHtml(rr.room_name) + '"'
+                + ' title="Cancel this reservation">'
+                + '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel'
+                + '</button>';
+        } else if (rr.status === 'Approved' && !rr.can_cancel) {
+            actionCell = '<span style="color:var(--color-on-surface-variant);font-size:.75rem;"'
+                + ' title="Cannot cancel within 1 hour of start time">\u2014</span>';
+        } else if (rr.status === 'Declined') {
+            actionCell = '<button class="btn-action btn-waitlist-rr"'
+                + ' data-action="join-waitlist"'
+                + ' data-room-id="' + _escHtml(String(rr.room_id || '')) + '"'
+                + ' data-room-name="' + _escHtml(rr.room_name) + '"'
+                + ' data-res-date="' + _escHtml(rr.reservation_date) + '"'
+                + ' data-start-time="' + _escHtml(rr.start_time) + '"'
+                + ' data-end-time="' + _escHtml(rr.end_time) + '"'
+                + ' title="Join waitlist for this slot">'
+                + '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist'
+                + '</button>';
+        }
+
+        return '<tr data-rr-status="' + _escHtml(rr.status) + '">'
+            + '<td class="fw-bold">' + _escHtml(rr.room_name)    + '</td>'
+            + '<td>'                 + location                   + '</td>'
+            + '<td>'                 + _escHtml(dateStr)          + '</td>'
+            + '<td style="white-space:nowrap;">' + _escHtml(timeStr) + '</td>'
+            + '<td>'                 + _escHtml(rr.purpose)       + '</td>'
+            + '<td>'                 + _escHtml(submittedLabel)   + '</td>'
+            + '<td><span class="status-pill ' + pillClass + '">'
+                + _escHtml(rr.status) + '</span></td>'
+            + '<td style="color:var(--color-on-surface-variant);font-size:.8rem;">'
+                + reason + '</td>'
+            + '<td>' + actionCell + '</td>'
+            + '</tr>';
+    }
+
+    /**
+     * Re-render the reservations tbody from a fresh array of row objects.
+     * Respects the current status-filter selection.
+     */
+    function renderReservationsTable(rows) {
+        var tbody = document.getElementById('roomReservationsTbody');
+        if (!tbody) return;
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;'
+                + 'padding:2.5rem;color:var(--color-on-surface-variant);'
+                + 'font-size:.875rem;">No room reservations yet.</td></tr>';
+            _applyResFilter();
+            return;
+        }
+
+        tbody.innerHTML = rows.map(_buildResRow).join('');
+        _applyResFilter();
+
+        // Keep the badge count on the "My Reservations" nav button in sync
+        var badge = document.querySelector('[data-rooms-nav="history"] .lnb-badge');
+        if (badge) {
+            badge.textContent = rows.length;
+            badge.style.display = rows.length ? '' : 'none';
+        }
+    }
+
+    /** Apply the current dropdown filter to visible rows (non-destructive). */
+    function _applyResFilter() {
+        var filter = document.getElementById('roomResStatusFilter');
+        var val = filter ? filter.value : 'All';
+        document.querySelectorAll('#roomReservationsTbody tr[data-rr-status]').forEach(function (row) {
+            row.style.display = (val === 'All' || row.dataset.rrStatus === val) ? '' : 'none';
+        });
+    }
+
+    /**
+     * Poll room-reservation/api/poll-reservations.php every 10 seconds.
+     * Shows a toast when a reservation status changes (e.g. Approved→Declined
+     * after a conflict is detected by a later admin action).
+     * Runs an immediate fetch on call so the table is populated before the
+     * first interval fires.
+     */
+    function startReservationsPolling() {
+        const INTERVAL = 10000; // 10 seconds — reservations change less often than equipment requests
+        var lastStatuses = {};
+
+        function doPoll() {
+            fetch('room-reservation/api/poll-reservations.php', {
+                method: 'GET',
+                credentials: 'same-origin',
+            })
+            .then(function (r) { if (!r.ok) return null; return r.json(); })
+            .then(function (rows) {
+                if (!Array.isArray(rows)) return;
+
+                var changed = false;
+
+                rows.forEach(function (rr) {
+                    var prev = lastStatuses[rr.id];
+                    if (prev !== rr.status) {
+                        changed = true;
+                        if (prev !== undefined) {
+                            // Status transitioned after initial load — notify user
+                            if (rr.status === 'Approved') {
+                                showToast('Room reservation for ' + rr.room_name + ' was Approved!', 'success');
+                            } else if (rr.status === 'Declined') {
+                                showToast('Room reservation for ' + rr.room_name + ' was Declined.', 'error');
+                            } else if (rr.status === 'Cancelled') {
+                                showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
+                            }
+                        }
+                        lastStatuses[rr.id] = rr.status;
+                    }
+                });
+
+                // Always re-render on first poll (prev is empty) so the table
+                // reflects server state even if PHP rendered stale data on page load.
+                if (changed || Object.keys(lastStatuses).length === 0) {
+                    // Populate initial snapshot on the very first pass
+                    if (Object.keys(lastStatuses).length === 0) {
+                        rows.forEach(function (rr) { lastStatuses[rr.id] = rr.status; });
+                    }
+                    renderReservationsTable(rows);
+                }
+            })
+            .catch(function () { /* silently ignore network errors */ });
+        }
+
+        doPoll();                       // fire immediately on call
+        setInterval(doPoll, INTERVAL);  // then every 10 seconds
+
+        /* Immediate refresh when the user submits a reservation — fired by
+           fcty-facilities.js after a successful submit-faculty-reserve call. */
+        document.addEventListener('pupsync:reservation-submitted', doPoll);
+    }
+
+    /* ── Cancel Reservation handler (event delegation on reservations table) */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action="cancel-reservation"]');
+        if (!btn) return;
+
+        var rrId     = btn.dataset.rrId;
+        var roomName = btn.dataset.roomName || 'this reservation';
+
+        if (!confirm('Cancel your reservation for ' + roomName + '?\n\nThis cannot be undone.')) return;
+
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+        btn.disabled = true;
+        btn.textContent = 'Cancelling…';
+
+        fetch('room-reservation/api/cancel-reservation.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ reservation_id: parseInt(rrId, 10), csrf_token: csrfToken }),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel';
+                return;
+            }
+            showToast('Reservation cancelled successfully.', 'success');
+            // Trigger immediate poll refresh
+            document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
+        })
+        .catch(function () {
+            showToast('Network error. Please try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel';
+        });
+    });
+
+    /* ── Join Waitlist handler (event delegation on reservations table) */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action="join-waitlist"]');
+        if (!btn) return;
+
+        var roomId    = btn.dataset.roomId;
+        var roomName  = btn.dataset.roomName || 'this room';
+        var resDate   = btn.dataset.resDate;
+        var startTime = btn.dataset.startTime;
+        var endTime   = btn.dataset.endTime;
+
+        if (!confirm('Join the waitlist for ' + roomName + ' on ' + resDate + '?\n\nYou\'ll be emailed if the slot becomes available.')) return;
+
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+        btn.disabled = true;
+        btn.textContent = 'Joining…';
+
+        fetch('room-reservation/api/join-waitlist.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                room_id: parseInt(roomId, 10),
+                reservation_date: resDate,
+                start_time: startTime,
+                end_time: endTime,
+                csrf_token: csrfToken,
+            }),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) {
+                showToast(data.error, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist';
+                return;
+            }
+            if (data.already) {
+                showToast('You are already on the waitlist for this slot.', 'success');
+            } else {
+                showToast('Added to waitlist! You\'ll be emailed if the slot opens up.', 'success');
+            }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications_active</span> On Waitlist';
+            btn.title = 'You are on the waitlist for this slot';
+        })
+        .catch(function () {
+            showToast('Network error. Please try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist';
+        });
+    });
 
     /* ── Faculty Code Panel ─────────────────────────────────────────────── */
 

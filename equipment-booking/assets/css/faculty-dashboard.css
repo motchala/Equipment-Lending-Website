@@ -1911,6 +1911,66 @@ body {
     color: var(--color-secondary);
 }
 
+/* ── Pill colour variants (room reservations table) ─────────── */
+.pill-waiting {
+    background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+
+.pill-approved {
+    background: var(--color-success-container);
+    color: var(--color-success);
+}
+
+.pill-declined {
+    background: var(--color-error-container);
+    color: var(--color-error);
+}
+
+.pill-cancelled {
+    background: #f3e8ff;
+    color: #7c3aed;
+}
+
+/* ── Action buttons in reservations table ─────────────────────── */
+.btn-cancel-rr,
+.btn-waitlist-rr {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background var(--transition), color var(--transition);
+    white-space: nowrap;
+}
+
+.btn-cancel-rr {
+    background: var(--color-error-container);
+    color: var(--color-error);
+    border-color: var(--color-error-container);
+}
+
+.btn-cancel-rr:hover {
+    background: var(--color-error);
+    color: #fff;
+}
+
+.btn-waitlist-rr {
+    background: color-mix(in srgb, #7c3aed 12%, transparent);
+    color: #7c3aed;
+    border-color: color-mix(in srgb, #7c3aed 20%, transparent);
+}
+
+.btn-waitlist-rr:hover {
+    background: #7c3aed;
+    color: #fff;
+}
+
 .btn-return-item {
     display: inline-flex;
     align-items: center;
