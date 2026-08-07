@@ -224,18 +224,25 @@
 
     function _restoreNav(state) {
         _navSuppressed = true;
-        // Always close all overlays first
         document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
         if (!state || state.type === 'tab') {
             const tab = (state && state.value) ? state.value : 'home';
             _switchTabDOM(tab);
-            if (state && state.sub) switchLendingSub(state.sub);
+            if (state && state.sub) {
+                switchLendingSub(state.sub);
+            } else if (tab === 'lending') {
+                // No sub in state — default to 'browse' rather than leaving nothing active.
+                // (The safety net in _switchTabDOM also catches this, but being explicit here
+                // prevents any flash of unstyled sub-nav buttons.)
+                switchLendingSub('browse');
+            }
         } else if (state.type === 'overlay') {
-            _switchTabDOM('home'); // ensure a tab is active behind overlay
+            _switchTabDOM('home');
             _openOverlayDOM(state.value);
         }
         _navSuppressed = false;
     }
+
 
     window.addEventListener('popstate', function (e) {
         _restoreNav(e.state);
@@ -332,6 +339,19 @@
         document.querySelectorAll('.tab-panel').forEach(p => {
             if (p !== panel) p.classList.remove('active');
         });
+
+        if (tabName === 'rooms' && window.PUPSyncFacilities) {
+            window.PUPSyncFacilities.start();
+        }
+
+        // SAFETY NET: if the lending panel is now active and no sub-tab has
+        // the active class, default to 'browse' to prevent a blank content area.
+        if (tabName === 'lending') {
+            const hasActiveSub = document.querySelector('#panel-lending .lending-sub.active');
+            if (!hasActiveSub) {
+                switchLendingSub('browse');
+            }
+        }
     }
 
     function switchTab(tabName, sub) {
@@ -1200,7 +1220,7 @@
             }
             // ── Adviser: require document attachment ──────────────────────────
             const fileInp = document.getElementById('request_document');
-            const docErr  = document.getElementById('documentError');
+            const docErr = document.getElementById('documentError');
             if (fileInp) {
                 if (!fileInp.files || fileInp.files.length === 0) {
                     e.preventDefault();
@@ -1274,19 +1294,19 @@
                     break;
                 case 'borrow-subtab': {
                     var tab = el.dataset.tab;
-                    var btnP  = document.getElementById('subtab-personal-btn');
-                    var btnA  = document.getElementById('subtab-adviser-btn');
-                    var panP  = document.getElementById('subtab-personal');
-                    var panA  = document.getElementById('subtab-adviser');
+                    var btnP = document.getElementById('subtab-personal-btn');
+                    var btnA = document.getElementById('subtab-adviser-btn');
+                    var panP = document.getElementById('subtab-personal');
+                    var panA = document.getElementById('subtab-adviser');
                     if (!btnP || !btnA || !panP || !panA) break;
                     if (tab === 'personal') {
-                        btnP.classList.add('active');    btnP.setAttribute('aria-selected', 'true');
+                        btnP.classList.add('active'); btnP.setAttribute('aria-selected', 'true');
                         btnA.classList.remove('active'); btnA.setAttribute('aria-selected', 'false');
-                        panP.classList.add('active');    panA.classList.remove('active');
+                        panP.classList.add('active'); panA.classList.remove('active');
                     } else {
-                        btnA.classList.add('active');    btnA.setAttribute('aria-selected', 'true');
+                        btnA.classList.add('active'); btnA.setAttribute('aria-selected', 'true');
                         btnP.classList.remove('active'); btnP.setAttribute('aria-selected', 'false');
-                        panA.classList.add('active');    panP.classList.remove('active');
+                        panA.classList.add('active'); panP.classList.remove('active');
                     }
                     break;
                 }
@@ -1455,6 +1475,13 @@
             document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
             // Remove active from all sidebar items (including settings and help)
             document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
+
+            const tabName = this.dataset.tab;
+            let sub = null;
+            if (tabName === 'lending') {
+                const activeSubBtn = document.querySelector('#panel-lending .lending-nav-btn.active');
+                sub = activeSubBtn ? activeSubBtn.dataset.lendingNav : 'browse';
+            }
             // Switch to the clicked tab (which will set its active state)
             switchTab(this.dataset.tab);
         });
@@ -2721,8 +2748,8 @@
     /** Build a single <tr> string from a reservation row object. */
     function _buildResRow(rr) {
         var pillClass = 'pill-waiting';
-        if (rr.status === 'Approved')  pillClass = 'pill-approved';
-        if (rr.status === 'Declined')  pillClass = 'pill-declined';
+        if (rr.status === 'Approved') pillClass = 'pill-approved';
+        if (rr.status === 'Declined') pillClass = 'pill-declined';
         if (rr.status === 'Cancelled') pillClass = 'pill-cancelled';
 
         var submittedLabel = 'Personal';
@@ -2734,16 +2761,16 @@
         try {
             var dp = dateStr.split('-');
             if (dp.length === 3) {
-                var months = ['Jan','Feb','Mar','Apr','May','Jun',
-                              'Jul','Aug','Sep','Oct','Nov','Dec'];
+                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                 dateStr = months[parseInt(dp[1], 10) - 1] + ' '
                     + parseInt(dp[2], 10) + ', ' + dp[0];
             }
         } catch (e) { /* keep raw string */ }
 
-        var timeStr  = _fmtResTime(rr.start_time) + ' \u2013 ' + _fmtResTime(rr.end_time);
+        var timeStr = _fmtResTime(rr.start_time) + ' \u2013 ' + _fmtResTime(rr.end_time);
         var location = _escHtml((rr.floor_label || '') + ', ' + (rr.building_name || ''));
-        var reason   = rr.reason ? _escHtml(rr.reason) : '\u2014';
+        var reason = rr.reason ? _escHtml(rr.reason) : '\u2014';
 
         // Actions cell
         var actionCell = '\u2014';
@@ -2772,16 +2799,16 @@
         }
 
         return '<tr data-rr-status="' + _escHtml(rr.status) + '">'
-            + '<td class="fw-bold">' + _escHtml(rr.room_name)    + '</td>'
-            + '<td>'                 + location                   + '</td>'
-            + '<td>'                 + _escHtml(dateStr)          + '</td>'
+            + '<td class="fw-bold">' + _escHtml(rr.room_name) + '</td>'
+            + '<td>' + location + '</td>'
+            + '<td>' + _escHtml(dateStr) + '</td>'
             + '<td style="white-space:nowrap;">' + _escHtml(timeStr) + '</td>'
-            + '<td>'                 + _escHtml(rr.purpose)       + '</td>'
-            + '<td>'                 + _escHtml(submittedLabel)   + '</td>'
+            + '<td>' + _escHtml(rr.purpose) + '</td>'
+            + '<td>' + _escHtml(submittedLabel) + '</td>'
             + '<td><span class="status-pill ' + pillClass + '">'
-                + _escHtml(rr.status) + '</span></td>'
+            + _escHtml(rr.status) + '</span></td>'
             + '<td style="color:var(--color-on-surface-variant);font-size:.8rem;">'
-                + reason + '</td>'
+            + reason + '</td>'
             + '<td>' + actionCell + '</td>'
             + '</tr>';
     }
@@ -2838,41 +2865,41 @@
                 method: 'GET',
                 credentials: 'same-origin',
             })
-            .then(function (r) { if (!r.ok) return null; return r.json(); })
-            .then(function (rows) {
-                if (!Array.isArray(rows)) return;
+                .then(function (r) { if (!r.ok) return null; return r.json(); })
+                .then(function (rows) {
+                    if (!Array.isArray(rows)) return;
 
-                var changed = false;
+                    var changed = false;
 
-                rows.forEach(function (rr) {
-                    var prev = lastStatuses[rr.id];
-                    if (prev !== rr.status) {
-                        changed = true;
-                        if (prev !== undefined) {
-                            // Status transitioned after initial load — notify user
-                            if (rr.status === 'Approved') {
-                                showToast('Room reservation for ' + rr.room_name + ' was Approved!', 'success');
-                            } else if (rr.status === 'Declined') {
-                                showToast('Room reservation for ' + rr.room_name + ' was Declined.', 'error');
-                            } else if (rr.status === 'Cancelled') {
-                                showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
+                    rows.forEach(function (rr) {
+                        var prev = lastStatuses[rr.id];
+                        if (prev !== rr.status) {
+                            changed = true;
+                            if (prev !== undefined) {
+                                // Status transitioned after initial load — notify user
+                                if (rr.status === 'Approved') {
+                                    showToast('Room reservation for ' + rr.room_name + ' was Approved!', 'success');
+                                } else if (rr.status === 'Declined') {
+                                    showToast('Room reservation for ' + rr.room_name + ' was Declined.', 'error');
+                                } else if (rr.status === 'Cancelled') {
+                                    showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
+                                }
                             }
+                            lastStatuses[rr.id] = rr.status;
                         }
-                        lastStatuses[rr.id] = rr.status;
-                    }
-                });
+                    });
 
-                // Always re-render on first poll (prev is empty) so the table
-                // reflects server state even if PHP rendered stale data on page load.
-                if (changed || Object.keys(lastStatuses).length === 0) {
-                    // Populate initial snapshot on the very first pass
-                    if (Object.keys(lastStatuses).length === 0) {
-                        rows.forEach(function (rr) { lastStatuses[rr.id] = rr.status; });
+                    // Always re-render on first poll (prev is empty) so the table
+                    // reflects server state even if PHP rendered stale data on page load.
+                    if (changed || Object.keys(lastStatuses).length === 0) {
+                        // Populate initial snapshot on the very first pass
+                        if (Object.keys(lastStatuses).length === 0) {
+                            rows.forEach(function (rr) { lastStatuses[rr.id] = rr.status; });
+                        }
+                        renderReservationsTable(rows);
                     }
-                    renderReservationsTable(rows);
-                }
-            })
-            .catch(function () { /* silently ignore network errors */ });
+                })
+                .catch(function () { /* silently ignore network errors */ });
         }
 
         doPoll();                       // fire immediately on call
@@ -2888,12 +2915,12 @@
         var btn = e.target.closest('[data-action="cancel-reservation"]');
         if (!btn) return;
 
-        var rrId     = btn.dataset.rrId;
+        var rrId = btn.dataset.rrId;
         var roomName = btn.dataset.roomName || 'this reservation';
 
         if (!confirm('Cancel your reservation for ' + roomName + '?\n\nThis cannot be undone.')) return;
 
-        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
         btn.disabled = true;
@@ -2905,23 +2932,23 @@
             credentials: 'same-origin',
             body: JSON.stringify({ reservation_id: parseInt(rrId, 10), csrf_token: csrfToken }),
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.error) {
-                showToast(data.error, 'error');
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel';
+                    return;
+                }
+                showToast('Reservation cancelled successfully.', 'success');
+                // Trigger immediate poll refresh
+                document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
+            })
+            .catch(function () {
+                showToast('Network error. Please try again.', 'error');
                 btn.disabled = false;
                 btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel';
-                return;
-            }
-            showToast('Reservation cancelled successfully.', 'success');
-            // Trigger immediate poll refresh
-            document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
-        })
-        .catch(function () {
-            showToast('Network error. Please try again.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel';
-        });
+            });
     });
 
     /* ── Join Waitlist handler (event delegation on reservations table) */
@@ -2929,15 +2956,15 @@
         var btn = e.target.closest('[data-action="join-waitlist"]');
         if (!btn) return;
 
-        var roomId    = btn.dataset.roomId;
-        var roomName  = btn.dataset.roomName || 'this room';
-        var resDate   = btn.dataset.resDate;
+        var roomId = btn.dataset.roomId;
+        var roomName = btn.dataset.roomName || 'this room';
+        var resDate = btn.dataset.resDate;
         var startTime = btn.dataset.startTime;
-        var endTime   = btn.dataset.endTime;
+        var endTime = btn.dataset.endTime;
 
         if (!confirm('Join the waitlist for ' + roomName + ' on ' + resDate + '?\n\nYou\'ll be emailed if the slot becomes available.')) return;
 
-        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
         btn.disabled = true;
@@ -2955,28 +2982,28 @@
                 csrf_token: csrfToken,
             }),
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.error) {
-                showToast(data.error, 'error');
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist';
+                    return;
+                }
+                if (data.already) {
+                    showToast('You are already on the waitlist for this slot.', 'success');
+                } else {
+                    showToast('Added to waitlist! You\'ll be emailed if the slot opens up.', 'success');
+                }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications_active</span> On Waitlist';
+                btn.title = 'You are on the waitlist for this slot';
+            })
+            .catch(function () {
+                showToast('Network error. Please try again.', 'error');
                 btn.disabled = false;
                 btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist';
-                return;
-            }
-            if (data.already) {
-                showToast('You are already on the waitlist for this slot.', 'success');
-            } else {
-                showToast('Added to waitlist! You\'ll be emailed if the slot opens up.', 'success');
-            }
-            btn.disabled = true;
-            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications_active</span> On Waitlist';
-            btn.title = 'You are on the waitlist for this slot';
-        })
-        .catch(function () {
-            showToast('Network error. Please try again.', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist';
-        });
+            });
     });
 
     /* ── Faculty Code Panel ─────────────────────────────────────────────── */
