@@ -1,143 +1,26 @@
 /* ================================================================
-   HERO CAROUSEL
-================================================================ */
-(function () {
-    const TOTAL = 7;
-    const INTERVAL = 6000; // 6 s between transitions
-    const IMG_BASE = 'css/images-design/';
-    const IMG_SUFFIX = '-hero-page.jpg';
-
-    const track = document.getElementById('carouselTrack');
-    const slides = Array.from(track.querySelectorAll('.carousel-slide'));
-    const dotsWrap = document.getElementById('carouselDots');
-    const counter = document.getElementById('carouselCounter');
-    const progress = document.getElementById('carouselProgress');
-
-    let current = 6; // start at index 6 (image 7)
-    let timer = null;
-    let progTimer = null;
-
-    /* Assign background images */
-    slides.forEach((s, i) => {
-        s.style.backgroundImage = `url('${IMG_BASE}${i + 1}${IMG_SUFFIX}')`;
-    });
-
-    /* Build dots */
-    for (let i = 0; i < TOTAL; i++) {
-        const d = document.createElement('button');
-        d.className = 'carousel-dot' + (i === current ? ' active' : '');
-        d.setAttribute('aria-label', `Go to slide ${i + 1}`);
-        d.addEventListener('click', () => goTo(i));
-        dotsWrap.appendChild(d);
-    }
-
-    function getDots() {
-        return dotsWrap.querySelectorAll('.carousel-dot');
-    }
-
-    function updateUI() {
-        slides.forEach((s, i) => s.classList.toggle('active', i === current));
-        getDots().forEach((d, i) => d.classList.toggle('active', i === current));
-        counter.textContent = `${current + 1} / ${TOTAL}`;
-    }
-
-    /* Animated progress bar */
-    function startProgress() {
-        clearInterval(progTimer);
-        progress.style.transition = 'none';
-        progress.style.width = '0%';
-        /* Force reflow */
-        void progress.offsetWidth;
-        progress.style.transition = `width ${INTERVAL}ms linear`;
-        progress.style.width = '100%';
-    }
-
-    function goTo(idx) {
-        current = (idx + TOTAL) % TOTAL;
-        updateUI();
-        resetTimer();
-        startProgress();
-    }
-
-    window.carouselGo = function (dir) {
-        goTo(current + dir);
-    };
-
-    function resetTimer() {
-        clearInterval(timer);
-        timer = setInterval(() => goTo(current + 1), INTERVAL);
-    }
-
-    /* Init */
-    updateUI();
-    startProgress();
-    resetTimer();
-
-    /* Pause on hover */
-    track.closest('.hero').addEventListener('mouseenter', () => {
-        clearInterval(timer);
-        clearInterval(progTimer);
-        progress.style.transition = 'none';
-    });
-    track.closest('.hero').addEventListener('mouseleave', () => {
-        startProgress();
-        resetTimer();
-    });
-
-    /* Touch swipe support */
-    let touchStartX = 0;
-    track.addEventListener('touchstart', e => {
-        touchStartX = e.touches[0].clientX;
-    }, {
-        passive: true
-    });
-    track.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        if (Math.abs(dx) > 40) goTo(current + (dx < 0 ? 1 : -1));
-    }, {
-        passive: true
-    });
-})();
-
-
-/* ================================================================
-   FOOTER SCROLL-REVEAL (IntersectionObserver)
-================================================================ */
-(function () {
-    const footer = document.getElementById('site-footer');
-    const obs = new IntersectionObserver(
-        ([entry]) => {
-            if (entry.isIntersecting) {
-                footer.classList.add('visible');
-                obs.disconnect();
-            }
-        }, {
-        threshold: 0.05
-    }
-    );
-    obs.observe(footer);
-})();
-
-
-/* ================================================================
    MODAL
 ================================================================ */
 const overlay = document.getElementById('authModal');
 let isMin = false;
 
-function openModal() {
+/**
+ * Opens the auth modal.
+ * @param {string|null} role  'student' (faculty login/register — see legacy
+ *                             id="studentSection"), 'admin', or null/undefined
+ *                             to land on the generic role selector.
+ */
+function openModal(role) {
     overlay.classList.remove('minimized');
     isMin = false;
     updateMinimizeIcon();
     overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
 
-    // Show role selector by default
-    showRoleSelector();
-
-    /* Only lock scroll when NOT in mobile-preview (frame handles its own scroll) */
-    const frame = document.getElementById('phoneFrameWrap');
-    if (!frame.classList.contains('mobile-preview')) {
-        document.body.style.overflow = 'hidden';
+    if (role) {
+        selectRole(role);
+    } else {
+        showRoleSelector();
     }
 }
 
@@ -182,7 +65,7 @@ document.addEventListener('keydown', e => {
 
 
 /* ================================================================
-   ROLE SELECTOR & NAVIGATION
+   ROLE SELECTOR & NAVIGATION (inside the modal)
 ================================================================ */
 function showRoleSelector() {
     // Hide all auth sections
@@ -217,6 +100,12 @@ function selectRole(role) {
         if (section) {
             section.classList.add('active');
         }
+    }
+
+    // Keep the modal handle label in sync with the active portal
+    const label = document.querySelector('.modal-handle-label');
+    if (label) {
+        label.textContent = role === 'admin' ? 'Admin Portal' : 'Faculty Portal';
     }
 }
 
@@ -337,44 +226,6 @@ setTimeout(() => {
 
 
 /* ================================================================
-   MOBILE VIEW TOGGLE
-   Creates a phone-frame preview centered in the browser window.
-   No browser resize needed — the UI itself scales to phone dimensions.
-================================================================ */
-let isMobilePreview = false;
-
-function toggleMobileView() {
-    isMobilePreview = !isMobilePreview;
-    const btn = document.getElementById('mobileToggleBtn');
-    const icon = document.getElementById('mobileToggleIcon');
-    const label = document.getElementById('mobileToggleLabel');
-    const frame = document.getElementById('phoneFrameWrap');
-    const html = document.documentElement;
-
-    if (isMobilePreview) {
-        html.classList.add('mobile-preview-bg');
-        frame.classList.add('mobile-preview');
-        btn.setAttribute('aria-pressed', 'true');
-        icon.className = 'fa-solid fa-desktop';
-        label.textContent = 'Desktop Ready';
-        btn.title = 'Exit mobile preview';
-        closeModal();
-        /* Scroll browser window to top so hero fills the phone frame */
-        window.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-        });
-    } else {
-        html.classList.remove('mobile-preview-bg');
-        frame.classList.remove('mobile-preview');
-        btn.setAttribute('aria-pressed', 'false');
-        icon.className = 'fa-solid fa-mobile-screen-button';
-        label.textContent = 'Mobile Ready';
-        btn.title = 'Switch to mobile preview layout';
-    }
-}
-
-/* ================================================================
    PASSWORD VISIBILITY TOGGLE
 ================================================================ */
 function toggleEye(inputId, btn) {
@@ -400,26 +251,12 @@ function toggleEye(inputId, btn) {
 ================================================================ */
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Carousel arrows
-    document.getElementById('carouselPrev')?.addEventListener('click', () => carouselGo(-1));
-    document.getElementById('carouselNext')?.addEventListener('click', () => carouselGo(1));
-
-    // Hero — Access Portal button
-    document.getElementById('accessPortalBtn')?.addEventListener('click', () => openModal());
-
-    // Footer — Sign In / Create Account links
-    document.getElementById('footerSignInBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal('login');
+    // Gateway — role access cards
+    document.getElementById('gwStudentBtn')?.addEventListener('click', () => {
+        window.location.href = 'student-dashboard.php';
     });
-    document.getElementById('footerRegisterBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        openModal('register');
-    });
-
-    // Footer — Mobile toggle buttons
-    document.getElementById('mobileToggleBtn')?.addEventListener('click', () => toggleMobileView());
-    document.getElementById('fmbDesktopBtn')?.addEventListener('click', () => toggleMobileView());
+    document.getElementById('gwFacultyBtn')?.addEventListener('click', () => openModal('student'));
+    document.getElementById('gwAdminBtn')?.addEventListener('click', () => openModal('admin'));
 
     // Modal — backdrop closes modal
     document.getElementById('modalBackdrop')?.addEventListener('click', () => closeModal());
@@ -441,16 +278,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (e.key === 'Enter') closeModal();
     });
 
-    // Role selector cards
+    // Role selector cards (legacy fallback path inside the modal itself)
     document.getElementById('roleFacultyBtn')?.addEventListener('click', () => selectRole('student'));
     document.getElementById('roleStudentBtn')?.addEventListener('click', () => {
         window.location.href = 'student-dashboard.php';
     });
     document.getElementById('roleAdminBtn')?.addEventListener('click', () => selectRole('admin'));
 
-    // Back buttons
-    document.getElementById('studentBackBtn')?.addEventListener('click', () => backToRoleSelector());
-    document.getElementById('adminBackBtn')?.addEventListener('click', () => backToRoleSelector());
+    // Back buttons — return to the gateway screen by closing the modal
+    document.getElementById('studentBackBtn')?.addEventListener('click', () => closeModal());
+    document.getElementById('adminBackBtn')?.addEventListener('click', () => closeModal());
 
     // Auth tabs
     document.getElementById('student-tab-login')?.addEventListener('click', () => switchStudentTab('login'));
