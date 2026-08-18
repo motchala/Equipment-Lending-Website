@@ -15,12 +15,6 @@ require_once __DIR__ . '/config/csrf.php';
 // Ensure server uses local timezone for login timestamps
 date_default_timezone_set('Asia/Manila');
 
-function validateStudentIDYear($student_id)
-{
-    $year = intval(substr($student_id, 0, 4));
-    return $year >= 2000 && $year <= 2030;
-}
-
 if (isset($_SESSION['faculty_id'])) {
     header("Location: faculty-dashboard.php");
     exit();
@@ -36,8 +30,8 @@ if (isset($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/config/db.php';
 $conn = getDB();
-$login_error = $register_error = $register_success = "";
-$login_email_val = $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
+$login_error = "";
+$login_email_val = "";
 
 // ----------- LOGIN -----------
 if (isset($_POST['login'])) {
@@ -154,59 +148,15 @@ if (isset($_POST['login'])) {
     }
 }
 
-// ----------- REGISTRATION -----------
-if (isset($_POST['register'])) {
-    csrf_verify();
-    $fullname         = trim($_POST['fullname']);
-    $student_id       = trim($_POST['student_id']);
-    $email            = trim($_POST['email']);
-    $password         = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
+// Faculty accounts are created through a different flow now (not self-registration
+// on this page), so there is no registration POST handler here anymore.
 
-    $reg_fullname_val  = $fullname;
-    $reg_studentid_val = $student_id;
-    $reg_email_val     = $email;
-
-    if (!$fullname || !$student_id || !$email || !$password || !$confirm_password) {
-        $register_error = "Please fill in all fields.";
-    } elseif ($password !== $confirm_password) {
-        $register_error = "Passwords do not match.";
-    } elseif (strlen($student_id) != 15) {
-        $register_error = "Student ID must be exactly 15 characters.";
-    } elseif (!preg_match('/^2[0-9]{3}-[0-9]{5}-BN-[0-9]$/', $student_id)) {
-        $register_error = "Invalid Student ID format. Use: YYYY-XXXXX-BN-X";
-    } elseif (!validateStudentIDYear($student_id)) {
-        $register_error = "Year must be between 2000 and 2030.";
-    } elseif (strlen($password) < 4) {
-        $register_error = "Password must be at least 4 characters.";
-    } elseif (strlen($fullname) < 5 || strlen($fullname) > 70) {
-        $register_error = "Full Name must be between 5 and 70 characters.";
-    } elseif (strlen($email) < 15 || strlen($email) > 254) {
-        $register_error = "Email must be between 15 and 254 characters.";
-    } else {
-        $stmt = $conn->prepare("SELECT * FROM tbl_users WHERE email = ? OR student_id = ?");
-        $stmt->bind_param("ss", $email, $student_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result->num_rows > 0) {
-            $register_error = "Email or Student ID already exists.";
-        } else {
-            $hashed = password_hash($password, PASSWORD_BCRYPT);
-            $stmt = $conn->prepare("INSERT INTO tbl_users (fullname, student_id, email, password) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssss", $fullname, $student_id, $email, $hashed);
-            if ($stmt->execute()) {
-                $register_success = "Account created! Redirecting to sign in…";
-                $reg_fullname_val = $reg_studentid_val = $reg_email_val = "";
-            } else {
-                $register_error = "Error: " . $stmt->error;
-            }
-        }
-    }
+// Which panel view should be active on page load (a server-side login error
+// needs to land the user back on the right form instead of the role picker).
+$panel_target_role = null;
+if ($login_error) {
+    $panel_target_role = (($_POST['user_type'] ?? '') === 'admin') ? 'admin' : 'faculty';
 }
-
-$open_tab = "login";
-if (!empty($register_error) || !empty($register_success)) $open_tab = "register";
-$auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($register_success));
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -273,34 +223,149 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
                 </div>
             </div>
 
-            <div class="access-cards">
-                <button class="access-card" id="gwStudentBtn" aria-label="Continue as Student">
-                    <span class="access-icon"><i class="fa-solid fa-graduation-cap"></i></span>
-                    <span class="access-text">
-                        <span class="access-title">Student</span>
-                        <span class="access-desc">Access services &amp; check availability</span>
-                    </span>
-                    <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
-                </button>
+            <!-- panel-stage swaps its content in place: role picker <-> login form.
+                 Nothing here is a modal/popup — it's the same right-hand panel,
+                 just switching which view is active. -->
+            <div class="panel-stage" id="panelStage">
 
-                <button class="access-card" id="gwFacultyBtn" aria-label="Continue as Faculty">
-                    <span class="access-icon"><i class="fa-solid fa-chalkboard-teacher"></i></span>
-                    <span class="access-text">
-                        <span class="access-title">Faculty</span>
-                        <span class="access-desc">Borrow equipment &amp; reserve rooms</span>
-                    </span>
-                    <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
-                </button>
+                <!-- ROLE PICKER -->
+                <div class="panel-view panel-view-access<?= $panel_target_role ? '' : ' active' ?>" id="accessView">
+                    <div class="access-cards">
+                        <button class="access-card" id="gwStudentBtn" aria-label="Continue as Student">
+                            <span class="access-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+                            <span class="access-text">
+                                <span class="access-title">Student</span>
+                                <span class="access-desc">Access services &amp; check availability</span>
+                            </span>
+                            <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                        </button>
 
-                <button class="access-card" id="gwAdminBtn" aria-label="Continue as Admin">
-                    <span class="access-icon"><i class="fa-solid fa-gear"></i></span>
-                    <span class="access-text">
-                        <span class="access-title">Admin</span>
-                        <span class="access-desc">System administration &amp; security</span>
-                    </span>
-                    <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
-                </button>
-            </div>
+                        <button class="access-card" id="gwFacultyBtn" aria-label="Continue as Faculty">
+                            <span class="access-icon"><i class="fa-solid fa-chalkboard-teacher"></i></span>
+                            <span class="access-text">
+                                <span class="access-title">Faculty</span>
+                                <span class="access-desc">Borrow equipment &amp; reserve rooms</span>
+                            </span>
+                            <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                        </button>
+
+                        <button class="access-card" id="gwAdminBtn" aria-label="Continue as Admin">
+                            <span class="access-icon"><i class="fa-solid fa-gear"></i></span>
+                            <span class="access-text">
+                                <span class="access-title">Admin</span>
+                                <span class="access-desc">System administration &amp; security</span>
+                            </span>
+                            <span class="access-arrow"><i class="fa-solid fa-chevron-right"></i></span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FACULTY LOGIN -->
+                <div class="panel-view panel-view-auth<?= $panel_target_role === 'faculty' ? ' active' : '' ?>" id="facultyView">
+                    <button class="back-btn" id="facultyBackBtn" type="button">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+
+                    <div class="auth-head">
+                        <span class="access-icon"><i class="fa-solid fa-chalkboard-teacher"></i></span>
+                        <div class="auth-head-text">
+                            <p class="pane-title">Faculty Portal</p>
+                            <p class="pane-subtitle">Borrow equipment &amp; reserve rooms</p>
+                        </div>
+                    </div>
+
+                    <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'student'): ?>
+                        <div class="auth-alert error">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <?= htmlspecialchars($login_error) ?>
+                        </div>
+                    <?php endif; ?>
+                    <form method="POST" action="">
+                        <?= csrf_field() ?>
+                        <!-- NOTE: user_type stays "student" here on purpose — that's the
+                             backend key the faculty (tbl_users) login branch checks for. -->
+                        <input type="hidden" name="user_type" value="student">
+                        <div class="form-group">
+                            <label for="faculty-login-email">Faculty Email</label>
+                            <div class="input-wrap">
+                                <input class="form-field" type="email" id="faculty-login-email" name="email"
+                                    placeholder="faculty@pup.edu.ph"
+                                    value="<?= htmlspecialchars($login_email_val) ?>"
+                                    autocomplete="email" required>
+                                <i class="fa-solid fa-envelope input-icon-left"></i>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="faculty-login-pass">Password</label>
+                            <div class="input-wrap">
+                                <input class="form-field" type="password" id="faculty-login-pass" name="password"
+                                    placeholder="Enter your password"
+                                    autocomplete="current-password" required>
+                                <i class="fa-solid fa-lock input-icon-left"></i>
+                                <button type="button" class="eye-toggle" data-target="faculty-login-pass" tabindex="-1" aria-label="Show password">
+                                    <i class="fa-regular fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" name="login" class="btn-auth">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            Sign In
+                        </button>
+                    </form>
+                </div>
+
+                <!-- ADMIN LOGIN -->
+                <div class="panel-view panel-view-auth<?= $panel_target_role === 'admin' ? ' active' : '' ?>" id="adminView">
+                    <button class="back-btn" id="adminBackBtn" type="button">
+                        <i class="fa-solid fa-arrow-left"></i> Back
+                    </button>
+
+                    <div class="auth-head">
+                        <span class="access-icon"><i class="fa-solid fa-gear"></i></span>
+                        <div class="auth-head-text">
+                            <p class="pane-title">Admin Login</p>
+                            <p class="pane-subtitle">Administrative access only</p>
+                        </div>
+                    </div>
+
+                    <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'admin'): ?>
+                        <div class="auth-alert error">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                            <?= htmlspecialchars($login_error) ?>
+                        </div>
+                    <?php endif; ?>
+                    <form method="POST" action="">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="user_type" value="admin">
+                        <div class="form-group">
+                            <label for="admin-login-email">Admin Email</label>
+                            <div class="input-wrap">
+                                <input class="form-field" type="email" id="admin-login-email" name="email"
+                                    placeholder="admin@pup.edu.ph"
+                                    autocomplete="email" required>
+                                <i class="fa-solid fa-envelope input-icon-left"></i>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="admin-login-pass">Password</label>
+                            <div class="input-wrap">
+                                <input class="form-field" type="password" id="admin-login-pass" name="password"
+                                    placeholder="Enter your password"
+                                    autocomplete="current-password" required>
+                                <i class="fa-solid fa-lock input-icon-left"></i>
+                                <button type="button" class="eye-toggle" data-target="admin-login-pass" tabindex="-1" aria-label="Show password">
+                                    <i class="fa-regular fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" name="login" class="btn-auth">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                            Sign In
+                        </button>
+                    </form>
+                </div>
+
+            </div><!-- /panel-stage -->
 
             <div class="panel-bottom">
                 <div class="panel-links">
@@ -319,291 +384,7 @@ $auto_open_modal = (!empty($login_error) || !empty($register_error) || !empty($r
     </main><!-- /gateway -->
 
 
-    <!-- ================================================================
-     AUTH MODAL — position:fixed, always relative to the real viewport
-================================================================ -->
-    <div class="modal-overlay" id="authModal" role="dialog" aria-modal="true" aria-label="Sign in or Register">
-        <div class="modal-backdrop" id="modalBackdrop"></div>
-        <div class="modal-card" id="modalCard">
-
-            <div class="modal-handle" id="modalHandle" role="button" tabindex="0"
-                aria-label="Minimize or restore auth panel">
-                <div class="modal-handle-bar">
-                    <div class="modal-handle-pill"></div>
-                    <span class="modal-handle-label">Faculty Portal</span>
-                    <span class="modal-minimized-hint">Tap to expand</span>
-                </div>
-                <div class="modal-handle-actions" id="modalHandleActions">
-                    <div class="modal-action-btn" id="minimizeBtn"
-                        title="Minimize" aria-label="Minimize panel" role="button" tabindex="0">
-                        <i class="fa-solid fa-minus"></i>
-                    </div>
-                    <div class="modal-action-btn" id="modalCloseBtn"
-                        title="Close" aria-label="Close panel" role="button" tabindex="0">
-                        <i class="fa-solid fa-xmark"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-body" id="modalBody">
-
-                <!-- ROLE SELECTOR -->
-                <div class="role-selector active" id="roleSelector">
-                    <div class="selector-header">
-                        <h2>Access Portal</h2>
-                        <p>Choose your role to continue</p>
-                    </div>
-                    <div class="role-cards">
-                        <button class="role-card" id="roleFacultyBtn">
-                            <div class="role-icon">
-                                <i class="fa-solid fa-chalkboard-teacher"></i>
-                            </div>
-                            <h3>Faculty</h3>
-                            <p>Borrow equipment & reserve rooms</p>
-                        </button>
-                        <button class="role-card" id="roleStudentBtn">
-                            <div class="role-icon">
-                                <i class="fa-solid fa-graduation-cap"></i>
-                            </div>
-                            <h3>Student</h3>
-                            <p>No account needed — borrow & reserve</p>
-                        </button>
-                        <button class="role-card" id="roleAdminBtn">
-                            <div class="role-icon">
-                                <i class="fa-solid fa-user-shield"></i>
-                            </div>
-                            <h3>Admin</h3>
-                            <p>System administration</p>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- FACULTY LOGIN/REGISTER -->
-                <div class="auth-section" id="studentSection">
-                    <button class="back-btn" id="studentBackBtn">
-                        <i class="fa-solid fa-arrow-left"></i> Back
-                    </button>
-
-                    <div class="auth-tabs" role="tablist">
-                        <button class="auth-tab-btn active" id="student-tab-login">
-                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Login
-                        </button>
-                        <button class="auth-tab-btn" id="student-tab-register">
-                            <i class="fa-solid fa-user-plus"></i> Register
-                        </button>
-                    </div>
-
-                    <!-- Faculty Login -->
-                    <div class="auth-pane active" id="studentLogin">
-                        <p class="pane-title">Faculty Login</p>
-                        <p class="pane-subtitle">Sign in with your faculty account</p>
-                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'student'): ?>
-                            <div class="auth-alert error">
-                                <i class="fa-solid fa-circle-exclamation"></i>
-                                <?= htmlspecialchars($login_error) ?>
-                            </div>
-                        <?php endif; ?>
-                        <form method="POST" action="">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="user_type" value="student">
-                            <div class="form-group">
-                                <label for="student-login-email">Faculty Email</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="email" id="student-login-email" name="email"
-                                        placeholder="faculty@pup.edu.ph"
-                                        value="<?= htmlspecialchars($login_email_val) ?>"
-                                        autocomplete="email" required>
-                                    <i class="fa-solid fa-envelope input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="student-login-pass">Password</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="password" id="student-login-pass" name="password"
-                                        placeholder="Enter your password"
-                                        autocomplete="current-password" required>
-                                    <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" data-target="student-login-pass" tabindex="-1" aria-label="Show password">
-                                        <i class="fa-regular fa-eye-slash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="submit" name="login" class="btn-auth">
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                                Sign In
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Faculty Register -->
-                    <div class="auth-pane" id="studentRegister">
-                        <p class="pane-title">Create Faculty Account</p>
-                        <p class="pane-subtitle">Join PUP Biñan's centralized resource system</p>
-                        <?php if ($register_error): ?>
-                            <div class="auth-alert error">
-                                <i class="fa-solid fa-circle-exclamation"></i>
-                                <?= htmlspecialchars($register_error) ?>
-                            </div>
-                        <?php endif; ?>
-                        <?php if ($register_success): ?>
-                            <div class="auth-alert success">
-                                <i class="fa-solid fa-circle-check"></i>
-                                <?= htmlspecialchars($register_success) ?>
-                            </div>
-                        <?php endif; ?>
-                        <form method="POST" action="">
-                            <?= csrf_field() ?>
-                            <div class="form-group">
-                                <label for="reg-name">Full Name</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="text" id="reg-name" name="fullname"
-                                        minlength="5" maxlength="70"
-                                        placeholder="Juan Dela Cruz"
-                                        value="<?= htmlspecialchars($reg_fullname_val) ?>"
-
-                                        autocomplete="name" required>
-                                    <i class="fa-solid fa-user input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="reg-sid">Student ID</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="text" id="reg-sid" name="student_id"
-                                        minlength="15" maxlength="15"
-                                        placeholder="20XX-00XXX-BN-X"
-                                        value="<?= htmlspecialchars($reg_studentid_val) ?>"
-
-                                        title="Format: YYYY-XXXXX-BN-X"
-                                        autocomplete="off" required>
-                                    <i class="fa-solid fa-id-card input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="reg-email">Email</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="email" id="reg-email" name="email"
-                                        minlength="15" maxlength="254"
-                                        placeholder="faculty@pup.edu.ph"
-                                        value="<?= htmlspecialchars($reg_email_val) ?>"
-
-                                        autocomplete="email" required>
-                                    <i class="fa-solid fa-envelope input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="reg-pass">Password</label>
-                                    <div class="input-wrap">
-                                        <input class="form-field" type="password" id="reg-pass" name="password"
-                                            minlength="4" placeholder="Min. 4 characters"
-                                            autocomplete="new-password" required>
-                                        <i class="fa-solid fa-lock input-icon-left"></i>
-                                        <button type="button" class="eye-toggle" data-target="reg-pass" tabindex="-1" aria-label="Show password">
-                                            <i class="fa-regular fa-eye-slash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="reg-cpass">Confirm</label>
-                                    <div class="input-wrap">
-                                        <input class="form-field" type="password" id="reg-cpass" name="confirm_password"
-                                            minlength="4" placeholder="Re-enter password"
-                                            autocomplete="new-password" required>
-                                        <i class="fa-solid fa-lock input-icon-left"></i>
-                                        <button type="button" class="eye-toggle" data-target="reg-cpass" tabindex="-1" aria-label="Show password">
-                                            <i class="fa-regular fa-eye-slash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="submit" name="register" class="btn-auth btn-auth--register">
-                                <i class="fa-solid fa-user-plus"></i>
-                                Create Account
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- ADMIN LOGIN -->
-                <div class="auth-section" id="adminSection">
-                    <button class="back-btn" id="adminBackBtn">
-                        <i class="fa-solid fa-arrow-left"></i> Back
-                    </button>
-
-                    <div class="auth-pane active">
-                        <p class="pane-title">Admin Login</p>
-                        <p class="pane-subtitle">Administrative access only</p>
-                        <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'admin'): ?>
-                            <div class="auth-alert error">
-                                <i class="fa-solid fa-circle-exclamation"></i>
-                                <?= htmlspecialchars($login_error) ?>
-                            </div>
-                        <?php endif; ?>
-                        <form method="POST" action="">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="user_type" value="admin">
-                            <div class="form-group">
-                                <label for="admin-login-email">Admin Email</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="email" id="admin-login-email" name="email"
-                                        placeholder="admin@pup.edu.ph"
-                                        autocomplete="email" required>
-                                    <i class="fa-solid fa-envelope input-icon-left"></i>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="admin-login-pass">Password</label>
-                                <div class="input-wrap">
-                                    <input class="form-field" type="password" id="admin-login-pass" name="password"
-                                        placeholder="Enter your password"
-                                        autocomplete="current-password" required>
-                                    <i class="fa-solid fa-lock input-icon-left"></i>
-                                    <button type="button" class="eye-toggle" data-target="admin-login-pass" tabindex="-1" aria-label="Show password">
-                                        <i class="fa-regular fa-eye-slash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <button type="submit" name="login" class="btn-auth">
-                                <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                                Sign In
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-            </div><!-- /modal-body -->
-        </div><!-- /modal-card -->
-    </div><!-- /modal-overlay -->
-
-    <?php
-    // Which modal section should auto-open on page load (server-side errors/success)?
-    // 'student' key = the faculty login/register form (see legacy id="studentSection").
-    $modal_target_role = null;
-    if ($login_error) {
-        $modal_target_role = (($_POST['user_type'] ?? '') === 'admin') ? 'admin' : 'student';
-    } elseif ($register_error || $register_success) {
-        $modal_target_role = 'student';
-    }
-    ?>
     <script src="assets/js/landing-page.js"></script>
-    <script nonce="<?php echo $csp_nonce; ?>">
-        /* ================================================================
-           INIT — PHP-generated values injected here
-        ================================================================ */
-        <?php if ($auto_open_modal): ?>
-            window.addEventListener('DOMContentLoaded', () => {
-                openModal(<?= json_encode($modal_target_role) ?>);
-                <?php if ($modal_target_role === 'student'): ?>
-                    switchStudentTab(<?= json_encode($open_tab) ?>);
-                <?php endif; ?>
-            });
-        <?php endif; ?>
-        <?php if (!empty($register_success)): ?>
-            setTimeout(() => {
-                switchStudentTab('login');
-            }, 2200);
-        <?php endif; ?>
-    </script>
 
 
 </body>

@@ -8,7 +8,7 @@
     --border: rgba(255, 255, 255, 0.12);
     --card-bg: rgba(15, 5, 7, 0.82);
 
-    /* Modal tokens — warm cream, easy on the eyes */
+    /* Auth card tokens — warm cream, easy on the eyes */
     --modal-bg: #ede8e0;
     --modal-sur: #e4ddd4;
     --modal-bdr: #cdc6bb;
@@ -491,232 +491,60 @@ body {
 }
 
 /* ================================================================
-   MODAL OVERLAY
+   PANEL STAGE — the right-hand panel swaps its own content in place
+   (role picker <-> login form) instead of opening a popup/modal.
 ================================================================ */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.35s var(--ease-out);
-}
-
-.modal-overlay.open {
-    pointer-events: all;
-    opacity: 1;
-}
-
-.modal-backdrop {
-    position: absolute;
-    inset: 0;
-    background: rgba(20, 4, 6, 0.45);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    opacity: 0;
-    transition: opacity 0.35s;
-    cursor: pointer;
-}
-
-.modal-overlay.open .modal-backdrop {
-    opacity: 1;
-}
-
-.modal-card {
+.panel-stage {
     position: relative;
-    z-index: 2;
-    width: 100%;
-    max-width: 480px;
-    background: var(--modal-bg);
-    border-radius: var(--r-lg) var(--r-lg) 0 0;
-    border: 1px solid var(--modal-bdr);
-    border-bottom: none;
-    transform: translateY(100%);
-    transition: transform 0.5s var(--ease-out);
-    overflow: hidden;
-    max-height: 92vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 -8px 40px rgba(96, 3, 2, 0.12), 0 -2px 12px rgba(0, 0, 0, 0.06);
 }
 
-.modal-overlay.open .modal-card {
-    transform: translateY(0);
-}
-
-.modal-overlay.minimized .modal-card {
-    transform: translateY(calc(100% - 56px));
-}
-
-.modal-overlay.minimized .modal-backdrop {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.modal-handle {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.9rem 1.4rem 0.6rem;
-    cursor: pointer;
-    gap: 1rem;
-    background: var(--modal-bg);
-    border-bottom: 1px solid var(--modal-bdr);
-}
-
-.modal-handle-bar {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.modal-handle-pill {
-    width: 36px;
-    height: 4px;
-    background: var(--modal-bdr);
-    border-radius: 2px;
-}
-
-.modal-handle-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-mid);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-}
-
-.modal-handle-actions {
-    display: flex;
-    gap: 6px;
-}
-
-.modal-action-btn {
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--modal-bdr);
-    background: var(--modal-sur);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-mid);
-    font-size: 0.7rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-
-.modal-action-btn:hover {
-    background: #f3e5e6;
-    border-color: rgba(96, 3, 2, 0.25);
-    color: var(--maroon);
-}
-
-.modal-minimized-hint {
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    font-weight: 500;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.modal-overlay.minimized .modal-minimized-hint {
-    opacity: 1;
-}
-
-.modal-overlay.minimized .modal-handle-label {
-    opacity: 0;
-}
-
-.modal-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1.4rem 2rem 2rem;
-    scrollbar-width: thin;
-    scrollbar-color: var(--modal-bdr) transparent;
-}
-
-.modal-body::-webkit-scrollbar {
-    width: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-    background: var(--modal-bdr);
-    border-radius: 2px;
-}
-
-.auth-tabs {
-    display: flex;
-    background: var(--modal-sur);
-    border: 1px solid var(--modal-bdr);
-    border-radius: var(--r-sm);
-    padding: 4px;
-    margin-bottom: 1.8rem;
-    gap: 4px;
-}
-
-.auth-tab-btn {
-    flex: 1;
-    padding: 9px;
-    border: none;
-    border-radius: 7px;
-    background: none;
-    color: var(--text-mid);
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: 'Outfit', sans-serif;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.auth-tab-btn.active {
-    background: var(--maroon);
-    color: white;
-    box-shadow: 0 2px 12px rgba(109, 27, 35, 0.4);
-}
-
-.auth-tab-btn:not(.active):hover {
-    color: var(--maroon);
-    background: #f3e5e6;
-}
-
-.auth-pane {
+.panel-view {
     display: none;
 }
 
-.auth-pane.active {
+.panel-view.active {
     display: block;
-    animation: paneFadeIn 0.3s var(--ease-out) both;
+    animation: panelViewIn 0.4s var(--ease-out) both;
 }
 
-#authModal.minimized {
-    pointer-events: none;
-}
-
-#authModal.minimized .modal-card {
-    pointer-events: auto;
-}
-
-@keyframes paneFadeIn {
+@keyframes panelViewIn {
     from {
         opacity: 0;
-        transform: translateY(6px)
+        transform: translateX(10px);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0)
+        transform: translateX(0);
     }
+}
+
+/* .panel-view-auth carries no styling of its own — .panel-view / .active
+   above already handles show/hide + fade-in. The class stays on the
+   facultyView/adminView markup only so JS (Esc-to-back) can target
+   "any open login form" without caring which role it is. Faculty/Admin
+   login now sit flat on the panel's own background: no card, no border,
+   no shadow — same elements as the role picker, just swapped in place. */
+
+.auth-head {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 1.6rem;
+}
+
+.auth-head .access-icon {
+    width: 46px;
+    height: 46px;
+    font-size: 1.05rem;
+}
+
+.auth-head-text .pane-title {
+    margin-bottom: 1px;
+}
+
+.auth-head-text .pane-subtitle {
+    margin-bottom: 0;
 }
 
 .pane-title {
@@ -732,6 +560,18 @@ body {
     font-size: 0.78rem;
     color: var(--text-mid);
     margin-bottom: 1.4rem;
+}
+
+@keyframes paneFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px)
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0)
+    }
 }
 
 .form-group {
@@ -809,7 +649,7 @@ body {
 .form-field {
     width: 100%;
     padding: 10px 36px 10px 34px;
-    background: #f5f0e8;
+    background: var(--modal-sur);
     border: 1px solid var(--modal-bdr);
     border-radius: var(--r-sm);
     color: var(--text-hi);
@@ -840,26 +680,9 @@ body {
 .form-field:-webkit-autofill,
 .form-field:-webkit-autofill:hover,
 .form-field:-webkit-autofill:focus {
-    -webkit-box-shadow: 0 0 0px 1000px #f5f0e8 inset;
+    -webkit-box-shadow: 0 0 0px 1000px var(--modal-sur) inset;
     -webkit-text-fill-color: var(--text-hi);
     border-color: var(--modal-bdr);
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-/* ── Inline styles moved from PHP ── */
-/* form-groups that sit inside a .form-row grid don't need their own bottom margin */
-.form-row .form-group {
-    margin-bottom: 0;
-}
-
-/* The register pane's submit button needs a bit of top breathing room */
-.btn-auth--register {
-    margin-top: 1rem;
 }
 
 .auth-alert {
@@ -925,70 +748,6 @@ body {
     opacity: 1;
 }
 
-.modal-footer-link {
-    text-align: center;
-    margin-top: 1.1rem;
-}
-
-.modal-footer-link span {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-}
-
-.modal-footer-link button {
-    background: none;
-    border: none;
-    color: var(--maroon);
-    font-weight: 600;
-    font-size: 0.78rem;
-    cursor: pointer;
-    margin-left: 4px;
-    font-family: 'Outfit', sans-serif;
-    text-decoration: none;
-}
-
-.modal-footer-link button:hover {
-    color: var(--maroon-deep);
-}
-
-.modal-divider {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 1.4rem 0 0;
-}
-
-.modal-divider hr {
-    flex: 1;
-    border: none;
-    border-top: 1px solid var(--modal-bdr);
-}
-
-.modal-divider span {
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-}
-
-.modal-school-note {
-    text-align: center;
-    margin-top: 0.8rem;
-    font-size: 0.7rem;
-    color: var(--text-dim);
-    line-height: 1.6;
-}
-
-.modal-school-note a {
-    color: var(--maroon);
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.modal-school-note a:hover {
-    text-decoration: underline;
-}
-
 /* ================================================================
    ANIMATIONS
 ================================================================ */
@@ -1015,42 +774,9 @@ body {
 }
 
 /* ================================================================
-   MODAL — RESPONSIVE
+   AUTH FORM — RESPONSIVE (facultyView / adminView inputs)
 ================================================================ */
-@media (min-width: 1200px) {
-    .modal-overlay {
-        align-items: flex-end;
-        justify-content: flex-end;
-        padding-right: 3rem;
-    }
-
-    .modal-card {
-        border-radius: var(--r-lg) var(--r-lg) 0 0;
-        max-width: 430px;
-    }
-}
-
-@media (max-width: 768px) {
-    .modal-body {
-        padding: 1.2rem 1.4rem 2rem;
-    }
-}
-
 @media (max-width: 480px) {
-    .form-row {
-        grid-template-columns: 1fr;
-        gap: 0.85rem;
-    }
-
-    .modal-body {
-        padding: 1rem 1.2rem 2rem;
-    }
-
-    .auth-tab-btn {
-        padding: 11px 9px;
-        min-height: 44px;
-    }
-
     .form-field {
         padding: 12px 12px 12px 34px;
         font-size: 16px;
@@ -1060,29 +786,6 @@ body {
     .btn-auth {
         padding: 14px;
         min-height: 48px;
-    }
-
-    .modal-card {
-        width: 95vw;
-        max-width: none;
-        margin: 1rem;
-    }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-    .modal-card {
-        max-height: 96vh;
-        border-radius: var(--r-md) var(--r-md) 0 0;
-    }
-
-    .modal-body {
-        padding: 0.8rem 1.5rem 1.5rem;
-    }
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .modal-card {
-        padding-bottom: env(safe-area-inset-bottom);
     }
 }
 
@@ -1134,273 +837,46 @@ body {
 }
 
 /* ================================================================
-   ROLE SELECTOR STYLES
+   BACK BUTTON — sits above the login form, returns to the role picker
 ================================================================ */
-
-.role-selector {
-    display: none;
-    padding: 1.5rem 0;
-}
-
-.role-selector.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
-.selector-header {
-    text-align: center;
-    margin-bottom: 1.75rem;
-}
-
-.selector-header h2 {
-    font-size: 1.625rem;
-    font-weight: 700;
-    color: var(--text-primary, #1e293b);
-    margin-bottom: 0.375rem;
-}
-
-.selector-header p {
-    font-size: 0.938rem;
-    color: var(--text-secondary, #64748b);
-}
-
-.role-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-.role-card {
-    background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
-    border: 2px solid #e2e8f0;
-    border-radius: 0.875rem;
-    padding: 1.25rem 1rem;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.role-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.role-card:hover {
-    transform: translateY(-8px);
-    border-color: #6366f1;
-    box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.2), 0 10px 10px -5px rgba(99, 102, 241, 0.1);
-}
-
-.role-card:hover::before {
-    opacity: 1;
-}
-
-.role-card:active {
-    transform: translateY(-4px);
-}
-
-.role-icon {
-    width: 60px;
-    height: 60px;
-    margin: 0 auto 1rem;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.875rem;
-    color: white;
-    position: relative;
-    z-index: 1;
-    transition: transform 0.3s ease;
-}
-
-.role-card:hover .role-icon {
-    transform: scale(1.15) rotate(5deg);
-}
-
-.role-card h3 {
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.375rem;
-    position: relative;
-    z-index: 1;
-}
-
-.role-card p {
-    font-size: 0.813rem;
-    color: #64748b;
-    position: relative;
-    z-index: 1;
-    line-height: 1.4;
-}
-
-/* Different colors for each role */
-.role-card:nth-child(1) .role-icon {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-}
-
-.role-card:nth-child(2) .role-icon {
-    background: linear-gradient(135deg, #10b981, #059669);
-}
-
-.role-card:nth-child(3) .role-icon {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-/* ================================================================
-   AUTH SECTIONS STYLES
-================================================================ */
-
-.auth-section {
-    display: none;
-    padding: 1rem 0;
-}
-
-.auth-section.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
 .back-btn {
     background: transparent;
     border: none;
-    color: #94a3b8;
-    font-size: 0.813rem;
-    font-weight: 500;
-    padding: 0.25rem 0.5rem;
+    color: var(--text-mid);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    padding: 0.3rem 0.4rem 0.3rem 0;
+    margin: 0 0 0.9rem 0;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    margin-bottom: 1rem;
-    transition: color 0.3s ease;
+    gap: 0.4rem;
+    transition: color 0.2s;
 }
 
-.back-btn:hover {
-    color: #64748b;
+.back-btn:hover,
+.back-btn:focus-visible {
+    color: var(--maroon);
+    outline: none;
 }
 
 .back-btn i {
-    font-size: 0.75rem;
-    transition: transform 0.3s ease;
+    font-size: 0.72rem;
+    transition: transform 0.25s var(--ease-out);
 }
 
 .back-btn:hover i {
     transform: translateX(-3px);
 }
 
-/* Contact Admin Button (subtle) */
-.contact-admin-wrap {
-    text-align: center;
-    margin-top: 1.5rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid #e2e8f0;
-}
-
-.contact-admin-btn {
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    font-size: 0.813rem;
-    font-weight: 500;
-    padding: 0.5rem;
-    cursor: pointer;
-    transition: color 0.3s ease;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-.contact-admin-btn:hover {
-    color: #64748b;
-}
-
-/* Dev Button (temporary for development) */
-.dev-access-wrap {
-    text-align: center;
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #fef3c7;
-    border-radius: 0.5rem;
-    border: 1px dashed #f59e0b;
-}
-
-.dev-access-btn {
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    border: none;
-    color: white;
-    font-size: 0.813rem;
-    font-weight: 600;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.dev-access-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
-}
-
-.dev-label {
-    display: block;
-    font-size: 0.75rem;
-    color: #92400e;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
 /* ================================================================
-   RESPONSIVE ADJUSTMENTS
+   RESPONSIVE ADJUSTMENTS — facultyView / adminView on small screens
 ================================================================ */
-
-@media (max-width: 768px) {
-    .role-cards {
-        grid-template-columns: 1fr;
-        gap: 0.875rem;
-    }
-
-    .role-card {
-        padding: 1rem 0.875rem;
-    }
-
-    .role-icon {
-        width: 50px;
-        height: 50px;
-        font-size: 1.5rem;
-        margin-bottom: 0.875rem;
-    }
-
-    .selector-header h2 {
-        font-size: 1.375rem;
-    }
-
-    .selector-header p {
-        font-size: 0.875rem;
-    }
-
-    .role-card h3 {
-        font-size: 1rem;
-    }
-
-    .role-card p {
-        font-size: 0.75rem;
+@media (max-width: 640px) {
+    .auth-head .access-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 0.95rem;
     }
 }
