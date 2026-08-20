@@ -24,6 +24,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <title>PUP Sync | Admin Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+        rel="stylesheet">
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css">
 </head>
 
@@ -33,34 +35,33 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
      HEADER
 ================================================================ -->
     <header class="app-header">
-        <div class="header-left">
-            <div class="app-logo">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon"
-                    style="color:var(--accent-maroon)">
+
+        <!-- Logo block — sits flush above the sidebar -->
+        <div class="header-logo">
+            <div class="logo-icon-box">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-                <div class="app-logo-text" style="display:flex;flex-direction:column;">
-                    <span style="white-space:nowrap;line-height:1.1;">
-                        <strong style="font-size:25px;">PUP</strong><span
-                            style="font-weight:500;font-size:21px;margin-left:1px;">SYNC</span>
-                        <span class="admin-badge">Admin</span>
-                    </span>
-                    <small>Admin Portal</small>
-                </div>
+            </div>
+            <div class="logo-text">
+                <span style="white-space:nowrap;line-height:1.2;">
+                    <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
+                    <span class="logo-badge">Admin</span>
+                </span>
+                <span>Admin Portal</span>
             </div>
         </div>
 
-        <!-- Center: Top Navigation Tabs -->
-        <nav class="nav-tabs-wrap" role="navigation" aria-label="Main Navigation">
-            <button class="nav-tab active" data-tab="dashboard">Dashboard</button>
-            <button class="nav-tab" data-tab="lending">Lending</button>
-            <button class="nav-tab" data-tab="rooms">Rooms</button>
-            <button class="nav-tab" data-tab="faculty">Faculty</button>
-        </nav>
+        <!-- Center: Search -->
+        <div class="header-search">
+            <span class="material-symbols-outlined search-icon">search</span>
+            <input type="text" class="header-search-input" placeholder="Search requests, equipment, faculty...">
+        </div>
 
+        <!-- Right: Notification + User + Avatar + Dropdown (unchanged) -->
         <div class="header-right">
             <!-- Notification Bell -->
             <button class="notif-btn" data-action="open-overlay" data-target="notifOverlay" title="Notifications">
@@ -77,9 +78,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </button>
 
             <div class="header-user-info">
-                <span class="u-name">
-                    <?php echo htmlspecialchars($admin_name); ?>
-                </span>
+                <span class="u-name"><?php echo htmlspecialchars($admin_name); ?></span>
                 <span class="u-role">Administrator</span>
             </div>
 
@@ -88,16 +87,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <?php echo htmlspecialchars($initials); ?>
             </div>
 
-            <!-- Profile Dropdown -->
+            <!-- Profile Dropdown (unchanged) -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
-                    <div class="dd-avatar">
-                        <?php echo htmlspecialchars($initials); ?>
-                    </div>
+                    <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
                     <div>
-                        <span class="dd-name">
-                            <?php echo htmlspecialchars($admin_name); ?>
-                        </span>
+                        <span class="dd-name"><?php echo htmlspecialchars($admin_name); ?></span>
                         <span class="dd-sub">Administrator</span>
                         <span class="dd-sub" style="margin-top:2px;">Full Access</span>
                     </div>
@@ -123,9 +118,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </svg>
                         </div>Notifications
                         <?php if ($stat_waiting + $stat_overdue > 0): ?>
-                            <span class="notif-badge">
-                                <?php echo $stat_waiting + $stat_overdue; ?>
-                            </span>
+                            <span class="notif-badge"><?php echo $stat_waiting + $stat_overdue; ?></span>
                         <?php endif; ?>
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="settingsOverlay">
@@ -134,8 +127,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                 width="16" height="16">
                                 <circle cx="12" cy="12" r="3" />
-                                <path
-                                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                             </svg>
                         </div>Settings
                     </button>
@@ -157,335 +149,359 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </header>
 
     <!-- ================================================================
+     APP BODY
+================================================================ -->
+    <div class="app-body">
+
+    <!-- ================================================================
+     SIDEBAR
+================================================================ -->
+    <nav class="sidebar" id="adminSidebar">
+
+        <div class="nav-group-label">Main</div>
+
+        <a class="nav-item active" data-tab="dashboard" href="#">
+            <span class="material-symbols-outlined">dashboard</span>
+            <span>Dashboard</span>
+        </a>
+        <a class="nav-item" data-tab="lending" id="snav-requests" href="#">
+            <span class="material-symbols-outlined">assignment</span>
+            <span>Requests</span>
+            <?php if ($stat_waiting > 0): ?>
+                <span class="nav-badge"><?php echo $stat_waiting; ?></span>
+            <?php endif; ?>
+        </a>
+        <a class="nav-item" data-tab="lending" id="snav-inventory" href="#">
+            <span class="material-symbols-outlined">inventory_2</span>
+            <span>Inventory</span>
+        </a>
+        <a class="nav-item" data-tab="rooms" href="#">
+            <span class="material-symbols-outlined">meeting_room</span>
+            <span>Rooms</span>
+        </a>
+        <a class="nav-item" data-tab="faculty" href="#">
+            <span class="material-symbols-outlined">group</span>
+            <span>Faculty</span>
+        </a>
+        <a class="nav-item" data-tab="lending" id="snav-arbitration" href="#">
+            <span class="material-symbols-outlined">balance</span>
+            <span>Arbitration</span>
+        </a>
+
+        <hr class="nav-divider">
+
+        <div class="sidebar-bottom">
+            <a class="nav-item" data-action="open-overlay" data-target="settingsOverlay" href="#">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Settings</span>
+            </a>
+            <a class="nav-item" data-action="open-overlay" data-target="accountOverlay" href="#">
+                <span class="material-symbols-outlined">help</span>
+                <span>Help Center</span>
+            </a>
+        </div>
+
+    </nav><!-- /sidebar -->
+
+    <!-- ================================================================
      MAIN
 ================================================================ -->
     <main id="app-main">
-
-        <!-- Alerts -->
-        <?php if (isset($_GET['added'])): ?>
-            <div class="alert-banner alert-success" id="added-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Success!</strong> Item added to inventory.
-                <button class="alert-close" data-action="dismiss-alert" data-target="added-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['updated'])): ?>
-            <div class="alert-banner alert-success" id="updated-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Updated!</strong> Item has been updated successfully.
-                <button class="alert-close" data-action="dismiss-alert" data-target="updated-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['room_added'])): ?>
-            <div class="alert-banner alert-success" id="room-added-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Room added!</strong> The room has been added to the registry.
-                <button class="alert-close" data-action="dismiss-alert" data-target="room-added-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['room_updated'])): ?>
-            <div class="alert-banner alert-success" id="room-updated-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Room updated!</strong> Changes saved successfully.
-                <button class="alert-close" data-action="dismiss-alert" data-target="room-updated-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['room_archived'])): ?>
-            <div class="alert-banner alert-success" id="room-archived-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Room archived.</strong> It has been removed from the active registry.
-                <button class="alert-close" data-action="dismiss-alert" data-target="room-archived-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['room_restored'])): ?>
-            <div class="alert-banner alert-success" id="room-restored-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                <strong>Room restored.</strong> It is now back in the active registry.
-                <button class="alert-close" data-action="dismiss-alert" data-target="room-restored-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if (isset($_GET['room_error'])): ?>
-            <div class="alert-banner alert-danger" id="room-error-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <strong>Error:</strong> Could not save room. Please check required fields and try again.
-                <button class="alert-close" data-action="dismiss-alert" data-target="room-error-alert">✕</button>
-            </div>
-        <?php endif; ?>
-        <?php if ($stat_overdue > 0): ?>
-            <div class="alert-banner alert-danger" id="overdue-alert">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <strong>Overdue Alert:</strong>
-                <?php echo $stat_overdue; ?> item(s) are currently overdue and need immediate attention.
-                <button class="alert-close" data-action="dismiss-alert" data-target="overdue-alert">✕</button>
-            </div>
-        <?php endif; ?>
 
         <!-- ============================================================
          TAB: DASHBOARD
     ============================================================ -->
         <div class="tab-panel active" id="panel-dashboard">
-            <div class="section-header">
-                <h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
-                        <rect x="3" y="3" width="7" height="7" />
-                        <rect x="14" y="3" width="7" height="7" />
-                        <rect x="14" y="14" width="7" height="7" />
-                        <rect x="3" y="14" width="7" height="7" />
-                    </svg>
-                    Admin Dashboard
-                </h2>
-                <p>
-                    <?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.
-                </p>
+
+            <!-- Overdue alert banner -->
+            <?php if ($stat_overdue > 0): ?>
+            <div class="ps-alert ps-alert--danger" id="overdue-alert">
+                <span class="material-symbols-outlined">warning</span>
+                <span><strong>Overdue Alert:</strong> <?php echo $stat_overdue; ?> item(s) are currently overdue and need immediate attention.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="overdue-alert">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <?php endif; ?>
+
+            <!-- URL-param flash alerts -->
+            <?php if (isset($_GET['added'])): ?>
+            <div class="ps-alert ps-alert--success" id="added-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Success!</strong> Item added to inventory.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="added-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['updated'])): ?>
+            <div class="ps-alert ps-alert--success" id="updated-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Updated!</strong> Item has been updated successfully.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="updated-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['room_added'])): ?>
+            <div class="ps-alert ps-alert--success" id="room-added-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Room added!</strong> The room has been added to the registry.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-added-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['room_updated'])): ?>
+            <div class="ps-alert ps-alert--success" id="room-updated-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Room updated!</strong> Changes saved successfully.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-updated-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['room_archived'])): ?>
+            <div class="ps-alert ps-alert--success" id="room-archived-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Room archived.</strong> It has been removed from the active registry.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-archived-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['room_restored'])): ?>
+            <div class="ps-alert ps-alert--success" id="room-restored-alert">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span><strong>Room restored.</strong> It is now back in the active registry.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-restored-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+            <?php if (isset($_GET['room_error'])): ?>
+            <div class="ps-alert ps-alert--danger" id="room-error-alert">
+                <span class="material-symbols-outlined">warning</span>
+                <span><strong>Error:</strong> Could not save room. Please check required fields and try again.</span>
+                <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-error-alert"><span class="material-symbols-outlined">close</span></button>
+            </div>
+            <?php endif; ?>
+
+            <!-- Page header row -->
+            <div class="ps-page-header-row">
+                <div class="ps-page-header">
+                    <h1>Good <?php
+                        $hour = (int)date('H');
+                        echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
+                    ?>, <?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?>.</h1>
+                    <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
+                </div>
+                <a href="?export=1" class="ps-btn ps-btn--outline">
+                    <span class="material-symbols-outlined">download</span> Export Report
+                </a>
             </div>
 
-            <!-- Hero Card -->
-            <div class="hero-card">
-                <h1>Equipment Lending Management</h1>
-                <p>Manage borrow requests, track inventory, approve or decline student requests — all from one place.
-                </p>
-            </div>
-
-            <!-- Stats Grid -->
-            <p
-                style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-light);margin-bottom:0.8rem;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                    <line x1="18" y1="20" x2="18" y2="10" />
-                    <line x1="12" y1="20" x2="12" y2="4" />
-                    <line x1="6" y1="20" x2="6" y2="14" />
-                    <line x1="2" y1="20" x2="22" y2="20" />
-                </svg>
-                System Overview
-            </p>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            width="20" height="20">
-                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-                        </svg></div>
-                    <div class="stat-label">Total Requests</div>
-                    <div class="stat-value">
-                        <?php echo $stat_total_req; ?>
+            <!-- Stat cards -->
+            <div class="ps-stats-row">
+                <div class="ps-stat-card">
+                    <div class="ps-stat-icon ps-stat-icon--maroon">
+                        <span class="material-symbols-outlined">assignment</span>
                     </div>
-                    <div class="stat-sub">All time</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="waiting"
-                    title="View pending requests">
-                    <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg></div>
-                    <div class="stat-label">Pending</div>
-                    <div class="stat-value" style="color:#c67c00;">
-                        <?php echo $stat_waiting; ?>
-                    </div>
-                    <div class="stat-sub stat-sub-link">Needs action →</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="approved"
-                    title="View approved requests">
-                    <div class="stat-icon" style="background:#e3fcef;color:#00875a;"><svg
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg></div>
-                    <div class="stat-label">Approved</div>
-                    <div class="stat-value" style="color:#00875a;">
-                        <?php echo $stat_approved; ?>
-                    </div>
-                    <div class="stat-sub stat-sub-link">Currently out →</div>
-                </div>
-                <div class="stat-card stat-card-clickable<?php echo $stat_overdue > 0 ? ' stat-card-alert' : ''; ?>"
-                    data-action="go-lending" data-lending="waiting" title="Overdue items need attention">
-                    <div class="stat-icon" style="background:#fff3e0;color:#e65100;"><svg
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <path
-                                d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                            <line x1="12" y1="9" x2="12" y2="13" />
-                            <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg></div>
-                    <div class="stat-label">Overdue</div>
-                    <div class="stat-value" style="color:#e65100;">
-                        <?php echo $stat_overdue; ?>
-                    </div>
-                    <div class="stat-sub stat-sub-link" style="color:#e65100;">Immediate action →</div>
-                </div>
-                <div class="stat-card stat-card-clickable" data-action="go-lending" data-lending="inventory">
-                    <div class="stat-icon" style="background:#e3f2fd;color:#1565c0;"><svg
-                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                            <path
-                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                        </svg></div>
-                    <div class="stat-label">Inventory Items</div>
-                    <div class="stat-value" style="color:#1565c0;">
-                        <?php echo $stat_inv_total; ?>
-                    </div>
-                    <div class="stat-sub stat-sub-link">Manage stock →</div>
-                </div>
-                <?php if ($stat_inv_low > 0): ?>
-                    <div class="stat-card stat-card-alert">
-                        <div class="stat-icon" style="background:#fff8e1;color:#c67c00;"><svg
-                                xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg></div>
-                        <div class="stat-label">Low Stock</div>
-                        <div class="stat-value" style="color:#c67c00;">
-                            <?php echo $stat_inv_low; ?>
-                        </div>
-                        <div class="stat-sub">Items with ≤2 units</div>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Home Grid -->
-            <div class="home-grid">
-                <!-- Recent Activity -->
-                <div class="activity-container">
-                    <h3>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img"
-                            style="color:var(--accent-maroon)">
-                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                        </svg>
-                        Recent Activity
-                    </h3>
-                    <?php
-                    $recent = mysqli_query($conn, "SELECT * FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
-                    if (mysqli_num_rows($recent) === 0): ?>
-                        <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem;">No activity
-                            yet.</p>
-                        <?php else:
-                        while ($r = mysqli_fetch_assoc($recent)):
-                            $dotClass = 'dot-waiting';
-                            if ($r['status'] === 'Approved') $dotClass = 'dot-approved';
-                            if ($r['status'] === 'Declined') $dotClass = 'dot-declined';
-                            if ($r['status'] === 'Overdue')  $dotClass = 'dot-overdue';
-                        ?>
-                            <div class="activity-item">
-                                <div class="activity-dot <?php echo $dotClass; ?>"></div>
-                                <div class="activity-info">
-                                    <h4>
-                                        <?php echo htmlspecialchars($r['faculty_name']); ?>
-                                    </h4>
-                                    <p>
-                                        <?php echo htmlspecialchars($r['equipment_name']); ?> &mdash;
-                                        <?php echo htmlspecialchars($r['status']); ?>
-                                    </p>
-                                </div>
-                                <span class="activity-time">
-                                    <?php echo date('M d', strtotime($r['request_date'])); ?>
-                                </span>
-                            </div>
-                    <?php endwhile;
-                    endif; ?>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="quick-actions">
-                    <h3>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img"
-                            style="color:var(--accent-maroon)">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                        </svg>
-                        Quick Actions
-                    </h3>
-                    <button class="qa-btn" data-action="go-lending" data-lending="waiting">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        Pending Requests <span
-                            style="margin-left:auto;background:#fff8e1;color:#c67c00;font-size:0.72rem;font-weight:700;padding:2px 9px;border-radius:20px;">
-                            <?php echo $stat_waiting; ?>
-                        </span>
-                    </button>
-                    <button class="qa-btn" data-action="go-lending" data-lending="inventory">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <path
-                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                        </svg>
-                        Manage Inventory
-                    </button>
-                    <button class="qa-btn" data-action="go-lending" data-lending="approved">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg>
-                        Approved Requests
-                    </button>
-                    <button class="qa-btn" data-action="go-lending" data-lending="raw">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <line x1="8" y1="6" x2="21" y2="6" />
-                            <line x1="8" y1="12" x2="21" y2="12" />
-                            <line x1="8" y1="18" x2="21" y2="18" />
-                            <line x1="3" y1="6" x2="3.01" y2="6" />
-                            <line x1="3" y1="12" x2="3.01" y2="12" />
-                            <line x1="3" y1="18" x2="3.01" y2="18" />
-                        </svg>
-                        Raw Data
-                    </button>
-                    <button class="qa-btn" data-action="open-overlay" data-target="notifOverlay">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                        </svg>
-                        Notifications
-                        <?php if ($stat_waiting + $stat_overdue > 0): ?>
-                            <span class="notif-badge" style="font-size:0.7rem;padding:1px 7px;">
-                                <?php echo $stat_waiting + $stat_overdue; ?>
-                            </span>
+                    <div class="ps-stat-body">
+                        <div class="ps-stat-val"><?php echo $stat_waiting; ?></div>
+                        <div class="ps-stat-lbl">Waiting Requests</div>
+                        <?php if ($stat_waiting > 0): ?>
+                        <div class="ps-stat-sub ps-stat-sub--warn">Needs action</div>
+                        <?php else: ?>
+                        <div class="ps-stat-sub">All clear</div>
                         <?php endif; ?>
-                    </button>
+                    </div>
+                </div>
+                <div class="ps-stat-card">
+                    <div class="ps-stat-icon ps-stat-icon--green">
+                        <span class="material-symbols-outlined">check_circle</span>
+                    </div>
+                    <div class="ps-stat-body">
+                        <div class="ps-stat-val"><?php echo $stat_approved; ?></div>
+                        <div class="ps-stat-lbl">Active Borrowings</div>
+                        <div class="ps-stat-sub">Currently out</div>
+                    </div>
+                </div>
+                <div class="ps-stat-card">
+                    <div class="ps-stat-icon ps-stat-icon--red">
+                        <span class="material-symbols-outlined">schedule</span>
+                    </div>
+                    <div class="ps-stat-body">
+                        <div class="ps-stat-val"><?php echo $stat_overdue; ?></div>
+                        <div class="ps-stat-lbl">Overdue Items</div>
+                        <?php if ($stat_overdue > 0): ?>
+                        <div class="ps-stat-sub ps-stat-sub--warn">Immediate attention</div>
+                        <?php else: ?>
+                        <div class="ps-stat-sub">None overdue</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="ps-stat-card">
+                    <div class="ps-stat-icon ps-stat-icon--orange">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                    </div>
+                    <div class="ps-stat-body">
+                        <div class="ps-stat-val"><?php echo $stat_inv_total; ?></div>
+                        <div class="ps-stat-lbl">Total Inventory</div>
+                        <?php if ($stat_inv_low > 0): ?>
+                        <div class="ps-stat-sub ps-stat-sub--warn"><?php echo $stat_inv_low; ?> low stock</div>
+                        <?php else: ?>
+                        <div class="ps-stat-sub">Stock OK</div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
+
+            <!-- Quick Actions label -->
+            <div class="ps-section-label">
+                <span class="material-symbols-outlined">bolt</span> Quick Actions
+            </div>
+
+            <!-- Quick Action cards -->
+            <div class="ps-quick-actions">
+                <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="waiting" style="cursor:pointer">
+                    <span class="material-symbols-outlined">assignment_turned_in</span>
+                    <strong>Review Requests</strong>
+                    <small><?php echo $stat_waiting; ?> waiting for approval</small>
+                </div>
+                <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="inventory" style="cursor:pointer">
+                    <span class="material-symbols-outlined">add_box</span>
+                    <strong>Add Equipment</strong>
+                    <small>Update inventory catalog</small>
+                </div>
+                <div class="ps-qa-card ps-qa-card--light" data-action="go-faculty" style="cursor:pointer">
+                    <span class="material-symbols-outlined">person_add</span>
+                    <strong>Register Faculty</strong>
+                    <small>Create new faculty account</small>
+                </div>
+            </div>
+
+            <!-- Bottom two-col: Recent Requests + Recent Activity -->
+            <div class="ps-two-col" style="margin-bottom:1.25rem;">
+
+                <!-- Recent Requests -->
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">assignment</span> Recent Requests</h3>
+                        <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-lending" data-lending="waiting">View All</button>
+                    </div>
+                    <div class="ps-card-body" style="padding:0">
+                        <table class="ps-table">
+                            <thead>
+                                <tr>
+                                    <th>Requester</th>
+                                    <th>Equipment</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests ORDER BY request_date DESC LIMIT 5");
+                                if ($recent_req && mysqli_num_rows($recent_req) > 0):
+                                    while ($rr = mysqli_fetch_assoc($recent_req)):
+                                        $badge = match($rr['status']) {
+                                            'Waiting'  => 'ps-badge--waiting',
+                                            'Approved' => 'ps-badge--active',
+                                            'Overdue'  => 'ps-badge--overdue',
+                                            'Returned' => 'ps-badge--returned',
+                                            default    => 'ps-badge--returned',
+                                        };
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
+                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($rr['faculty_id']); ?></div>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
+                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
+                                </tr>
+                                <?php endwhile; else: ?>
+                                <tr><td colspan="3" style="text-align:center;color:var(--text-light);padding:1.5rem">No requests yet.</td></tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">history</span> Recent Activity</h3>
+                    </div>
+                    <div class="ps-card-body">
+                        <?php
+                        $recent_act = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
+                        if ($recent_act && mysqli_num_rows($recent_act) > 0):
+                            while ($ra = mysqli_fetch_assoc($recent_act)):
+                                $dot_active = in_array($ra['status'], ['Approved', 'Returned']) ? '' : 'ps-feed-dot--gray';
+                        ?>
+                        <div class="ps-feed-item">
+                            <div class="ps-feed-dot <?php echo $dot_active; ?>"></div>
+                            <div class="ps-feed-body">
+                                <div class="ps-feed-title"><?php echo htmlspecialchars($ra['equipment_name']); ?> — <?php echo htmlspecialchars($ra['status']); ?></div>
+                                <div class="ps-feed-meta"><?php echo htmlspecialchars($ra['faculty_name']); ?></div>
+                            </div>
+                            <div class="ps-feed-time"><?php echo date('M d', strtotime($ra['request_date'])); ?></div>
+                        </div>
+                        <?php endwhile; else: ?>
+                        <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem">No activity yet.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom two-col: Room Status + Faculty Overview -->
+            <div class="ps-two-col">
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">meeting_room</span> Room Status</h3>
+                        <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-rooms">Manage</button>
+                    </div>
+                    <div class="ps-card-body">
+                        <?php
+                        $rooms_total  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0"))['c'] ?? 0;
+                        $rooms_issues = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'"))['c'] ?? 0;
+                        $rooms_today  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(created_at)=CURDATE()"))['c'] ?? 0;
+                        ?>
+                        <div class="ps-mini-stats">
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val"><?php echo $rooms_total; ?></div>
+                                <div class="ps-mini-lbl">Active Rooms</div>
+                            </div>
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val" style="color:var(--warning)"><?php echo $rooms_issues; ?></div>
+                                <div class="ps-mini-lbl">Reported Issues</div>
+                            </div>
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val" style="color:var(--success)"><?php echo $rooms_today; ?></div>
+                                <div class="ps-mini-lbl">Reservations Today</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
+                        <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
+                    </div>
+                    <div class="ps-card-body">
+                        <?php
+                        $fac_total   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty'"))['c'] ?? 0;
+                        $fac_active  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty' AND status='Active'"))['c'] ?? 0;
+                        $fac_org     = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty' AND is_org_adviser=1"))['c'] ?? 0;
+                        ?>
+                        <div class="ps-mini-stats">
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val"><?php echo $fac_total; ?></div>
+                                <div class="ps-mini-lbl">Total Faculty</div>
+                            </div>
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val" style="color:var(--success)"><?php echo $fac_active; ?></div>
+                                <div class="ps-mini-lbl">Active</div>
+                            </div>
+                            <div class="ps-mini-stat">
+                                <div class="ps-mini-val" style="color:var(--accent-maroon)"><?php echo $fac_org; ?></div>
+                                <div class="ps-mini-lbl">Org Advisers</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div><!-- /panel-dashboard -->
 
 
@@ -2502,6 +2518,8 @@ endif; ?>
         </div><!-- /panel-faculty -->
 
     </main><!-- /app-main -->
+
+    </div><!-- /app-body -->
 
 
     <!-- ================================================================
