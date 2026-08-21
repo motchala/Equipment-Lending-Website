@@ -452,9 +452,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="ps-card-body">
                         <?php
-                        $rooms_total  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0"))['c'] ?? 0;
-                        $rooms_issues = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'"))['c'] ?? 0;
-                        $rooms_today  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(created_at)=CURDATE()"))['c'] ?? 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0");
+                        $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
+                        $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE()");
+                        $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
                         ?>
                         <div class="ps-mini-stats">
                             <div class="ps-mini-stat">
@@ -480,9 +483,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="ps-card-body">
                         <?php
-                        $fac_total   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty'"))['c'] ?? 0;
-                        $fac_active  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty' AND status='Active'"))['c'] ?? 0;
-                        $fac_org     = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts WHERE role='faculty' AND is_org_adviser=1"))['c'] ?? 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users");
+                        $fac_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role != 'Organization Adviser'");
+                        $fac_active = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                        $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role = 'Organization Adviser'");
+                        $fac_org    = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
                         ?>
                         <div class="ps-mini-stats">
                             <div class="ps-mini-stat">
