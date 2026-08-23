@@ -1004,6 +1004,392 @@ main#app-main {
     border-radius: 6px;
 }
 
+/* ════════════════════════════════════════════════════════════════
+   PHASE 3 — REQUESTS PANEL COMPONENTS
+════════════════════════════════════════════════════════════════ */
+
+/* ── Extra button variants ────────────────────────────────────── */
+.ps-btn--success {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+}
+
+.ps-btn--success:hover {
+    background: #219150;
+}
+
+.ps-btn--danger {
+    background: var(--danger);
+    color: white;
+    border-color: var(--danger);
+}
+
+.ps-btn--danger:hover {
+    background: #a93226;
+}
+
+/* ── Extra alert variant ──────────────────────────────────────── */
+.ps-alert--info {
+    background: #eaf4fc;
+    border: 1px solid #b3d9f5;
+    color: #2471a3;
+}
+
+/* ── Form controls ────────────────────────────────────────────── */
+.ps-form-group {
+    margin-bottom: 1rem;
+}
+
+.ps-form-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.ps-form-control {
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-dark);
+    background: var(--primary-white);
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+}
+
+.ps-form-control:focus {
+    border-color: var(--accent-maroon);
+}
+
+.ps-form-control::placeholder {
+    color: var(--text-light);
+}
+
+textarea.ps-form-control {
+    resize: vertical;
+}
+
+select.ps-form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2rem;
+}
+
+.ps-form-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 3px;
+}
+
+/* ── Help note (info bar above tables) ───────────────────────── */
+.ps-help-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.7rem 1rem;
+    background: #eaf4fc;
+    border: 1px solid #b3d9f5;
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: #2471a3;
+    margin-bottom: 1rem;
+}
+
+.ps-help-note .material-symbols-outlined {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.ps-empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--text-light);
+}
+
+.ps-empty-state .material-symbols-outlined {
+    font-size: 40px;
+    opacity: 0.3;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.ps-empty-state p {
+    font-size: 13px;
+}
+
+/* ── Table wrap (horizontal scroll) ──────────────────────────── */
+.ps-table-wrap {
+    overflow-x: auto;
+}
+
+/* ── Sub-tabs (Requests panel) ────────────────────────────────── */
+.rq-sub-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 1.25rem;
+    background: var(--primary-white);
+    padding: 5px;
+    border-radius: 12px;
+    border: 1px solid var(--khaki-border);
+    width: fit-content;
+}
+
+.rq-sub-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.rq-sub-tab:hover {
+    background: var(--secondary-cream);
+    color: var(--text-dark);
+}
+
+.rq-sub-tab.active {
+    background: var(--accent-maroon);
+    color: white;
+    font-weight: 600;
+}
+
+.rq-tab-badge {
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 50px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.rq-sub-tab.active .rq-tab-badge {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Sub-panels ───────────────────────────────────────────────── */
+.rq-sub-panel {
+    display: none;
+}
+
+.rq-sub-panel.active {
+    display: block;
+}
+
+/* ── MODAL SYSTEM ─────────────────────────────────────────────── */
+.ps-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.ps-modal-backdrop.ps-modal-open {
+    display: flex;
+}
+
+.ps-modal {
+    background: var(--primary-white);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.ps-modal--sm {
+    max-width: 380px;
+}
+
+.ps-modal--lg {
+    max-width: 640px;
+}
+
+.ps-modal-head {
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.ps-modal-head h3 {
+    font-size: 14px;
+    font-weight: 700;
+    flex: 1;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.ps-modal-head-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.ps-modal-head-icon .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.ps-mhi--success {
+    background: #eafaf2;
+    color: var(--success);
+}
+
+.ps-mhi--danger {
+    background: #fdecea;
+    color: var(--danger);
+}
+
+.ps-mhi--warning {
+    background: #fef6e4;
+    color: var(--warning);
+}
+
+.ps-mhi--maroon {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+.ps-mhi--info {
+    background: #eaf4fc;
+    color: #2471a3;
+}
+
+.ps-modal-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--secondary-cream);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.ps-modal-close:hover {
+    background: var(--khaki-border);
+}
+
+.ps-modal-close .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.ps-modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.ps-modal-foot {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--khaki-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* ── Request summary block (inside modals) ────────────────────── */
+.ps-req-summary {
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.ps-req-sum-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 12.5px;
+}
+
+.ps-req-sum-row:last-child {
+    margin-bottom: 0;
+}
+
+.ps-rsl {
+    font-weight: 600;
+    color: var(--text-light);
+    min-width: 90px;
+    font-size: 11.5px;
+    flex-shrink: 0;
+}
+
+.ps-rsv {
+    color: var(--text-dark);
+}
+
+/* ── Detail grid (request detail modal) ──────────────────────── */
+.ps-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+}
+
+.ps-detail-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    margin-bottom: 2px;
+}
+
+.ps-detail-value {
+    font-size: 12.5px;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+
+/* ── Notice preview box ───────────────────────────────────────── */
+.ps-notice-preview {
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    font-family: 'Poppins', sans-serif;
+    color: var(--text-dark);
+}
+
 /* ── TAB PANELS ───────────────────────────────────────────────── */
 .tab-panel {
     display: none;

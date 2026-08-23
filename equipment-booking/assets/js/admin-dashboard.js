@@ -1677,3 +1677,85 @@
             });
     });
 })();
+
+/* ════════════════════════════════════════════════════════════════
+   PHASE 3 — REQUESTS PANEL JS
+   Modal system + sub-tab switcher
+════════════════════════════════════════════════════════════════ */
+
+/* ── ps-modal open / close ────────────────────────────────────── */
+function psOpenModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add('ps-modal-open');
+}
+function psCloseModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('ps-modal-open');
+}
+
+/* Close modal when clicking the backdrop */
+document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
+    bd.addEventListener('click', function (e) {
+        if (e.target === bd) bd.classList.remove('ps-modal-open');
+    });
+});
+
+/* ── Requests sub-tab switcher ────────────────────────────────── */
+(function () {
+    var tabGroup = document.getElementById('rqTabs');
+    if (!tabGroup) return;
+
+    tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            /* Deactivate all tabs and panels */
+            tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
+                p.classList.remove('active');
+            });
+
+            /* Activate clicked tab and its panel */
+            tab.classList.add('active');
+            var panelId = tab.dataset.rqPanel;
+            var panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('active');
+        });
+    });
+})();
+
+/* ── Live search — Waiting table ─────────────────────────────── */
+(function () {
+    var input = document.getElementById('rq-waiting-search');
+    var table = document.getElementById('rq-waiting-table');
+    if (!input || !table) return;
+    input.addEventListener('input', function () {
+        var q = input.value.toLowerCase();
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    });
+})();
+
+/* ── Live search + status filter — All Requests table ────────── */
+(function () {
+    var searchInput = document.getElementById('rq-all-search');
+    var statusSel = document.getElementById('rq-all-status');
+    var table = document.getElementById('rq-all-table');
+    if (!table) return;
+
+    function filterAll() {
+        var q = searchInput ? searchInput.value.toLowerCase() : '';
+        var status = statusSel ? statusSel.value : '';
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            var rowStat = row.dataset.status || '';
+            var matchQ = !q || text.includes(q);
+            var matchS = !status || rowStat === status;
+            row.style.display = (matchQ && matchS) ? '' : 'none';
+        });
+    }
+    if (searchInput) searchInput.addEventListener('input', filterAll);
+    if (statusSel) statusSel.addEventListener('change', filterAll);
+})();

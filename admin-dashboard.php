@@ -164,7 +164,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <span class="material-symbols-outlined">dashboard</span>
             <span>Dashboard</span>
         </a>
-        <a class="nav-item" data-tab="lending" id="snav-requests" href="#">
+        <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
             <span class="material-symbols-outlined">assignment</span>
             <span>Requests</span>
             <?php if ($stat_waiting > 0): ?>
@@ -512,7 +512,613 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
         <!-- ============================================================
-         TAB: LENDING
+         TAB: REQUESTS  (Phase 3 redesign)
+    ============================================================ -->
+        <div class="tab-panel" id="panel-requests">
+
+            <!-- Page header -->
+            <div class="ps-page-header-row">
+                <div class="ps-page-header">
+                    <h1>Equipment Requests</h1>
+                    <p>Review, approve, or decline borrow requests submitted by faculty and students.</p>
+                </div>
+                <button class="ps-btn ps-btn--outline" onclick="psOpenModal('ps-export-modal')">
+                    <span class="material-symbols-outlined">download</span> Export
+                </button>
+            </div>
+
+            <!-- Sub-tabs -->
+            <div class="rq-sub-tabs" id="rqTabs">
+                <button class="rq-sub-tab active" data-rq-panel="rq-waiting">
+                    Waiting
+                    <?php if ($stat_waiting > 0): ?>
+                        <span class="rq-tab-badge"><?php echo $stat_waiting; ?></span>
+                    <?php endif; ?>
+                </button>
+                <button class="rq-sub-tab" data-rq-panel="rq-active">Active Borrowings</button>
+                <button class="rq-sub-tab" data-rq-panel="rq-overdue">
+                    Overdue
+                    <?php if ($stat_overdue > 0): ?>
+                        <span class="rq-tab-badge"><?php echo $stat_overdue; ?></span>
+                    <?php endif; ?>
+                </button>
+                <button class="rq-sub-tab" data-rq-panel="rq-history">History</button>
+                <button class="rq-sub-tab" data-rq-panel="rq-all">All Requests</button>
+            </div>
+
+            <!-- ── WAITING ───────────────────────────────────────────── -->
+            <div class="rq-sub-panel active" id="rq-waiting">
+                <div class="ps-help-note">
+                    <span class="material-symbols-outlined">info</span>
+                    These requests are pending your approval. Approve to issue the item, or decline with an optional reason.
+                </div>
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">pending</span> Waiting for Approval</h3>
+                        <div style="display:flex;gap:6px">
+                            <input class="ps-form-control" style="width:200px" placeholder="Search requester..." id="rq-waiting-search">
+                        </div>
+                    </div>
+                    <div class="ps-table-wrap">
+                        <table class="ps-table" id="rq-waiting-table">
+                            <thead>
+                                <tr>
+                                    <th>Request ID</th>
+                                    <th>Requester</th>
+                                    <th>Student/Faculty ID</th>
+                                    <th>Equipment</th>
+                                    <th>Date Requested</th>
+                                    <th>Date Needed</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                mysqli_data_seek($waiting_result, 0);
+                                if (mysqli_num_rows($waiting_result) > 0):
+                                    while ($r = mysqli_fetch_assoc($waiting_result)):
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong style="color:var(--accent-maroon);cursor:pointer"
+                                            onclick="psOpenModal('ps-req-detail-modal')">
+                                            #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
+                                        </strong>
+                                    </td>
+                                    <td>
+                                        <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                        <div style="font-size:11px;color:var(--text-light)">Faculty</div>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                    <td><?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></td>
+                                    <td><?php echo date('M d, g:i A', strtotime($r['borrow_date'])); ?></td>
+                                    <td>
+                                        <div style="display:flex;gap:6px">
+                                            <button class="ps-btn ps-btn--success ps-btn--sm"
+                                                onclick="psOpenModal('ps-approve-modal')">
+                                                <span class="material-symbols-outlined">check</span> Approve
+                                            </button>
+                                            <button class="ps-btn ps-btn--danger ps-btn--sm"
+                                                onclick="psOpenModal('ps-decline-modal')">
+                                                <span class="material-symbols-outlined">close</span> Decline
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endwhile;
+                                else: ?>
+                                <tr>
+                                    <td colspan="7">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">assignment_turned_in</span>
+                                            <p>No pending requests. All caught up!</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /rq-waiting -->
+
+            <!-- ── ACTIVE BORROWINGS ─────────────────────────────────── -->
+            <div class="rq-sub-panel" id="rq-active">
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">check_circle</span>
+                            Active Borrowings (<?php echo $stat_approved; ?>)</h3>
+                    </div>
+                    <div class="ps-table-wrap">
+                        <table class="ps-table">
+                            <thead>
+                                <tr>
+                                    <th>Borrower</th>
+                                    <th>Equipment</th>
+                                    <th>Issued</th>
+                                    <th>Due</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                mysqli_data_seek($approved_result, 0);
+                                if (mysqli_num_rows($approved_result) > 0):
+                                    while ($r = mysqli_fetch_assoc($approved_result)):
+                                        $isOD = strtotime($r['return_date']) < strtotime($today);
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($r['faculty_id']); ?></div>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                    <td><?php echo date('M d', strtotime($r['borrow_date'])); ?></td>
+                                    <td style="<?php echo $isOD ? 'color:var(--danger);font-weight:600' : ''; ?>">
+                                        <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                    </td>
+                                    <td>
+                                        <span class="ps-badge ps-badge--dot <?php echo $isOD ? 'ps-badge--overdue' : 'ps-badge--active'; ?>">
+                                            <?php echo $isOD ? 'Overdue' : 'Active'; ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="ps-btn ps-btn--ghost ps-btn--sm"
+                                            onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                    </td>
+                                </tr>
+                                <?php endwhile;
+                                else: ?>
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">inventory_2</span>
+                                            <p>No active borrowings at the moment.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /rq-active -->
+
+            <!-- ── OVERDUE ────────────────────────────────────────────── -->
+            <div class="rq-sub-panel" id="rq-overdue">
+                <?php if ($stat_overdue > 0): ?>
+                <div class="ps-alert ps-alert--danger">
+                    <span class="material-symbols-outlined">warning</span>
+                    <?php echo $stat_overdue; ?> item(s) are overdue. Contact the borrowers immediately.
+                </div>
+                <?php endif; ?>
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">schedule</span>
+                            Overdue Items (<?php echo $stat_overdue; ?>)</h3>
+                    </div>
+                    <div class="ps-table-wrap">
+                        <table class="ps-table">
+                            <thead>
+                                <tr>
+                                    <th>Borrower</th>
+                                    <th>Equipment</th>
+                                    <th>Due Date</th>
+                                    <th>Days Overdue</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $overdue_q = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Overdue' OR (status='Approved' AND return_date < CURDATE()) ORDER BY return_date ASC");
+                                if ($overdue_q && mysqli_num_rows($overdue_q) > 0):
+                                    while ($r = mysqli_fetch_assoc($overdue_q)):
+                                        $days_od = max(0, (int)floor((strtotime($today) - strtotime($r['return_date'])) / 86400));
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($r['faculty_id']); ?></div>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                    <td style="color:var(--danger);font-weight:600"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
+                                    <td><span class="ps-badge ps-badge--overdue"><?php echo $days_od; ?> days</span></td>
+                                    <td>
+                                        <div style="display:flex;gap:6px">
+                                            <button class="ps-btn ps-btn--ghost ps-btn--sm"
+                                                onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                            <button class="ps-btn ps-btn--outline ps-btn--sm"
+                                                onclick="psOpenModal('ps-notice-modal')">Send Notice</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endwhile;
+                                else: ?>
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">check_circle</span>
+                                            <p>No overdue items. Great job!</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /rq-overdue -->
+
+            <!-- ── HISTORY ────────────────────────────────────────────── -->
+            <div class="rq-sub-panel" id="rq-history">
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">history</span> Request History</h3>
+                        <select class="ps-form-control" style="width:160px">
+                            <option>All time</option>
+                            <option>This week</option>
+                            <option>This month</option>
+                        </select>
+                    </div>
+                    <div class="ps-table-wrap">
+                        <table class="ps-table">
+                            <thead>
+                                <tr>
+                                    <th>Request ID</th>
+                                    <th>Borrower</th>
+                                    <th>Equipment</th>
+                                    <th>Status</th>
+                                    <th>Returned</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $history_q = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status IN ('Returned','Declined') ORDER BY request_date DESC LIMIT 50");
+                                if ($history_q && mysqli_num_rows($history_q) > 0):
+                                    while ($r = mysqli_fetch_assoc($history_q)):
+                                        $hbadge = $r['status'] === 'Returned' ? 'ps-badge--returned' : 'ps-badge--overdue';
+                                ?>
+                                <tr>
+                                    <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
+                                        onclick="psOpenModal('ps-req-detail-modal')">
+                                        #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                    <td><span class="ps-badge ps-badge--dot <?php echo $hbadge; ?>"><?php echo htmlspecialchars($r['status']); ?></span></td>
+                                    <td><?php echo date('M d', strtotime($r['return_date'])); ?></td>
+                                    <td>
+                                        <button class="ps-btn ps-btn--ghost ps-btn--sm"
+                                            onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                    </td>
+                                </tr>
+                                <?php endwhile;
+                                else: ?>
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">history</span>
+                                            <p>No request history yet.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /rq-history -->
+
+            <!-- ── ALL REQUESTS ──────────────────────────────────────── -->
+            <div class="rq-sub-panel" id="rq-all">
+                <div class="ps-card">
+                    <div class="ps-card-header">
+                        <h3><span class="material-symbols-outlined">list_alt</span> All Requests</h3>
+                        <div style="display:flex;gap:6px">
+                            <input class="ps-form-control" style="width:220px" placeholder="Search..." id="rq-all-search">
+                            <select class="ps-form-control" style="width:140px" id="rq-all-status">
+                                <option value="">All statuses</option>
+                                <option value="Waiting">Waiting</option>
+                                <option value="Approved">Active</option>
+                                <option value="Returned">Returned</option>
+                                <option value="Overdue">Overdue</option>
+                                <option value="Declined">Declined</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ps-table-wrap">
+                        <table class="ps-table" id="rq-all-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Borrower</th>
+                                    <th>Equipment</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php
+                                $all_q = mysqli_query($conn, "SELECT * FROM tbl_requests ORDER BY request_date DESC LIMIT 100");
+                                if ($all_q && mysqli_num_rows($all_q) > 0):
+                                    while ($r = mysqli_fetch_assoc($all_q)):
+                                        $abadge = match($r['status']) {
+                                            'Waiting'  => 'ps-badge--waiting',
+                                            'Approved' => 'ps-badge--active',
+                                            'Overdue'  => 'ps-badge--overdue',
+                                            'Returned' => 'ps-badge--returned',
+                                            default    => 'ps-badge--returned',
+                                        };
+                                ?>
+                                <tr data-status="<?php echo htmlspecialchars($r['status']); ?>">
+                                    <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
+                                        onclick="psOpenModal('ps-req-detail-modal')">
+                                        #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                    <td><span class="ps-badge ps-badge--dot <?php echo $abadge; ?>"><?php echo htmlspecialchars($r['status']); ?></span></td>
+                                    <td><?php echo date('M d', strtotime($r['request_date'])); ?></td>
+                                    <td>
+                                        <?php if ($r['status'] === 'Waiting'): ?>
+                                        <div style="display:flex;gap:5px">
+                                            <button class="ps-btn ps-btn--success ps-btn--sm" onclick="psOpenModal('ps-approve-modal')">Approve</button>
+                                            <button class="ps-btn ps-btn--danger ps-btn--sm" onclick="psOpenModal('ps-decline-modal')">Decline</button>
+                                        </div>
+                                        <?php elseif ($r['status'] === 'Approved' || $r['status'] === 'Overdue'): ?>
+                                        <div style="display:flex;gap:5px">
+                                            <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-return-modal')">Return</button>
+                                            <?php if ($r['status'] === 'Overdue'): ?>
+                                            <button class="ps-btn ps-btn--outline ps-btn--sm" onclick="psOpenModal('ps-notice-modal')">Notice</button>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php else: ?>
+                                        <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                                <?php endwhile;
+                                else: ?>
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="ps-empty-state">
+                                            <span class="material-symbols-outlined">list_alt</span>
+                                            <p>No requests found.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /rq-all -->
+
+        </div><!-- /panel-requests -->
+
+
+        <!-- ================================================================
+             MODALS — REQUESTS PANEL  (UI only — functions wired in Phase 4)
+        ================================================================ -->
+
+        <!-- MODAL: APPROVE REQUEST -->
+        <div class="ps-modal-backdrop" id="ps-approve-modal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--success">
+                        <span class="material-symbols-outlined">check_circle</span>
+                    </div>
+                    <h3>Approve Request</h3>
+                    <button class="ps-modal-close" onclick="psCloseModal('ps-approve-modal')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div class="ps-req-summary">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="approve-borrower">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="approve-equipment">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Date Needed</span><span class="ps-rsv" id="approve-date-needed">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Return Due Date</label>
+                        <input class="ps-form-control" type="date" id="approve-due-date"
+                            value="<?php echo date('Y-m-d', strtotime('+7 days')); ?>">
+                        <div class="ps-form-hint">Borrower will be expected to return the item by this date.</div>
+                    </div>
+                    <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
+                </div>
+                <div class="ps-modal-foot">
+                    <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-approve-modal')">Cancel</button>
+                    <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-approve-modal')">
+                        <span class="material-symbols-outlined">check</span> Approve Request
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: DECLINE REQUEST -->
+        <div class="ps-modal-backdrop" id="ps-decline-modal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--danger">
+                        <span class="material-symbols-outlined">cancel</span>
+                    </div>
+                    <h3>Decline Request</h3>
+                    <button class="ps-modal-close" onclick="psCloseModal('ps-decline-modal')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div class="ps-req-summary">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                        <textarea class="ps-form-control" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
+                        <div class="ps-form-hint">This reason will be sent to the borrower via email.</div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-decline-modal')">Cancel</button>
+                    <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-decline-modal')">
+                        <span class="material-symbols-outlined">close</span> Decline Request
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: CONFIRM RETURN -->
+        <div class="ps-modal-backdrop" id="ps-return-modal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">assignment_return</span>
+                    </div>
+                    <h3>Confirm Return</h3>
+                    <button class="ps-modal-close" onclick="psCloseModal('ps-return-modal')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div class="ps-req-summary">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Return Condition</label>
+                        <select class="ps-form-control">
+                            <option>Good — No visible damage</option>
+                            <option>Fair — Minor wear</option>
+                            <option>Damaged — Needs repair</option>
+                            <option>Missing — Item not returned</option>
+                        </select>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                        <textarea class="ps-form-control" rows="2" placeholder="Any notes about the return..."></textarea>
+                    </div>
+                    <div class="ps-alert ps-alert--info" style="margin:0">
+                        <span class="material-symbols-outlined">info</span>
+                        Confirming will update the stock count and close this request.
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-return-modal')">Cancel</button>
+                    <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-return-modal')">
+                        <span class="material-symbols-outlined">check</span> Confirm Return
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: SEND OVERDUE NOTICE -->
+        <div class="ps-modal-backdrop" id="ps-notice-modal">
+            <div class="ps-modal">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--warning">
+                        <span class="material-symbols-outlined">mail</span>
+                    </div>
+                    <h3>Send Overdue Notice</h3>
+                    <button class="ps-modal-close" onclick="psCloseModal('ps-notice-modal')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div class="ps-req-summary" style="margin-bottom:1rem">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Days Overdue</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Message Preview</label>
+                        <div class="ps-notice-preview">Dear [Borrower Name],
+
+This is a reminder that the following item borrowed from the PUPSync Equipment Lending System is now overdue:
+
+• Item: [Equipment Name]
+• Due Date: [Due Date]
+• Days Overdue: [N] days
+
+Please return the item as soon as possible to avoid further penalties.
+
+Thank you,
+PUPSync Admin — Biñan Campus</div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Delivery Method</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px">
+                            <input type="checkbox" checked> Send via Email
+                        </label>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-notice-modal')">Cancel</button>
+                    <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-notice-modal')">
+                        <span class="material-symbols-outlined">send</span> Send Notice
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: REQUEST DETAIL -->
+        <div class="ps-modal-backdrop" id="ps-req-detail-modal">
+            <div class="ps-modal ps-modal--lg">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">assignment</span>
+                    </div>
+                    <h3>Request Details</h3>
+                    <button class="ps-modal-close" onclick="psCloseModal('ps-req-detail-modal')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+                        <span class="ps-badge ps-badge--waiting ps-badge--dot" style="font-size:12px;padding:4px 12px">Waiting for Approval</span>
+                        <span style="font-size:11.5px;color:var(--text-light)">Submitted: —</span>
+                    </div>
+                    <div class="ps-detail-grid" style="margin-bottom:1.25rem">
+                        <div class="ps-detail-item"><div class="ps-detail-label">Requester</div><div class="ps-detail-value" style="font-weight:600">—</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Student / Faculty ID</div><div class="ps-detail-value">—</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Requester Type</div><div class="ps-detail-value">Faculty</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Email</div><div class="ps-detail-value" style="font-size:12px">—</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Equipment</div><div class="ps-detail-value" style="font-weight:600">—</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Quantity</div><div class="ps-detail-value">1</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Date Needed</div><div class="ps-detail-value" style="font-weight:600">—</div></div>
+                        <div class="ps-detail-item"><div class="ps-detail-label">Return By</div><div class="ps-detail-value">—</div></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Purpose / Notes</label>
+                        <div style="background:var(--secondary-cream);border-radius:8px;padding:0.75rem;font-size:12.5px;color:var(--text-dark);border:1px solid var(--khaki-border)">—</div>
+                    </div>
+                    <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;font-size:12px;color:var(--text-light);border:1px solid var(--khaki-border)">
+                        <strong style="color:var(--text-dark)">Arbitration Status:</strong> Pending review.
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-req-detail-modal')">Close</button>
+                    <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-decline-modal')">
+                        <span class="material-symbols-outlined">close</span> Decline
+                    </button>
+                    <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-approve-modal')">
+                        <span class="material-symbols-outlined">check</span> Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+         TAB: LENDING  (legacy — Inventory and Arbitration still use this)
     ============================================================ -->
         <div class="tab-panel" id="panel-lending">
 
