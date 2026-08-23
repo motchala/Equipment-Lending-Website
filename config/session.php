@@ -25,7 +25,7 @@ if (session_status() === PHP_SESSION_NONE) {
     // On shared hosting (e.g. InfinityFree), the server php.ini may ignore
     // session_set_cookie_params(), so ini_set is used as a stronger override.
     ini_set('session.cookie_httponly', '1');   // fixes "Cookie No HttpOnly Flag"
-    ini_set('session.cookie_samesite', 'Strict');
+    ini_set('session.cookie_samesite', 'Lax');
     ini_set('session.cookie_secure',   $is_https ? '1' : '0');
     ini_set('session.cookie_lifetime', '0');
     ini_set('session.cookie_path',     '/');
@@ -39,7 +39,7 @@ if (session_status() === PHP_SESSION_NONE) {
         'domain'   => '',
         'secure'   => $is_https,
         'httponly' => true,
-        'samesite' => 'Strict',
+        'samesite' => 'Lax',
     ]);
 
     session_start();
