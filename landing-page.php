@@ -52,7 +52,7 @@ if (isset($_POST['login'])) {
                 $res_acc = $stmt_acc->get_result();
                 if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
                     // tbl_accounts stores the legacy plain-text password; require it to match
-                    if ($password === $row_acc['password'] || password_verify($password, $row_acc['password'])) {
+                    if ($password === $row_acc['password']) {
                         $_SESSION['admin'] = true;
                         $_SESSION['login_time'] = time();
 
