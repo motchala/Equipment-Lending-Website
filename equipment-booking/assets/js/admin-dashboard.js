@@ -136,12 +136,13 @@
     }
 
     /* ── Tab switcher ────────────────────────────────────────── */
-    function _switchTabDOM(tabName) {
+    function _switchTabDOM(tabName, clickedEl) {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.remove('active'));
         const panel = document.getElementById('panel-' + tabName);
-        const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
         if (panel) panel.classList.add('active');
+        // Highlight the specific element that was clicked, or fall back to first match
+        const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
     }
 
@@ -263,9 +264,9 @@
         roomsPanel.querySelectorAll('.rooms-sub-panel').forEach(p => p.classList.remove('active'));
         roomsPanel.querySelectorAll('[data-rooms-tab]').forEach(b => b.classList.remove('active'));
         const activePanel = document.getElementById(tabName + '-panel');
-        const activeBtn   = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
+        const activeBtn = roomsPanel.querySelector('[data-rooms-tab="' + tabName + '"]');
         if (activePanel) activePanel.classList.add('active');
-        if (activeBtn)   activeBtn.classList.add('active');
+        if (activeBtn) activeBtn.classList.add('active');
     }
     function _getUnreadCount() {
         return document.querySelectorAll('.notif-item.unread').length;
@@ -521,7 +522,6 @@
                         switchLendingSub('history');
                         switchHistoryTab(dest);
                     } else if (dest === 'archive') {
-                        // archive is now inside inventory as "Archived Items"
                         switchLendingSub('inventory');
                         switchHistoryTab('reg-archived');
                     } else {
@@ -529,6 +529,12 @@
                     }
                     break;
                 }
+                case 'go-rooms':
+                    _switchTabDOM('rooms');
+                    break;
+                case 'go-faculty':
+                    _switchTabDOM('faculty');
+                    break;
                 case 'show-add-form': {
                     const fw = document.getElementById('item-form-wrap');
                     const regToggle = document.getElementById('registry-toggle-wrap');
@@ -611,8 +617,8 @@
 
     /* ── Faculty: adviser toggle show/hide ───────────────────── */
     const facAdviserChk = document.getElementById('fac-adviser');
-    const facOrgGroup   = document.getElementById('fac-org-group');
-    const facOrgSelect  = document.getElementById('fac-org');
+    const facOrgGroup = document.getElementById('fac-org-group');
+    const facOrgSelect = document.getElementById('fac-org');
 
     function _syncAdviserToggle() {
         if (!facAdviserChk || !facOrgGroup) return;
@@ -648,8 +654,8 @@
             ? '<span class="status-pill pill-info">' + _esc(data.org_name) + '</span>'
             : '<span style="color:var(--text-light);">&mdash;</span>';
         tr.innerHTML =
-            '<td class="fw-bold">' + _esc(data.fullname)  + '</td>' +
-            '<td>' + _esc(data.email)     + '</td>' +
+            '<td class="fw-bold">' + _esc(data.fullname) + '</td>' +
+            '<td>' + _esc(data.email) + '</td>' +
             '<td><span class="status-pill ' + roleClass + '">' + _esc(data.role) + '</span></td>' +
             '<td>' + orgCell + '</td>' +
             '<td><label class="faculty-toggle-label">' +
@@ -661,8 +667,8 @@
     }
 
     /* ── Faculty: create-account submit ──────────────────────── */
-    const facSubmitBtn   = document.getElementById('fac-submit-btn');
-    const facFormAlert   = document.getElementById('fac-form-alert');
+    const facSubmitBtn = document.getElementById('fac-submit-btn');
+    const facFormAlert = document.getElementById('fac-form-alert');
 
     function _showFacAlert(msg, isError) {
         if (!facFormAlert) return;
@@ -682,15 +688,15 @@
         facSubmitBtn.addEventListener('click', function () {
             _clearFacAlert();
 
-            const email      = (document.getElementById('fac-email')?.value  || '').trim();
-            const backup     = (document.getElementById('fac-backup')?.value || '').trim();
-            const firstName  = (document.getElementById('fac-first')?.value  || '').trim();
+            const email = (document.getElementById('fac-email')?.value || '').trim();
+            const backup = (document.getElementById('fac-backup')?.value || '').trim();
+            const firstName = (document.getElementById('fac-first')?.value || '').trim();
             const middleName = (document.getElementById('fac-middle')?.value || '').trim();
-            const lastName   = (document.getElementById('fac-last')?.value   || '').trim();
-            const password   = document.getElementById('fac-password')?.value || '';
-            const confirm    = document.getElementById('fac-confirm')?.value  || '';
-            const isAdviser  = facAdviserChk?.checked ? '1' : '0';
-            const orgId      = facOrgSelect?.value || '';
+            const lastName = (document.getElementById('fac-last')?.value || '').trim();
+            const password = document.getElementById('fac-password')?.value || '';
+            const confirm = document.getElementById('fac-confirm')?.value || '';
+            const isAdviser = facAdviserChk?.checked ? '1' : '0';
+            const orgId = facOrgSelect?.value || '';
 
             // Client-side pre-checks (mirror server validation for immediate UX feedback)
             if (!email) {
@@ -720,76 +726,76 @@
             facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;animation:spin 0.8s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Creating...';
 
             const body = new URLSearchParams({
-                csrf_token:       getCsrfToken(),
-                pupsync_email:    email,
-                backup_email:     backup,
-                first_name:       firstName,
-                middle_name:      middleName,
-                last_name:        lastName,
-                password:         password,
+                csrf_token: getCsrfToken(),
+                pupsync_email: email,
+                backup_email: backup,
+                first_name: firstName,
+                middle_name: middleName,
+                last_name: lastName,
+                password: password,
                 confirm_password: confirm,
-                is_org_adviser:   isAdviser,
-                organization_id:  orgId
+                is_org_adviser: isAdviser,
+                organization_id: orgId
             });
 
             fetch('equipment-booking/api/create-faculty-account.php', {
-                method:  'POST',
+                method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body:    body.toString()
+                body: body.toString()
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    _showFacAlert(
-                        'Account created. Faculty ID: ' + data.faculty_id, false
-                    );
-                    showToast('Faculty account created successfully.');
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        _showFacAlert(
+                            'Account created. Faculty ID: ' + data.faculty_id, false
+                        );
+                        showToast('Faculty account created successfully.');
 
-                    // Build fullname for the new DOM row
-                    const parts = [firstName, middleName, lastName].filter(Boolean);
-                    const fullname = parts.join(' ');
-                    const role = isAdviser === '1'
-                        ? 'Organization Adviser'
-                        : 'Regular Faculty';
-                    const orgName = isAdviser === '1'
-                        ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
-                        : '';
+                        // Build fullname for the new DOM row
+                        const parts = [firstName, middleName, lastName].filter(Boolean);
+                        const fullname = parts.join(' ');
+                        const role = isAdviser === '1'
+                            ? 'Organization Adviser'
+                            : 'Regular Faculty';
+                        const orgName = isAdviser === '1'
+                            ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
+                            : '';
 
-                    // DOM prepend: remove empty-state row if present, then prepend new row
-                    const emptyRow = document.getElementById('fac-empty-row');
-                    if (emptyRow) emptyRow.remove();
+                        // DOM prepend: remove empty-state row if present, then prepend new row
+                        const emptyRow = document.getElementById('fac-empty-row');
+                        if (emptyRow) emptyRow.remove();
 
-                    const tbody = document.getElementById('faculty-list-tbody');
-                    if (tbody) {
-                        const newRow = _buildFacultyRow({
-                            fullname, email, role,
-                            org_name:            orgName,
-                            faculty_id:          data.faculty_id || '',
-                            allow_org_borrowing: 0
-                        });
-                        tbody.prepend(newRow);
+                        const tbody = document.getElementById('faculty-list-tbody');
+                        if (tbody) {
+                            const newRow = _buildFacultyRow({
+                                fullname, email, role,
+                                org_name: orgName,
+                                faculty_id: data.faculty_id || '',
+                                allow_org_borrowing: 0
+                            });
+                            tbody.prepend(newRow);
+                        }
+
+                        // Reset form
+                        ['fac-email', 'fac-backup', 'fac-first', 'fac-middle', 'fac-last', 'fac-password', 'fac-confirm']
+                            .forEach(id => {
+                                const el = document.getElementById(id);
+                                if (el) el.value = '';
+                            });
+                        if (facAdviserChk) facAdviserChk.checked = false;
+                        _syncAdviserToggle();
+
+                    } else {
+                        _showFacAlert(data.message || 'An error occurred.', true);
                     }
-
-                    // Reset form
-                    ['fac-email','fac-backup','fac-first','fac-middle','fac-last','fac-password','fac-confirm']
-                        .forEach(id => {
-                            const el = document.getElementById(id);
-                            if (el) el.value = '';
-                        });
-                    if (facAdviserChk) facAdviserChk.checked = false;
-                    _syncAdviserToggle();
-
-                } else {
-                    _showFacAlert(data.message || 'An error occurred.', true);
-                }
-            })
-            .catch(() => {
-                _showFacAlert('Network error. Please try again.', true);
-            })
-            .finally(() => {
-                facSubmitBtn.disabled = false;
-                facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
-            });
+                })
+                .catch(() => {
+                    _showFacAlert('Network error. Please try again.', true);
+                })
+                .finally(() => {
+                    facSubmitBtn.disabled = false;
+                    facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
+                });
         });
     }
 
@@ -813,9 +819,12 @@
     if (avatarBtn) avatarBtn.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
     document.addEventListener('click', e => { if (!e.target.closest('.header-right')) closeDropdown(); });
 
-    /* ── Nav tabs ─────────────────────────────────────────────── */
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-        btn.addEventListener('click', function () { _switchTabDOM(this.dataset.tab); });
+    /* ── Sidebar nav items ────────────────────────────────────── */
+    document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            _switchTabDOM(this.dataset.tab, this);
+        });
     });
 
     /* ── Lending sub-nav ─────────────────────────────────────── */
@@ -835,8 +844,8 @@
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
-        const modal   = document.getElementById('adminCancelRrModal');
-        const desc    = document.getElementById('adminCancelRrDesc');
+        const modal = document.getElementById('adminCancelRrModal');
+        const desc = document.getElementById('adminCancelRrDesc');
         const alertEl = document.getElementById('admin-cancel-rr-alert');
         document.getElementById('adminCancelRrId').value = rrId;
         alertEl.style.display = 'none';
@@ -869,7 +878,7 @@
     const submitAdminCancelRrBtn = document.getElementById('submitAdminCancelRrBtn');
     if (submitAdminCancelRrBtn) {
         submitAdminCancelRrBtn.addEventListener('click', function () {
-            const rrId    = document.getElementById('adminCancelRrId').value;
+            const rrId = document.getElementById('adminCancelRrId').value;
             const alertEl = document.getElementById('admin-cancel-rr-alert');
             this.disabled = true;
             this.textContent = 'Cancelling…';
@@ -883,36 +892,36 @@
                     csrf_token: getCsrfToken(),
                 }),
             })
-            .then(r => r.json())
-            .then(data => {
-                this.disabled = false;
-                this.textContent = 'Confirm Cancellation';
-                if (data.error) {
+                .then(r => r.json())
+                .then(data => {
+                    this.disabled = false;
+                    this.textContent = 'Confirm Cancellation';
+                    if (data.error) {
+                        alertEl.style.display = 'block';
+                        alertEl.style.background = '#ffeaea';
+                        alertEl.style.color = 'var(--danger)';
+                        alertEl.textContent = data.error;
+                        return;
+                    }
+                    closeAdminCancelRrModal();
+                    showToast('Reservation cancelled. Faculty and waitlist notified.');
+                    setTimeout(() => location.reload(), 1200);
+                })
+                .catch(() => {
+                    this.disabled = false;
+                    this.textContent = 'Confirm Cancellation';
                     alertEl.style.display = 'block';
                     alertEl.style.background = '#ffeaea';
                     alertEl.style.color = 'var(--danger)';
-                    alertEl.textContent = data.error;
-                    return;
-                }
-                closeAdminCancelRrModal();
-                showToast('Reservation cancelled. Faculty and waitlist notified.');
-                setTimeout(() => location.reload(), 1200);
-            })
-            .catch(() => {
-                this.disabled = false;
-                this.textContent = 'Confirm Cancellation';
-                alertEl.style.display = 'block';
-                alertEl.style.background = '#ffeaea';
-                alertEl.style.color = 'var(--danger)';
-                alertEl.textContent = 'Network error. Please try again.';
-            });
+                    alertEl.textContent = 'Network error. Please try again.';
+                });
         });
     }
 
     /* ── Issue Review Modal ─────────────────────────────────── */
     function openIssueReviewModal(issueId, roomName, reporter, description) {
-        const modal   = document.getElementById('issueReviewModal');
-        const desc    = document.getElementById('issueReviewDesc');
+        const modal = document.getElementById('issueReviewModal');
+        const desc = document.getElementById('issueReviewDesc');
         const alertEl = document.getElementById('issue-review-alert');
         document.getElementById('issueReviewId').value = issueId;
         document.getElementById('issueAdminNotes').value = '';
@@ -932,55 +941,55 @@
 
     function _escAdm(str) {
         return String(str || '')
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-            .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function _submitIssueResolution(resolution) {
-        const issueId    = document.getElementById('issueReviewId').value;
+        const issueId = document.getElementById('issueReviewId').value;
         const adminNotes = document.getElementById('issueAdminNotes').value.trim();
-        const setMaint   = document.getElementById('issueSetMaintenance').checked;
-        const alertEl    = document.getElementById('issue-review-alert');
+        const setMaint = document.getElementById('issueSetMaintenance').checked;
+        const alertEl = document.getElementById('issue-review-alert');
 
         fetch('room-reservation/api/resolve-room-issue.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
             body: JSON.stringify({
-                issue_id:        parseInt(issueId, 10),
-                resolution:      resolution,
-                admin_notes:     adminNotes,
+                issue_id: parseInt(issueId, 10),
+                resolution: resolution,
+                admin_notes: adminNotes,
                 set_maintenance: setMaint,
-                csrf_token:      getCsrfToken(),
+                csrf_token: getCsrfToken(),
             }),
         })
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('resolveIssueBtn').disabled  = false;
-            document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
-            document.getElementById('dismissIssueBtn').disabled  = false;
-            document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
-            if (data.error) {
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('resolveIssueBtn').disabled = false;
+                document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
+                document.getElementById('dismissIssueBtn').disabled = false;
+                document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
+                if (data.error) {
+                    alertEl.style.display = 'block';
+                    alertEl.style.background = '#ffeaea';
+                    alertEl.style.color = 'var(--danger)';
+                    alertEl.textContent = data.error;
+                    return;
+                }
+                closeIssueReviewModal();
+                showToast('Issue report ' + resolution.toLowerCase() + '.');
+                setTimeout(() => location.reload(), 1200);
+            })
+            .catch(() => {
+                document.getElementById('resolveIssueBtn').disabled = false;
+                document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
+                document.getElementById('dismissIssueBtn').disabled = false;
+                document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
                 alertEl.style.display = 'block';
                 alertEl.style.background = '#ffeaea';
                 alertEl.style.color = 'var(--danger)';
-                alertEl.textContent = data.error;
-                return;
-            }
-            closeIssueReviewModal();
-            showToast('Issue report ' + resolution.toLowerCase() + '.');
-            setTimeout(() => location.reload(), 1200);
-        })
-        .catch(() => {
-            document.getElementById('resolveIssueBtn').disabled  = false;
-            document.getElementById('resolveIssueBtn').textContent = 'Mark Resolved';
-            document.getElementById('dismissIssueBtn').disabled  = false;
-            document.getElementById('dismissIssueBtn').textContent = 'Dismiss';
-            alertEl.style.display = 'block';
-            alertEl.style.background = '#ffeaea';
-            alertEl.style.color = 'var(--danger)';
-            alertEl.textContent = 'Network error. Please try again.';
-        });
+                alertEl.textContent = 'Network error. Please try again.';
+            });
     }
 
     document.addEventListener('click', function (e) {
@@ -1208,11 +1217,11 @@
         // Auto-dismiss alerts after 5s
         setTimeout(() => {
             ['added-alert', 'updated-alert',
-             'room-added-alert', 'room-updated-alert',
-             'room-archived-alert', 'room-restored-alert'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = 'none';
-            });
+                'room-added-alert', 'room-updated-alert',
+                'room-archived-alert', 'room-restored-alert'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
         }, 5000);
     }
 
@@ -1629,42 +1638,124 @@
         const toggle = e.target.closest('.org-borrowing-toggle');
         if (!toggle) return;
 
-        const facultyId       = toggle.dataset.facultyId;
-        const newValue        = toggle.checked ? 1 : 0;
+        const facultyId = toggle.dataset.facultyId;
+        const newValue = toggle.checked ? 1 : 0;
         const previousChecked = !toggle.checked;   // save for revert on error
 
         const formData = new FormData();
-        formData.append('csrf_token',          getCsrfToken());
-        formData.append('faculty_id',          facultyId);
+        formData.append('csrf_token', getCsrfToken());
+        formData.append('faculty_id', facultyId);
         formData.append('allow_org_borrowing', newValue);
 
         fetch('equipment-booking/api/toggle-org-borrowing.php', {
             method: 'POST',
-            body:   formData
+            body: formData
         })
-        .then(function (res) {
-            return res.json().then(function (data) {
-                return { status: res.status, data };
-            });
-        })
-        .then(function ({ status, data }) {
-            if (status === 200 && data.status === 'success') {
-                // Update checked state to the value confirmed by the server
-                toggle.checked = data.allow_org_borrowing === 1;
-                showToast(
-                    data.allow_org_borrowing === 1
-                        ? 'Org borrowing enabled.'
-                        : 'Org borrowing disabled.'
-                );
-            } else {
-                // Revert the toggle
+            .then(function (res) {
+                return res.json().then(function (data) {
+                    return { status: res.status, data };
+                });
+            })
+            .then(function ({ status, data }) {
+                if (status === 200 && data.status === 'success') {
+                    // Update checked state to the value confirmed by the server
+                    toggle.checked = data.allow_org_borrowing === 1;
+                    showToast(
+                        data.allow_org_borrowing === 1
+                            ? 'Org borrowing enabled.'
+                            : 'Org borrowing disabled.'
+                    );
+                } else {
+                    // Revert the toggle
+                    toggle.checked = previousChecked;
+                    showToast('Error: ' + (data.message || 'Could not update permission.'));
+                }
+            })
+            .catch(function () {
                 toggle.checked = previousChecked;
-                showToast('Error: ' + (data.message || 'Could not update permission.'));
-            }
-        })
-        .catch(function () {
-            toggle.checked = previousChecked;
-            showToast('Network error. Please try again.');
+                showToast('Network error. Please try again.');
+            });
+    });
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   PHASE 3 — REQUESTS PANEL JS
+   Modal system + sub-tab switcher
+════════════════════════════════════════════════════════════════ */
+
+/* ── ps-modal open / close ────────────────────────────────────── */
+function psOpenModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add('ps-modal-open');
+}
+function psCloseModal(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('ps-modal-open');
+}
+
+/* Close modal when clicking the backdrop */
+document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
+    bd.addEventListener('click', function (e) {
+        if (e.target === bd) bd.classList.remove('ps-modal-open');
+    });
+});
+
+/* ── Requests sub-tab switcher ────────────────────────────────── */
+(function () {
+    var tabGroup = document.getElementById('rqTabs');
+    if (!tabGroup) return;
+
+    tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            /* Deactivate all tabs and panels */
+            tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (t) {
+                t.classList.remove('active');
+            });
+            document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
+                p.classList.remove('active');
+            });
+
+            /* Activate clicked tab and its panel */
+            tab.classList.add('active');
+            var panelId = tab.dataset.rqPanel;
+            var panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('active');
         });
     });
+})();
+
+/* ── Live search — Waiting table ─────────────────────────────── */
+(function () {
+    var input = document.getElementById('rq-waiting-search');
+    var table = document.getElementById('rq-waiting-table');
+    if (!input || !table) return;
+    input.addEventListener('input', function () {
+        var q = input.value.toLowerCase();
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    });
+})();
+
+/* ── Live search + status filter — All Requests table ────────── */
+(function () {
+    var searchInput = document.getElementById('rq-all-search');
+    var statusSel = document.getElementById('rq-all-status');
+    var table = document.getElementById('rq-all-table');
+    if (!table) return;
+
+    function filterAll() {
+        var q = searchInput ? searchInput.value.toLowerCase() : '';
+        var status = statusSel ? statusSel.value : '';
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            var text = row.textContent.toLowerCase();
+            var rowStat = row.dataset.status || '';
+            var matchQ = !q || text.includes(q);
+            var matchS = !status || rowStat === status;
+            row.style.display = (matchQ && matchS) ? '' : 'none';
+        });
+    }
+    if (searchInput) searchInput.addEventListener('input', filterAll);
+    if (statusSel) statusSel.addEventListener('change', filterAll);
 })();
