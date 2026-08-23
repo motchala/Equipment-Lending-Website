@@ -4558,3 +4558,1154 @@ input[type="range"] {
     pointer-events: auto;
     /* allow text selection when pinned open */
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   INVENTORY SCREEN — REDESIGN
+   All rules below are scoped to inventory only.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Page Header ─────────────────────────────────────────────────── */
+.inv-redesign-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.inv-page-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.2;
+}
+
+.inv-page-sub {
+    color: var(--text-light);
+    font-size: 12.5px;
+    margin-top: 3px;
+}
+
+.btn-inv-add-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.55rem 1.1rem;
+    background: var(--accent-maroon);
+    color: #fff;
+    border: 1.5px solid var(--accent-maroon);
+    border-radius: 9px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-inv-add-primary:hover {
+    background: var(--accent-dark);
+}
+
+/* ── Split Layout ────────────────────────────────────────────────── */
+.inv-split-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.inv-list-col,
+.inv-form-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* JS-conflict fix: _enterEditMode() adds .hidden to #inv-table-card and
+   .hidden/.edit-mode to #item-form-wrap. We override those here so the
+   always-visible split panels cannot be collapsed by existing JS.        */
+.inv-list-col #inv-table-card,
+.inv-list-col #inv-table-card.hidden,
+.inv-form-col #item-form-wrap,
+.inv-form-col #item-form-wrap.hidden,
+.inv-form-col #item-form-wrap.edit-mode {
+    display: block !important;
+}
+
+/* ── Left Panel Header ───────────────────────────────────────────── */
+.inv-list-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.inv-list-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.inv-list-title .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--accent-maroon);
+}
+
+.inv-search-ctrl {
+    width: 155px;
+    padding: 0.45rem 0.85rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    color: var(--text-dark);
+    background: var(--secondary-cream);
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.inv-search-ctrl:focus {
+    border-color: var(--accent-maroon);
+    background: var(--primary-white);
+}
+
+/* ── Item rows ───────────────────────────────────────────────────── */
+.inv-list-body {
+    padding: 0 1.25rem;
+}
+
+.inv-row-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.inv-row-item:last-child {
+    border-bottom: none;
+}
+
+.inv-row-thumb {
+    width: 48px;
+    height: 48px;
+    background: var(--secondary-cream);
+    border-radius: 10px;
+    border: 1px solid var(--khaki-border);
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.inv-row-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.inv-thumb-ph {
+    display: none;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+}
+
+.inv-thumb-ph .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--accent-maroon);
+}
+
+.inv-row-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.inv-row-info .i-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inv-row-info .i-cat {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+}
+
+.inv-row-qty {
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.inv-row-qty .q-val {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1;
+}
+
+.inv-row-qty .q-val.q-low {
+    color: var(--warning);
+}
+
+.inv-row-qty .q-val.q-none {
+    color: var(--danger);
+}
+
+.inv-row-qty .q-lbl {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+.inv-row-actions {
+    flex-shrink: 0;
+}
+
+.btn-inv-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+
+.btn-inv-edit:hover {
+    background: var(--hover-bg);
+    color: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+}
+
+.inv-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: var(--text-light);
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.inv-empty-state .material-symbols-outlined {
+    font-size: 40px;
+    opacity: .35;
+}
+
+.inv-empty-state p {
+    font-size: 13px;
+}
+
+/* ── Right Panel: Form ───────────────────────────────────────────── */
+.inv-form-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.inv-form-header h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.inv-form-header h3 .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--accent-maroon);
+}
+
+.inv-form-body {
+    padding: 1.25rem;
+}
+
+.inv-form-body .form-group {
+    margin-bottom: 1rem;
+}
+
+.inv-form-body .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+}
+
+.inv-req {
+    color: var(--danger);
+}
+
+.inv-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.inv-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 0.5rem;
+    align-items: center;
+}
+
+.btn-inv-save {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0.6rem 1rem;
+    background: var(--accent-maroon);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn-inv-save:hover {
+    background: var(--accent-dark);
+}
+
+.btn-inv-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-inv-delete:hover {
+    background: #fdecea;
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+/* ── Archived Section ────────────────────────────────────────────── */
+.inv-archived-wrap {
+    margin-top: 1.5rem;
+}
+
+.inv-arch-toggle {
+    margin-bottom: 0;
+}
+
+/* ── Archive Equipment Modal ─────────────────────────────────────── */
+.inv-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.inv-modal {
+    background: var(--card-bg);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+    overflow: hidden;
+}
+
+.inv-modal-sm {
+    max-width: 380px;
+}
+
+.inv-modal-head {
+    padding: 1.1rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.inv-modal-head h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    flex: 1;
+    margin: 0;
+}
+
+.inv-modal-head-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.inv-modal-head-icon .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.inv-modal-head-icon.danger {
+    background: #fdecea;
+    color: var(--danger);
+}
+
+.inv-modal-head-icon.maroon {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+.inv-modal-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: none;
+    background: var(--secondary-cream);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.inv-modal-close:hover {
+    background: var(--khaki-border);
+}
+
+.inv-modal-close .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.inv-modal-body {
+    padding: 1.25rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.inv-modal-body p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dark);
+}
+
+.inv-modal-foot {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--khaki-border);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-inv-cancel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.5rem 1rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-inv-cancel:hover {
+    background: var(--hover-bg);
+    color: var(--text-dark);
+}
+
+.btn-inv-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.5rem 1rem;
+    border: 1.5px solid var(--danger);
+    border-radius: 8px;
+    background: var(--danger);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+}
+
+.btn-inv-danger:hover {
+    background: #a93226;
+    border-color: #a93226;
+}
+
+.btn-inv-danger .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.inv-alert-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-top: 0.75rem;
+}
+
+.inv-alert-banner.danger {
+    background: #fdecea;
+    border: 1px solid #f5c6c6;
+    color: var(--danger);
+}
+
+.inv-alert-banner .material-symbols-outlined {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── Hide the lending tab bar on the Inventory screen ────────────────────────
+   :has() watches for #lending-inventory.active; hides .lending-nav only then,
+   leaving every other lending sub-panel (Requests, History, etc.) unaffected. */
+#panel-lending:has(#lending-inventory.active) .lending-nav {
+    display: none;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+    .inv-split-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .inv-search-ctrl {
+        width: 120px;
+    }
+
+    .inv-form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ROOMS PANEL — Prototype V2 Redesign (Applied Aug 2026)
+   All rules are either scoped to #panel-rooms or use a pr- prefix so
+   they cannot bleed into any other panel. JS hooks (.rooms-sub-panel,
+   data-rooms-tab, #rooms-*-panel, #room-form-wrap, #addRoomBtn) are
+   unchanged — only visual classes and HTML structure are updated.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Page header row ─────────────────────────────────────── */
+#panel-rooms .pr-page-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+#panel-rooms .pr-page-title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 4px;
+    line-height: 1.2;
+}
+
+#panel-rooms .pr-page-subtitle {
+    font-size: 0.81rem;
+    color: var(--text-light);
+    margin: 0;
+    max-width: 560px;
+}
+
+/* ── Button system (rooms-panel scoped) ──────────────────── */
+#panel-rooms .pr-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.5rem 1.1rem;
+    border-radius: 10px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    text-decoration: none !important;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#panel-rooms .pr-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+#panel-rooms .pr-btn-primary {
+    background: var(--accent-maroon);
+    color: #fff;
+    border-color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-btn-primary:hover {
+    background: var(--accent-dark);
+    border-color: var(--accent-dark);
+}
+
+#panel-rooms .pr-btn-ghost {
+    background: transparent;
+    color: var(--text-dark);
+    border-color: transparent;
+}
+
+#panel-rooms .pr-btn-ghost:hover {
+    background: var(--secondary-cream);
+}
+
+#panel-rooms .pr-btn-outline {
+    background: transparent;
+    color: var(--text-dark);
+    border-color: var(--khaki-border);
+}
+
+#panel-rooms .pr-btn-outline:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-btn-success {
+    background: #27ae60;
+    color: #fff;
+    border-color: #27ae60;
+}
+
+#panel-rooms .pr-btn-success:hover {
+    background: #219150;
+}
+
+#panel-rooms .pr-btn-danger {
+    background: var(--danger);
+    color: #fff;
+    border-color: var(--danger);
+}
+
+#panel-rooms .pr-btn-danger:hover {
+    background: #a93226;
+}
+
+#panel-rooms .pr-btn-sm {
+    padding: 0.28rem 0.75rem;
+    font-size: 11.5px;
+}
+
+/* ── Sub-tabs (replaces history-toggle-wrap visually) ────── */
+#panel-rooms .pr-sub-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    padding: 4px;
+    border-radius: 10px;
+    margin-bottom: 1.35rem;
+    flex-wrap: wrap;
+}
+
+#panel-rooms .pr-sub-tab {
+    padding: 0.4rem 1rem;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#panel-rooms .pr-sub-tab:hover {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text-dark);
+}
+
+#panel-rooms .pr-sub-tab.active {
+    background: var(--accent-maroon);
+    color: #fff;
+    font-weight: 600;
+}
+
+#panel-rooms .pr-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-maroon);
+    color: #fff;
+    border-radius: 50px;
+    padding: 1px 7px;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+#panel-rooms .pr-sub-tab.active .pr-tab-badge {
+    background: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Empty state ─────────────────────────────────────────── */
+#panel-rooms .pr-empty {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-light);
+    font-size: 0.87rem;
+}
+
+#panel-rooms .pr-empty strong {
+    color: var(--accent-maroon);
+}
+
+/* ── Room groups + grid ──────────────────────────────────── */
+#panel-rooms .pr-room-group {
+    margin-bottom: 2rem;
+}
+
+#panel-rooms .pr-room-group-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-light);
+    margin: 0 0 0.75rem;
+}
+
+#panel-rooms .pr-room-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+/* ── Room card — override global .room-card for vertical grid ── */
+#panel-rooms .room-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    gap: 0;
+    align-items: stretch;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+#panel-rooms .room-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 32px rgba(96, 3, 2, 0.13);
+}
+
+/* Banner */
+#panel-rooms .rc-banner {
+    height: 96px;
+    background: linear-gradient(135deg, var(--accent-maroon) 0%, #8a1a1a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#panel-rooms .rc-banner .material-symbols-outlined {
+    font-size: 42px;
+    color: rgba(255, 255, 255, 0.42);
+}
+
+/* Body */
+#panel-rooms .rc-body {
+    padding: 0.9rem 1rem;
+    flex: 1;
+}
+
+#panel-rooms .rc-body h4 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 5px;
+}
+
+#panel-rooms .rc-meta {
+    font-size: 11.5px;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+#panel-rooms .rc-meta svg {
+    flex-shrink: 0;
+}
+
+/* Status badge inside rc-meta */
+#panel-rooms .rc-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 50px;
+    border: 1.5px solid transparent;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+#panel-rooms .rc-status.avail {
+    color: #27ae60;
+    background: #eafaf2;
+    border-color: #a9dfbf;
+}
+
+#panel-rooms .rc-status.maint {
+    color: #e67e22;
+    background: #fef6e4;
+    border-color: #f5cba7;
+}
+
+#panel-rooms .rc-status.nobk {
+    color: #6b7280;
+    background: #f1f3f5;
+    border-color: #d1d5db;
+}
+
+/* Amenity chips */
+#panel-rooms .rc-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+#panel-rooms .rc-chips span {
+    font-size: 10.5px;
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+/* Footer */
+#panel-rooms .rc-footer {
+    padding: 0.65rem 0.85rem;
+    border-top: 1px solid var(--khaki-border);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* ── Card wrapper for sub-panels (archived / reservations / issues) ── */
+#panel-rooms .pr-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+#panel-rooms .pr-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.95rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+#panel-rooms .pr-card-header h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+#panel-rooms .pr-card-header h3 .material-symbols-outlined {
+    font-size: 17px;
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-card-header h3 svg {
+    width: 16px;
+    height: 16px;
+    color: var(--accent-maroon);
+    flex-shrink: 0;
+}
+
+#panel-rooms .pr-card-note {
+    padding: 0.6rem 1.25rem;
+    font-size: 0.79rem;
+    color: var(--text-light);
+    border-bottom: 1px solid var(--khaki-border);
+    background: var(--secondary-cream);
+}
+
+/* ── Data table ──────────────────────────────────────────── */
+#panel-rooms .pr-tbl-wrap {
+    overflow-x: auto;
+}
+
+#panel-rooms .pr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+
+#panel-rooms .pr-table thead th {
+    background: var(--secondary-cream);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light);
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px solid var(--khaki-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+#panel-rooms .pr-table tbody td {
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--khaki-border);
+    color: var(--text-dark);
+    vertical-align: middle;
+}
+
+#panel-rooms .pr-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+#panel-rooms .pr-table tbody tr:hover td {
+    background: #faf8f4;
+}
+
+#panel-rooms .pr-table .td-fw {
+    font-weight: 600;
+}
+
+#panel-rooms .pr-table .td-sm {
+    font-size: 0.78rem;
+    color: var(--text-light);
+}
+
+/* ── Status pills for tables ──────────────────────────────── */
+#panel-rooms .pr-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 50px;
+    border: 1.5px solid transparent;
+}
+
+#panel-rooms .pr-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+#panel-rooms .pr-pill-approved {
+    color: #27ae60;
+    background: #eafaf2;
+    border-color: #a9dfbf;
+}
+
+#panel-rooms .pr-pill-pending {
+    color: #e67e22;
+    background: #fef6e4;
+    border-color: #f5cba7;
+}
+
+#panel-rooms .pr-pill-cancelled {
+    color: #6b7280;
+    background: #f1f3f5;
+    border-color: #d1d5db;
+}
+
+#panel-rooms .pr-pill-declined {
+    color: #c0392b;
+    background: #fdecea;
+    border-color: #e5b8bb;
+}
+
+#panel-rooms .pr-pill-open {
+    color: #e67e22;
+    background: #fef6e4;
+    border-color: #f5cba7;
+}
+
+#panel-rooms .pr-pill-resolved {
+    color: #27ae60;
+    background: #eafaf2;
+    border-color: #a9dfbf;
+}
+
+#panel-rooms .pr-pill-dismissed {
+    color: #6b7280;
+    background: #f1f3f5;
+    border-color: #d1d5db;
+}
+
+#panel-rooms .pr-pill-avail {
+    color: #27ae60;
+    background: #eafaf2;
+    border-color: #a9dfbf;
+}
+
+#panel-rooms .pr-pill-maint {
+    color: #e67e22;
+    background: #fef6e4;
+    border-color: #f5cba7;
+}
+
+/* ── Table action buttons ─────────────────────────────────── */
+#panel-rooms .pr-tbl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 13px;
+    border-radius: 8px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+}
+
+#panel-rooms .pr-tbl-btn:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    background: #fdf8f8;
+}
+
+#panel-rooms .pr-tbl-btn.restore {
+    color: #27ae60;
+    border-color: #a9dfbf;
+}
+
+#panel-rooms .pr-tbl-btn.restore:hover {
+    background: #eafaf2;
+}
+
+#panel-rooms .pr-tbl-btn.cancel-r {
+    color: var(--danger);
+    border-color: #e5b8bb;
+}
+
+#panel-rooms .pr-tbl-btn.cancel-r:hover {
+    background: #fdecea;
+}
+
+#panel-rooms .pr-tbl-btn.review {
+    color: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-tbl-btn.review:hover {
+    background: #f3e5e6;
+}
+
+/* ── Add/Edit room form card — visual refresh ────────────── */
+#room-form-wrap .eq-card.form-card {
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    background: var(--card-bg);
+    box-shadow: 0 4px 20px rgba(96, 3, 2, 0.08);
+    overflow: hidden;
+}
+
+#room-form-wrap .form-card-header {
+    background: #faf8f4;
+    border-bottom: 1.5px solid var(--khaki-border);
+    padding: 1rem 1.35rem;
+}
+
+#room-form-wrap .form-card-header h2 {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) {
+    #panel-rooms .pr-room-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    #panel-rooms .pr-room-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #panel-rooms .pr-page-header-row {
+        flex-direction: column;
+    }
+}
