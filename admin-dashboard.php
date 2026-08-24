@@ -3149,9 +3149,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     if (capacity) parts += ' – Capacity: ' + capacity;
                                                     meta.textContent = parts;
                                                 }
-                                                const editLink = document.getElementById('rsm-edit-link');
-                                                if (editLink && _roomId)
-                                                    editLink.href = 'admin-dashboard.php?tab=rooms&edit_room=' + _roomId;
                                                 const modal = document.getElementById('roomScheduleModal');
                                                 if (modal) modal.classList.remove('hidden');
                                                 try { renderGrid(); } catch(e) { console.warn('renderGrid error:', e); }
@@ -4709,11 +4706,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rsm-legend-item"><div class="rsm-legend-dot avail"></div> Available</div>
             </div>
             <div class="rsm-foot">
-                <button class="pr-btn pr-btn-ghost" data-action="close-room-schedule">Close</button>
-                <a id="rsm-edit-link" href="#" class="pr-btn pr-btn-outline">
-                    <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
-                    Edit Room
-                </a>
+                <button type="button" class="btn-cancel-acc" data-action="close-room-schedule">Close</button>
             </div>
         </div><!-- /.rsm-card -->
     </div><!-- /#roomScheduleModal -->
