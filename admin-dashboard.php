@@ -526,7 +526,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <h1>Equipment Requests</h1>
                         <p>Review, approve, or decline borrow requests submitted by faculty and students.</p>
                     </div>
-                    <button class="ps-btn ps-btn--outline" onclick="psOpenModal('ps-export-modal')">
+                    <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
                         <span class="material-symbols-outlined">download</span> Export
                     </button>
                 </div>
@@ -585,7 +585,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <tr>
                                                 <td>
                                                     <strong style="color:var(--accent-maroon);cursor:pointer"
-                                                        onclick="psOpenModal('ps-req-detail-modal')">
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                         #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                     </strong>
                                                 </td>
@@ -600,11 +600,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <div style="display:flex;gap:6px">
                                                         <button class="ps-btn ps-btn--success ps-btn--sm"
-                                                            onclick="psOpenModal('ps-approve-modal')">
+                                                            data-action="ps-open-modal" data-modal="ps-approve-modal">
                                                             <span class="material-symbols-outlined">check</span> Approve
                                                         </button>
                                                         <button class="ps-btn ps-btn--danger ps-btn--sm"
-                                                            onclick="psOpenModal('ps-decline-modal')">
+                                                            data-action="ps-open-modal" data-modal="ps-decline-modal">
                                                             <span class="material-symbols-outlined">close</span> Decline
                                                         </button>
                                                     </div>
@@ -670,7 +670,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 </td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                                        data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
                                                 </td>
                                             </tr>
                                         <?php endwhile;
@@ -732,9 +732,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <div style="display:flex;gap:6px">
                                                         <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                            onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                                            data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
                                                         <button class="ps-btn ps-btn--outline ps-btn--sm"
-                                                            onclick="psOpenModal('ps-notice-modal')">Send Notice</button>
+                                                            data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -787,7 +787,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     ?>
                                             <tr>
                                                 <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    onclick="psOpenModal('ps-req-detail-modal')">
+                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                     #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
@@ -796,7 +796,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo date('M d', strtotime($r['return_date'])); ?></td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                 </td>
                                             </tr>
                                         <?php endwhile;
@@ -860,7 +860,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     ?>
                                             <tr data-status="<?php echo htmlspecialchars($r['status']); ?>">
                                                 <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    onclick="psOpenModal('ps-req-detail-modal')">
+                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                     #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
@@ -870,18 +870,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <?php if ($r['status'] === 'Waiting'): ?>
                                                         <div style="display:flex;gap:5px">
-                                                            <button class="ps-btn ps-btn--success ps-btn--sm" onclick="psOpenModal('ps-approve-modal')">Approve</button>
-                                                            <button class="ps-btn ps-btn--danger ps-btn--sm" onclick="psOpenModal('ps-decline-modal')">Decline</button>
+                                                            <button class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal">Approve</button>
+                                                            <button class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal">Decline</button>
                                                         </div>
                                                     <?php elseif ($r['status'] === 'Approved' || $r['status'] === 'Overdue'): ?>
                                                         <div style="display:flex;gap:5px">
-                                                            <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-return-modal')">Return</button>
+                                                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
                                                             <?php if ($r['status'] === 'Overdue'): ?>
-                                                                <button class="ps-btn ps-btn--outline ps-btn--sm" onclick="psOpenModal('ps-notice-modal')">Notice</button>
+                                                                <button class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal">Notice</button>
                                                             <?php endif; ?>
                                                         </div>
                                                     <?php else: ?>
-                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -917,7 +917,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">check_circle</span>
                         </div>
                         <h3>Approve Request</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-approve-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-approve-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -937,8 +937,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-approve-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-approve-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--success" data-action="ps-close-modal" data-modal="ps-approve-modal">
                             <span class="material-symbols-outlined">check</span> Approve Request
                         </button>
                     </div>
@@ -953,7 +953,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">cancel</span>
                         </div>
                         <h3>Decline Request</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-decline-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -970,8 +970,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-decline-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-decline-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--danger" data-action="ps-close-modal" data-modal="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span> Decline Request
                         </button>
                     </div>
@@ -986,7 +986,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">assignment_return</span>
                         </div>
                         <h3>Confirm Return</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-return-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1016,8 +1016,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-return-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-return-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
                             <span class="material-symbols-outlined">check</span> Confirm Return
                         </button>
                     </div>
@@ -1032,7 +1032,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">mail</span>
                         </div>
                         <h3>Send Overdue Notice</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-notice-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-notice-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1066,8 +1066,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-notice-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-notice-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
                             <span class="material-symbols-outlined">send</span> Send Notice
                         </button>
                     </div>
@@ -1082,7 +1082,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">assignment</span>
                         </div>
                         <h3>Request Details</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-req-detail-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-req-detail-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1134,11 +1134,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-req-detail-modal')">Close</button>
-                        <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-decline-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-req-detail-modal">Close</button>
+                        <button class="ps-btn ps-btn--danger" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span> Decline
                         </button>
-                        <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-approve-modal')">
+                        <button class="ps-btn ps-btn--success" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
                             <span class="material-symbols-outlined">check</span> Approve
                         </button>
                     </div>
@@ -1153,7 +1153,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">download</span>
                         </div>
                         <h3>Export Requests</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-export-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-export-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1195,8 +1195,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-export-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-export-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-export-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-export-modal">
                             <span class="material-symbols-outlined">download</span> Export
                         </button>
                     </div>
@@ -1915,7 +1915,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <?php if ($edit_item): ?>
                                                 <button type="button" class="btn-inv-delete"
                                                     title="Archive item"
-                                                    onclick="openInvModal('deleteEquipModal')">
+                                                    data-action="inv-open-modal" data-modal="deleteEquipModal">
                                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                         fill="none" stroke="currentColor" stroke-width="2"
                                                         stroke-linecap="round" stroke-linejoin="round"
@@ -2690,7 +2690,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <button type="button"
                                                 class="pr-btn pr-btn-ghost pr-btn-sm rc-schedule-btn"
                                                 style="flex:1;"
-                                                onclick="psOpenSchedule(this)">
+                                                data-action="open-room-schedule">
                                                 View Schedule
                                             </button>
                                             <a href="admin-dashboard.php?tab=rooms&edit_room=<?php echo (int)$room['room_id']; ?>"
@@ -2922,73 +2922,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </div><!-- /#rooms-issues-panel -->
 
 
-                                    <!-- ══════════════════════════════════════════════════════
-                     ROOM SCHEDULE MODAL
-                     ══════════════════════════════════════════════════════ -->
-                                    <div id="roomScheduleModal" class="hidden">
-                                        <div class="rsm-card">
 
-                                            <!-- Header -->
-                                            <div class="rsm-head">
-                                                <div class="rsm-head-icon">
-                                                    <span class="material-symbols-outlined">calendar_month</span>
-                                                </div>
-                                                <h3 id="rsm-title">Room Schedule</h3>
-                                                <button class="rsm-close-btn" onclick="psCloseSchedule()" aria-label="Close">
-                                                    <span class="material-symbols-outlined">close</span>
-                                                </button>
-                                            </div>
-
-                                            <!-- Info bar + week navigation -->
-                                            <div class="rsm-info-row">
-                                                <span class="rsm-room-meta" id="rsm-meta"></span>
-                                                <div class="rsm-week-ctrl">
-                                                    <button class="rsm-week-nav-btn" onclick="psScheduleNav(-1)" title="Previous week">
-                                                        <span class="material-symbols-outlined">chevron_left</span>
-                                                    </button>
-                                                    <span class="rsm-week-lbl" id="rsm-week-lbl"></span>
-                                                    <button class="rsm-week-nav-btn" onclick="psScheduleNav(1)" title="Next week">
-                                                        <span class="material-symbols-outlined">chevron_right</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <!-- Schedule grid -->
-                                            <div class="rsm-body">
-                                                <div class="rsm-grid">
-                                                    <div class="rsm-grid-head">
-                                                        <div class="rsm-grid-th">TIME</div>
-                                                        <div class="rsm-grid-th">MON</div>
-                                                        <div class="rsm-grid-th">TUE</div>
-                                                        <div class="rsm-grid-th">WED</div>
-                                                        <div class="rsm-grid-th">THU</div>
-                                                        <div class="rsm-grid-th">FRI</div>
-                                                    </div>
-                                                    <div id="rsm-grid-body"></div>
-                                                </div>
-                                            </div>
-
-                                            <!-- Legend -->
-                                            <div class="rsm-legend">
-                                                <div class="rsm-legend-item">
-                                                    <div class="rsm-legend-dot reserved"></div> Reserved
-                                                </div>
-                                                <div class="rsm-legend-item">
-                                                    <div class="rsm-legend-dot avail"></div> Available
-                                                </div>
-                                            </div>
-
-                                            <!-- Footer -->
-                                            <div class="rsm-foot">
-                                                <button class="pr-btn pr-btn-ghost" onclick="psCloseSchedule()">Close</button>
-                                                <a id="rsm-edit-link" href="#" class="pr-btn pr-btn-outline">
-                                                    <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
-                                                    Edit Room
-                                                </a>
-                                            </div>
-
-                                        </div><!-- /.rsm-card -->
-                                    </div><!-- /#roomScheduleModal -->
 
                                     <!-- ── Rooms: JSON data + schedule JS ──────────────────── -->
                                     <?php
@@ -3024,7 +2958,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         }
                                     ));
                                     ?>
-                                    <script>
+                                    <script nonce="<?php echo $csp_nonce; ?>">
                                         /* ── PUPSync Room Schedule module ──────────────────────── */
                                         (function() {
                                             'use strict';
@@ -3201,35 +3135,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             window.psOpenSchedule = function(btn) {
                                                 const card = btn.closest('.room-card');
                                                 if (!card) return;
-
                                                 _roomId = parseInt(card.dataset.roomId) || null;
                                                 _roomName = card.dataset.roomName || '';
                                                 _weekOff = 0;
-
-                                                // Populate header
                                                 const title = document.getElementById('rsm-title');
-                                                if (title) title.textContent = 'Room Schedule — ' + _roomName;
-
-                                                // Populate meta line
+                                                if (title) title.textContent = 'Room Schedule – ' + _roomName;
                                                 const meta = document.getElementById('rsm-meta');
                                                 if (meta) {
                                                     const campus = card.dataset.roomCampus || '';
                                                     const floor = card.dataset.roomFloor || '';
                                                     const capacity = card.dataset.roomCapacity || '';
-                                                    let parts = [campus, floor].filter(Boolean).join(' · ');
-                                                    if (capacity) parts += ' · Capacity: ' + capacity;
+                                                    let parts = [campus, floor].filter(Boolean).join(' – ');
+                                                    if (capacity) parts += ' – Capacity: ' + capacity;
                                                     meta.textContent = parts;
                                                 }
-
-                                                // Set edit link
                                                 const editLink = document.getElementById('rsm-edit-link');
                                                 if (editLink && _roomId)
                                                     editLink.href = 'admin-dashboard.php?tab=rooms&edit_room=' + _roomId;
-
-                                                renderGrid();
-
                                                 const modal = document.getElementById('roomScheduleModal');
                                                 if (modal) modal.classList.remove('hidden');
+                                                try { renderGrid(); } catch(e) { console.warn('renderGrid error:', e); }
                                             };
 
                                             window.psCloseSchedule = function() {
@@ -3242,15 +3167,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 renderGrid();
                                             };
 
-                                            // Close on backdrop click
                                             document.addEventListener('click', function(e) {
                                                 const modal = document.getElementById('roomScheduleModal');
+                                                if (e.target.closest('[data-action="open-room-schedule"]')) {
+                                                    window.psOpenSchedule(e.target.closest('[data-action="open-room-schedule"]')); return;
+                                                }
+                                                if (e.target.closest('[data-action="close-room-schedule"]')) {
+                                                    window.psCloseSchedule(); return;
+                                                }
+                                                const navBtn = e.target.closest('[data-action="room-schedule-nav"]');
+                                                if (navBtn) { window.psScheduleNav(parseInt(navBtn.dataset.dir)); return; }
                                                 if (modal && !modal.classList.contains('hidden') && e.target === modal)
                                                     window.psCloseSchedule();
-                                            });
-
-                                            // Close edit-room modal on backdrop click
-                                            document.addEventListener('click', function(e) {
                                                 const rfw = document.getElementById('room-form-wrap');
                                                 if (rfw && !rfw.classList.contains('hidden') && e.target === rfw)
                                                     rfw.classList.add('hidden');
@@ -4562,7 +4490,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <!-- Modal + sub-tab functions (inline for guaranteed global scope) -->
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* ── Modal open / close ─────────────────────────────────────── */
         function psOpenModal(id) {
             var el = document.getElementById(id);
@@ -4630,19 +4558,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             if (allSearch) allSearch.addEventListener('input', filterAll);
             if (allStatus) allStatus.addEventListener('change', filterAll);
         });
+
+        /* data-action delegation for ps-modal and inv-modal */
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            var action = btn.dataset.action;
+            if (action === 'ps-open-modal') {
+                psOpenModal(btn.dataset.modal);
+            } else if (action === 'ps-close-modal') {
+                psCloseModal(btn.dataset.modal);
+            } else if (action === 'ps-switch-modal') {
+                psCloseModal(btn.dataset.close);
+                psOpenModal(btn.dataset.open);
+            } else if (action === 'inv-open-modal') {
+                openInvModal(btn.dataset.modal);
+            } else if (action === 'inv-close-modal') {
+                closeInvModal(btn.dataset.modal);
+            } else if (action === 'inv-backdrop') {
+                if (e.target === btn) closeInvModal(btn.dataset.modal);
+            }
+        });
     </script>
 
 
     <!-- ── INVENTORY: Archive Equipment Modal ─────────────────────── -->
     <div class="inv-modal-backdrop" id="deleteEquipModal" style="display:none"
-        onclick="if(event.target===this)closeInvModal('deleteEquipModal')">
+        data-action="inv-backdrop" data-modal="deleteEquipModal">
         <div class="inv-modal inv-modal-sm">
             <div class="inv-modal-head">
                 <div class="inv-modal-head-icon danger">
                     <span class="material-symbols-outlined">archive</span>
                 </div>
                 <h3>Archive Equipment</h3>
-                <button class="inv-modal-close" onclick="closeInvModal('deleteEquipModal')">
+                <button class="inv-modal-close" data-action="inv-close-modal" data-modal="deleteEquipModal">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -4654,14 +4603,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
             </div>
             <div class="inv-modal-foot">
-                <button class="btn-inv-cancel" onclick="closeInvModal('deleteEquipModal')">Cancel</button>
+                <button class="btn-inv-cancel" data-action="inv-close-modal" data-modal="deleteEquipModal">Cancel</button>
                 <a href="admin-dashboard.php?delete_item=<?php echo $edit_item ? $edit_item['item_id'] : ''; ?>"
                     class="btn-inv-danger"><span class="material-symbols-outlined">archive</span>Archive</a>
             </div>
         </div>
     </div>
 
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* ── Inventory helpers ───────────────────────────────────── */
         function openInvModal(id) {
             var m = document.getElementById(id);
@@ -4715,6 +4664,59 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             syncTabBar();
         });
     </script>
+
+    <!-- ══════════════════════════════════════════════════════
+         ROOM SCHEDULE MODAL
+         ══════════════════════════════════════════════════════ -->
+    <div id="roomScheduleModal" class="hidden">
+        <div class="rsm-card">
+            <div class="rsm-head">
+                <div class="rsm-head-icon">
+                    <span class="material-symbols-outlined">calendar_month</span>
+                </div>
+                <h3 id="rsm-title">Room Schedule</h3>
+                <button class="rsm-close-btn" data-action="close-room-schedule" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="rsm-info-row">
+                <span class="rsm-room-meta" id="rsm-meta"></span>
+                <div class="rsm-week-ctrl">
+                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="-1" title="Previous week">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <span class="rsm-week-lbl" id="rsm-week-lbl"></span>
+                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="1" title="Next week">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+            <div class="rsm-body">
+                <div class="rsm-grid">
+                    <div class="rsm-grid-head">
+                        <div class="rsm-grid-th">TIME</div>
+                        <div class="rsm-grid-th">MON</div>
+                        <div class="rsm-grid-th">TUE</div>
+                        <div class="rsm-grid-th">WED</div>
+                        <div class="rsm-grid-th">THU</div>
+                        <div class="rsm-grid-th">FRI</div>
+                    </div>
+                    <div id="rsm-grid-body"></div>
+                </div>
+            </div>
+            <div class="rsm-legend">
+                <div class="rsm-legend-item"><div class="rsm-legend-dot reserved"></div> Reserved</div>
+                <div class="rsm-legend-item"><div class="rsm-legend-dot avail"></div> Available</div>
+            </div>
+            <div class="rsm-foot">
+                <button class="pr-btn pr-btn-ghost" data-action="close-room-schedule">Close</button>
+                <a id="rsm-edit-link" href="#" class="pr-btn pr-btn-outline">
+                    <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
+                    Edit Room
+                </a>
+            </div>
+        </div><!-- /.rsm-card -->
+    </div><!-- /#roomScheduleModal -->
 
 </body>
 
