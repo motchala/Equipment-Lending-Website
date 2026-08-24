@@ -526,7 +526,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <h1>Equipment Requests</h1>
                         <p>Review, approve, or decline borrow requests submitted by faculty and students.</p>
                     </div>
-                    <button class="ps-btn ps-btn--outline" onclick="psOpenModal('ps-export-modal')">
+                    <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
                         <span class="material-symbols-outlined">download</span> Export
                     </button>
                 </div>
@@ -585,7 +585,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <tr>
                                                 <td>
                                                     <strong style="color:var(--accent-maroon);cursor:pointer"
-                                                        onclick="psOpenModal('ps-req-detail-modal')">
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                         #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                     </strong>
                                                 </td>
@@ -600,11 +600,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <div style="display:flex;gap:6px">
                                                         <button class="ps-btn ps-btn--success ps-btn--sm"
-                                                            onclick="psOpenModal('ps-approve-modal')">
+                                                            data-action="ps-open-modal" data-modal="ps-approve-modal">
                                                             <span class="material-symbols-outlined">check</span> Approve
                                                         </button>
                                                         <button class="ps-btn ps-btn--danger ps-btn--sm"
-                                                            onclick="psOpenModal('ps-decline-modal')">
+                                                            data-action="ps-open-modal" data-modal="ps-decline-modal">
                                                             <span class="material-symbols-outlined">close</span> Decline
                                                         </button>
                                                     </div>
@@ -670,7 +670,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 </td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                                        data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
                                                 </td>
                                             </tr>
                                         <?php endwhile;
@@ -732,9 +732,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <div style="display:flex;gap:6px">
                                                         <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                            onclick="psOpenModal('ps-return-modal')">Confirm Return</button>
+                                                            data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
                                                         <button class="ps-btn ps-btn--outline ps-btn--sm"
-                                                            onclick="psOpenModal('ps-notice-modal')">Send Notice</button>
+                                                            data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -787,7 +787,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     ?>
                                             <tr>
                                                 <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    onclick="psOpenModal('ps-req-detail-modal')">
+                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                     #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
@@ -796,7 +796,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo date('M d', strtotime($r['return_date'])); ?></td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                 </td>
                                             </tr>
                                         <?php endwhile;
@@ -860,7 +860,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     ?>
                                             <tr data-status="<?php echo htmlspecialchars($r['status']); ?>">
                                                 <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    onclick="psOpenModal('ps-req-detail-modal')">
+                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                     #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
@@ -870,18 +870,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <?php if ($r['status'] === 'Waiting'): ?>
                                                         <div style="display:flex;gap:5px">
-                                                            <button class="ps-btn ps-btn--success ps-btn--sm" onclick="psOpenModal('ps-approve-modal')">Approve</button>
-                                                            <button class="ps-btn ps-btn--danger ps-btn--sm" onclick="psOpenModal('ps-decline-modal')">Decline</button>
+                                                            <button class="ps-btn ps-btn--success ps-btn--sm" data-action="ps-open-modal" data-modal="ps-approve-modal">Approve</button>
+                                                            <button class="ps-btn ps-btn--danger ps-btn--sm" data-action="ps-open-modal" data-modal="ps-decline-modal">Decline</button>
                                                         </div>
                                                     <?php elseif ($r['status'] === 'Approved' || $r['status'] === 'Overdue'): ?>
                                                         <div style="display:flex;gap:5px">
-                                                            <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-return-modal')">Return</button>
+                                                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal">Return</button>
                                                             <?php if ($r['status'] === 'Overdue'): ?>
-                                                                <button class="ps-btn ps-btn--outline ps-btn--sm" onclick="psOpenModal('ps-notice-modal')">Notice</button>
+                                                                <button class="ps-btn ps-btn--outline ps-btn--sm" data-action="ps-open-modal" data-modal="ps-notice-modal">Notice</button>
                                                             <?php endif; ?>
                                                         </div>
                                                     <?php else: ?>
-                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm" onclick="psOpenModal('ps-req-detail-modal')">View</button>
+                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -917,7 +917,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">check_circle</span>
                         </div>
                         <h3>Approve Request</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-approve-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-approve-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -937,8 +937,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-approve-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-approve-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--success" data-action="ps-close-modal" data-modal="ps-approve-modal">
                             <span class="material-symbols-outlined">check</span> Approve Request
                         </button>
                     </div>
@@ -953,7 +953,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">cancel</span>
                         </div>
                         <h3>Decline Request</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-decline-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -970,8 +970,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-decline-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-decline-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--danger" data-action="ps-close-modal" data-modal="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span> Decline Request
                         </button>
                     </div>
@@ -986,7 +986,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">assignment_return</span>
                         </div>
                         <h3>Confirm Return</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-return-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1016,8 +1016,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-return-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-return-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
                             <span class="material-symbols-outlined">check</span> Confirm Return
                         </button>
                     </div>
@@ -1032,7 +1032,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">mail</span>
                         </div>
                         <h3>Send Overdue Notice</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-notice-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-notice-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1066,8 +1066,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-notice-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-notice-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
                             <span class="material-symbols-outlined">send</span> Send Notice
                         </button>
                     </div>
@@ -1082,7 +1082,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">assignment</span>
                         </div>
                         <h3>Request Details</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-req-detail-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-req-detail-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1134,11 +1134,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-req-detail-modal')">Close</button>
-                        <button class="ps-btn ps-btn--danger" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-decline-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-req-detail-modal">Close</button>
+                        <button class="ps-btn ps-btn--danger" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
                             <span class="material-symbols-outlined">close</span> Decline
                         </button>
-                        <button class="ps-btn ps-btn--success" onclick="psCloseModal('ps-req-detail-modal');psOpenModal('ps-approve-modal')">
+                        <button class="ps-btn ps-btn--success" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
                             <span class="material-symbols-outlined">check</span> Approve
                         </button>
                     </div>
@@ -1153,7 +1153,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">download</span>
                         </div>
                         <h3>Export Requests</h3>
-                        <button class="ps-modal-close" onclick="psCloseModal('ps-export-modal')">
+                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-export-modal">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -1195,8 +1195,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                     <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" onclick="psCloseModal('ps-export-modal')">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" onclick="psCloseModal('ps-export-modal')">
+                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-export-modal">Cancel</button>
+                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-export-modal">
                             <span class="material-symbols-outlined">download</span> Export
                         </button>
                     </div>
@@ -1915,7 +1915,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <?php if ($edit_item): ?>
                                                 <button type="button" class="btn-inv-delete"
                                                     title="Archive item"
-                                                    onclick="openInvModal('deleteEquipModal')">
+                                                    data-action="inv-open-modal" data-modal="deleteEquipModal">
                                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                         fill="none" stroke="currentColor" stroke-width="2"
                                                         stroke-linecap="round" stroke-linejoin="round"
@@ -2371,25 +2371,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
 
                 <!-- ── Add / Edit Room form (hidden by default) ────────── -->
-                <div id="room-form-wrap" class="<?php echo $edit_room ? '' : 'hidden'; ?>" style="margin-bottom:1.5rem;">
+                <div id="room-form-wrap" class="<?php echo $edit_room ? '' : 'hidden'; ?>">
                     <div class="eq-card form-card">
 
-                        <!-- Header — matches equipment form exactly -->
+                        <!-- Modal header -->
                         <div class="form-card-header">
-                            <h2>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                                    <line x1="9" y1="3" x2="9" y2="21" />
-                                </svg>
-                                <span id="room-form-title"><?php echo $edit_room ? 'Edit Room' : 'Add New Room'; ?></span>
+                            <div class="rmod-head-icon">
+                                <span class="material-symbols-outlined"><?php echo $edit_room ? 'edit' : 'add_home_work'; ?></span>
+                            </div>
+                            <h2 id="room-form-title">
+                                <?php echo $edit_room
+                                    ? 'Edit Room &mdash; ' . htmlspecialchars($edit_room['room_name'])
+                                    : 'Add New Room'; ?>
                             </h2>
-                            <button type="button" class="btn-close-custom" data-action="hide-room-form" aria-label="Close form">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                            <button type="button" class="rmod-close-btn" data-action="hide-room-form" aria-label="Close">
+                                <span class="material-symbols-outlined">close</span>
                             </button>
                         </div>
 
@@ -2561,9 +2557,33 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <?php echo $edit_room ? 'Update Room' : 'Add Room'; ?>
                                 </button>
                             </form>
+
+                            <?php if ($edit_room): ?>
+                                <!-- Archive danger zone — only visible in edit mode -->
+                                <div class="rmod-archive-zone">
+                                    <a href="admin-dashboard.php?archive_room=<?php echo (int)$edit_room['room_id']; ?>"
+                                        class="pr-btn pr-btn-danger pr-btn-sm"
+                                        onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                                        Archive Room
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+
                         </div><!-- /.form-card-body -->
 
-                    </div>
+                        <!-- Modal footer -->
+                        <div class="rmod-footer">
+                            <button type="button" class="pr-btn pr-btn-ghost" data-action="hide-room-form">Cancel</button>
+                            <button type="submit" form="roomForm"
+                                name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
+                                class="pr-btn pr-btn-primary">
+                                <span class="material-symbols-outlined" style="font-size:15px;">save</span>
+                                <?php echo $edit_room ? 'Save Changes' : 'Add Room'; ?>
+                            </button>
+                        </div>
+
+                    </div><!-- /.eq-card.form-card -->
                 </div><!-- /#room-form-wrap -->
 
                 <!-- ── Tab navigation (prototype redesign) ───────────────── -->
@@ -2636,8 +2656,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 elseif (str_contains($rn, 'library'))                                   $room_icon = 'local_library';
                                 elseif (str_contains($rn, 'science') || str_contains($rn, 'chem'))     $room_icon = 'science';
                                     ?>
-                                    <!-- Room card -->
-                                    <div class="room-card">
+                                    <!-- Room card (Image 3 design) -->
+                                    <div class="room-card"
+                                        data-room-id="<?php echo (int)$room['room_id']; ?>"
+                                        data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
+                                        data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
+                                        data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
+                                        data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
+                                        data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>">
 
                                         <!-- Banner -->
                                         <div class="rc-banner">
@@ -2652,33 +2678,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <rect x="2" y="7" width="20" height="14" rx="2" />
                                                     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                                                 </svg>
-                                                <?php echo htmlspecialchars($fl . ' · ' . $room['building_name']); ?>
-                                                <?php if ($room['seating_capacity'] !== null): ?>&nbsp;· <?php echo (int)$room['seating_capacity']; ?> seats<?php endif; ?>
-                                                <span class="rc-status <?php echo $rc_status_cls; ?>">
+                                                <?php echo htmlspecialchars($room['campus_name'] . ' · ' . $fl); ?>
+                                                <span class="rc-status <?php echo $rc_status_cls; ?>" style="margin-left:auto;">
                                                     <?php echo htmlspecialchars($room['status']); ?>
                                                 </span>
                                             </div>
-                                            <?php if (!empty($amenities_arr)): ?>
-                                                <div class="rc-chips">
-                                                    <?php foreach ($amenities_arr as $am): ?>
-                                                        <span><?php echo htmlspecialchars($am); ?></span>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                            <?php endif; ?>
                                         </div>
 
-                                        <!-- Footer actions -->
+                                        <!-- Footer: View Schedule + Edit pencil -->
                                         <div class="rc-footer">
+                                            <button type="button"
+                                                class="pr-btn pr-btn-ghost pr-btn-sm rc-schedule-btn"
+                                                style="flex:1;"
+                                                data-action="open-room-schedule">
+                                                View Schedule
+                                            </button>
                                             <a href="admin-dashboard.php?tab=rooms&edit_room=<?php echo (int)$room['room_id']; ?>"
-                                                class="pr-btn pr-btn-ghost pr-btn-sm" style="flex:1;">
-                                                <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
-                                                Edit Room
-                                            </a>
-                                            <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
                                                 class="pr-btn pr-btn-outline pr-btn-sm"
-                                                style="color:var(--danger);border-color:#e5b8bb;"
-                                                onclick="return confirm('Archive this room? It will be hidden from the registry.')">
-                                                <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                                                title="Edit room">
+                                                <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
                                             </a>
                                         </div>
 
@@ -2902,6 +2920,268 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             </div>
                                         </div>
                                     </div><!-- /#rooms-issues-panel -->
+
+
+
+
+                                    <!-- ── Rooms: JSON data + schedule JS ──────────────────── -->
+                                    <?php
+                                    // Encode rooms list for schedule JS
+                                    $ps_rooms_json = array_map(function ($r) {
+                                        return [
+                                            'room_id'    => (int)$r['room_id'],
+                                            'room_name'  => $r['room_name'],
+                                            'campus'     => $r['campus_name'],
+                                            'building'   => $r['building_name'],
+                                            'floor'      => !empty($r['floor_label']) ? $r['floor_label'] : ($r['floor_number'] . 'F'),
+                                            'capacity'   => $r['seating_capacity'],
+                                        ];
+                                    }, $rooms_list ?? []);
+
+                                    // Approved reservations only (these appear on the schedule grid)
+                                    $ps_rsvp_json = array_values(array_filter(
+                                        array_map(function ($ar) {
+                                            return [
+                                                'id'           => (int)$ar['id'],
+                                                'room_id'      => isset($ar['room_id']) ? (int)$ar['room_id'] : null,
+                                                'room_name'    => $ar['room_name'],
+                                                'date'         => $ar['reservation_date'],
+                                                'start_fmt'    => $ar['start_fmt'],
+                                                'end_fmt'      => $ar['end_fmt'],
+                                                'label'        => !empty($ar['purpose']) ? $ar['purpose'] : $ar['faculty_name'],
+                                                'faculty'      => $ar['faculty_name'],
+                                                'status'       => $ar['status'],
+                                            ];
+                                        }, $admin_room_reservations ?? []),
+                                        function ($ar) {
+                                            return $ar['status'] === 'Approved';
+                                        }
+                                    ));
+                                    ?>
+                                    <script nonce="<?php echo $csp_nonce; ?>">
+                                        /* ── PUPSync Room Schedule module ──────────────────────── */
+                                        (function() {
+                                            'use strict';
+
+                                            /* — Data injected from PHP — */
+                                            const PS_ROOMS = <?php echo json_encode(array_values($ps_rooms_json)); ?>;
+                                            const PS_RSVP = <?php echo json_encode($ps_rsvp_json); ?>;
+
+                                            /* — Time slots shown in the grid — */
+                                            const SLOTS = [{
+                                                    label: '7–8 AM',
+                                                    h: 7
+                                                },
+                                                {
+                                                    label: '8–9 AM',
+                                                    h: 8
+                                                },
+                                                {
+                                                    label: '9–10 AM',
+                                                    h: 9
+                                                },
+                                                {
+                                                    label: '10–11 AM',
+                                                    h: 10
+                                                },
+                                                {
+                                                    label: '11 AM–12 PM',
+                                                    h: 11
+                                                },
+                                                {
+                                                    label: '12–1 PM',
+                                                    h: 12
+                                                },
+                                                {
+                                                    label: '1–2 PM',
+                                                    h: 13
+                                                },
+                                                {
+                                                    label: '2–3 PM',
+                                                    h: 14
+                                                },
+                                                {
+                                                    label: '3–4 PM',
+                                                    h: 15
+                                                },
+                                                {
+                                                    label: '4–5 PM',
+                                                    h: 16
+                                                },
+                                            ];
+                                            const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                                            ];
+
+                                            /* — State — */
+                                            let _roomId = null;
+                                            let _roomName = '';
+                                            let _weekOff = 0; // 0 = current week
+
+                                            /* — Helpers — */
+                                            function parseHour(fmt) {
+                                                if (!fmt) return 0;
+                                                const [timePart, period] = fmt.trim().split(/\s+/);
+                                                let [h] = (timePart || '0:00').split(':').map(Number);
+                                                if ((period || '').toUpperCase() === 'PM' && h !== 12) h += 12;
+                                                if ((period || '').toUpperCase() === 'AM' && h === 12) h = 0;
+                                                return h;
+                                            }
+
+                                            function getMondayDate(offset) {
+                                                const today = new Date();
+                                                const d = today.getDay(); // 0=Sun
+                                                const diff = d === 0 ? -6 : (1 - d); // to Monday
+                                                const mon = new Date(today);
+                                                mon.setDate(today.getDate() + diff + offset * 7);
+                                                mon.setHours(0, 0, 0, 0);
+                                                return mon;
+                                            }
+
+                                            function getWeekDates(offset) {
+                                                const mon = getMondayDate(offset);
+                                                return Array.from({
+                                                    length: 5
+                                                }, (_, i) => {
+                                                    const d = new Date(mon);
+                                                    d.setDate(mon.getDate() + i);
+                                                    return d;
+                                                });
+                                            }
+
+                                            function toISO(d) {
+                                                const y = d.getFullYear();
+                                                const m = String(d.getMonth() + 1).padStart(2, '0');
+                                                const day = String(d.getDate()).padStart(2, '0');
+                                                return `${y}-${m}-${day}`;
+                                            }
+
+                                            function weekLabel(offset) {
+                                                const dates = getWeekDates(offset);
+                                                const s = dates[0],
+                                                    e = dates[4];
+                                                if (s.getMonth() === e.getMonth())
+                                                    return `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`;
+                                                return `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+                                            }
+
+                                            /* — Render the weekly grid — */
+                                            function renderGrid() {
+                                                const dates = getWeekDates(_weekOff);
+                                                const dateISOs = dates.map(toISO);
+
+                                                // Update week label
+                                                const lbl = document.getElementById('rsm-week-lbl');
+                                                if (lbl) lbl.textContent = weekLabel(_weekOff);
+
+                                                // Filter reservations for this room & week
+                                                const rsvps = PS_RSVP.filter(r => {
+                                                    const sameRoom = _roomId ?
+                                                        (r.room_id === _roomId) :
+                                                        (r.room_name === _roomName);
+                                                    return sameRoom && dateISOs.includes(r.date);
+                                                });
+
+                                                // Build lookup: dateISO → [ reservations ]
+                                                const lookup = {};
+                                                rsvps.forEach(r => {
+                                                    if (!lookup[r.date]) lookup[r.date] = [];
+                                                    lookup[r.date].push(r);
+                                                });
+
+                                                // Build rows
+                                                const gridBody = document.getElementById('rsm-grid-body');
+                                                if (!gridBody) return;
+                                                gridBody.innerHTML = '';
+
+                                                SLOTS.forEach(slot => {
+                                                    const row = document.createElement('div');
+                                                    row.className = 'rsm-grid-row';
+
+                                                    // Time label cell
+                                                    const tc = document.createElement('div');
+                                                    tc.className = 'rsm-grid-time';
+                                                    tc.textContent = slot.label;
+                                                    row.appendChild(tc);
+
+                                                    // Day cells
+                                                    dates.forEach((date, di) => {
+                                                        const cell = document.createElement('div');
+                                                        cell.className = 'rsm-grid-cell';
+
+                                                        const dayRsvps = lookup[dateISOs[di]] || [];
+                                                        const hit = dayRsvps.find(r => {
+                                                            const sh = parseHour(r.start_fmt);
+                                                            const eh = parseHour(r.end_fmt);
+                                                            return slot.h >= sh && slot.h < eh;
+                                                        });
+
+                                                        if (hit) {
+                                                            const blk = document.createElement('span');
+                                                            blk.className = 'rsm-block';
+                                                            const txt = (hit.label || hit.faculty || 'Reserved').substring(0, 20);
+                                                            blk.textContent = txt;
+                                                            blk.title = `${hit.faculty} — ${hit.label || ''}`.replace(/^—\s*/, '');
+                                                            cell.appendChild(blk);
+                                                        }
+                                                        row.appendChild(cell);
+                                                    });
+
+                                                    gridBody.appendChild(row);
+                                                });
+                                            }
+
+                                            /* — Public API — */
+                                            window.psOpenSchedule = function(btn) {
+                                                const card = btn.closest('.room-card');
+                                                if (!card) return;
+                                                _roomId = parseInt(card.dataset.roomId) || null;
+                                                _roomName = card.dataset.roomName || '';
+                                                _weekOff = 0;
+                                                const title = document.getElementById('rsm-title');
+                                                if (title) title.textContent = 'Room Schedule – ' + _roomName;
+                                                const meta = document.getElementById('rsm-meta');
+                                                if (meta) {
+                                                    const campus = card.dataset.roomCampus || '';
+                                                    const floor = card.dataset.roomFloor || '';
+                                                    const capacity = card.dataset.roomCapacity || '';
+                                                    let parts = [campus, floor].filter(Boolean).join(' – ');
+                                                    if (capacity) parts += ' – Capacity: ' + capacity;
+                                                    meta.textContent = parts;
+                                                }
+                                                const modal = document.getElementById('roomScheduleModal');
+                                                if (modal) modal.classList.remove('hidden');
+                                                try { renderGrid(); } catch(e) { console.warn('renderGrid error:', e); }
+                                            };
+
+                                            window.psCloseSchedule = function() {
+                                                const modal = document.getElementById('roomScheduleModal');
+                                                if (modal) modal.classList.add('hidden');
+                                            };
+
+                                            window.psScheduleNav = function(dir) {
+                                                _weekOff += dir;
+                                                renderGrid();
+                                            };
+
+                                            document.addEventListener('click', function(e) {
+                                                const modal = document.getElementById('roomScheduleModal');
+                                                if (e.target.closest('[data-action="open-room-schedule"]')) {
+                                                    window.psOpenSchedule(e.target.closest('[data-action="open-room-schedule"]')); return;
+                                                }
+                                                if (e.target.closest('[data-action="close-room-schedule"]')) {
+                                                    window.psCloseSchedule(); return;
+                                                }
+                                                const navBtn = e.target.closest('[data-action="room-schedule-nav"]');
+                                                if (navBtn) { window.psScheduleNav(parseInt(navBtn.dataset.dir)); return; }
+                                                if (modal && !modal.classList.contains('hidden') && e.target === modal)
+                                                    window.psCloseSchedule();
+                                                const rfw = document.getElementById('room-form-wrap');
+                                                if (rfw && !rfw.classList.contains('hidden') && e.target === rfw)
+                                                    rfw.classList.add('hidden');
+                                            });
+                                        })();
+                                    </script>
 
                                 </div><!-- /panel-rooms -->
 
@@ -4207,7 +4487,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <!-- Modal + sub-tab functions (inline for guaranteed global scope) -->
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         /* ── Modal open / close ─────────────────────────────────────── */
         function psOpenModal(id) {
             var el = document.getElementById(id);
@@ -4275,19 +4555,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             if (allSearch) allSearch.addEventListener('input', filterAll);
             if (allStatus) allStatus.addEventListener('change', filterAll);
         });
+
+        /* data-action delegation for ps-modal and inv-modal */
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            var action = btn.dataset.action;
+            if (action === 'ps-open-modal') {
+                psOpenModal(btn.dataset.modal);
+            } else if (action === 'ps-close-modal') {
+                psCloseModal(btn.dataset.modal);
+            } else if (action === 'ps-switch-modal') {
+                psCloseModal(btn.dataset.close);
+                psOpenModal(btn.dataset.open);
+            } else if (action === 'inv-open-modal') {
+                openInvModal(btn.dataset.modal);
+            } else if (action === 'inv-close-modal') {
+                closeInvModal(btn.dataset.modal);
+            } else if (action === 'inv-backdrop') {
+                if (e.target === btn) closeInvModal(btn.dataset.modal);
+            }
+        });
     </script>
 
 
     <!-- ── INVENTORY: Archive Equipment Modal ─────────────────────── -->
     <div class="inv-modal-backdrop" id="deleteEquipModal" style="display:none"
-        onclick="if(event.target===this)closeInvModal('deleteEquipModal')">
+        data-action="inv-backdrop" data-modal="deleteEquipModal">
         <div class="inv-modal inv-modal-sm">
             <div class="inv-modal-head">
                 <div class="inv-modal-head-icon danger">
                     <span class="material-symbols-outlined">archive</span>
                 </div>
                 <h3>Archive Equipment</h3>
-                <button class="inv-modal-close" onclick="closeInvModal('deleteEquipModal')">
+                <button class="inv-modal-close" data-action="inv-close-modal" data-modal="deleteEquipModal">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
@@ -4299,14 +4600,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
             </div>
             <div class="inv-modal-foot">
-                <button class="btn-inv-cancel" onclick="closeInvModal('deleteEquipModal')">Cancel</button>
+                <button class="btn-inv-cancel" data-action="inv-close-modal" data-modal="deleteEquipModal">Cancel</button>
                 <a href="admin-dashboard.php?delete_item=<?php echo $edit_item ? $edit_item['item_id'] : ''; ?>"
                     class="btn-inv-danger"><span class="material-symbols-outlined">archive</span>Archive</a>
             </div>
         </div>
     </div>
 
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
+        /* ── Inventory helpers ───────────────────────────────────── */
         function openInvModal(id) {
             var m = document.getElementById(id);
             if (m) m.style.display = 'flex';
@@ -4316,23 +4618,98 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             var m = document.getElementById(id);
             if (m) m.style.display = 'none';
         }
+
         document.addEventListener('DOMContentLoaded', function() {
-            var inv = document.getElementById('snav-inventory');
-            if (!inv) return;
-            inv.addEventListener('click', function() {
-                document.querySelectorAll('.lending-sub').forEach(function(s) {
-                    s.classList.remove('active');
+            var lendingNav = document.querySelector('.lending-nav');
+            var lendingInv = document.getElementById('lending-inventory');
+
+            /* Hide/show the tab bar based on whether inventory sub is active.
+               Uses direct style manipulation — no :has() required.          */
+            function syncTabBar() {
+                if (!lendingNav) return;
+                var invActive = lendingInv && lendingInv.classList.contains('active');
+                lendingNav.style.setProperty('display', invActive ? 'none' : '', 'important');
+            }
+
+            /* Watch #lending-inventory for class changes (active added/removed) */
+            if (lendingInv) {
+                new MutationObserver(syncTabBar).observe(lendingInv, {
+                    attributes: true,
+                    attributeFilter: ['class']
                 });
-                document.querySelectorAll('.lending-nav-btn').forEach(function(b) {
-                    b.classList.remove('active');
+            }
+
+            /* Sidebar "Inventory" click: switch sub-panel to inventory
+               (existing JS only shows #panel-lending, not the sub-panel) */
+            var snavInv = document.getElementById('snav-inventory');
+            if (snavInv) {
+                snavInv.addEventListener('click', function() {
+                    document.querySelectorAll('.lending-sub').forEach(function(s) {
+                        s.classList.remove('active');
+                    });
+                    document.querySelectorAll('.lending-nav-btn').forEach(function(b) {
+                        b.classList.remove('active');
+                    });
+                    var sub = document.getElementById('lending-inventory');
+                    var btn = document.querySelector('.lending-nav-btn[data-lending-nav="inventory"]');
+                    if (sub) sub.classList.add('active'); /* triggers MutationObserver → hides tab bar */
+                    if (btn) btn.classList.add('active');
                 });
-                var sub = document.getElementById('lending-inventory');
-                var btn = document.querySelector('.lending-nav-btn[data-lending-nav="inventory"]');
-                if (sub) sub.classList.add('active');
-                if (btn) btn.classList.add('active');
-            });
+            }
+
+            /* Handle page load when ?edit_item= causes inventory to be active already */
+            syncTabBar();
         });
     </script>
+
+    <!-- ══════════════════════════════════════════════════════
+         ROOM SCHEDULE MODAL
+         ══════════════════════════════════════════════════════ -->
+    <div id="roomScheduleModal" class="hidden">
+        <div class="rsm-card">
+            <div class="rsm-head">
+                <div class="rsm-head-icon">
+                    <span class="material-symbols-outlined">calendar_month</span>
+                </div>
+                <h3 id="rsm-title">Room Schedule</h3>
+                <button class="rsm-close-btn" data-action="close-room-schedule" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="rsm-info-row">
+                <span class="rsm-room-meta" id="rsm-meta"></span>
+                <div class="rsm-week-ctrl">
+                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="-1" title="Previous week">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <span class="rsm-week-lbl" id="rsm-week-lbl"></span>
+                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="1" title="Next week">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+            <div class="rsm-body">
+                <div class="rsm-grid">
+                    <div class="rsm-grid-head">
+                        <div class="rsm-grid-th">TIME</div>
+                        <div class="rsm-grid-th">MON</div>
+                        <div class="rsm-grid-th">TUE</div>
+                        <div class="rsm-grid-th">WED</div>
+                        <div class="rsm-grid-th">THU</div>
+                        <div class="rsm-grid-th">FRI</div>
+                    </div>
+                    <div id="rsm-grid-body"></div>
+                </div>
+            </div>
+            <div class="rsm-legend">
+                <div class="rsm-legend-item"><div class="rsm-legend-dot reserved"></div> Reserved</div>
+                <div class="rsm-legend-item"><div class="rsm-legend-dot avail"></div> Available</div>
+            </div>
+            <div class="rsm-foot">
+                <button type="button" class="btn-cancel-acc" data-action="close-room-schedule">Close</button>
+            </div>
+        </div><!-- /.rsm-card -->
+    </div><!-- /#roomScheduleModal -->
 
 </body>
 
