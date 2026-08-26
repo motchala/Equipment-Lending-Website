@@ -48,6 +48,9 @@ document.addEventListener('keydown', e => {
 ================================================================ */
 setTimeout(() => {
     document.querySelectorAll('.auth-alert').forEach(el => {
+        // Skip banners that are showing an active lockout countdown —
+        // those must stay visible until the timer expires and reloads.
+        if (el.dataset.lockoutActive === '1') return;
         el.style.transition = 'opacity 0.5s, max-height 0.4s, margin 0.4s';
         el.style.opacity = '0';
         el.style.maxHeight = '0';
@@ -102,3 +105,59 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+/* ================================================================
+   LOGIN RATE LIMITING — lockout countdown timer
+   Runs when the page loads with an active lockout on either the
+   Faculty or Admin login form. Counts down from the server-supplied
+   seconds value (data-lockout-seconds on the disabled submit button),
+   updates the <span> in the banner every second, and reloads when
+   the lockout expires so the form is re-enabled without a manual
+   refresh.
+
+   Also suppresses the generic 5-second auto-dismiss on whichever
+   banner is showing a lockout — that banner must stay visible for
+   the full lockout duration.
+================================================================ */
+(function () {
+    'use strict';
+
+    function initLockoutCountdown(btnId, spanId) {
+        const btn = document.getElementById(btnId);
+        const span = document.getElementById(spanId);
+
+        if (!btn || !span || !btn.hasAttribute('data-lockout-seconds')) return;
+
+        let secondsLeft = parseInt(btn.getAttribute('data-lockout-seconds'), 10);
+        if (isNaN(secondsLeft) || secondsLeft <= 0) return;
+
+        const banner = span.closest('.auth-alert');
+        if (banner) banner.dataset.lockoutActive = '1';
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+        }
+
+        span.textContent = formatTime(secondsLeft);
+
+        const interval = setInterval(function () {
+            secondsLeft -= 1;
+
+            if (secondsLeft <= 0) {
+                clearInterval(interval);
+                window.location.reload();
+                return;
+            }
+
+            span.textContent = formatTime(secondsLeft);
+        }, 1000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initLockoutCountdown('facultySubmitBtn', 'lockout-countdown-faculty');
+        initLockoutCountdown('adminSubmitBtn', 'lockout-countdown-admin');
+    });
+
+}());

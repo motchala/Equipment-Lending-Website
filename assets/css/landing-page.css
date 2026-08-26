@@ -880,3 +880,45 @@ body {
         font-size: 0.95rem;
     }
 }
+
+/* ================================================================
+   RATE LIMITING — lockout UI states
+================================================================ */
+
+/* Disabled Sign In button during an active lockout.
+   Uses the same maroon palette but reduces visual weight to signal
+   unavailability without breaking the existing button shape/layout. */
+.btn-auth:disabled {
+    background: linear-gradient(135deg, rgba(109, 27, 35, 0.38), rgba(80, 18, 24, 0.38));
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+    pointer-events: none;   /* belt-and-suspenders: block hover transforms too */
+}
+
+/* Override the responsive min-height rule so it still applies when disabled */
+@media (max-width: 480px) {
+    .btn-auth:disabled {
+        min-height: 48px;
+    }
+}
+
+/* Lockout-specific banner variant.
+   Uses an amber/warning tone to visually distinguish a lockout
+   (a time-bound state) from a plain credential error (actionable now). */
+.auth-alert.warning {
+    background: rgba(180, 110, 0, 0.07);
+    color: #8a5700;
+    border: 1px solid rgba(180, 110, 0, 0.22);
+}
+
+/* Countdown span inside the lockout banner — monospace keeps the
+   digits from jumping as the width changes each second. */
+#lockout-countdown-faculty,
+#lockout-countdown-admin {
+    font-variant-numeric: tabular-nums;
+    font-family: 'Outfit', monospace;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}

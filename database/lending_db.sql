@@ -441,6 +441,34 @@ INSERT IGNORE INTO `tbl_organizations` (`name`) VALUES
 -- Columns `is_org_adviser`, `organization_id`, and FK `fk_users_org` are now
 -- defined directly in CREATE TABLE tbl_users above; no ALTER TABLE needed here.
 
+CREATE TABLE IF NOT EXISTS `tbl_login_attempts` (
+  `id`            INT(11)          NOT NULL AUTO_INCREMENT,
+  `identifier`    VARCHAR(255)     NOT NULL,
+  `ip_address`    VARCHAR(45)      NOT NULL,
+  `attempt_count` TINYINT(3) UNSIGNED NOT NULL DEFAULT 1,
+  `lockout_level` TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
+  `locked_until`  DATETIME         DEFAULT NULL,
+  `last_attempt`  DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                   ON UPDATE CURRENT_TIMESTAMP,
+  `login_ok`      TINYINT(1)       NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ident_ip` (`identifier`(191), `ip_address`),
+  INDEX `idx_locked_until` (`locked_until`),
+  INDEX `idx_last_attempt` (`last_attempt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- This is for attempting to login non-existent email (for attackers)
+CREATE TABLE IF NOT EXISTS `tbl_ip_login_attempts` (
+  `id`           INT(11)     NOT NULL AUTO_INCREMENT,
+  `ip_address`   VARCHAR(45) NOT NULL,
+  `fail_count`   SMALLINT(5) UNSIGNED NOT NULL DEFAULT 1,
+  `window_start` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `locked_until` DATETIME    DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ip` (`ip_address`),
+  INDEX `idx_ip_locked` (`locked_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
