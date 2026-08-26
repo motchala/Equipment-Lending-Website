@@ -1,5 +1,4 @@
 ﻿<?php
-
 // fix for application disclosure vulnerability.
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -12,7 +11,6 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/csrf.php';
-// Ensure server uses local timezone for login timestamps
 date_default_timezone_set('Asia/Manila');
 
 if (isset($_SESSION['faculty_id'])) {
@@ -23,27 +21,71 @@ if (isset($_SESSION['admin'])) {
     header("Location: admin-dashboard.php");
     exit();
 }
-if (isset($_SESSION['user_id'])) {
-    // Students have no dashboard yet — keep them on the landing page
-    // (fall through to show the page normally)
-}
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/equipment-booking/core/mailer.php';
+require_once __DIR__ . '/equipment-booking/core/rate-limiter.php';
 $conn = getDB();
-$login_error = "";
-$login_email_val = "";
 
-// ----------- LOGIN -----------
+// ── PRG: read and immediately clear any flash data from the session ────────
+// Flash keys are written by the POST handler below and consumed exactly once
+// on the following GET request. Clearing them here prevents stale state on
+// a subsequent page load.
+$login_error     = $_SESSION['flash_login_error']     ?? "";
+$login_email_val = $_SESSION['flash_login_email']     ?? "";
+$lockout_seconds = (int)($_SESSION['flash_lockout_seconds'] ?? 0);
+$lockout_until   = $_SESSION['flash_lockout_until']   ?? "";
+$panel_target_role = $_SESSION['flash_panel_role']    ?? null;
+
+unset(
+    $_SESSION['flash_login_error'],
+    $_SESSION['flash_login_email'],
+    $_SESSION['flash_lockout_seconds'],
+    $_SESSION['flash_lockout_until'],
+    $_SESSION['flash_panel_role']
+);
+
+// ── POST handler ───────────────────────────────────────────────────────────
+// Every branch that does NOT redirect to a dashboard writes flash data to
+// the session and redirects back to GET landing-page.php (PRG pattern).
+// This prevents form resubmission when window.location.reload() fires at
+// lockout expiry.
 if (isset($_POST['login'])) {
     csrf_verify();
-    $email    = trim($_POST['email']);
-    $password = $_POST['password'];
-    $user_type = $_POST['user_type'] ?? 'student'; // Default to student if not specified
-    $login_email_val = $email;
+    $email     = trim($_POST['email']);
+    $password  = $_POST['password'];
+    $user_type = $_POST['user_type'] ?? 'student';
+
+    // Preserve the submitted email so the field stays populated on redirect.
+    $_SESSION['flash_login_email'] = $email;
+
+    // ── Rate-limit pre-checks ──────────────────────────────────────────────
+    $rl_ip = rl_get_client_ip();
+
+    // Layer 1 — IP-wide throttle (runs first; broader restriction).
+    $ip_check = checkIpAllowed($rl_ip, $conn);
+    if (!$ip_check['allowed']) {
+        $_SESSION['flash_login_error']     = "Too many failed attempts from this location. Try again in " . gmdate('i:s', $ip_check['seconds_left']) . ".";
+        $_SESSION['flash_lockout_seconds'] = $ip_check['seconds_left'];
+        $_SESSION['flash_lockout_until']   = $ip_check['locked_until'];
+        $_SESSION['flash_panel_role']      = ($user_type === 'admin') ? 'admin' : 'faculty';
+        header("Location: landing-page.php");
+        exit();
+    }
+
+    // Layer 2 — per-account throttle (email + IP pair).
+    $rl_check = checkLoginAllowed($email, $rl_ip, $conn);
+    if (!$rl_check['allowed']) {
+        $_SESSION['flash_login_error']     = "Too many failed attempts. Try again in " . gmdate('i:s', $rl_check['seconds_left']) . ".";
+        $_SESSION['flash_lockout_seconds'] = $rl_check['seconds_left'];
+        $_SESSION['flash_lockout_until']   = $rl_check['locked_until'];
+        $_SESSION['flash_panel_role']      = ($user_type === 'admin') ? 'admin' : 'faculty';
+        header("Location: landing-page.php");
+        exit();
+    }
 
     // ===== ADMIN LOGIN =====
     if ($user_type === 'admin') {
-        // Admin shortcut login (local dev) — validate against legacy `tbl_accounts` password
         if ($email === 'main@admin.edu') {
             $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
             if ($stmt_acc) {
@@ -51,21 +93,18 @@ if (isset($_POST['login'])) {
                 $stmt_acc->execute();
                 $res_acc = $stmt_acc->get_result();
                 if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
-                    // tbl_accounts stores the legacy plain-text password; require it to match
                     if ($password === $row_acc['password']) {
-                        $_SESSION['admin'] = true;
+                        // ── Successful admin login ─────────────────────────
+                        $_SESSION['admin']      = true;
                         $_SESSION['login_time'] = time();
 
                         $admin_name_db = 'Administrator';
 
-                        // Ensure `last_login` column exists and load previous value into session
                         $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
                         if ($col_check && mysqli_num_rows($col_check) === 0) {
-                            // Add column (nullable) if it's missing
                             @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
                         }
 
-                        // Fetch previous last_login (may be null)
                         $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
                         if ($stmt_last) {
                             $stmt_last->bind_param("s", $email);
@@ -77,8 +116,7 @@ if (isset($_POST['login'])) {
                             $stmt_last->close();
                         }
 
-                        // Update last_login to now
-                        $now_dt = date('Y-m-d H:i:s');
+                        $now_dt  = date('Y-m-d H:i:s');
                         $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
                         if ($stmt_up) {
                             $stmt_up->bind_param("ss", $now_dt, $email);
@@ -86,7 +124,6 @@ if (isset($_POST['login'])) {
                             $stmt_up->close();
                         }
 
-                        // Try tbl_users first (regular users table)
                         $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
                         if ($stmt_admin) {
                             $stmt_admin->bind_param("s", $email);
@@ -97,28 +134,63 @@ if (isset($_POST['login'])) {
                             }
                         }
 
-                        // If not found, use the legacy tbl_accounts fullName
                         if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
                             $admin_name_db = $row_acc['fullName'];
                         }
 
-                        $_SESSION['admin_name'] = $admin_name_db;
+                        $_SESSION['admin_name']  = $admin_name_db;
                         $_SESSION['admin_email'] = $email;
+
+                        // Clear flash_login_email — no longer needed on success.
+                        unset($_SESSION['flash_login_email']);
+
+                        recordSuccessfulLogin($email, $rl_ip, $conn);
                         header("Location: admin-dashboard.php");
                         exit();
+
                     } else {
-                        $login_error = "Invalid admin credentials.";
+                        // ── Wrong admin password ───────────────────────────
+                        $rl_result = recordFailedAttempt($email, $rl_ip, true, $row_acc['fullName'] ?? 'Administrator', $conn);
+                        $_SESSION['flash_login_error'] = $rl_result['message'];
+                        $_SESSION['flash_panel_role']  = 'admin';
+                        if ($rl_result['locked']) {
+                            $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
+                            $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
+                        }
+                        header("Location: landing-page.php");
+                        exit();
                     }
                 } else {
-                    $login_error = "Admin account not found.";
+                    // ── Admin DB row not found ─────────────────────────────
+                    $rl_result  = recordFailedAttempt($email, $rl_ip, false, '', $conn);
+                    $ip_result  = recordIpFailedAttempt($rl_ip, $conn);
+
+                    if ($ip_result['locked']) {
+                        $_SESSION['flash_login_error']     = $ip_result['message'];
+                        $_SESSION['flash_lockout_seconds'] = $ip_result['seconds_left'];
+                        $_SESSION['flash_lockout_until']   = $ip_result['locked_until'];
+                    } elseif ($rl_result['locked']) {
+                        $_SESSION['flash_login_error']     = $rl_result['message'];
+                        $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
+                        $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
+                    } else {
+                        $_SESSION['flash_login_error'] = $rl_result['message'];
+                    }
+                    $_SESSION['flash_panel_role'] = 'admin';
+                    header("Location: landing-page.php");
+                    exit();
                 }
             }
         } else {
-            $login_error = "Admin account not found. Please use the correct admin email.";
+            // ── Wrong admin email (not main@admin.edu) — no attempt tracked ──
+            $_SESSION['flash_login_error'] = "Admin account not found. Please use the correct admin email.";
+            $_SESSION['flash_panel_role']  = 'admin';
+            header("Location: landing-page.php");
+            exit();
         }
     }
 
-    // ===== FACULTY LOGIN (borrower — uses tbl_users, goes to faculty-dashboard) =====
+    // ===== FACULTY LOGIN =====
     elseif ($user_type === 'student') {
         $stmt = $conn->prepare("SELECT faculty_id, fullname, password FROM tbl_users WHERE email = ?");
         $stmt->bind_param("s", $email);
@@ -128,35 +200,62 @@ if (isset($_POST['login'])) {
         if ($result->num_rows === 1) {
             $user = $result->fetch_assoc();
             if (password_verify($password, $user['password'])) {
-                $_SESSION['faculty_id'] = $user['faculty_id'];
-                $_SESSION['faculty_name'] = $user['fullname'];
+                // ── Successful faculty login ───────────────────────────────
+                $_SESSION['faculty_id']    = $user['faculty_id'];
+                $_SESSION['faculty_name']  = $user['fullname'];
                 $_SESSION['faculty_email'] = $email;
-                $_SESSION['login_time'] = time();
+                $_SESSION['login_time']    = time();
+
+                // Clear flash_login_email — no longer needed on success.
+                unset($_SESSION['flash_login_email']);
+
+                recordSuccessfulLogin($email, $rl_ip, $conn);
                 header("Location: faculty-dashboard.php");
                 exit();
             } else {
-                $login_error = "Incorrect password.";
+                // ── Wrong faculty password ─────────────────────────────────
+                $rl_result = recordFailedAttempt($email, $rl_ip, true, $user['fullname'] ?? '', $conn);
+                $_SESSION['flash_login_error'] = $rl_result['message'];
+                $_SESSION['flash_panel_role']  = 'faculty';
+                if ($rl_result['locked']) {
+                    $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
+                    $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
+                }
+                header("Location: landing-page.php");
+                exit();
             }
         } else {
-            $login_error = "Account not found. Please register first.";
+            // ── Faculty email not found ────────────────────────────────────
+            $rl_result  = recordFailedAttempt($email, $rl_ip, false, '', $conn);
+            $ip_result  = recordIpFailedAttempt($rl_ip, $conn);
+
+            if ($ip_result['locked']) {
+                $_SESSION['flash_login_error']     = $ip_result['message'];
+                $_SESSION['flash_lockout_seconds'] = $ip_result['seconds_left'];
+                $_SESSION['flash_lockout_until']   = $ip_result['locked_until'];
+            } elseif ($rl_result['locked']) {
+                $_SESSION['flash_login_error']     = $rl_result['message'];
+                $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
+                $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
+            } else {
+                $_SESSION['flash_login_error'] = $rl_result['message'];
+            }
+            $_SESSION['flash_panel_role'] = 'faculty';
+            header("Location: landing-page.php");
+            exit();
         }
     }
 
-    // ===== FACULTY LOGIN (view-only — uses tbl_faculty, no dashboard yet) =====
+    // ===== STUB — view-only faculty path =====
     else {
-        $login_error = "Faculty portal is not yet available. Please contact admin.";
+        $_SESSION['flash_login_error'] = "Faculty portal is not yet available. Please contact admin.";
+        $_SESSION['flash_panel_role']  = 'faculty';
+        header("Location: landing-page.php");
+        exit();
     }
 }
-
-// Faculty accounts are created through a different flow now (not self-registration
-// on this page), so there is no registration POST handler here anymore.
-
-// Which panel view should be active on page load (a server-side login error
-// needs to land the user back on the right form instead of the role picker).
-$panel_target_role = null;
-if ($login_error) {
-    $panel_target_role = (($_POST['user_type'] ?? '') === 'admin') ? 'admin' : 'faculty';
-}
+// ── End POST handler — all paths above exit() ─────────────────────────────
+// Everything below this line executes only on GET requests.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -274,10 +373,18 @@ if ($login_error) {
                         </div>
                     </div>
 
-                    <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'student'): ?>
+                    <?php
+                        $faculty_show_banner = $login_error && $panel_target_role === 'faculty';
+                    ?>
+                    <?php if ($faculty_show_banner): ?>
                         <div class="auth-alert error">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                            <?= htmlspecialchars($login_error) ?>
+                            <i class="fa-solid fa-<?= $lockout_seconds > 0 ? 'lock' : 'circle-exclamation' ?>"></i>
+                            <?php if ($lockout_seconds > 0): ?>
+                                <?= strpos($login_error, 'location') !== false ? 'Too many failed attempts from this location.' : 'Too many failed attempts.' ?>
+                                Try again in <span id="lockout-countdown-faculty"><?= gmdate('i:s', $lockout_seconds) ?></span>.
+                            <?php else: ?>
+                                <?= htmlspecialchars($login_error) ?>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                     <form method="POST" action="">
@@ -307,7 +414,12 @@ if ($login_error) {
                                 </button>
                             </div>
                         </div>
-                        <button type="submit" name="login" class="btn-auth">
+                        <button type="submit" name="login" class="btn-auth"
+                            id="facultySubmitBtn"
+                            <?php if ($lockout_seconds > 0 && $panel_target_role === 'faculty'): ?>
+                                disabled
+                                data-lockout-seconds="<?= (int)$lockout_seconds ?>"
+                            <?php endif; ?>>
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
                             Sign In
                         </button>
@@ -328,10 +440,18 @@ if ($login_error) {
                         </div>
                     </div>
 
-                    <?php if ($login_error && isset($_POST['user_type']) && $_POST['user_type'] == 'admin'): ?>
+                    <?php
+                        $admin_show_banner = $login_error && $panel_target_role === 'admin';
+                    ?>
+                    <?php if ($admin_show_banner): ?>
                         <div class="auth-alert error">
-                            <i class="fa-solid fa-circle-exclamation"></i>
-                            <?= htmlspecialchars($login_error) ?>
+                            <i class="fa-solid fa-<?= $lockout_seconds > 0 ? 'lock' : 'circle-exclamation' ?>"></i>
+                            <?php if ($lockout_seconds > 0): ?>
+                                <?= strpos($login_error, 'location') !== false ? 'Too many failed attempts from this location.' : 'Too many failed attempts.' ?>
+                                Try again in <span id="lockout-countdown-admin"><?= gmdate('i:s', $lockout_seconds) ?></span>.
+                            <?php else: ?>
+                                <?= htmlspecialchars($login_error) ?>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                     <form method="POST" action="">
@@ -358,7 +478,12 @@ if ($login_error) {
                                 </button>
                             </div>
                         </div>
-                        <button type="submit" name="login" class="btn-auth">
+                        <button type="submit" name="login" class="btn-auth"
+                            id="adminSubmitBtn"
+                            <?php if ($lockout_seconds > 0 && $panel_target_role === 'admin'): ?>
+                                disabled
+                                data-lockout-seconds="<?= (int)$lockout_seconds ?>"
+                            <?php endif; ?>>
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
                             Sign In
                         </button>
