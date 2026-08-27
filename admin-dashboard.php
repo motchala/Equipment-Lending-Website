@@ -51,7 +51,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
                     <span class="logo-badge">Admin</span>
                 </span>
-                <span>Admin Portal</span>
+                <span class="logo-subtitle">Admin Portal</span>
             </div>
         </div>
 
@@ -183,7 +183,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <span class="material-symbols-outlined">group</span>
                 <span>Faculty</span>
             </a>
-            <a class="nav-item" data-tab="lending" id="snav-arbitration" href="#">
+            <a class="nav-item" data-tab="arbitration" id="snav-arbitration" href="#">
                 <span class="material-symbols-outlined">balance</span>
                 <span>Arbitration</span>
             </a>
@@ -905,303 +905,178 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div><!-- /panel-requests -->
 
 
-            <!-- ================================================================
-             MODALS — REQUESTS PANEL  (UI only — functions wired in Phase 4)
-        ================================================================ -->
 
-            <!-- MODAL: APPROVE REQUEST -->
-            <div class="ps-modal-backdrop" id="ps-approve-modal">
-                <div class="ps-modal ps-modal--sm">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--success">
-                            <span class="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <h3>Approve Request</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-approve-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <div class="ps-modal-body">
-                        <div class="ps-req-summary">
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="approve-borrower">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="approve-equipment">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Date Needed</span><span class="ps-rsv" id="approve-date-needed">—</span></div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Return Due Date</label>
-                            <input class="ps-form-control" type="date" id="approve-due-date"
-                                value="<?php echo date('Y-m-d', strtotime('+7 days')); ?>">
-                            <div class="ps-form-hint">Borrower will be expected to return the item by this date.</div>
-                        </div>
-                        <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
-                    </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>
-                        <button class="ps-btn ps-btn--success" data-action="ps-close-modal" data-modal="ps-approve-modal">
-                            <span class="material-symbols-outlined">check</span> Approve Request
-                        </button>
+
+            <!-- ============================================================
+         TAB: ARBITRATION  (Phase 3 redesign)
+    ============================================================ -->
+            <div class="tab-panel" id="panel-arbitration">
+
+                <div class="ps-page-header-row">
+                    <div class="ps-page-header">
+                        <h1>Arbitration Engine</h1>
+                        <p>Configure automatic request processing rules and view the decision log.</p>
                     </div>
                 </div>
-            </div>
 
-            <!-- MODAL: DECLINE REQUEST -->
-            <div class="ps-modal-backdrop" id="ps-decline-modal">
-                <div class="ps-modal ps-modal--sm">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--danger">
-                            <span class="material-symbols-outlined">cancel</span>
-                        </div>
-                        <h3>Decline Request</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-decline-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <div class="ps-modal-body">
-                        <div class="ps-req-summary">
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                            <textarea class="ps-form-control" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
-                            <div class="ps-form-hint">This reason will be sent to the borrower via email.</div>
-                        </div>
-                    </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
-                        <button class="ps-btn ps-btn--danger" data-action="ps-close-modal" data-modal="ps-decline-modal">
-                            <span class="material-symbols-outlined">close</span> Decline Request
-                        </button>
-                    </div>
+                <!-- Sub-tabs -->
+                <div class="rq-sub-tabs" id="arbSubTabs">
+                    <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
+                    <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
                 </div>
-            </div>
 
-            <!-- MODAL: CONFIRM RETURN -->
-            <div class="ps-modal-backdrop" id="ps-return-modal">
-                <div class="ps-modal ps-modal--sm">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--maroon">
-                            <span class="material-symbols-outlined">assignment_return</span>
-                        </div>
-                        <h3>Confirm Return</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
+                <!-- ── CONFIGURATION ─────────────────────────────────────── -->
+                <div class="arb-sub-panel active" id="arb-sub-config">
+                    <div class="ps-help-note">
+                        <span class="material-symbols-outlined">info</span>
+                        These rules determine how the system automatically approves or declines requests. Changes take effect immediately.
                     </div>
-                    <div class="ps-modal-body">
-                        <div class="ps-req-summary">
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Return Condition</label>
-                            <select class="ps-form-control">
-                                <option>Good — No visible damage</option>
-                                <option>Fair — Minor wear</option>
-                                <option>Damaged — Needs repair</option>
-                                <option>Missing — Item not returned</option>
-                            </select>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                            <textarea class="ps-form-control" rows="2" placeholder="Any notes about the return..."></textarea>
-                        </div>
-                        <div class="ps-alert ps-alert--info" style="margin:0">
-                            <span class="material-symbols-outlined">info</span>
-                            Confirming will update the stock count and close this request.
-                        </div>
-                    </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
-                            <span class="material-symbols-outlined">check</span> Confirm Return
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODAL: SEND OVERDUE NOTICE -->
-            <div class="ps-modal-backdrop" id="ps-notice-modal">
-                <div class="ps-modal">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--warning">
-                            <span class="material-symbols-outlined">mail</span>
-                        </div>
-                        <h3>Send Overdue Notice</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-notice-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <div class="ps-modal-body">
-                        <div class="ps-req-summary" style="margin-bottom:1rem">
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
-                            <div class="ps-req-sum-row"><span class="ps-rsl">Days Overdue</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Message Preview</label>
-                            <div class="ps-notice-preview">Dear [Borrower Name],
-
-                                This is a reminder that the following item borrowed from the PUPSync Equipment Lending System is now overdue:
-
-                                • Item: [Equipment Name]
-                                • Due Date: [Due Date]
-                                • Days Overdue: [N] days
-
-                                Please return the item as soon as possible to avoid further penalties.
-
-                                Thank you,
-                                PUPSync Admin — Biñan Campus</div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Delivery Method</label>
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px">
-                                <input type="checkbox" checked> Send via Email
-                            </label>
-                        </div>
-                    </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
-                            <span class="material-symbols-outlined">send</span> Send Notice
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODAL: REQUEST DETAIL -->
-            <div class="ps-modal-backdrop" id="ps-req-detail-modal">
-                <div class="ps-modal ps-modal--lg">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--maroon">
-                            <span class="material-symbols-outlined">assignment</span>
-                        </div>
-                        <h3>Request Details</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-req-detail-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <div class="ps-modal-body">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
-                            <span class="ps-badge ps-badge--waiting ps-badge--dot" style="font-size:12px;padding:4px 12px">Waiting for Approval</span>
-                            <span style="font-size:11.5px;color:var(--text-light)">Submitted: —</span>
-                        </div>
-                        <div class="ps-detail-grid" style="margin-bottom:1.25rem">
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Requester</div>
-                                <div class="ps-detail-value" style="font-weight:600">—</div>
+                    <div class="ps-two-col">
+                        <!-- Left: Rules -->
+                        <div class="ps-card">
+                            <div class="ps-card-header">
+                                <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
                             </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Student / Faculty ID</div>
-                                <div class="ps-detail-value">—</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Requester Type</div>
-                                <div class="ps-detail-value">Faculty</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Email</div>
-                                <div class="ps-detail-value" style="font-size:12px">—</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Equipment</div>
-                                <div class="ps-detail-value" style="font-weight:600">—</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Quantity</div>
-                                <div class="ps-detail-value">1</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Date Needed</div>
-                                <div class="ps-detail-value" style="font-weight:600">—</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Return By</div>
-                                <div class="ps-detail-value">—</div>
-                            </div>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Purpose / Notes</label>
-                            <div style="background:var(--secondary-cream);border-radius:8px;padding:0.75rem;font-size:12.5px;color:var(--text-dark);border:1px solid var(--khaki-border)">—</div>
-                        </div>
-                        <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;font-size:12px;color:var(--text-light);border:1px solid var(--khaki-border)">
-                            <strong style="color:var(--text-dark)">Arbitration Status:</strong> Pending review.
-                        </div>
-                    </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-req-detail-modal">Close</button>
-                        <button class="ps-btn ps-btn--danger" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
-                            <span class="material-symbols-outlined">close</span> Decline
-                        </button>
-                        <button class="ps-btn ps-btn--success" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
-                            <span class="material-symbols-outlined">check</span> Approve
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODAL: EXPORT REQUESTS -->
-            <div class="ps-modal-backdrop" id="ps-export-modal">
-                <div class="ps-modal ps-modal--sm">
-                    <div class="ps-modal-head">
-                        <div class="ps-modal-head-icon ps-mhi--info">
-                            <span class="material-symbols-outlined">download</span>
-                        </div>
-                        <h3>Export Requests</h3>
-                        <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-export-modal">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <div class="ps-modal-body">
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Date Range</label>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                                <div>
-                                    <div style="font-size:11px;color:var(--text-light);margin-bottom:3px">From</div>
-                                    <input class="ps-form-control" type="date" value="<?php echo date('Y-m-01'); ?>">
+                            <div class="ps-card-body">
+                                <div class="arb-rule">
+                                    <h4>
+                                        <span class="material-symbols-outlined">check_circle</span>
+                                        Auto-approve Faculty Requests
+                                        <label class="ps-toggle" style="margin-left:auto">
+                                            <input type="checkbox" checked>
+                                            <span class="ps-toggle-track"></span>
+                                        </label>
+                                    </h4>
+                                    <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
                                 </div>
-                                <div>
-                                    <div style="font-size:11px;color:var(--text-light);margin-bottom:3px">To</div>
-                                    <input class="ps-form-control" type="date" value="<?php echo date('Y-m-d'); ?>">
+                                <div class="arb-rule">
+                                    <h4>
+                                        <span class="material-symbols-outlined">block</span>
+                                        Block Overdue Borrowers
+                                        <label class="ps-toggle" style="margin-left:auto">
+                                            <input type="checkbox"
+                                                <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
+                                            <span class="ps-toggle-track"></span>
+                                        </label>
+                                    </h4>
+                                    <p>Automatically decline new requests from users with overdue items.</p>
+                                </div>
+                                <div class="arb-rule">
+                                    <h4>
+                                        <span class="material-symbols-outlined">inventory</span>
+                                        Stock-Based Rejection
+                                        <label class="ps-toggle" style="margin-left:auto">
+                                            <input type="checkbox"
+                                                <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
+                                            <span class="ps-toggle-track"></span>
+                                        </label>
+                                    </h4>
+                                    <p>Automatically decline if available stock falls below minimum threshold.</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Filter by Status</label>
-                            <select class="ps-form-control">
-                                <option value="">All Statuses</option>
-                                <option value="Waiting">Waiting</option>
-                                <option value="Approved">Active Borrowings</option>
-                                <option value="Overdue">Overdue</option>
-                                <option value="Returned">Returned</option>
-                                <option value="Declined">Declined</option>
-                            </select>
-                        </div>
-                        <div class="ps-form-group">
-                            <label class="ps-form-label">Export Format</label>
-                            <div style="display:flex;gap:10px;margin-top:4px">
-                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                                    <input type="radio" name="export-fmt" value="csv" checked> CSV
-                                </label>
-                                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                                    <input type="radio" name="export-fmt" value="xlsx"> Excel (.xlsx)
-                                </label>
+                        <!-- Right: Thresholds -->
+                        <div class="ps-card">
+                            <div class="ps-card-header">
+                                <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
+                            </div>
+                            <div class="ps-card-body">
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Maximum Borrow Days</label>
+                                    <input class="ps-form-control" type="number" min="1" max="60"
+                                        value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
+                                    <div class="ps-form-hint">Items must be returned within this many days.</div>
+                                </div>
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Max Items Per Borrower</label>
+                                    <input class="ps-form-control" type="number" min="1" max="20"
+                                        value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
+                                    <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
+                                </div>
+                                <div class="ps-form-group">
+                                    <label class="ps-form-label">Low Stock Threshold</label>
+                                    <input class="ps-form-control" type="number" min="0" max="10"
+                                        value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
+                                    <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
+                                </div>
+                                <button type="button" class="ps-btn ps-btn--primary"
+                                    style="width:100%;justify-content:center;margin-top:0.25rem">
+                                    <span class="material-symbols-outlined">save</span> Save Configuration
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div class="ps-modal-foot">
-                        <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-export-modal">Cancel</button>
-                        <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-export-modal">
-                            <span class="material-symbols-outlined">download</span> Export
-                        </button>
+                </div><!-- /arb-sub-config -->
+
+                <!-- ── DECISION LOG ───────────────────────────────────────── -->
+                <div class="arb-sub-panel" id="arb-sub-log">
+                    <div class="ps-card">
+                        <div class="ps-card-header">
+                            <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
+                            <select class="ps-form-control" style="width:160px" id="arb-log-filter">
+                                <option value="">All decisions</option>
+                                <option value="Approved">Auto-approved</option>
+                                <option value="Declined">Auto-declined</option>
+                            </select>
+                        </div>
+                        <div class="ps-table-wrap">
+                            <table class="ps-table" id="arb-log-new-table">
+                                <thead>
+                                    <tr>
+                                        <th>Request ID</th>
+                                        <th>Decision</th>
+                                        <th>Rule Triggered</th>
+                                        <th>Borrower</th>
+                                        <th>Equipment</th>
+                                        <th>Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
+                                    ?>
+                                        <tr>
+                                            <td colspan="6">
+                                                <div class="ps-empty-state">
+                                                    <span class="material-symbols-outlined">history</span>
+                                                    <p>No arbitration log entries yet.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php else:
+                                        mysqli_data_seek($arb_log_result, 0);
+                                        while ($r = mysqli_fetch_assoc($arb_log_result)):
+                                            $dec    = $r['decision'];
+                                            $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
+                                        ?>
+                                            <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
+                                                <td style="font-weight:600;color:var(--accent-maroon)">
+                                                    <?php echo htmlspecialchars($r['request_id']); ?>
+                                                </td>
+                                                <td>
+                                                    <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
+                                                        <?php echo htmlspecialchars($dec); ?>
+                                                    </span>
+                                                </td>
+                                                <td style="font-size:12px;color:var(--text-light)">
+                                                    <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                                <td style="font-size:12px;color:var(--text-light)">
+                                                    <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
+                                                </td>
+                                            </tr>
+                                    <?php endwhile;
+                                    endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </div><!-- /arb-sub-log -->
+
+            </div><!-- /panel-arbitration -->
+
 
             <!-- ============================================================
          TAB: LENDING  (legacy — Inventory and Arbitration still use this)
@@ -3151,7 +3026,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 }
                                                 const modal = document.getElementById('roomScheduleModal');
                                                 if (modal) modal.classList.remove('hidden');
-                                                try { renderGrid(); } catch(e) { console.warn('renderGrid error:', e); }
+                                                try {
+                                                    renderGrid();
+                                                } catch (e) {
+                                                    console.warn('renderGrid error:', e);
+                                                }
                                             };
 
                                             window.psCloseSchedule = function() {
@@ -3167,13 +3046,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             document.addEventListener('click', function(e) {
                                                 const modal = document.getElementById('roomScheduleModal');
                                                 if (e.target.closest('[data-action="open-room-schedule"]')) {
-                                                    window.psOpenSchedule(e.target.closest('[data-action="open-room-schedule"]')); return;
+                                                    window.psOpenSchedule(e.target.closest('[data-action="open-room-schedule"]'));
+                                                    return;
                                                 }
                                                 if (e.target.closest('[data-action="close-room-schedule"]')) {
-                                                    window.psCloseSchedule(); return;
+                                                    window.psCloseSchedule();
+                                                    return;
                                                 }
                                                 const navBtn = e.target.closest('[data-action="room-schedule-nav"]');
-                                                if (navBtn) { window.psScheduleNav(parseInt(navBtn.dataset.dir)); return; }
+                                                if (navBtn) {
+                                                    window.psScheduleNav(parseInt(navBtn.dataset.dir));
+                                                    return;
+                                                }
                                                 if (modal && !modal.classList.contains('hidden') && e.target === modal)
                                                     window.psCloseSchedule();
                                                 const rfw = document.getElementById('room-form-wrap');
@@ -3324,9 +3208,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
                                                     Faculty List
                                                     <span class="fac-count-badge">(<?php
-                                                    $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
-                                                    echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
-                                                    ?>)</span>
+                                                                                    $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
+                                                                                    echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
+                                                                                    ?>)</span>
                                                 </h2>
                                                 <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
                                                     <input type="text" id="fac-search-input"
@@ -3355,12 +3239,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                         $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
                                                         $fac_res = $conn->query(
                                                             "SELECT u.fullname, u.email, u.role,"
-                                                            . " u.faculty_id,"
-                                                            . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
-                                                            . "     o.name AS org_name"
-                                                            . " FROM tbl_users u"
-                                                            . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
-                                                            . " ORDER BY u.fullname ASC"
+                                                                . " u.faculty_id,"
+                                                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
+                                                                . "     o.name AS org_name"
+                                                                . " FROM tbl_users u"
+                                                                . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
+                                                                . " ORDER BY u.fullname ASC"
                                                         );
                                                         if ($fac_res && $fac_res->num_rows > 0):
                                                             while ($frow = $fac_res->fetch_assoc()):
@@ -3377,8 +3261,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                     data-role="<?= htmlspecialchars($frow['role']) ?>"
                                                                     data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
                                                                     data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
-                                                                    data-init="<?= $initFac ?>"
-                                                                >
+                                                                    data-init="<?= $initFac ?>">
                                                                     <td>
                                                                         <div style="font-weight:600"><?= htmlspecialchars($frow['fullname']) ?></div>
                                                                         <div style="font-size:11px;color:var(--text-light)"><?= $subLabel ?></div>
@@ -3422,6 +3305,309 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </main><!-- /app-main -->
 
     </div><!-- /app-body -->
+
+    <!-- ================================================================
+         REQUESTS PANEL MODALS — outside app-body for correct fixed positioning
+    ================================================================ -->
+
+    <!-- ================================================================
+             MODALS — REQUESTS PANEL  (UI only — functions wired in Phase 4)
+        ================================================================ -->
+
+    <!-- MODAL: APPROVE REQUEST -->
+    <div class="ps-modal-backdrop" id="ps-approve-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--success">
+                    <span class="material-symbols-outlined">check_circle</span>
+                </div>
+                <h3>Approve Request</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-approve-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="approve-borrower">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="approve-equipment">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Date Needed</span><span class="ps-rsv" id="approve-date-needed">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Return Due Date</label>
+                    <input class="ps-form-control" type="date" id="approve-due-date"
+                        value="<?php echo date('Y-m-d', strtotime('+7 days')); ?>">
+                    <div class="ps-form-hint">Borrower will be expected to return the item by this date.</div>
+                </div>
+                <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>
+                <button class="ps-btn ps-btn--success" data-action="ps-close-modal" data-modal="ps-approve-modal">
+                    <span class="material-symbols-outlined">check</span> Approve Request
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DECLINE REQUEST -->
+    <div class="ps-modal-backdrop" id="ps-decline-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">cancel</span>
+                </div>
+                <h3>Decline Request</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-decline-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                    <textarea class="ps-form-control" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
+                    <div class="ps-form-hint">This reason will be sent to the borrower via email.</div>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
+                <button class="ps-btn ps-btn--danger" data-action="ps-close-modal" data-modal="ps-decline-modal">
+                    <span class="material-symbols-outlined">close</span> Decline Request
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CONFIRM RETURN -->
+    <div class="ps-modal-backdrop" id="ps-return-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">assignment_return</span>
+                </div>
+                <h3>Confirm Return</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Return Condition</label>
+                    <select class="ps-form-control">
+                        <option>Good — No visible damage</option>
+                        <option>Fair — Minor wear</option>
+                        <option>Damaged — Needs repair</option>
+                        <option>Missing — Item not returned</option>
+                    </select>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                    <textarea class="ps-form-control" rows="2" placeholder="Any notes about the return..."></textarea>
+                </div>
+                <div class="ps-alert ps-alert--info" style="margin:0">
+                    <span class="material-symbols-outlined">info</span>
+                    Confirming will update the stock count and close this request.
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
+                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
+                    <span class="material-symbols-outlined">check</span> Confirm Return
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SEND OVERDUE NOTICE -->
+    <div class="ps-modal-backdrop" id="ps-notice-modal">
+        <div class="ps-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--warning">
+                    <span class="material-symbols-outlined">mail</span>
+                </div>
+                <h3>Send Overdue Notice</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-notice-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="ps-req-summary" style="margin-bottom:1rem">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Days Overdue</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Message Preview</label>
+                    <div class="ps-notice-preview">Dear [Borrower Name],
+
+                        This is a reminder that the following item borrowed from the PUPSync Equipment Lending System is now overdue:
+
+                        • Item: [Equipment Name]
+                        • Due Date: [Due Date]
+                        • Days Overdue: [N] days
+
+                        Please return the item as soon as possible to avoid further penalties.
+
+                        Thank you,
+                        PUPSync Admin — Biñan Campus</div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Delivery Method</label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px">
+                        <input type="checkbox" checked> Send via Email
+                    </label>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
+                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
+                    <span class="material-symbols-outlined">send</span> Send Notice
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REQUEST DETAIL -->
+    <div class="ps-modal-backdrop" id="ps-req-detail-modal">
+        <div class="ps-modal ps-modal--lg">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">assignment</span>
+                </div>
+                <h3>Request Details</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-req-detail-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
+                    <span class="ps-badge ps-badge--waiting ps-badge--dot" style="font-size:12px;padding:4px 12px">Waiting for Approval</span>
+                    <span style="font-size:11.5px;color:var(--text-light)">Submitted: —</span>
+                </div>
+                <div class="ps-detail-grid" style="margin-bottom:1.25rem">
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Requester</div>
+                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Student / Faculty ID</div>
+                        <div class="ps-detail-value">—</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Requester Type</div>
+                        <div class="ps-detail-value">Faculty</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Email</div>
+                        <div class="ps-detail-value" style="font-size:12px">—</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Equipment</div>
+                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Quantity</div>
+                        <div class="ps-detail-value">1</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Date Needed</div>
+                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                    </div>
+                    <div class="ps-detail-item">
+                        <div class="ps-detail-label">Return By</div>
+                        <div class="ps-detail-value">—</div>
+                    </div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Purpose / Notes</label>
+                    <div style="background:var(--secondary-cream);border-radius:8px;padding:0.75rem;font-size:12.5px;color:var(--text-dark);border:1px solid var(--khaki-border)">—</div>
+                </div>
+                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;font-size:12px;color:var(--text-light);border:1px solid var(--khaki-border)">
+                    <strong style="color:var(--text-dark)">Arbitration Status:</strong> Pending review.
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-req-detail-modal">Close</button>
+                <button class="ps-btn ps-btn--danger" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
+                    <span class="material-symbols-outlined">close</span> Decline
+                </button>
+                <button class="ps-btn ps-btn--success" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
+                    <span class="material-symbols-outlined">check</span> Approve
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EXPORT REQUESTS -->
+    <div class="ps-modal-backdrop" id="ps-export-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--info">
+                    <span class="material-symbols-outlined">download</span>
+                </div>
+                <h3>Export Requests</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-export-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Date Range</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <div>
+                            <div style="font-size:11px;color:var(--text-light);margin-bottom:3px">From</div>
+                            <input class="ps-form-control" type="date" value="<?php echo date('Y-m-01'); ?>">
+                        </div>
+                        <div>
+                            <div style="font-size:11px;color:var(--text-light);margin-bottom:3px">To</div>
+                            <input class="ps-form-control" type="date" value="<?php echo date('Y-m-d'); ?>">
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Filter by Status</label>
+                    <select class="ps-form-control">
+                        <option value="">All Statuses</option>
+                        <option value="Waiting">Waiting</option>
+                        <option value="Approved">Active Borrowings</option>
+                        <option value="Overdue">Overdue</option>
+                        <option value="Returned">Returned</option>
+                        <option value="Declined">Declined</option>
+                    </select>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Export Format</label>
+                    <div style="display:flex;gap:10px;margin-top:4px">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="radio" name="export-fmt" value="csv" checked> CSV
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                            <input type="radio" name="export-fmt" value="xlsx"> Excel (.xlsx)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-export-modal">Cancel</button>
+                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-export-modal">
+                    <span class="material-symbols-outlined">download</span> Export
+                </button>
+            </div>
+        </div>
+    </div>
+
 
 
     <!-- ================================================================
@@ -4656,8 +4842,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
             </div>
             <div class="rsm-legend">
-                <div class="rsm-legend-item"><div class="rsm-legend-dot reserved"></div> Reserved</div>
-                <div class="rsm-legend-item"><div class="rsm-legend-dot avail"></div> Available</div>
+                <div class="rsm-legend-item">
+                    <div class="rsm-legend-dot reserved"></div> Reserved
+                </div>
+                <div class="rsm-legend-item">
+                    <div class="rsm-legend-dot avail"></div> Available
+                </div>
             </div>
             <div class="rsm-foot">
                 <button type="button" class="btn-cancel-acc" data-action="close-room-schedule">Close</button>
@@ -4731,7 +4921,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </label>
 
                 <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
-                    <button class="ps-btn ps-btn--danger ps-btn--sm" id="fac-edit-delete-btn">
+                    <button class="ps-btn ps-btn--danger" id="fac-edit-delete-btn" type="button" disabled>
                         <span class="material-symbols-outlined">person_remove</span> Delete Account
                     </button>
                 </div>
@@ -4800,10 +4990,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         if ($fac_ddl && $fac_ddl->num_rows > 0):
                             while ($fdrow = $fac_ddl->fetch_assoc()):
                         ?>
-                            <option value="<?= htmlspecialchars($fdrow['faculty_id']) ?>">
-                                <?= htmlspecialchars($fdrow['fullname']) ?>
-                            </option>
-                        <?php endwhile; else: ?>
+                                <option value="<?= htmlspecialchars($fdrow['faculty_id']) ?>">
+                                    <?= htmlspecialchars($fdrow['fullname']) ?>
+                                </option>
+                            <?php endwhile;
+                        else: ?>
                             <option value="">&#8212; No faculty accounts yet &#8212;</option>
                         <?php endif; ?>
                     </select>
@@ -4833,162 +5024,155 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     <!-- Faculty Panel JS -->
     <script>
-    (function () {
-        function openFacModal(id) {
-            var el = document.getElementById(id);
-            if (el) el.classList.add('ps-modal-open');
-        }
-        function closeFacModal(id) {
-            var el = document.getElementById(id);
-            if (el) el.classList.remove('ps-modal-open');
-        }
+        (function() {
+            function openFacModal(id) {
+                var el = document.getElementById(id);
+                if (el) el.classList.add('ps-modal-open');
+            }
 
-        /* Search filter */
-        var facSearch = document.getElementById('fac-search-input');
-        if (facSearch) {
-            facSearch.addEventListener('input', function () {
-                var q = facSearch.value.toLowerCase();
-                var table = document.getElementById('fac-list-table');
-                if (!table) return;
-                table.querySelectorAll('tbody tr').forEach(function (row) {
-                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+            function closeFacModal(id) {
+                var el = document.getElementById(id);
+                if (el) el.classList.remove('ps-modal-open');
+            }
+
+            /* Search filter */
+            var facSearch = document.getElementById('fac-search-input');
+            if (facSearch) {
+                facSearch.addEventListener('input', function() {
+                    var q = facSearch.value.toLowerCase();
+                    var table = document.getElementById('fac-list-table');
+                    if (!table) return;
+                    table.querySelectorAll('tbody tr').forEach(function(row) {
+                        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+                    });
+                });
+            }
+
+            /* Edit modal: open on row edit-button click */
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('.fac-edit-btn');
+                if (!btn) return;
+                var row = btn.closest('tr');
+                if (!row) return;
+
+                var fullname = row.dataset.fullname || '';
+                var email = row.dataset.email || '';
+                var facId = row.dataset.facultyId || '';
+                var role = row.dataset.role || '';
+                var org = row.dataset.org || '';
+                var aob = row.dataset.aob === '1';
+                var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
+                var isAdviser = role === 'Organization Adviser';
+                var subLine = facId + ' \u00B7 ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
+
+                var parts = fullname.trim().split(' ');
+                var lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+                var firstName = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+
+                document.getElementById('fac-edit-avatar').textContent = init;
+                document.getElementById('fac-edit-name-display').textContent = fullname;
+                document.getElementById('fac-edit-meta-display').textContent = subLine;
+                document.getElementById('fac-edit-first').value = firstName;
+                document.getElementById('fac-edit-last').value = lastName;
+                document.getElementById('fac-edit-email').value = email;
+                document.getElementById('fac-edit-backup').value = '';
+                document.getElementById('fac-edit-adviser').checked = isAdviser;
+                document.getElementById('fac-edit-org').value = org;
+                document.getElementById('fac-edit-aob').checked = aob;
+                document.getElementById('fac-delete-name').textContent = fullname;
+
+                openFacModal('fac-edit-modal');
+            });
+
+            /* Edit modal: close */
+            ['fac-edit-close', 'fac-edit-cancel'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('click', function() {
+                    closeFacModal('fac-edit-modal');
                 });
             });
-        }
 
-        /* Edit modal: open on row edit-button click */
-        document.addEventListener('click', function (e) {
-            var btn = e.target.closest('.fac-edit-btn');
-            if (!btn) return;
-            var row = btn.closest('tr');
-            if (!row) return;
+            /* Delete Account: non-functional until later dev stage */
 
-            var fullname  = row.dataset.fullname  || '';
-            var email     = row.dataset.email     || '';
-            var facId     = row.dataset.facultyId || '';
-            var role      = row.dataset.role      || '';
-            var org       = row.dataset.org       || '';
-            var aob       = row.dataset.aob === '1';
-            var init      = row.dataset.init      || (fullname.charAt(0).toUpperCase()) || 'F';
-            var isAdviser = role === 'Organization Adviser';
-            var subLine   = facId + ' � ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
+            /* Save Changes: non-functional until later dev stage */
 
-            var parts    = fullname.trim().split(' ');
-            var lastName  = parts.length > 1 ? parts[parts.length - 1] : '';
-            var firstName = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
-
-            document.getElementById('fac-edit-avatar').textContent       = init;
-            document.getElementById('fac-edit-name-display').textContent = fullname;
-            document.getElementById('fac-edit-meta-display').textContent = subLine;
-            document.getElementById('fac-edit-first').value  = firstName;
-            document.getElementById('fac-edit-last').value   = lastName;
-            document.getElementById('fac-edit-email').value  = email;
-            document.getElementById('fac-edit-backup').value = '';
-            document.getElementById('fac-edit-adviser').checked = isAdviser;
-            document.getElementById('fac-edit-org').value    = org;
-            document.getElementById('fac-edit-aob').checked  = aob;
-            document.getElementById('fac-delete-name').textContent = fullname;
-
-            openFacModal('fac-edit-modal');
-        });
-
-        /* Edit modal: close */
-        ['fac-edit-close', 'fac-edit-cancel'].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.addEventListener('click', function () { closeFacModal('fac-edit-modal'); });
-        });
-
-        /* Edit modal: Delete Account -> open delete confirm */
-        var facEditDel = document.getElementById('fac-edit-delete-btn');
-        if (facEditDel) {
-            facEditDel.addEventListener('click', function () {
-                closeFacModal('fac-edit-modal');
-                openFacModal('fac-delete-modal');
-            });
-        }
-
-        /* Edit modal: Save Changes (placeholder) */
-        var facEditSave = document.getElementById('fac-edit-save');
-        if (facEditSave) {
-            facEditSave.addEventListener('click', function () {
-                closeFacModal('fac-edit-modal');
-                if (typeof showToast === 'function') showToast('Faculty account updated.', 't-success');
-            });
-        }
-
-        /* Delete modal: close */
-        ['fac-delete-close', 'fac-delete-cancel'].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.addEventListener('click', function () { closeFacModal('fac-delete-modal'); });
-        });
-
-        /* Delete modal: confirm (placeholder) */
-        var facDelConf = document.getElementById('fac-delete-confirm');
-        if (facDelConf) {
-            facDelConf.addEventListener('click', function () {
-                closeFacModal('fac-delete-modal');
-                if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
-            });
-        }
-
-        /* Generate Code modal: open */
-        function _genCode() {
-            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            var c = '';
-            for (var i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
-            return 'PUP-' + c;
-        }
-
-        var facGenBtn = document.getElementById('fac-gen-code-btn');
-        if (facGenBtn) {
-            facGenBtn.addEventListener('click', function () {
-                document.getElementById('fac-code-value').textContent = _genCode();
-                openFacModal('fac-code-modal');
-            });
-        }
-
-        /* Gen Code modal: close */
-        ['fac-code-close', 'fac-code-close-btn'].forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.addEventListener('click', function () { closeFacModal('fac-code-modal'); });
-        });
-
-        /* Gen Code modal: regenerate */
-        var facRegen = document.getElementById('fac-code-regen-btn');
-        if (facRegen) {
-            facRegen.addEventListener('click', function () {
-                document.getElementById('fac-code-value').textContent = _genCode();
-            });
-        }
-
-        /* Gen Code modal: copy */
-        var facCopy = document.getElementById('fac-code-copy-btn');
-        if (facCopy) {
-            facCopy.addEventListener('click', function () {
-                var val = document.getElementById('fac-code-value').textContent;
-                navigator.clipboard.writeText(val).then(function () {
-                    if (typeof showToast === 'function') showToast('Code copied to clipboard.', 't-success');
-                }).catch(function () {
-                    var ta = document.createElement('textarea');
-                    ta.value = val;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    if (typeof showToast === 'function') showToast('Code copied.', 't-success');
+            /* Delete modal: close */
+            ['fac-delete-close', 'fac-delete-cancel'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('click', function() {
+                    closeFacModal('fac-delete-modal');
                 });
             });
-        }
 
-        /* Backdrop click to close */
-        ['fac-edit-modal', 'fac-delete-modal', 'fac-code-modal'].forEach(function (id) {
-            var bd = document.getElementById(id);
-            if (bd) bd.addEventListener('click', function (e) {
-                if (e.target === bd) closeFacModal(id);
+            /* Delete modal: confirm (placeholder) */
+            var facDelConf = document.getElementById('fac-delete-confirm');
+            if (facDelConf) {
+                facDelConf.addEventListener('click', function() {
+                    closeFacModal('fac-delete-modal');
+                    if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
+                });
+            }
+
+            /* Generate Code modal: open */
+            function _genCode() {
+                var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+                var c = '';
+                for (var i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
+                return 'PUP-' + c;
+            }
+
+            var facGenBtn = document.getElementById('fac-gen-code-btn');
+            if (facGenBtn) {
+                facGenBtn.addEventListener('click', function() {
+                    document.getElementById('fac-code-value').textContent = _genCode();
+                    openFacModal('fac-code-modal');
+                });
+            }
+
+            /* Gen Code modal: close */
+            ['fac-code-close', 'fac-code-close-btn'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.addEventListener('click', function() {
+                    closeFacModal('fac-code-modal');
+                });
             });
-        });
 
-    }());
+            /* Gen Code modal: regenerate */
+            var facRegen = document.getElementById('fac-code-regen-btn');
+            if (facRegen) {
+                facRegen.addEventListener('click', function() {
+                    document.getElementById('fac-code-value').textContent = _genCode();
+                });
+            }
+
+            /* Gen Code modal: copy */
+            var facCopy = document.getElementById('fac-code-copy-btn');
+            if (facCopy) {
+                facCopy.addEventListener('click', function() {
+                    var val = document.getElementById('fac-code-value').textContent;
+                    navigator.clipboard.writeText(val).then(function() {
+                        if (typeof showToast === 'function') showToast('Code copied to clipboard.', 't-success');
+                    }).catch(function() {
+                        var ta = document.createElement('textarea');
+                        ta.value = val;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        if (typeof showToast === 'function') showToast('Code copied.', 't-success');
+                    });
+                });
+            }
+
+            /* Backdrop click to close */
+            ['fac-edit-modal', 'fac-delete-modal', 'fac-code-modal'].forEach(function(id) {
+                var bd = document.getElementById(id);
+                if (bd) bd.addEventListener('click', function(e) {
+                    if (e.target === bd) closeFacModal(id);
+                });
+            });
+
+        }());
     </script>
 </body>
 

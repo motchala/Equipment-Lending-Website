@@ -1773,3 +1773,41 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     if (searchInput) searchInput.addEventListener('input', filterAll);
     if (statusSel) statusSel.addEventListener('change', filterAll);
 })();
+/* ════════════════════════════════════════════════════════════════
+   PHASE 3 — ARBITRATION + EXPORT HELPERS
+════════════════════════════════════════════════════════════════ */
+
+/* Arbitration sub-tab switcher */
+(function () {
+    var arbTabs = document.getElementById('arbSubTabs');
+    if (!arbTabs) return;
+    arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('#panel-arbitration .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
+            tab.classList.add('active');
+            var panel = document.getElementById(tab.dataset.arbPanel);
+            if (panel) panel.classList.add('active');
+        });
+    });
+
+    /* Decision log filter */
+    var filterSel = document.getElementById('arb-log-filter');
+    var logTable = document.getElementById('arb-log-new-table');
+    if (filterSel && logTable) {
+        filterSel.addEventListener('change', function () {
+            var val = filterSel.value;
+            logTable.querySelectorAll('tbody tr').forEach(function (row) {
+                row.style.display = (!val || (row.dataset.decision || '') === val) ? '' : 'none';
+            });
+        });
+    }
+})();
+
+/* Export format button selector */
+function psSelectFmt(btn) {
+    var row = btn.closest('.ps-export-fmt-row');
+    if (!row) return;
+    row.querySelectorAll('.ps-export-fmt-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+}
