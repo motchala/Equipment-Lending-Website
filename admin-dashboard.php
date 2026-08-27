@@ -3191,84 +3191,57 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     ============================================================ -->
                                 <div class="tab-panel" id="panel-faculty">
 
-                                    <!-- Section header -->
-                                    <div class="section-header">
-                                        <h2>
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="important-icon">
-                                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                <circle cx="8.5" cy="7" r="4" />
-                                                <line x1="20" y1="8" x2="20" y2="14" />
-                                                <line x1="23" y1="11" x2="17" y2="11" />
-                                            </svg>
-                                            Faculty Management
-                                        </h2>
-                                        <p>Create and manage faculty accounts.</p>
+                                    <div style="margin-bottom:1.5rem">
+                                        <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
+                                        <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create and manage faculty accounts. Enable or disable org borrowing privileges.</p>
                                     </div>
 
-                                    <!-- Two-column layout: form left, list right -->
                                     <div class="faculty-layout">
 
-                                        <!-- ── CREATE FORM ──────────────────────────────────── -->
+                                        <!-- CREATE FORM -->
                                         <div class="eq-card faculty-form-card">
                                             <div class="eq-card-header">
                                                 <h2>
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round" width="18" height="18"
-                                                        style="margin-right:8px;vertical-align:middle;">
-                                                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                        <circle cx="8.5" cy="7" r="4" />
-                                                        <line x1="20" y1="8" x2="20" y2="14" />
-                                                        <line x1="23" y1="11" x2="17" y2="11" />
-                                                    </svg>
+                                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">person_add</span>
                                                     Create Faculty Account
                                                 </h2>
                                             </div>
                                             <div class="eq-card-body">
-
-                                                <!-- CSRF token -->
                                                 <?= csrf_field() ?>
 
-                                                <!-- PUPSync Email -->
                                                 <div class="form-group">
                                                     <label for="fac-email">PUPSync Email <span class="req-star">*</span></label>
                                                     <input type="email" id="fac-email" name="pupsync_email"
                                                         class="form-control-custom" maxlength="254" required
-                                                        placeholder="e.g. juan.delacruz@pup.edu.ph">
+                                                        placeholder="faculty@example.com">
                                                 </div>
 
-                                                <!-- Backup Email -->
                                                 <div class="form-group">
-                                                    <label for="fac-backup">Google Account / Backup Email</label>
+                                                    <label for="fac-backup">Google / Backup Email</label>
                                                     <input type="email" id="fac-backup" name="backup_email"
                                                         class="form-control-custom" maxlength="254"
-                                                        placeholder="Optional">
+                                                        placeholder="backup@gmail.com">
                                                 </div>
 
-                                                <!-- First Name + Middle Name (side-by-side) -->
                                                 <div class="form-row">
                                                     <div class="form-group">
                                                         <label for="fac-first">First Name <span class="req-star">*</span></label>
                                                         <input type="text" id="fac-first" name="first_name"
-                                                            class="form-control-custom" maxlength="100" required>
+                                                            class="form-control-custom" maxlength="100" required placeholder="First">
                                                     </div>
                                                     <div class="form-group">
                                                         <label for="fac-middle">Middle Name</label>
                                                         <input type="text" id="fac-middle" name="middle_name"
-                                                            class="form-control-custom" maxlength="100"
-                                                            placeholder="Optional">
+                                                            class="form-control-custom" maxlength="100" placeholder="Middle">
                                                     </div>
                                                 </div>
 
-                                                <!-- Last Name -->
                                                 <div class="form-group">
                                                     <label for="fac-last">Last Name <span class="req-star">*</span></label>
                                                     <input type="text" id="fac-last" name="last_name"
-                                                        class="form-control-custom" maxlength="100" required>
+                                                        class="form-control-custom" maxlength="100" required placeholder="Last">
                                                 </div>
 
-                                                <!-- Password -->
                                                 <div class="form-row">
                                                     <div class="form-group">
                                                         <label for="fac-password">Password <span class="req-star">*</span></label>
@@ -3276,13 +3249,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                             <input type="password" id="fac-password" name="password"
                                                                 class="form-control-custom" maxlength="128" required
                                                                 placeholder="Min. 8 characters">
-                                                            <button type="button" class="fac-pw-toggle" data-target="fac-password" aria-label="Show password">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                                    stroke-linejoin="round" width="16" height="16">
-                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                                                    <circle cx="12" cy="12" r="3" />
-                                                                </svg>
+                                                            <button type="button" class="fac-pw-toggle"
+                                                                data-target="fac-password" aria-label="Toggle password">
+                                                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                                                             </button>
                                                         </div>
                                                     </div>
@@ -3292,146 +3261,130 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                             <input type="password" id="fac-confirm" name="confirm_password"
                                                                 class="form-control-custom" maxlength="128" required
                                                                 placeholder="Re-enter password">
-                                                            <button type="button" class="fac-pw-toggle" data-target="fac-confirm" aria-label="Show password">
-                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                                    stroke-linejoin="round" width="16" height="16">
-                                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                                                    <circle cx="12" cy="12" r="3" />
-                                                                </svg>
+                                                            <button type="button" class="fac-pw-toggle"
+                                                                data-target="fac-confirm" aria-label="Toggle password">
+                                                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                                                             </button>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                <!-- Adviser toggle -->
-                                                <div class="form-group faculty-adviser-toggle-wrap">
-                                                    <label class="faculty-toggle-label">
-                                                        <input type="checkbox" id="fac-adviser" name="is_org_adviser"
-                                                            value="1" class="faculty-toggle-input">
-                                                        <span class="faculty-toggle-track"></span>
-                                                        Is this faculty an organization adviser?
-                                                    </label>
+                                                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
+                                                    <div class="form-group faculty-adviser-toggle-wrap" style="margin-bottom:0.65rem">
+                                                        <label class="faculty-toggle-label">
+                                                            <input type="checkbox" id="fac-adviser" name="is_org_adviser"
+                                                                value="1" class="faculty-toggle-input">
+                                                            <span class="faculty-toggle-track"></span>
+                                                            This faculty is an organization adviser
+                                                        </label>
+                                                    </div>
+                                                    <div id="fac-org-group" style="display:none;">
+                                                        <label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">Organization</label>
+                                                        <?php
+                                                        $org_opts_res = $conn->query(
+                                                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                                                        );
+                                                        if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
+                                                            <select id="fac-org" name="organization_id"
+                                                                class="form-control-custom">
+                                                                <option value="">&#8212; Select Organization &#8212;</option>
+                                                                <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
+                                                                    <option value="<?= (int)$org_row['id'] ?>">
+                                                                        <?= htmlspecialchars($org_row['name']) ?>
+                                                                    </option>
+                                                                <?php endwhile; ?>
+                                                            </select>
+                                                        <?php else: ?>
+                                                            <select id="fac-org" name="organization_id"
+                                                                class="form-control-custom" disabled>
+                                                                <option value="">&#8212; Organizations unavailable &#8212;</option>
+                                                            </select>
+                                                            <small class="faculty-field-error">
+                                                                Could not load organizations.
+                                                            </small>
+                                                        <?php endif; ?>
+                                                    </div>
                                                 </div>
 
-                                                <!-- Organization dropdown (hidden by default) -->
-                                                <div class="form-group" id="fac-org-group" style="display:none;">
-                                                    <label for="fac-org">Organization <span class="req-star">*</span></label>
-                                                    <?php
-                                                    $org_opts_res = $conn->query(
-                                                        "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                                                    );
-                                                    if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
-                                                        <select id="fac-org" name="organization_id"
-                                                            class="form-control-custom">
-                                                            <option value="">— Select Organization —</option>
-                                                            <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
-                                                                <option value="<?= (int)$org_row['id'] ?>">
-                                                                    <?= htmlspecialchars($org_row['name']) ?>
-                                                                </option>
-                                                            <?php endwhile; ?>
-                                                        </select>
-                                                    <?php else: ?>
-                                                        <select id="fac-org" name="organization_id"
-                                                            class="form-control-custom" disabled>
-                                                            <option value="">— Organizations unavailable —</option>
-                                                        </select>
-                                                        <small class="faculty-field-error">
-                                                            Could not load organizations. Please refresh after applying the DB migration.
-                                                        </small>
-                                                    <?php endif; ?>
-                                                </div>
-
-                                                <!-- Inline feedback area -->
                                                 <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
 
-                                                <!-- Submit -->
                                                 <button type="button" id="fac-submit-btn"
-                                                    class="btn-submit-form">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round" width="16" height="16"
-                                                        style="vertical-align:middle;margin-right:6px;">
-                                                        <circle cx="12" cy="12" r="10" />
-                                                        <line x1="12" y1="8" x2="12" y2="16" />
-                                                        <line x1="8" y1="12" x2="16" y2="12" />
-                                                    </svg>
+                                                    class="ps-btn ps-btn--primary" style="width:100%">
+                                                    <span class="material-symbols-outlined">person_add</span>
                                                     Create Account
                                                 </button>
-
                                             </div><!-- /eq-card-body -->
                                         </div><!-- /faculty-form-card -->
 
 
-                                        <!-- ── FACULTY LIST ─────────────────────────────────── -->
+                                        <!-- FACULTY LIST -->
                                         <div class="eq-card">
-                                            <div class="eq-card-header">
+                                            <div class="eq-card-header" style="flex-wrap:wrap;gap:0.75rem">
                                                 <h2>
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round" width="18" height="18"
-                                                        style="margin-right:8px;vertical-align:middle;">
-                                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                        <circle cx="9" cy="7" r="4" />
-                                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                                                    </svg>
-                                                    Faculty Accounts
-                                                </h2>
-                                                <span class="status-pill pill-info" style="font-size:0.72rem;">
-                                                    <?php
+                                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
+                                                    Faculty List
+                                                    <span class="fac-count-badge">(<?php
                                                     $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
                                                     echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
-                                                    ?> total
-                                                </span>
+                                                    ?>)</span>
+                                                </h2>
+                                                <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+                                                    <input type="text" id="fac-search-input"
+                                                        class="form-control-custom"
+                                                        style="width:180px;font-size:12px"
+                                                        placeholder="Search faculty...">
+                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" id="fac-gen-code-btn">
+                                                        <span class="material-symbols-outlined">key</span> Gen Code
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div class="tbl-wrap">
-                                                <table class="admin-table">
+                                                <table class="admin-table" id="fac-list-table">
                                                     <thead>
                                                         <tr>
-                                                            <th>Full Name</th>
-                                                            <th>PUPSync Email</th>
-                                                            <th>Role</th>
-                                                            <th>Organization</th>
-                                                            <th>Allow Org Borrowing</th>
+                                                            <th>Name</th>
+                                                            <th>Faculty ID</th>
+                                                            <th>Email</th>
+                                                            <th>Org Borrowing</th>
+                                                            <th>Actions</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="faculty-list-tbody">
                                                         <?php
-                                                        // Guard: check whether allow_org_borrowing column exists before querying it.
-                                                        // If the dual-borrowing-mode migration hasn't been run yet the column is absent
-                                                        // and the query would throw a fatal error. Fall back to 0 for all rows.
                                                         $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
                                                         $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
                                                         $fac_res = $conn->query(
-                                                            "SELECT u.fullname, u.email, u.role,
-                                        u.faculty_id,"
-                                                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
-                                                                . "     o.name AS org_name
-                                   FROM tbl_users u
-                                   LEFT JOIN tbl_organizations o
-                                     ON u.organization_id = o.id
-                                   ORDER BY u.fullname ASC"
+                                                            "SELECT u.fullname, u.email, u.role,"
+                                                            . " u.faculty_id,"
+                                                            . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
+                                                            . "     o.name AS org_name"
+                                                            . " FROM tbl_users u"
+                                                            . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
+                                                            . " ORDER BY u.fullname ASC"
                                                         );
                                                         if ($fac_res && $fac_res->num_rows > 0):
                                                             while ($frow = $fac_res->fetch_assoc()):
-                                                                $roleClass = ($frow['role'] === 'Organization Adviser') ? 'pill-approved' : 'pill-info';
+                                                                $isAdviser = ($frow['role'] === 'Organization Adviser');
+                                                                $subLabel  = $isAdviser && !empty($frow['org_name'])
+                                                                    ? 'Org Adviser &middot; ' . htmlspecialchars($frow['org_name'])
+                                                                    : 'Active Faculty';
+                                                                $initFac   = strtoupper(substr($frow['fullname'] ?? 'F', 0, 1));
                                                         ?>
-                                                                <tr>
-                                                                    <td class="fw-bold"><?= htmlspecialchars($frow['fullname']) ?></td>
-                                                                    <td><?= htmlspecialchars($frow['email']) ?></td>
+                                                                <tr
+                                                                    data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
+                                                                    data-email="<?= htmlspecialchars($frow['email']) ?>"
+                                                                    data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                                                                    data-role="<?= htmlspecialchars($frow['role']) ?>"
+                                                                    data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
+                                                                    data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
+                                                                    data-init="<?= $initFac ?>"
+                                                                >
                                                                     <td>
-                                                                        <span class="status-pill <?= $roleClass ?>">
-                                                                            <?= htmlspecialchars($frow['role']) ?>
-                                                                        </span>
+                                                                        <div style="font-weight:600"><?= htmlspecialchars($frow['fullname']) ?></div>
+                                                                        <div style="font-size:11px;color:var(--text-light)"><?= $subLabel ?></div>
                                                                     </td>
-                                                                    <td>
-                                                                        <?php if ($frow['org_name']): ?>
-                                                                            <span class="status-pill pill-info"><?= htmlspecialchars($frow['org_name']) ?></span>
-                                                                        <?php else: ?>
-                                                                            <span style="color:var(--text-light);">&mdash;</span>
-                                                                        <?php endif; ?>
-                                                                    </td>
+                                                                    <td style="font-size:12px;color:var(--text-light)"><?= htmlspecialchars($frow['faculty_id']) ?></td>
+                                                                    <td style="font-size:12px"><?= htmlspecialchars($frow['email']) ?></td>
                                                                     <td>
                                                                         <label class="faculty-toggle-label">
                                                                             <input type="checkbox"
@@ -3441,18 +3394,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                             <span class="faculty-toggle-track"></span>
                                                                         </label>
                                                                     </td>
+                                                                    <td>
+                                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">
+                                                                            <span class="material-symbols-outlined">edit</span>
+                                                                        </button>
+                                                                    </td>
                                                                 </tr>
                                                             <?php endwhile;
                                                         else: ?>
                                                             <tr id="fac-empty-row">
-                                                                <td colspan="5" class="text-muted" style="text-align:center;padding:3rem;">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                                        stroke-linejoin="round" width="40" height="40"
-                                                                        style="display:block;margin:0 auto 10px;opacity:0.3;">
-                                                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                                                        <circle cx="9" cy="7" r="4" />
-                                                                    </svg>
+                                                                <td colspan="5"
+                                                                    style="text-align:center;padding:3rem;color:var(--text-light)">
+                                                                    <span class="material-symbols-outlined"
+                                                                        style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
                                                                     No faculty accounts yet.
                                                                 </td>
                                                             </tr>
@@ -4711,6 +4665,331 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div><!-- /.rsm-card -->
     </div><!-- /#roomScheduleModal -->
 
+
+
+    <!-- ================================================================
+     MODAL: EDIT FACULTY ACCOUNT
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="fac-edit-modal">
+        <div class="ps-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">manage_accounts</span>
+                </div>
+                <h3>Edit Faculty Account</h3>
+                <button class="ps-modal-close" id="fac-edit-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <!-- Faculty identity banner -->
+                <div style="display:flex;align-items:center;gap:12px;background:var(--secondary-cream);border-radius:12px;padding:0.9rem;border:1px solid var(--khaki-border);margin-bottom:1.25rem">
+                    <div id="fac-edit-avatar"
+                        style="width:44px;height:44px;background:var(--accent-maroon);border-radius:50%;display:grid;place-items:center;color:white;font-weight:700;font-size:16px;flex-shrink:0">F</div>
+                    <div>
+                        <div id="fac-edit-name-display" style="font-weight:600;font-size:13.5px">&#8212;</div>
+                        <div id="fac-edit-meta-display" style="font-size:11.5px;color:var(--text-light)">&#8212;</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">First Name</label>
+                        <input type="text" id="fac-edit-first" class="form-control-custom" placeholder="First">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Last Name</label>
+                        <input type="text" id="fac-edit-last" class="form-control-custom" placeholder="Last">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">PUPSync Email</label>
+                    <input type="email" id="fac-edit-email" class="form-control-custom" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Backup Email</label>
+                    <input type="email" id="fac-edit-backup" class="form-control-custom" placeholder="backup@gmail.com">
+                </div>
+
+                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
+                    <label class="faculty-toggle-label" style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;cursor:pointer">
+                        <input type="checkbox" id="fac-edit-adviser" class="faculty-toggle-input">
+                        <span class="faculty-toggle-track"></span>
+                        Organization Adviser
+                    </label>
+                    <div class="form-group" style="margin-bottom:0;margin-top:0.65rem">
+                        <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Organization Name</label>
+                        <input type="text" id="fac-edit-org" class="form-control-custom" placeholder="e.g. JPIA">
+                    </div>
+                </div>
+
+                <label class="faculty-toggle-label" style="font-size:13px;cursor:pointer;display:flex;align-items:center">
+                    <input type="checkbox" id="fac-edit-aob" class="faculty-toggle-input">
+                    <span class="faculty-toggle-track"></span>
+                    Org Borrowing Enabled
+                </label>
+
+                <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
+                    <button class="ps-btn ps-btn--danger ps-btn--sm" id="fac-edit-delete-btn">
+                        <span class="material-symbols-outlined">person_remove</span> Delete Account
+                    </button>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="fac-edit-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--primary" id="fac-edit-save">
+                    <span class="material-symbols-outlined">save</span> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================================================
+     MODAL: DELETE FACULTY CONFIRM
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="fac-delete-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">person_remove</span>
+                </div>
+                <h3>Delete Faculty Account</h3>
+                <button class="ps-modal-close" id="fac-delete-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p style="font-size:13px;margin-bottom:0.75rem">Are you sure you want to permanently delete the account of <strong id="fac-delete-name">this faculty member</strong>?</p>
+                <div class="ps-alert ps-alert--danger" style="margin:0">
+                    <span class="material-symbols-outlined">warning</span>
+                    This action cannot be undone. All associated borrowing history will be preserved.
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="fac-delete-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--danger" id="fac-delete-confirm">
+                    <span class="material-symbols-outlined">delete</span> Delete Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================================================
+     MODAL: GENERATE FACULTY CODE
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="fac-code-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">key</span>
+                </div>
+                <h3>Generate Faculty Code</h3>
+                <button class="ps-modal-close" id="fac-code-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <div class="form-group" style="margin-bottom:1.25rem">
+                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Faculty Member</label>
+                    <select id="fac-code-select" class="form-control-custom">
+                        <?php
+                        $fac_ddl = $conn->query("SELECT faculty_id, fullname FROM tbl_users ORDER BY fullname ASC");
+                        if ($fac_ddl && $fac_ddl->num_rows > 0):
+                            while ($fdrow = $fac_ddl->fetch_assoc()):
+                        ?>
+                            <option value="<?= htmlspecialchars($fdrow['faculty_id']) ?>">
+                                <?= htmlspecialchars($fdrow['fullname']) ?>
+                            </option>
+                        <?php endwhile; else: ?>
+                            <option value="">&#8212; No faculty accounts yet &#8212;</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="fac-code-display">
+                    <div class="fac-code-label">ORGANIZATION BORROWING CODE</div>
+                    <div class="fac-code-val" id="fac-code-value">PUP&#8211;&#8211;&#8211;&#8211;</div>
+                    <div class="fac-code-sub">Valid for one-time org borrowing activation</div>
+                    <button class="fac-code-copy-btn" id="fac-code-copy-btn">
+                        <span class="material-symbols-outlined">content_copy</span> Copy Code
+                    </button>
+                </div>
+                <p style="font-size:12px;color:var(--text-light);text-align:center;margin-top:0.75rem">
+                    Share this code with the faculty member. It expires in 48 hours.
+                </p>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="fac-code-close-btn">Close</button>
+                <button class="ps-btn ps-btn--outline" id="fac-code-regen-btn">
+                    <span class="material-symbols-outlined">refresh</span> Regenerate
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Faculty Panel JS -->
+    <script>
+    (function () {
+        function openFacModal(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.add('ps-modal-open');
+        }
+        function closeFacModal(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.remove('ps-modal-open');
+        }
+
+        /* Search filter */
+        var facSearch = document.getElementById('fac-search-input');
+        if (facSearch) {
+            facSearch.addEventListener('input', function () {
+                var q = facSearch.value.toLowerCase();
+                var table = document.getElementById('fac-list-table');
+                if (!table) return;
+                table.querySelectorAll('tbody tr').forEach(function (row) {
+                    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+                });
+            });
+        }
+
+        /* Edit modal: open on row edit-button click */
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.fac-edit-btn');
+            if (!btn) return;
+            var row = btn.closest('tr');
+            if (!row) return;
+
+            var fullname  = row.dataset.fullname  || '';
+            var email     = row.dataset.email     || '';
+            var facId     = row.dataset.facultyId || '';
+            var role      = row.dataset.role      || '';
+            var org       = row.dataset.org       || '';
+            var aob       = row.dataset.aob === '1';
+            var init      = row.dataset.init      || (fullname.charAt(0).toUpperCase()) || 'F';
+            var isAdviser = role === 'Organization Adviser';
+            var subLine   = facId + ' � ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
+
+            var parts    = fullname.trim().split(' ');
+            var lastName  = parts.length > 1 ? parts[parts.length - 1] : '';
+            var firstName = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+
+            document.getElementById('fac-edit-avatar').textContent       = init;
+            document.getElementById('fac-edit-name-display').textContent = fullname;
+            document.getElementById('fac-edit-meta-display').textContent = subLine;
+            document.getElementById('fac-edit-first').value  = firstName;
+            document.getElementById('fac-edit-last').value   = lastName;
+            document.getElementById('fac-edit-email').value  = email;
+            document.getElementById('fac-edit-backup').value = '';
+            document.getElementById('fac-edit-adviser').checked = isAdviser;
+            document.getElementById('fac-edit-org').value    = org;
+            document.getElementById('fac-edit-aob').checked  = aob;
+            document.getElementById('fac-delete-name').textContent = fullname;
+
+            openFacModal('fac-edit-modal');
+        });
+
+        /* Edit modal: close */
+        ['fac-edit-close', 'fac-edit-cancel'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', function () { closeFacModal('fac-edit-modal'); });
+        });
+
+        /* Edit modal: Delete Account -> open delete confirm */
+        var facEditDel = document.getElementById('fac-edit-delete-btn');
+        if (facEditDel) {
+            facEditDel.addEventListener('click', function () {
+                closeFacModal('fac-edit-modal');
+                openFacModal('fac-delete-modal');
+            });
+        }
+
+        /* Edit modal: Save Changes (placeholder) */
+        var facEditSave = document.getElementById('fac-edit-save');
+        if (facEditSave) {
+            facEditSave.addEventListener('click', function () {
+                closeFacModal('fac-edit-modal');
+                if (typeof showToast === 'function') showToast('Faculty account updated.', 't-success');
+            });
+        }
+
+        /* Delete modal: close */
+        ['fac-delete-close', 'fac-delete-cancel'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', function () { closeFacModal('fac-delete-modal'); });
+        });
+
+        /* Delete modal: confirm (placeholder) */
+        var facDelConf = document.getElementById('fac-delete-confirm');
+        if (facDelConf) {
+            facDelConf.addEventListener('click', function () {
+                closeFacModal('fac-delete-modal');
+                if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
+            });
+        }
+
+        /* Generate Code modal: open */
+        function _genCode() {
+            var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            var c = '';
+            for (var i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
+            return 'PUP-' + c;
+        }
+
+        var facGenBtn = document.getElementById('fac-gen-code-btn');
+        if (facGenBtn) {
+            facGenBtn.addEventListener('click', function () {
+                document.getElementById('fac-code-value').textContent = _genCode();
+                openFacModal('fac-code-modal');
+            });
+        }
+
+        /* Gen Code modal: close */
+        ['fac-code-close', 'fac-code-close-btn'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('click', function () { closeFacModal('fac-code-modal'); });
+        });
+
+        /* Gen Code modal: regenerate */
+        var facRegen = document.getElementById('fac-code-regen-btn');
+        if (facRegen) {
+            facRegen.addEventListener('click', function () {
+                document.getElementById('fac-code-value').textContent = _genCode();
+            });
+        }
+
+        /* Gen Code modal: copy */
+        var facCopy = document.getElementById('fac-code-copy-btn');
+        if (facCopy) {
+            facCopy.addEventListener('click', function () {
+                var val = document.getElementById('fac-code-value').textContent;
+                navigator.clipboard.writeText(val).then(function () {
+                    if (typeof showToast === 'function') showToast('Code copied to clipboard.', 't-success');
+                }).catch(function () {
+                    var ta = document.createElement('textarea');
+                    ta.value = val;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (typeof showToast === 'function') showToast('Code copied.', 't-success');
+                });
+            });
+        }
+
+        /* Backdrop click to close */
+        ['fac-edit-modal', 'fac-delete-modal', 'fac-code-modal'].forEach(function (id) {
+            var bd = document.getElementById(id);
+            if (bd) bd.addEventListener('click', function (e) {
+                if (e.target === bd) closeFacModal(id);
+            });
+        });
+
+    }());
+    </script>
 </body>
 
 </html>

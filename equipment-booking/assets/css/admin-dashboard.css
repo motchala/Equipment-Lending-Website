@@ -6143,3 +6143,97 @@ body:has(#roomScheduleModal:not(.hidden)) {
 #panel-rooms .rc-schedule-btn:hover {
     color: var(--accent-maroon);
 }
+
+/* ================================================================
+   FACULTY PANEL  — redesigned styles
+================================================================ */
+
+/* Count badge next to Faculty List heading */
+.fac-count-badge {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+/* Password-field wrapper */
+.fac-pw-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.fac-pw-wrap .form-control-custom {
+    padding-right: 2.4rem;
+    flex: 1;
+}
+
+.fac-pw-toggle {
+    position: absolute;
+    right: 0.6rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    padding: 0;
+    line-height: 1;
+}
+
+.fac-pw-toggle:hover {
+    color: var(--accent-maroon);
+}
+
+/* ---- Generate-Code card (inside Gen Code modal) -------------- */
+.fac-code-display {
+    background: var(--accent-maroon);
+    border-radius: 14px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #fff;
+}
+
+.fac-code-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    opacity: 0.75;
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+}
+
+.fac-code-val {
+    font-size: 2rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.4rem;
+}
+
+.fac-code-sub {
+    font-size: 11.5px;
+    opacity: 0.78;
+    margin-bottom: 1.1rem;
+}
+
+.fac-code-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 0.45rem 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.fac-code-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.fac-code-copy-btn .material-symbols-outlined {
+    font-size: 16px;
+}
