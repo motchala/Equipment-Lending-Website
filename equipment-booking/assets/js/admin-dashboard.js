@@ -649,20 +649,34 @@
     function _buildFacultyRow(data) {
         // data = { fullname, email, role, org_name, faculty_id, allow_org_borrowing }
         const tr = document.createElement('tr');
-        const roleClass = data.role === 'Organization Adviser' ? 'pill-approved' : 'pill-info';
-        const orgCell = data.org_name
-            ? '<span class="status-pill pill-info">' + _esc(data.org_name) + '</span>'
-            : '<span style="color:var(--text-light);">&mdash;</span>';
+        const isAdviser = data.role === 'Organization Adviser';
+        const subLabel = isAdviser && data.org_name
+            ? 'Org Adviser \u00B7 ' + data.org_name
+            : 'Active Faculty';
+        const init = (data.fullname || 'F').charAt(0).toUpperCase();
+
+        tr.dataset.fullname = data.fullname || '';
+        tr.dataset.email = data.email || '';
+        tr.dataset.facultyId = data.faculty_id || '';
+        tr.dataset.role = data.role || '';
+        tr.dataset.org = data.org_name || '';
+        tr.dataset.aob = data.allow_org_borrowing === 1 ? '1' : '0';
+        tr.dataset.init = init;
+
         tr.innerHTML =
-            '<td class="fw-bold">' + _esc(data.fullname) + '</td>' +
-            '<td>' + _esc(data.email) + '</td>' +
-            '<td><span class="status-pill ' + roleClass + '">' + _esc(data.role) + '</span></td>' +
-            '<td>' + orgCell + '</td>' +
+            '<td>' +
+            '<div style="font-weight:600">' + _esc(data.fullname) + '</div>' +
+            '<div style="font-size:11px;color:var(--text-light)">' + _esc(subLabel) + '</div>' +
+            '</td>' +
+            '<td style="font-size:12px;color:var(--text-light)">' + _esc(data.faculty_id || '') + '</td>' +
+            '<td style="font-size:12px">' + _esc(data.email) + '</td>' +
             '<td><label class="faculty-toggle-label">' +
             '<input type="checkbox" class="faculty-toggle-input org-borrowing-toggle"' +
             ' data-faculty-id="' + _esc(data.faculty_id || '') + '"' +
             (data.allow_org_borrowing === 1 ? ' checked' : '') +
-            '><span class="faculty-toggle-track"></span></label></td>';
+            '><span class="faculty-toggle-track"></span></label></td>' +
+            '<td><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">' +
+            '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
     }
 
@@ -1759,3 +1773,41 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     if (searchInput) searchInput.addEventListener('input', filterAll);
     if (statusSel) statusSel.addEventListener('change', filterAll);
 })();
+/* ════════════════════════════════════════════════════════════════
+   PHASE 3 — ARBITRATION + EXPORT HELPERS
+════════════════════════════════════════════════════════════════ */
+
+/* Arbitration sub-tab switcher */
+(function () {
+    var arbTabs = document.getElementById('arbSubTabs');
+    if (!arbTabs) return;
+    arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
+            document.querySelectorAll('#panel-arbitration .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
+            tab.classList.add('active');
+            var panel = document.getElementById(tab.dataset.arbPanel);
+            if (panel) panel.classList.add('active');
+        });
+    });
+
+    /* Decision log filter */
+    var filterSel = document.getElementById('arb-log-filter');
+    var logTable = document.getElementById('arb-log-new-table');
+    if (filterSel && logTable) {
+        filterSel.addEventListener('change', function () {
+            var val = filterSel.value;
+            logTable.querySelectorAll('tbody tr').forEach(function (row) {
+                row.style.display = (!val || (row.dataset.decision || '') === val) ? '' : 'none';
+            });
+        });
+    }
+})();
+
+/* Export format button selector */
+function psSelectFmt(btn) {
+    var row = btn.closest('.ps-export-fmt-row');
+    if (!row) return;
+    row.querySelectorAll('.ps-export-fmt-btn').forEach(function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+}
