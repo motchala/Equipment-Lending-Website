@@ -6,8 +6,12 @@ DirectoryIndex landing-page.php
     # Anti-clickjacking: X-Frame-Options (legacy browsers)
     Header always set X-Frame-Options "DENY"
 
-    # CSP fallback: only set if PHP hasn't already sent one (PHP pages set their own nonce-based CSP)
-    Header setifempty Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self';"
+    # CSP is set per-page by PHP with a unique nonce (see admin-functions.php, etc.).
+    # The line below was removed because on servers where mod_headers fires alongside
+    # PHP-FPM/FastCGI, 'setifempty' may still emit a SECOND CSP header that lacks the
+    # PHP-generated nonce. Browsers enforce all CSP headers simultaneously, so this
+    # caused the nonce-bearing inline scripts to be blocked, breaking modal buttons.
+    # Header setifempty Content-Security-Policy "..." <-- intentionally disabled
 
     Header unset Access-Control-Allow-Origin
     Header always unset Access-Control-Allow-Origin
