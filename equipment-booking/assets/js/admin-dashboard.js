@@ -1539,6 +1539,205 @@
         });
     }
 
+    /* ════════════════════════════════════════════════════════════
+       REQUESTS PANEL (redesigned) — Approve / Decline / Detail
+       Populates the ps-approve-modal / ps-decline-modal /
+       ps-req-detail-modal from the clicked row's data-* attributes
+       and submits to the existing admin-override.php endpoint —
+       the same one the Arbitration "Override" flow already uses.
+       A manual Approve/Decline from this tab is logged as an admin
+       override (requires a reason, min. 5 chars), same as it is
+       everywhere else in the app.
+    ════════════════════════════════════════════════════════════════ */
+    (function () {
+        let reqCtx = null;
+
+        const approveConfirmBtn = document.getElementById('ps-approve-confirm-btn');
+        const declineConfirmBtn = document.getElementById('ps-decline-confirm-btn');
+        const approveReasonInput = document.getElementById('approve-reason');
+        const declineReasonInput = document.getElementById('decline-reason');
+
+        function rowCtx(el) {
+            const tr = el.closest('tr[data-id]');
+            if (!tr) return null;
+            const d = tr.dataset;
+            return {
+                id: d.id, status: d.status, borrower: d.borrower, idNumber: d.idNumber,
+                reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
+                room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
+                returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
+                arbRule: d.arbRule
+            };
+        }
+
+        function reqNo(id) { return '#R-' + String(id || 0).padStart(4, '0'); }
+
+        function clearAlert(id) {
+            const el = document.getElementById(id);
+            if (el) { el.style.display = 'none'; el.textContent = ''; }
+        }
+
+        function showAlert(id, msg) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.display = 'block';
+            el.style.background = '#ffeaea';
+            el.style.color = 'var(--danger)';
+            el.textContent = msg;
+        }
+
+        function fillApprove(ctx) {
+            document.getElementById('approve-request-id').value = ctx.id;
+            document.getElementById('ps-approve-reqno').textContent = reqNo(ctx.id);
+            document.getElementById('approve-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('approve-equipment').textContent = ctx.equipment || '—';
+            document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
+            const dd = document.getElementById('approve-due-date');
+            if (dd) dd.value = ctx.returnDate || '';
+            if (approveReasonInput) approveReasonInput.value = '';
+            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
+            clearAlert('ps-approve-alert');
+        }
+
+        function fillDecline(ctx) {
+            document.getElementById('decline-request-id').value = ctx.id;
+            document.getElementById('ps-decline-reqno').textContent = reqNo(ctx.id);
+            document.getElementById('decline-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
+            if (declineReasonInput) declineReasonInput.value = '';
+            if (declineConfirmBtn) declineConfirmBtn.disabled = true;
+            clearAlert('ps-decline-alert');
+        }
+
+        function fillDetail(ctx) {
+            document.getElementById('detail-request-id').value = ctx.id;
+            document.getElementById('detail-submitted').textContent = ctx.submitted || '—';
+            document.getElementById('detail-requester').textContent = ctx.borrower || '—';
+            document.getElementById('detail-id-number').textContent = ctx.idNumber || '—';
+            document.getElementById('detail-req-type').textContent = ctx.reqType || 'Faculty';
+            document.getElementById('detail-room').textContent = ctx.room || '—';
+            document.getElementById('detail-equipment').textContent = ctx.equipment || '—';
+            document.getElementById('detail-date-needed').textContent = ctx.dateNeeded || '—';
+            document.getElementById('detail-return-by').textContent = ctx.returnDateDisplay || '—';
+            document.getElementById('detail-instructor').textContent = ctx.instructor || '—';
+
+            const badgeMap = {
+                Waiting: ['ps-badge--waiting', 'Waiting for Approval'],
+                Approved: ['ps-badge--active', 'Active / Approved'],
+                Overdue: ['ps-badge--overdue', 'Overdue'],
+                Returned: ['ps-badge--returned', 'Returned'],
+                Declined: ['ps-badge--returned', 'Declined']
+            };
+            const info = badgeMap[ctx.status] || ['ps-badge--waiting', ctx.status || '—'];
+            const badge = document.getElementById('detail-status-badge');
+            if (badge) {
+                badge.className = 'ps-badge ps-badge--dot ' + info[0];
+                badge.style.fontSize = '12px';
+                badge.style.padding = '4px 12px';
+                badge.textContent = info[1];
+            }
+
+            const arbEl = document.getElementById('detail-arb-status');
+            if (arbEl) {
+                arbEl.textContent = ctx.arbRule === 'override'
+                    ? 'Manually overridden by an admin.'
+                    : (ctx.status === 'Waiting' ? 'Pending review.' : 'Processed — rule: ' + (ctx.arbRule || 'n/a'));
+            }
+
+            // Only a Waiting request can be approved/declined from the detail view
+            const declineBtn = document.getElementById('ps-detail-decline-btn');
+            const approveBtn = document.getElementById('ps-detail-approve-btn');
+            const showActions = ctx.status === 'Waiting';
+            if (declineBtn) declineBtn.style.display = showActions ? '' : 'none';
+            if (approveBtn) approveBtn.style.display = showActions ? '' : 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            const trigger = e.target.closest('[data-modal="ps-approve-modal"], [data-modal="ps-decline-modal"], [data-modal="ps-req-detail-modal"]');
+            if (!trigger) return;
+
+            // Row click carries fresh context; the detail modal's own footer
+            // Approve/Decline buttons have no row, so fall back to what was
+            // last loaded into the detail view.
+            const ctx = rowCtx(trigger) || reqCtx;
+            if (!ctx) return;
+            reqCtx = ctx;
+
+            const modalId = trigger.dataset.modal;
+            if (modalId === 'ps-approve-modal') fillApprove(ctx);
+            else if (modalId === 'ps-decline-modal') fillDecline(ctx);
+            else if (modalId === 'ps-req-detail-modal') fillDetail(ctx);
+        });
+
+        if (approveReasonInput && approveConfirmBtn) {
+            approveReasonInput.addEventListener('input', function () {
+                approveConfirmBtn.disabled = this.value.trim().length < 5;
+            });
+        }
+        if (declineReasonInput && declineConfirmBtn) {
+            declineReasonInput.addEventListener('input', function () {
+                declineConfirmBtn.disabled = this.value.trim().length < 5;
+            });
+        }
+
+        function submitDecision(requestId, newStatus, reason, alertId, btn, busyLabel) {
+            btn.disabled = true;
+            btn.dataset.origLabel = btn.innerHTML;
+            btn.textContent = busyLabel;
+            clearAlert(alertId);
+
+            const formData = new FormData();
+            formData.append('request_id', requestId);
+            formData.append('new_status', newStatus);
+            formData.append('override_reason', reason);
+            formData.append('csrf_token', getCsrfToken());
+
+            fetch('equipment-booking/api/admin-override.php', { method: 'POST', body: formData })
+                .then(function (r) { return r.json().then(function (d) { return d; }); })
+                .then(function (data) {
+                    if (data && data.status === 'success') {
+                        showToast(newStatus === 'Approved' ? 'Request approved.' : 'Request declined.');
+                        psCloseModal('ps-approve-modal');
+                        psCloseModal('ps-decline-modal');
+                        psCloseModal('ps-req-detail-modal');
+                        setTimeout(function () { location.reload(); }, 900);
+                    } else {
+                        showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
+                        btn.disabled = false;
+                        btn.innerHTML = btn.dataset.origLabel;
+                    }
+                })
+                .catch(function () {
+                    showAlert(alertId, 'Network error. Please try again.');
+                    btn.disabled = false;
+                    btn.innerHTML = btn.dataset.origLabel;
+                });
+        }
+
+        if (approveConfirmBtn) {
+            approveConfirmBtn.addEventListener('click', function () {
+                const id = document.getElementById('approve-request-id').value;
+                const reason = (approveReasonInput.value || '').trim();
+                if (reason.length < 5) {
+                    showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
+                    return;
+                }
+                submitDecision(id, 'Approved', reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…');
+            });
+        }
+        if (declineConfirmBtn) {
+            declineConfirmBtn.addEventListener('click', function () {
+                const id = document.getElementById('decline-request-id').value;
+                const reason = (declineReasonInput.value || '').trim();
+                if (reason.length < 5) {
+                    showAlert('ps-decline-alert', 'Please enter a reason (min. 5 characters).');
+                    return;
+                }
+                submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
+            });
+        }
+    })();
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 

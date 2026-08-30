@@ -582,7 +582,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     if (mysqli_num_rows($waiting_result) > 0):
                                         while ($r = mysqli_fetch_assoc($waiting_result)):
                                     ?>
-                                            <tr>
+                                            <tr class="ps-req-row"
+                                                data-id="<?php echo (int)$r['id']; ?>"
+                                                data-status="Waiting"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                data-id-number="<?php echo htmlspecialchars($r['faculty_id']); ?>"
+                                                data-req-type="Faculty"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
+                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
+                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
+                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
+                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
+                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
+                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
                                                 <td>
                                                     <strong style="color:var(--accent-maroon);cursor:pointer"
                                                         data-action="ps-open-modal" data-modal="ps-req-detail-modal">
@@ -858,7 +871,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 default    => 'ps-badge--returned',
                                             };
                                     ?>
-                                            <tr data-status="<?php echo htmlspecialchars($r['status']); ?>">
+                                            <tr class="ps-req-row"
+                                                data-id="<?php echo (int)$r['id']; ?>"
+                                                data-status="<?php echo htmlspecialchars($r['status']); ?>"
+                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                data-id-number="<?php echo htmlspecialchars($r['faculty_id']); ?>"
+                                                data-req-type="Faculty"
+                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
+                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
+                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
+                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
+                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
+                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
+                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
                                                 <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
                                                     data-action="ps-open-modal" data-modal="ps-req-detail-modal">
                                                     #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
@@ -3539,23 +3565,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
+                <input type="hidden" id="approve-request-id" value="">
+                <div id="ps-approve-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
                 <div class="ps-req-summary">
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" id="ps-approve-reqno" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="approve-borrower">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="approve-equipment">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Date Needed</span><span class="ps-rsv" id="approve-date-needed">—</span></div>
                 </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Return Due Date</label>
-                    <input class="ps-form-control" type="date" id="approve-due-date"
-                        value="<?php echo date('Y-m-d', strtotime('+7 days')); ?>">
-                    <div class="ps-form-hint">Borrower will be expected to return the item by this date.</div>
+                    <input class="ps-form-control" type="date" id="approve-due-date" readonly disabled>
+                    <div class="ps-form-hint">Set by the borrower when they submitted the request.</div>
                 </div>
-                <p style="font-size:12.5px;color:var(--text-light)">The borrower will be notified by email once approved.</p>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Reason / Note <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters — kept in the arbitration log)</span></label>
+                    <textarea class="ps-form-control" id="approve-reason" rows="2" placeholder="e.g. Item available, request meets policy..."></textarea>
+                </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-approve-modal">Cancel</button>
-                <button class="ps-btn ps-btn--success" data-action="ps-close-modal" data-modal="ps-approve-modal">
+                <button class="ps-btn ps-btn--success" id="ps-approve-confirm-btn">
                     <span class="material-symbols-outlined">check</span> Approve Request
                 </button>
             </div>
@@ -3575,20 +3605,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
+                <input type="hidden" id="decline-request-id" value="">
+                <div id="ps-decline-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
                 <div class="ps-req-summary">
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" id="ps-decline-reqno" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="decline-borrower">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="decline-equipment">—</span></div>
                 </div>
                 <div class="ps-form-group">
-                    <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                    <textarea class="ps-form-control" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
-                    <div class="ps-form-hint">This reason will be sent to the borrower via email.</div>
+                    <label class="ps-form-label">Reason for Declining <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
+                    <textarea class="ps-form-control" id="decline-reason" rows="3" placeholder="e.g. Item is currently in use by another borrower..."></textarea>
                 </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
-                <button class="ps-btn ps-btn--danger" data-action="ps-close-modal" data-modal="ps-decline-modal">
+                <button class="ps-btn ps-btn--danger" id="ps-decline-confirm-btn">
                     <span class="material-symbols-outlined">close</span> Decline Request
                 </button>
             </div>
@@ -3704,30 +3735,31 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
+                <input type="hidden" id="detail-request-id" value="">
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem">
-                    <span class="ps-badge ps-badge--waiting ps-badge--dot" style="font-size:12px;padding:4px 12px">Waiting for Approval</span>
-                    <span style="font-size:11.5px;color:var(--text-light)">Submitted: —</span>
+                    <span class="ps-badge ps-badge--waiting ps-badge--dot" id="detail-status-badge" style="font-size:12px;padding:4px 12px">Waiting for Approval</span>
+                    <span style="font-size:11.5px;color:var(--text-light)">Submitted: <span id="detail-submitted">—</span></span>
                 </div>
                 <div class="ps-detail-grid" style="margin-bottom:1.25rem">
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Requester</div>
-                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                        <div class="ps-detail-value" id="detail-requester" style="font-weight:600">—</div>
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Student / Faculty ID</div>
-                        <div class="ps-detail-value">—</div>
+                        <div class="ps-detail-value" id="detail-id-number">—</div>
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Requester Type</div>
-                        <div class="ps-detail-value">Faculty</div>
+                        <div class="ps-detail-value" id="detail-req-type">Faculty</div>
                     </div>
                     <div class="ps-detail-item">
-                        <div class="ps-detail-label">Email</div>
-                        <div class="ps-detail-value" style="font-size:12px">—</div>
+                        <div class="ps-detail-label">Room</div>
+                        <div class="ps-detail-value" id="detail-room" style="font-size:12px">—</div>
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Equipment</div>
-                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                        <div class="ps-detail-value" id="detail-equipment" style="font-weight:600">—</div>
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Quantity</div>
@@ -3735,27 +3767,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Date Needed</div>
-                        <div class="ps-detail-value" style="font-weight:600">—</div>
+                        <div class="ps-detail-value" id="detail-date-needed" style="font-weight:600">—</div>
                     </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Return By</div>
-                        <div class="ps-detail-value">—</div>
+                        <div class="ps-detail-value" id="detail-return-by">—</div>
                     </div>
                 </div>
                 <div class="ps-form-group">
-                    <label class="ps-form-label">Purpose / Notes</label>
-                    <div style="background:var(--secondary-cream);border-radius:8px;padding:0.75rem;font-size:12.5px;color:var(--text-dark);border:1px solid var(--khaki-border)">—</div>
+                    <label class="ps-form-label">Instructor / Assigned To</label>
+                    <div id="detail-instructor" style="background:var(--secondary-cream);border-radius:8px;padding:0.75rem;font-size:12.5px;color:var(--text-dark);border:1px solid var(--khaki-border)">—</div>
                 </div>
                 <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;font-size:12px;color:var(--text-light);border:1px solid var(--khaki-border)">
-                    <strong style="color:var(--text-dark)">Arbitration Status:</strong> Pending review.
+                    <strong style="color:var(--text-dark)">Arbitration Status:</strong> <span id="detail-arb-status">Pending review.</span>
                 </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-req-detail-modal">Close</button>
-                <button class="ps-btn ps-btn--danger" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
+                <button class="ps-btn ps-btn--danger" id="ps-detail-decline-btn" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-decline-modal">
                     <span class="material-symbols-outlined">close</span> Decline
                 </button>
-                <button class="ps-btn ps-btn--success" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
+                <button class="ps-btn ps-btn--success" id="ps-detail-approve-btn" data-action="ps-switch-modal" data-close="ps-req-detail-modal" data-open="ps-approve-modal">
                     <span class="material-symbols-outlined">check</span> Approve
                 </button>
             </div>
@@ -3911,7 +3943,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
 
-                    
+
 
                     <!-- How it works -->
                     <p class="hc-section-label" style="margin-top:2rem;">How PUPSync Works</p>
