@@ -1992,9 +1992,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="form-card-body">
                             <form method="POST" id="roomForm">
                                 <?= csrf_field() ?>
-                                <?php if ($edit_room): ?>
-                                    <input type="hidden" name="room_id" value="<?php echo (int)$edit_room['room_id']; ?>">
-                                <?php endif; ?>
+                                <input type="hidden" name="room_id" id="room-form-id"
+                                    value="<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>">
 
                                 <!-- Row 1: Building | Room Name -->
                                 <div class="form-row">
@@ -2147,38 +2146,38 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
 
                                 <!-- Row 6: Submit button -->
-                                <button type="submit" name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
+                                <button type="submit" id="room-form-submit-inner"
+                                    name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
                                     class="btn-submit-form">
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
-                                    <?php echo $edit_room ? 'Update Room' : 'Add Room'; ?>
+                                    <span id="room-submit-inner-label"><?php echo $edit_room ? 'Update Room' : 'Add Room'; ?></span>
                                 </button>
                             </form>
 
-                            <?php if ($edit_room): ?>
-                                <!-- Archive danger zone — only visible in edit mode -->
-                                <div class="rmod-archive-zone">
-                                    <a href="admin-dashboard.php?archive_room=<?php echo (int)$edit_room['room_id']; ?>"
-                                        class="pr-btn pr-btn-danger pr-btn-sm"
-                                        onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
-                                        <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
-                                        Archive Room
-                                    </a>
-                                </div>
-                            <?php endif; ?>
+                            <!-- Archive zone: always in DOM, shown/hidden by JS -->
+                            <div class="rmod-archive-zone<?php echo $edit_room ? '' : ' hidden'; ?>" id="room-archive-zone">
+                                <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
+                                    id="room-archive-link"
+                                    class="pr-btn pr-btn-danger pr-btn-sm"
+                                    onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
+                                    <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                                    Archive Room
+                                </a>
+                            </div>
 
                         </div><!-- /.form-card-body -->
 
                         <!-- Modal footer -->
                         <div class="rmod-footer">
                             <button type="button" class="pr-btn pr-btn-ghost" data-action="hide-room-form">Cancel</button>
-                            <button type="submit" form="roomForm"
+                            <button type="submit" form="roomForm" id="room-form-submit-foot"
                                 name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
                                 class="pr-btn pr-btn-primary">
                                 <span class="material-symbols-outlined" style="font-size:15px;">save</span>
-                                <?php echo $edit_room ? 'Save Changes' : 'Add Room'; ?>
+                                <span id="room-submit-foot-label"><?php echo $edit_room ? 'Save Changes' : 'Add Room'; ?></span>
                             </button>
                         </div>
 
@@ -2262,7 +2261,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
                                         data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
                                         data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
-                                        data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>">
+                                        data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
+                                        data-room-building-id="<?php echo (int)$room['building_id']; ?>"
+                                        data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
+                                        data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
+                                        data-room-status="<?php echo htmlspecialchars($room['status'], ENT_QUOTES); ?>"
+                                        data-room-sort="<?php echo (int)$room['sort_order']; ?>"
+                                        data-room-amenities="<?php
+                                                                $am_raw = isset($room['amenities']) && $room['amenities'] ? $room['amenities'] : '[]';
+                                                                $am_arr = json_decode($am_raw, true);
+                                                                echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
+                                                                ?>">
 
                                         <!-- Banner -->
                                         <div class="rc-banner">
@@ -2292,11 +2301,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-action="open-room-schedule">
                                                 View Schedule
                                             </button>
-                                            <a href="admin-dashboard.php?tab=rooms&edit_room=<?php echo (int)$room['room_id']; ?>"
+                                            <button type="button"
                                                 class="pr-btn pr-btn-outline pr-btn-sm"
-                                                title="Edit room">
+                                                title="Edit room"
+                                                data-action="edit-room-inline">
                                                 <span class="material-symbols-outlined" style="font-size:15px;">edit</span>
-                                            </a>
+                                            </button>
                                         </div>
 
                                     </div><!-- /.room-card -->
@@ -2766,6 +2776,107 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 _weekOff += dir;
                                                 renderGrid();
                                             };
+
+                                            /* ── edit-room-inline: populate & show form without page reload ── */
+                                            document.addEventListener('click', function(e) {
+                                                var btn = e.target.closest('[data-action="edit-room-inline"]');
+                                                if (!btn) return;
+                                                var card = btn.closest('.room-card');
+                                                if (!card) return;
+                                                var d = card.dataset;
+                                                var form = document.getElementById('roomForm');
+                                                if (!form) return;
+
+                                                /* Populate all fields */
+                                                var el;
+                                                el = document.getElementById('room-form-id');
+                                                if (el) el.value = d.roomId || '';
+
+                                                el = form.querySelector('select[name="building_id"]');
+                                                if (el) el.value = d.roomBuildingId || '';
+
+                                                el = form.querySelector('input[name="room_name"]');
+                                                if (el) el.value = d.roomName || '';
+
+                                                el = form.querySelector('input[name="floor_number"]');
+                                                if (el) el.value = d.roomFloorNum || '1';
+
+                                                el = form.querySelector('input[name="floor_label"]');
+                                                if (el) el.value = d.roomFloorLabel || '';
+
+                                                el = form.querySelector('input[name="seating_capacity"]');
+                                                if (el) el.value = d.roomCapacity || '';
+
+                                                el = form.querySelector('select[name="room_status"]');
+                                                if (el) el.value = d.roomStatus || 'Available';
+
+                                                el = form.querySelector('input[name="sort_order"]');
+                                                if (el) el.value = d.roomSort || '0';
+
+                                                var amenities = [];
+                                                try {
+                                                    amenities = JSON.parse(d.roomAmenities || '[]');
+                                                } catch (x) {}
+                                                form.querySelectorAll('input[name="amenities[]"]').forEach(function(cb) {
+                                                    cb.checked = amenities.indexOf(cb.value) !== -1;
+                                                });
+
+                                                /* Update title + icon */
+                                                el = document.getElementById('room-form-title');
+                                                if (el) el.textContent = 'Edit Room — ' + (d.roomName || '');
+                                                el = document.querySelector('#room-form-wrap .rmod-head-icon .material-symbols-outlined');
+                                                if (el) el.textContent = 'edit';
+
+                                                /* Switch submit buttons to update_room */
+                                                ['room-form-submit-inner', 'room-form-submit-foot'].forEach(function(id) {
+                                                    var b = document.getElementById(id);
+                                                    if (b) b.name = 'update_room';
+                                                });
+                                                el = document.getElementById('room-submit-inner-label');
+                                                if (el) el.textContent = 'Update Room';
+                                                el = document.getElementById('room-submit-foot-label');
+                                                if (el) el.textContent = 'Save Changes';
+
+                                                /* Archive zone */
+                                                var az = document.getElementById('room-archive-zone');
+                                                if (az) az.classList.remove('hidden');
+                                                var al = document.getElementById('room-archive-link');
+                                                if (al) al.href = 'admin-dashboard.php?archive_room=' + encodeURIComponent(d.roomId || '');
+
+                                                /* Show form and scroll */
+                                                var rfw = document.getElementById('room-form-wrap');
+                                                if (rfw) {
+                                                    rfw.classList.remove('hidden');
+                                                    setTimeout(function() {
+                                                        rfw.scrollIntoView({
+                                                            behavior: 'smooth',
+                                                            block: 'start'
+                                                        });
+                                                    }, 30);
+                                                }
+                                            });
+
+                                            /* Reset form to Add-mode when Cancel/Close is clicked */
+                                            document.addEventListener('click', function(e) {
+                                                if (!e.target.closest('[data-action="hide-room-form"]')) return;
+                                                var el;
+                                                el = document.getElementById('room-form-title');
+                                                if (el) el.textContent = 'Add New Room';
+                                                el = document.querySelector('#room-form-wrap .rmod-head-icon .material-symbols-outlined');
+                                                if (el) el.textContent = 'add_home_work';
+                                                ['room-form-submit-inner', 'room-form-submit-foot'].forEach(function(id) {
+                                                    var b = document.getElementById(id);
+                                                    if (b) b.name = 'add_room';
+                                                });
+                                                el = document.getElementById('room-submit-inner-label');
+                                                if (el) el.textContent = 'Add Room';
+                                                el = document.getElementById('room-submit-foot-label');
+                                                if (el) el.textContent = 'Add Room';
+                                                var az = document.getElementById('room-archive-zone');
+                                                if (az) az.classList.add('hidden');
+                                                el = document.getElementById('room-form-id');
+                                                if (el) el.value = '';
+                                            });
 
                                             document.addEventListener('click', function(e) {
                                                 const modal = document.getElementById('roomScheduleModal');
