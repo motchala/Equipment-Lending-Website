@@ -195,7 +195,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <span class="material-symbols-outlined">settings</span>
                     <span>Settings</span>
                 </a>
-                <a class="nav-item" data-action="open-overlay" data-target="accountOverlay" href="#">
+                <a class="nav-item" data-action="open-overlay" data-target="helpCenterOverlay" href="#">
                     <span class="material-symbols-outlined">help</span>
                     <span>Help Center</span>
                 </a>
@@ -3825,6 +3825,490 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <!-- ================================================================
      OVERLAY: ACCOUNT
 ================================================================ -->
+
+    <!-- ================================================================
+         OVERLAY: HELP CENTER
+    ================================================================ -->
+    <div class="overlay-page" id="helpCenterOverlay">
+
+        <!-- Top bar -->
+        <div class="overlay-topbar">
+            <button class="overlay-topbar-back" data-action="close-overlay" data-target="helpCenterOverlay">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    style="vertical-align:middle;margin-right:4px;">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 5 5 12 12 19" />
+                </svg>
+                Back to Dashboard
+            </button>
+            <div class="overlay-topbar-sep"></div>
+            <span class="overlay-topbar-title">Help Center</span>
+            <div class="overlay-topbar-brand">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                    <polyline points="2 17 12 22 22 17" />
+                    <polyline points="2 12 12 17 22 12" />
+                </svg>
+                <span>PUPSYNC</span>
+            </div>
+        </div>
+
+        <!-- Two-column layout (reuses account-layout CSS) -->
+        <div class="account-layout">
+
+            <!-- Sidebar -->
+            <div class="account-sidebar">
+                <span class="account-sidebar-label">Help Center</span>
+                <button class="hc-nav-btn active" data-hc-tab="hc-start">
+                    <span class="material-symbols-outlined">rocket_launch</span>
+                    Getting Started
+                </button>
+                <button class="hc-nav-btn" data-hc-tab="hc-faq">
+                    <span class="material-symbols-outlined">quiz</span>
+                    FAQ
+                </button>
+                <button class="hc-nav-btn" data-hc-tab="hc-guides">
+                    <span class="material-symbols-outlined">menu_book</span>
+                    User Guides
+                </button>
+                <button class="hc-nav-btn" data-hc-tab="hc-about">
+                    <span class="material-symbols-outlined">info</span>
+                    About PUPSync
+                </button>
+
+                <div class="hc-sidebar-footer">
+                    <div class="hc-sidebar-version">
+                        <span class="material-symbols-outlined">verified</span>
+                        PUPSync v2.0 &middot; Stable
+                    </div>
+                    <div class="hc-sidebar-campus">Biñan Campus Admin Portal</div>
+                </div>
+            </div>
+
+            <!-- Main content area -->
+            <div class="account-content">
+
+                <!-- ══════════════════════════════════════════════
+                     PANEL: Getting Started
+                ══════════════════════════════════════════════ -->
+                <div id="hc-start" class="overlay-sub-panel active">
+
+                    <!-- Welcome hero -->
+                    <div class="hc-hero">
+                        <div class="hc-hero-icon-wrap">
+                            <span class="material-symbols-outlined">help_center</span>
+                        </div>
+                        <div class="hc-hero-text">
+                            <h2>Welcome to the PUPSync Help Center</h2>
+                            <p>Everything you need to confidently manage equipment lending and room reservations for your campus.</p>
+                            <div class="hc-hero-tags">
+                                <span><span class="material-symbols-outlined">inventory_2</span> Equipment Lending</span>
+                                <span><span class="material-symbols-outlined">meeting_room</span> Room Reservations</span>
+                                <span><span class="material-symbols-outlined">group</span> Faculty Management</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    
+
+                    <!-- How it works -->
+                    <p class="hc-section-label" style="margin-top:2rem;">How PUPSync Works</p>
+                    <div class="hc-steps-grid">
+                        <div class="hc-step-card">
+                            <div class="hc-step-badge">1</div>
+                            <div class="hc-step-icon">
+                                <span class="material-symbols-outlined">person_add</span>
+                            </div>
+                            <div class="hc-step-title">Faculty Submits</div>
+                            <div class="hc-step-body">Faculty members log in to their portal and request equipment or room reservations, specifying dates, times, and purpose.</div>
+                        </div>
+                        <div class="hc-step-card">
+                            <div class="hc-step-badge">2</div>
+                            <div class="hc-step-icon">
+                                <span class="material-symbols-outlined">admin_panel_settings</span>
+                            </div>
+                            <div class="hc-step-title">Admin Reviews</div>
+                            <div class="hc-step-body">You review the request here in the admin dashboard, verify availability, and approve or decline — optionally with a reason.</div>
+                        </div>
+                        <div class="hc-step-card">
+                            <div class="hc-step-badge">3</div>
+                            <div class="hc-step-icon">
+                                <span class="material-symbols-outlined">check_circle</span>
+                            </div>
+                            <div class="hc-step-title">Fulfilled</div>
+                            <div class="hc-step-body">Approved loans are tracked until return. Room reservations appear on the room schedule automatically and block that slot.</div>
+                        </div>
+                    </div>
+
+                    <!-- Tip -->
+                    <div class="hc-tip-box">
+                        <span class="material-symbols-outlined">lightbulb</span>
+                        <div>
+                            <strong>Pro tip:</strong> Use the <strong>Arbitration</strong> panel to resolve conflicts when two faculty members request the same resource at the same time. The admin's ruling is final.
+                        </div>
+                    </div>
+
+                </div><!-- /#hc-start -->
+
+
+                <!-- ══════════════════════════════════════════════
+                     PANEL: FAQ
+                ══════════════════════════════════════════════ -->
+                <div id="hc-faq" class="overlay-sub-panel">
+
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">Help Center</span>
+                        <h2>Frequently Asked Questions</h2>
+                        <p>Quick answers to the most common admin questions about PUPSync.</p>
+                    </div>
+
+                    <div class="hc-faq-list">
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do I approve or decline a borrow request?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Go to <strong>Requests</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do I add new equipment to the inventory?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Go to <strong>Inventory</strong> and click <strong>+ Add Equipment</strong>. Fill in the item name, description, quantity, condition, and category. Items become available for borrowing immediately after saving. You can also set an item to "Not Available" if it's under repair.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">What happens when I archive a room?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do faculty members submit room reservations?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Faculty log in to their portal and go to <strong>Room Reservations</strong>. They select the campus, building, room, date, time slot, and purpose. The request appears in your <strong>Rooms → Reservations</strong> panel. The room slot is not blocked until you confirm it.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do I manage or create faculty accounts?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Go to <strong>Faculty</strong> in the sidebar. You can view all active faculty accounts, review their request history, and reset passwords. Click <strong>+ Add Faculty</strong> to create a new account. New accounts receive a default password that must be changed on first login.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">What is the Arbitration panel used for?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Arbitration handles conflicts when two or more faculty members compete for the same resource — a room or equipment — at the same time. You review both claims, see who has stronger grounds, and make a final ruling. The ruling overrides the normal approval flow and is logged.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do I handle a reported room issue?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                In <strong>Rooms → Issues</strong>, you'll see all open reports submitted by faculty. Click <strong>Review</strong> on any open issue. You can mark it as <em>Resolved</em> (problem fixed, room stays active) or <em>Dismissed</em> (not a valid concern). Note: rooms are <strong>not</strong> automatically set to Maintenance — you must edit the room status separately if needed.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">Can I restore an archived room or equipment item?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Yes. For rooms, go to <strong>Rooms → Archived</strong> and click <strong>Restore</strong> next to the room. For equipment, go to <strong>Inventory → Archived</strong> and click <strong>Restore</strong>. The item or room returns to the active list immediately and is available again.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">How do I cancel an approved room reservation?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                Go to <strong>Rooms → Reservations</strong>. Find the reservation with an <em>Approved</em> status and click <strong>Cancel</strong>. You can add a reason for the cancellation. Please note: you cannot cancel a reservation within 1 hour of its scheduled start time — this restriction is enforced to protect faculty planning.
+                            </div>
+                        </details>
+
+                        <details class="hc-faq-item">
+                            <summary class="hc-faq-q">
+                                <span class="hc-faq-q-text">What do the different request statuses mean?</span>
+                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                            </summary>
+                            <div class="hc-faq-a">
+                                <div class="hc-status-table">
+                                    <div class="hc-st-row"><span class="hc-st-pill pending">Pending</span><span>Awaiting admin review and action.</span></div>
+                                    <div class="hc-st-row"><span class="hc-st-pill approved">Approved</span><span>Admin confirmed — item loaned or room reserved.</span></div>
+                                    <div class="hc-st-row"><span class="hc-st-pill declined">Declined</span><span>Admin rejected the request.</span></div>
+                                    <div class="hc-st-row"><span class="hc-st-pill cancelled">Cancelled</span><span>Cancelled by the admin or the faculty member.</span></div>
+                                    <div class="hc-st-row"><span class="hc-st-pill returned">Returned</span><span>Equipment was returned and processed (lending only).</span></div>
+                                    <div class="hc-st-row"><span class="hc-st-pill overdue">Overdue</span><span>Item not returned by the agreed return date.</span></div>
+                                </div>
+                            </div>
+                        </details>
+
+                    </div><!-- /.hc-faq-list -->
+
+                </div><!-- /#hc-faq -->
+
+
+                <!-- ══════════════════════════════════════════════
+                     PANEL: User Guides
+                ══════════════════════════════════════════════ -->
+                <div id="hc-guides" class="overlay-sub-panel">
+
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">Help Center</span>
+                        <h2>User Guides</h2>
+                        <p>Step-by-step guides for every major feature of the PUPSync Admin Portal.</p>
+                    </div>
+
+                    <div class="hc-guide-grid">
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#27ae60,#1e8449);">
+                                <span class="material-symbols-outlined">inventory_2</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Equipment &amp; Inventory</div>
+                                <div class="hc-gc-desc">Learn how to add, edit, archive, and restore equipment items. Manage stock levels and item conditions.</div>
+                                <div class="hc-gc-topics">
+                                    <span>Adding items</span>
+                                    <span>Archiving</span>
+                                    <span>Stock levels</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#e67e22,#ca6f1e);">
+                                <span class="material-symbols-outlined">task_alt</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Processing Borrow Requests</div>
+                                <div class="hc-gc-desc">Understand the full request lifecycle — from submission to return — and how to handle overdue items.</div>
+                                <div class="hc-gc-topics">
+                                    <span>Approve / Decline</span>
+                                    <span>Overdue items</span>
+                                    <span>History log</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,var(--accent-maroon),#8a1a1a);">
+                                <span class="material-symbols-outlined">meeting_room</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Room Management</div>
+                                <div class="hc-gc-desc">Set up rooms, manage availability, confirm reservations, review weekly schedules, and handle issue reports.</div>
+                                <div class="hc-gc-topics">
+                                    <span>Room setup</span>
+                                    <span>Reservations</span>
+                                    <span>Issue reports</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#3949ab,#283593);">
+                                <span class="material-symbols-outlined">group</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Faculty Administration</div>
+                                <div class="hc-gc-desc">Create and manage faculty accounts, reset passwords, review activity logs, and control access levels.</div>
+                                <div class="hc-gc-topics">
+                                    <span>New accounts</span>
+                                    <span>Password reset</span>
+                                    <span>Activity</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#0097a7,#00838f);">
+                                <span class="material-symbols-outlined">dashboard</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Dashboard &amp; Reports</div>
+                                <div class="hc-gc-desc">Understand the dashboard widgets, key metrics, and how to read the activity summaries shown on the main screen.</div>
+                                <div class="hc-gc-topics">
+                                    <span>Metrics</span>
+                                    <span>Widgets</span>
+                                    <span>Activity feed</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="hc-guide-card">
+                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#6d4c41,#4e342e);">
+                                <span class="material-symbols-outlined">gavel</span>
+                            </div>
+                            <div class="hc-gc-body">
+                                <div class="hc-gc-title">Arbitration &amp; Disputes</div>
+                                <div class="hc-gc-desc">Step-by-step process for reviewing and resolving conflicts between faculty members over shared resources.</div>
+                                <div class="hc-gc-topics">
+                                    <span>Conflict review</span>
+                                    <span>Ruling</span>
+                                    <span>Override</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div><!-- /.hc-guide-grid -->
+
+                    <div class="hc-tip-box" style="margin-top:1.5rem;">
+                        <span class="material-symbols-outlined">info</span>
+                        <div>Detailed step-by-step documentation for each guide is available from your system administrator or the PUPSync project team.</div>
+                    </div>
+
+                </div><!-- /#hc-guides -->
+
+
+                <!-- ══════════════════════════════════════════════
+                     PANEL: About PUPSync
+                ══════════════════════════════════════════════ -->
+                <div id="hc-about" class="overlay-sub-panel">
+
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">Help Center</span>
+                        <h2>About PUPSync</h2>
+                        <p>System information, version details, and contact information.</p>
+                    </div>
+
+                    <!-- Brand hero -->
+                    <div class="hc-about-hero">
+                        <div class="hc-about-logo">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                                <polyline points="2 17 12 22 22 17" />
+                                <polyline points="2 12 12 17 22 12" />
+                            </svg>
+                        </div>
+                        <div class="hc-about-brand-text">
+                            <div class="hc-about-name">PUPSync</div>
+                            <div class="hc-about-tagline">Equipment Lending &amp; Room Reservation System</div>
+                            <div class="hc-about-ver">Version 2.0 &middot; Stable Release</div>
+                        </div>
+                    </div>
+
+                    <!-- System info -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">info</span>
+                                System Information
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">System Name</span>
+                            <span class="info-val">PUPSync Admin Portal</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Version</span>
+                            <span class="info-val">2.0 (Stable)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Campus</span>
+                            <span class="info-val">PUP Biñan Campus</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Module Coverage</span>
+                            <span class="info-val">Equipment Lending, Room Reservations, Faculty Management, Arbitration</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Environment</span>
+                            <span class="info-val">
+                                <span class="ov-access-badge">Production</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Tech stack -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">code</span>
+                                Technology Stack
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Backend</span>
+                            <span class="info-val">PHP 8 &middot; MySQL</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Frontend</span>
+                            <span class="info-val">HTML5 &middot; CSS3 &middot; Vanilla JavaScript</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Icons</span>
+                            <span class="info-val">Google Material Symbols</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Typography</span>
+                            <span class="info-val">Poppins (Google Fonts)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Authentication</span>
+                            <span class="info-val">PHP Sessions &middot; CSRF Token Protection</span>
+                        </div>
+                    </div>
+
+                    <!-- Support contact -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">support_agent</span>
+                                Support &amp; Contact
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Development Team</span>
+                            <span class="info-val">PUPSync Project Team &middot; PUP Biñan</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Issue Reporting</span>
+                            <span class="info-val">Contact your system administrator or IT department.</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Academic Use</span>
+                            <span class="info-val">Developed as a capstone project for academic purposes.</span>
+                        </div>
+                    </div>
+
+                </div><!-- /#hc-about -->
+
+            </div><!-- /.account-content -->
+        </div><!-- /.account-layout -->
+    </div><!-- /#helpCenterOverlay -->
+
     <div class="overlay-page" id="accountOverlay">
         <div class="overlay-topbar">
             <button class="overlay-topbar-back" data-action="close-overlay" data-target="accountOverlay">

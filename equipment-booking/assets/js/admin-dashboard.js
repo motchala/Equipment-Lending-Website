@@ -170,6 +170,8 @@
                 switchSettTab('st-appearance');
             } else if (id === 'notifOverlay') {
                 filterNotifs('all');
+            } else if (id === 'helpCenterOverlay') {
+                switchHcTab('hc-start');
             }
         }
     }
@@ -187,6 +189,9 @@
                 document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
             } else if (id === 'notifOverlay') {
                 document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+            } else if (id === 'helpCenterOverlay') {
+                document.querySelectorAll('.hc-nav-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('#helpCenterOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
             }
         }
     }
@@ -235,6 +240,15 @@
     }
 
     /* ── Account sub-tabs ────────────────────────────────────── */
+    function switchHcTab(panelId) {
+        document.querySelectorAll('#helpCenterOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.hc-nav-btn').forEach(b => b.classList.remove('active'));
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('active');
+        const btn = document.querySelector('.hc-nav-btn[data-hc-tab="' + panelId + '"]');
+        if (btn) btn.classList.add('active');
+    }
+
     function switchAccTab(panelId) {
         document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
@@ -514,6 +528,14 @@
                 case 'dismiss-alert': {
                     const t = document.getElementById(el.dataset.target);
                     if (t) t.style.display = 'none'; break;
+                }
+                case 'hc-go': {
+                    closeOverlay('helpCenterOverlay');
+                    const hcTab = el.dataset.tab;
+                    if (hcTab) {
+                        _switchTabDOM(hcTab, true);
+                    }
+                    break;
                 }
                 case 'go-lending': {
                     const dest = el.dataset.lending || 'waiting';
@@ -1115,6 +1137,11 @@
     /* ── Account sub-nav ─────────────────────────────────────── */
     document.querySelectorAll('.acc-nav-btn').forEach(btn => {
         btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
+    });
+
+    /* ── Help Center sub-nav ────────────────────────────────── */
+    document.querySelectorAll('.hc-nav-btn').forEach(btn => {
+        btn.addEventListener('click', function () { switchHcTab(this.dataset.hcTab); });
     });
 
     /* ── Settings sub-nav ────────────────────────────────────── */
