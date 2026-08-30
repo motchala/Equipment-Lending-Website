@@ -3002,517 +3002,517 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
 
-                                <!-- ============================================================
+            <!-- ============================================================
          TAB: INVENTORY
     ============================================================ -->
-                                <div class="tab-panel" id="panel-inventory">
+            <div class="tab-panel" id="panel-inventory">
 
-                                    <!-- ── INVENTORY SCREEN (REDESIGNED) ─────────────────── -->
-                                    <div class="lending-sub" id="lending-inventory">
+                <!-- ── INVENTORY SCREEN (REDESIGNED) ─────────────────── -->
+            <div class="lending-sub" id="lending-inventory">
 
-                                        <!-- Page Header -->
-                                        <div class="inv-redesign-header">
-                                            <div>
-                                                <h1 class="inv-page-title">Equipment Inventory</h1>
-                                                <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
+                <!-- Page Header -->
+                <div class="inv-redesign-header">
+                    <div>
+                        <h1 class="inv-page-title">Equipment Inventory</h1>
+                        <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
+                    </div>
+                    <button class="btn-add-item btn-inv-add-primary" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                            stroke-linejoin="round" width="15" height="15">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add Equipment
+                    </button>
+                </div>
+
+                <!-- Split Layout -->
+                <div class="inv-split-layout">
+
+                    <!-- LEFT: Equipment List -->
+                    <div class="inv-list-col">
+                        <div class="eq-card inv-list-card" id="inv-table-card">
+                            <div class="inv-list-header">
+                                <h3 class="inv-list-title">
+                                    <span class="material-symbols-outlined">inventory_2</span>
+                                    All Equipment (<?php echo mysqli_num_rows($inventory_result); ?>)
+                                </h3>
+                                <input type="text" id="inventorySearch" class="inv-search-ctrl"
+                                    placeholder="Search...">
+                            </div>
+                            <div class="inv-list-body" id="inventory-body">
+                                <?php
+                                mysqli_data_seek($inventory_result, 0);
+                                if (mysqli_num_rows($inventory_result) === 0): ?>
+                                    <div class="inv-empty-state">
+                                        <span class="material-symbols-outlined">inventory_2</span>
+                                        <p>Inventory is empty.</p>
+                                    </div>
+                                    <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
+                                        <div class="inv-row-item">
+                                            <div class="inv-row-thumb">
+                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                    onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+                                                <div class="inv-thumb-ph">
+                                                    <span class="material-symbols-outlined">inventory_2</span>
+                                                </div>
                                             </div>
-                                            <button class="btn-add-item btn-inv-add-primary" type="button">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                    stroke-linejoin="round" width="15" height="15">
-                                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                                </svg>
-                                                Add Equipment
-                                            </button>
-                                        </div>
-
-                                        <!-- Split Layout -->
-                                        <div class="inv-split-layout">
-
-                                            <!-- LEFT: Equipment List -->
-                                            <div class="inv-list-col">
-                                                <div class="eq-card inv-list-card" id="inv-table-card">
-                                                    <div class="inv-list-header">
-                                                        <h3 class="inv-list-title">
-                                                            <span class="material-symbols-outlined">inventory_2</span>
-                                                            All Equipment (<?php echo mysqli_num_rows($inventory_result); ?>)
-                                                        </h3>
-                                                        <input type="text" id="inventorySearch" class="inv-search-ctrl"
-                                                            placeholder="Search...">
-                                                    </div>
-                                                    <div class="inv-list-body" id="inventory-body">
-                                                        <?php
-                                                        mysqli_data_seek($inventory_result, 0);
-                                                        if (mysqli_num_rows($inventory_result) === 0): ?>
-                                                            <div class="inv-empty-state">
-                                                                <span class="material-symbols-outlined">inventory_2</span>
-                                                                <p>Inventory is empty.</p>
-                                                            </div>
-                                                            <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
-                                                                <div class="inv-row-item">
-                                                                    <div class="inv-row-thumb">
-                                                                        <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                            alt="<?php echo htmlspecialchars($item['item_name']); ?>"
-                                                                            onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
-                                                                        <div class="inv-thumb-ph">
-                                                                            <span class="material-symbols-outlined">inventory_2</span>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="inv-row-info">
-                                                                        <div class="i-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                                                        <div class="i-cat"><?php echo htmlspecialchars($item['category']); ?></div>
-                                                                    </div>
-                                                                    <div class="inv-row-qty">
-                                                                        <div class="q-val<?php
-                                                                                            if ($item['quantity'] == 0)     echo ' q-none';
-                                                                                            elseif ($item['quantity'] <= 2) echo ' q-low';
-                                                                                            ?>">
-                                                                            <?php echo $item['quantity']; ?>
-                                                                        </div>
-                                                                        <div class="q-lbl"><?php
-                                                                                            if ($item['quantity'] > 2)     echo 'in stock';
-                                                                                            elseif ($item['quantity'] > 0) echo 'low stock';
-                                                                                            else                           echo 'no stock';
-                                                                                            ?></div>
-                                                                    </div>
-                                                                    <div class="inv-row-actions">
-                                                                        <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>"
-                                                                            class="btn-inv-edit" title="Edit item">
-                                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                                fill="none" stroke="currentColor" stroke-width="2"
-                                                                                stroke-linecap="round" stroke-linejoin="round"
-                                                                                width="14" height="14">
-                                                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                                            </svg>
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-                                                        <?php endwhile;
-                                                        endif; ?>
-                                                    </div>
+                                            <div class="inv-row-info">
+                                                <div class="i-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                                <div class="i-cat"><?php echo htmlspecialchars($item['category']); ?></div>
+                                            </div>
+                                            <div class="inv-row-qty">
+                                                <div class="q-val<?php
+                                                                    if ($item['quantity'] == 0)     echo ' q-none';
+                                                                    elseif ($item['quantity'] <= 2) echo ' q-low';
+                                                                    ?>">
+                                                    <?php echo $item['quantity']; ?>
                                                 </div>
-                                            </div><!-- /inv-list-col -->
-
-                                            <!-- RIGHT: Add / Edit Form -->
-                                            <div class="inv-form-col">
-                                                <div class="eq-card inv-form-card" id="item-form-wrap">
-                                                    <div class="inv-form-header">
-                                                        <h3>
-                                                            <span class="material-symbols-outlined">add_box</span>
-                                                            <span id="form-title">
-                                                                <?php echo $edit_item ? 'Edit Equipment' : 'Add / Edit Equipment'; ?>
-                                                            </span>
-                                                        </h3>
-                                                    </div>
-                                                    <div class="inv-form-body">
-                                                        <form method="POST" enctype="multipart/form-data" id="itemForm">
-                                                            <?= csrf_field() ?>
-                                                            <?php if ($edit_item): ?>
-                                                                <input type="hidden" name="item_id"
-                                                                    value="<?php echo $edit_item['item_id']; ?>">
-                                                                <input type="hidden" name="old_image"
-                                                                    value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
-                                                            <?php endif; ?>
-
-                                                            <div class="form-group">
-                                                                <label>Item Name <span class="inv-req">*</span></label>
-                                                                <input type="text" name="item_name" class="form-control-custom"
-                                                                    value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                                                    placeholder="e.g. Extension Cord" required>
-                                                            </div>
-
-                                                            <div class="form-group">
-                                                                <label>Category <span class="inv-req">*</span></label>
-                                                                <select name="category" class="form-control-custom" required>
-                                                                    <option value="">Select category...</option>
-                                                                    <?php
-                                                                    $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
-                                                                    foreach ($cats as $c) {
-                                                                        $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                                        echo "<option value=\"$c\" $sel>$c</option>";
-                                                                    }
-                                                                    ?>
-                                                                </select>
-                                                            </div>
-
-                                                            <div class="form-group">
-                                                                <label>Description</label>
-                                                                <textarea name="description" class="form-control-custom" rows="3"
-                                                                    placeholder="Short description of the item..."></textarea>
-                                                            </div>
-
-                                                            <div class="inv-form-row">
-                                                                <div class="form-group">
-                                                                    <label>Quantity <span class="inv-req">*</span></label>
-                                                                    <input type="number" name="quantity" class="form-control-custom"
-                                                                        min="0"
-                                                                        value="<?php echo $edit_item ? $edit_item['quantity'] : '1'; ?>"
-                                                                        required>
-                                                                </div>
-                                                                <div class="form-group">
-                                                                    <label>Condition</label>
-                                                                    <select name="condition" class="form-control-custom">
-                                                                        <option value="Good">Good</option>
-                                                                        <option value="Fair">Fair</option>
-                                                                        <option value="For Repair">For Repair</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-
-                                                            <div class="form-group">
-                                                                <label>Item Image</label>
-                                                                <div class="drop-zone" id="dropZone">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                                        width="32" height="32" style="color:var(--text-light)">
-                                                                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                                                                        <circle cx="8.5" cy="8.5" r="1.5" />
-                                                                        <polyline points="21 15 16 10 5 21" />
-                                                                    </svg>
-                                                                    <p>Click to upload, drag &amp; drop, or paste an image</p>
-                                                                    <input type="file" name="item_image" id="itemImageInput"
-                                                                        accept="image/*" style="display:none;">
-                                                                    <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                                                        <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
-                                                                            class="drop-zone-preview" id="imagePreview" style="display:block;">
-                                                                    <?php else: ?>
-                                                                        <img id="imagePreview" class="drop-zone-preview" style="display:none;">
-                                                                    <?php endif; ?>
-                                                                </div>
-                                                                <button type="button" id="removeImageBtn"
-                                                                    class="<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : 'hidden'; ?>"
-                                                                    style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">
-                                                                    &#x2715; Remove image
-                                                                </button>
-                                                            </div>
-
-                                                            <div class="inv-form-actions">
-                                                                <button type="submit"
-                                                                    name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
-                                                                    class="btn-inv-save">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                                        width="15" height="15">
-                                                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                                        <polyline points="17 21 17 13 7 13 7 21" />
-                                                                        <polyline points="7 3 7 8 15 8" />
-                                                                    </svg>
-                                                                    <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
-                                                                </button>
-                                                                <?php if ($edit_item): ?>
-                                                                    <button type="button" class="btn-inv-delete"
-                                                                        title="Archive item"
-                                                                        data-action="inv-open-modal" data-modal="deleteEquipModal">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                                            width="15" height="15">
-                                                                            <polyline points="3 6 5 6 21 6" />
-                                                                            <path d="M19 6l-1 14H6L5 6" />
-                                                                            <path d="M10 11v6" />
-                                                                            <path d="M14 11v6" />
-                                                                            <path d="M9 6V4h6v2" />
-                                                                        </svg>
-                                                                    </button>
-                                                                <?php endif; ?>
-                                                            </div>
-
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div><!-- /inv-form-col -->
-
-                                        </div><!-- /inv-split-layout -->
-
-                                        <!-- Archived Items -->
-                                        <div class="inv-archived-wrap">
-                                            <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
-                                                <button class="history-toggle-btn" data-history-tab="reg-archived">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round" width="14" height="14">
-                                                        <polyline points="21 8 21 21 3 21 3 8" />
-                                                        <rect x="1" y="3" width="22" height="5" />
-                                                        <line x1="10" y1="12" x2="14" y2="12" />
+                                                <div class="q-lbl"><?php
+                                                                    if ($item['quantity'] > 2)     echo 'in stock';
+                                                                    elseif ($item['quantity'] > 0) echo 'low stock';
+                                                                    else                           echo 'no stock';
+                                                                    ?></div>
+                                            </div>
+                                            <div class="inv-row-actions">
+                                                <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>"
+                                                    class="btn-inv-edit" title="Edit item">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round"
+                                                        width="14" height="14">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                                     </svg>
-                                                    Archived Items
-                                                </button>
+                                                </a>
                                             </div>
-                                            <div class="history-panel" id="history-reg-archived">
-                                                <div class="eq-card">
-                                                    <div class="tbl-wrap">
-                                                        <table class="admin-table">
-                                                            <thead>
-                                                                <tr>
-                                                                    <th>Image</th>
-                                                                    <th>Item Name</th>
-                                                                    <th>Category</th>
-                                                                    <th>Actions</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                <?php if (mysqli_num_rows($archive_result) === 0): ?>
-                                                                    <tr>
-                                                                        <td colspan="4" class="text-muted"
-                                                                            style="text-align:center;padding:2.5rem;">
-                                                                            No archived items.
-                                                                        </td>
-                                                                    </tr>
-                                                                    <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
-                                                                        <tr>
-                                                                            <td>
-                                                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                                    class="item-img"
-                                                                                    onerror="this.src='../uploads/default.png'">
-                                                                            </td>
-                                                                            <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                                            <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                                            <td class="action-cell">
-                                                                                <div class="action-btns">
-                                                                                    <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
-                                                                                        class="btn-action btn-restore" title="Restore">
-                                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                                                            width="14" height="14">
-                                                                                            <polyline points="1 4 1 10 7 10" />
-                                                                                            <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                                                        </svg>
-                                                                                    </a>
-                                                                                    <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
-                                                                                        class="btn-action btn-force-del" title="Delete permanently"
-                                                                                        onclick="return confirm('Permanently delete? This cannot be undone.')">
-                                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                                                            width="14" height="14">
-                                                                                            <polyline points="3 6 5 6 21 6" />
-                                                                                            <path d="M19 6l-1 14H6L5 6" />
-                                                                                            <path d="M10 11v6" />
-                                                                                            <path d="M14 11v6" />
-                                                                                            <path d="M9 6V4h6v2" />
-                                                                                        </svg>
-                                                                                    </a>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                <?php endwhile;
-                                                                endif; ?>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div><!-- /history-reg-archived -->
-                                        </div><!-- /inv-archived-wrap -->
+                                        </div>
+                                <?php endwhile;
+                                endif; ?>
+                            </div>
+                        </div>
+                    </div><!-- /inv-list-col -->
 
-                                    </div><!-- /lending-inventory -->
+                    <!-- RIGHT: Add / Edit Form -->
+                    <div class="inv-form-col">
+                        <div class="eq-card inv-form-card" id="item-form-wrap">
+                            <div class="inv-form-header">
+                                <h3>
+                                    <span class="material-symbols-outlined">add_box</span>
+                                    <span id="form-title">
+                                        <?php echo $edit_item ? 'Edit Equipment' : 'Add / Edit Equipment'; ?>
+                                    </span>
+                                </h3>
+                            </div>
+                            <div class="inv-form-body">
+                                <form method="POST" enctype="multipart/form-data" id="itemForm">
+                                    <?= csrf_field() ?>
+                                    <?php if ($edit_item): ?>
+                                        <input type="hidden" name="item_id"
+                                            value="<?php echo $edit_item['item_id']; ?>">
+                                        <input type="hidden" name="old_image"
+                                            value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
+                                    <?php endif; ?>
 
-                                </div><!-- /panel-inventory -->
+                                    <div class="form-group">
+                                        <label>Item Name <span class="inv-req">*</span></label>
+                                        <input type="text" name="item_name" class="form-control-custom"
+                                            value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
+                                            placeholder="e.g. Extension Cord" required>
+                                    </div>
 
-                                <!-- ============================================================
+                                    <div class="form-group">
+                                        <label>Category <span class="inv-req">*</span></label>
+                                        <select name="category" class="form-control-custom" required>
+                                            <option value="">Select category...</option>
+                                            <?php
+                                            $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
+                                            foreach ($cats as $c) {
+                                                $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                                echo "<option value=\"$c\" $sel>$c</option>";
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Description</label>
+                                        <textarea name="description" class="form-control-custom" rows="3"
+                                            placeholder="Short description of the item..."></textarea>
+                                    </div>
+
+                                    <div class="inv-form-row">
+                                        <div class="form-group">
+                                            <label>Quantity <span class="inv-req">*</span></label>
+                                            <input type="number" name="quantity" class="form-control-custom"
+                                                min="0"
+                                                value="<?php echo $edit_item ? $edit_item['quantity'] : '1'; ?>"
+                                                required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Condition</label>
+                                            <select name="condition" class="form-control-custom">
+                                                <option value="Good">Good</option>
+                                                <option value="Fair">Fair</option>
+                                                <option value="For Repair">For Repair</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Item Image</label>
+                                        <div class="drop-zone" id="dropZone">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                fill="none" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round"
+                                                width="32" height="32" style="color:var(--text-light)">
+                                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                                <polyline points="21 15 16 10 5 21" />
+                                            </svg>
+                                            <p>Click to upload, drag &amp; drop, or paste an image</p>
+                                            <input type="file" name="item_image" id="itemImageInput"
+                                                accept="image/*" style="display:none;">
+                                            <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
+                                                <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
+                                                    class="drop-zone-preview" id="imagePreview" style="display:block;">
+                                            <?php else: ?>
+                                                <img id="imagePreview" class="drop-zone-preview" style="display:none;">
+                                            <?php endif; ?>
+                                        </div>
+                                        <button type="button" id="removeImageBtn"
+                                            class="<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : 'hidden'; ?>"
+                                            style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">
+                                            &#x2715; Remove image
+                                        </button>
+                                    </div>
+
+                                    <div class="inv-form-actions">
+                                        <button type="submit"
+                                            name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                                            class="btn-inv-save">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                fill="none" stroke="currentColor" stroke-width="2"
+                                                stroke-linecap="round" stroke-linejoin="round"
+                                                width="15" height="15">
+                                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                                <polyline points="17 21 17 13 7 13 7 21" />
+                                                <polyline points="7 3 7 8 15 8" />
+                                            </svg>
+                                            <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
+                                        </button>
+                                        <?php if ($edit_item): ?>
+                                            <button type="button" class="btn-inv-delete"
+                                                title="Archive item"
+                                                data-action="inv-open-modal" data-modal="deleteEquipModal">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    fill="none" stroke="currentColor" stroke-width="2"
+                                                    stroke-linecap="round" stroke-linejoin="round"
+                                                    width="15" height="15">
+                                                    <polyline points="3 6 5 6 21 6" />
+                                                    <path d="M19 6l-1 14H6L5 6" />
+                                                    <path d="M10 11v6" />
+                                                    <path d="M14 11v6" />
+                                                    <path d="M9 6V4h6v2" />
+                                                </svg>
+                                            </button>
+                                        <?php endif; ?>
+                                    </div>
+
+                                </form>
+                            </div>
+                        </div>
+                    </div><!-- /inv-form-col -->
+
+                </div><!-- /inv-split-layout -->
+
+                <!-- Archived Items -->
+                <div class="inv-archived-wrap">
+                    <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
+                        <button class="history-toggle-btn" data-history-tab="reg-archived">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" width="14" height="14">
+                                <polyline points="21 8 21 21 3 21 3 8" />
+                                <rect x="1" y="3" width="22" height="5" />
+                                <line x1="10" y1="12" x2="14" y2="12" />
+                            </svg>
+                            Archived Items
+                        </button>
+                    </div>
+                    <div class="history-panel" id="history-reg-archived">
+                        <div class="eq-card">
+                            <div class="tbl-wrap">
+                                <table class="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Image</th>
+                                            <th>Item Name</th>
+                                            <th>Category</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (mysqli_num_rows($archive_result) === 0): ?>
+                                            <tr>
+                                                <td colspan="4" class="text-muted"
+                                                    style="text-align:center;padding:2.5rem;">
+                                                    No archived items.
+                                                </td>
+                                            </tr>
+                                            <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
+                                                <tr>
+                                                    <td>
+                                                        <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                            class="item-img"
+                                                            onerror="this.src='../uploads/default.png'">
+                                                    </td>
+                                                    <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($item['category']); ?></td>
+                                                    <td class="action-cell">
+                                                        <div class="action-btns">
+                                                            <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                                                                class="btn-action btn-restore" title="Restore">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                    fill="none" stroke="currentColor" stroke-width="2"
+                                                                    stroke-linecap="round" stroke-linejoin="round"
+                                                                    width="14" height="14">
+                                                                    <polyline points="1 4 1 10 7 10" />
+                                                                    <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                                </svg>
+                                                            </a>
+                                                            <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                                                                class="btn-action btn-force-del" title="Delete permanently"
+                                                                onclick="return confirm('Permanently delete? This cannot be undone.')">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                    fill="none" stroke="currentColor" stroke-width="2"
+                                                                    stroke-linecap="round" stroke-linejoin="round"
+                                                                    width="14" height="14">
+                                                                    <polyline points="3 6 5 6 21 6" />
+                                                                    <path d="M19 6l-1 14H6L5 6" />
+                                                                    <path d="M10 11v6" />
+                                                                    <path d="M14 11v6" />
+                                                                    <path d="M9 6V4h6v2" />
+                                                                </svg>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                        <?php endwhile;
+                                        endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div><!-- /history-reg-archived -->
+                </div><!-- /inv-archived-wrap -->
+
+            </div><!-- /lending-inventory -->
+
+            </div><!-- /panel-inventory -->
+
+            <!-- ============================================================
          TAB: SETTINGS
     ============================================================ -->
-                                <div class="tab-panel" id="panel-settings">
+            <div class="tab-panel" id="panel-settings">
 
-                                    <!-- Page Header -->
-                                    <div class="sett-page-header">
-                                        <h1 class="sett-page-title">Settings</h1>
-                                        <p class="sett-page-sub">Manage your admin account, appearance, and notification preferences.</p>
-                                    </div>
+                <!-- Page Header -->
+                <div class="sett-page-header">
+                    <h1 class="sett-page-title">Settings</h1>
+                    <p class="sett-page-sub">Manage your admin account, appearance, and notification preferences.</p>
+                </div>
 
-                                    <!-- Profile Banner -->
-                                    <div class="sett-profile-banner">
-                                        <div class="sett-profile-avatar">
-                                            <?php echo strtoupper(substr($admin_name, 0, 1)); ?>
-                                        </div>
-                                        <div class="sett-profile-info">
-                                            <div class="sett-profile-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                                            <div class="sett-profile-meta">Administrator &middot; Full Access &middot; <?php echo htmlspecialchars($admin_email); ?></div>
-                                        </div>
-                                        <button class="sett-edit-btn" data-action="show-change-pass">Edit Profile</button>
-                                    </div>
+                <!-- Profile Banner -->
+                <div class="sett-profile-banner">
+                    <div class="sett-profile-avatar">
+                        <?php echo strtoupper(substr($admin_name, 0, 1)); ?>
+                    </div>
+                    <div class="sett-profile-info">
+                        <div class="sett-profile-name"><?php echo htmlspecialchars($admin_name); ?></div>
+                        <div class="sett-profile-meta">Administrator &middot; Full Access &middot; <?php echo htmlspecialchars($admin_email); ?></div>
+                    </div>
+                    <button class="sett-edit-btn" data-action="show-change-pass">Edit Profile</button>
+                </div>
 
-                                    <!-- 2-Column Card Grid -->
-                                    <div class="sett-grid">
+                <!-- 2-Column Card Grid -->
+                <div class="sett-grid">
 
-                                        <!-- Appearance -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">palette</span>
-                                                <h3>Appearance</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="sett-field-lbl">Theme</div>
-                                                <div class="sett-theme-row">
-                                                    <div class="sett-theme-opt sett-theme-sel" id="tp-light" data-action="apply-theme" data-theme="light">
-                                                        &#9728;&#65039; Light
-                                                    </div>
-                                                    <div class="sett-theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
-                                                        &#127769; Dark
-                                                    </div>
-                                                    <div class="sett-theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
-                                                        &#9889; High Contrast
-                                                    </div>
-                                                </div>
-                                                <div class="sett-toggle-row">
-                                                    <div class="sett-toggle-lbl">
-                                                        <span class="sett-tgl-title">Compact Mode</span>
-                                                    </div>
-                                                    <div style="display:flex;align-items:center;gap:10px;">
-                                                        <label class="toggle-sw">
-                                                            <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
-                                                            <span class="toggle-track"></span>
-                                                        </label>
-                                                        <span class="sett-tgl-sub">Reduce spacing for denser view</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <!-- Appearance -->
+                    <div class="sett-card">
+                        <div class="sett-card-head">
+                            <span class="material-symbols-outlined">palette</span>
+                            <h3>Appearance</h3>
+                        </div>
+                        <div class="sett-card-body">
+                            <div class="sett-field-lbl">Theme</div>
+                            <div class="sett-theme-row">
+                                <div class="sett-theme-opt sett-theme-sel" id="tp-light" data-action="apply-theme" data-theme="light">
+                                    &#9728;&#65039; Light
+                                </div>
+                                <div class="sett-theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
+                                    &#127769; Dark
+                                </div>
+                                <div class="sett-theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
+                                    &#9889; High Contrast
+                                </div>
+                            </div>
+                            <div class="sett-toggle-row">
+                                <div class="sett-toggle-lbl">
+                                    <span class="sett-tgl-title">Compact Mode</span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <label class="toggle-sw">
+                                        <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
+                                        <span class="toggle-track"></span>
+                                    </label>
+                                    <span class="sett-tgl-sub">Reduce spacing for denser view</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                        <!-- Notification Preferences -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">notifications</span>
-                                                <h3>Notification Preferences</h3>
-                                            </div>
-                                            <div class="sett-card-body sett-card-body--notifs">
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" checked>
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">New Requests</div>
-                                                        <div class="sett-notif-sub">Alert when faculty submits a request</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" checked>
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Overdue Alerts</div>
-                                                        <div class="sett-notif-sub">Alert when an item becomes overdue</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Room Issues</div>
-                                                        <div class="sett-notif-sub">Alert when a room issue is reported</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <!-- Notification Preferences -->
+                    <div class="sett-card">
+                        <div class="sett-card-head">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <h3>Notification Preferences</h3>
+                        </div>
+                        <div class="sett-card-body sett-card-body--notifs">
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <div>
+                                    <div class="sett-notif-title">New Requests</div>
+                                    <div class="sett-notif-sub">Alert when faculty submits a request</div>
+                                </div>
+                            </div>
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw">
+                                    <input type="checkbox" checked>
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <div>
+                                    <div class="sett-notif-title">Overdue Alerts</div>
+                                    <div class="sett-notif-sub">Alert when an item becomes overdue</div>
+                                </div>
+                            </div>
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw">
+                                    <input type="checkbox">
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <div>
+                                    <div class="sett-notif-title">Room Issues</div>
+                                    <div class="sett-notif-sub">Alert when a room issue is reported</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                        <!-- Security -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">lock</span>
-                                                <h3>Security</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Current Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">New Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Confirm New Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <button class="sett-update-pw-btn" data-action="show-change-pass">
-                                                    Update Password
-                                                </button>
-                                            </div>
-                                        </div>
+                    <!-- Security -->
+                    <div class="sett-card">
+                        <div class="sett-card-head">
+                            <span class="material-symbols-outlined">lock</span>
+                            <h3>Security</h3>
+                        </div>
+                        <div class="sett-card-body">
+                            <div class="form-group">
+                                <label class="sett-field-lbl">Current Password</label>
+                                <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="sett-field-lbl">New Password</label>
+                                <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label class="sett-field-lbl">Confirm New Password</label>
+                                <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
+                            </div>
+                            <button class="sett-update-pw-btn" data-action="show-change-pass">
+                                Update Password
+                            </button>
+                        </div>
+                    </div>
 
-                                        <!-- Accessibility -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">accessibility</span>
-                                                <h3>Accessibility</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Text Size</label>
-                                                    <select class="form-control-custom">
-                                                        <option>Normal</option>
-                                                        <option>Large</option>
-                                                        <option>X-Large</option>
-                                                    </select>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Reduce animations</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Enhanced Focus Ring</div>
-                                                        <div class="sett-notif-sub">Makes keyboard focus outlines more visible</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <!-- Accessibility -->
+                    <div class="sett-card">
+                        <div class="sett-card-head">
+                            <span class="material-symbols-outlined">accessibility</span>
+                            <h3>Accessibility</h3>
+                        </div>
+                        <div class="sett-card-body">
+                            <div class="form-group">
+                                <label class="sett-field-lbl">Text Size</label>
+                                <select class="form-control-custom">
+                                    <option>Normal</option>
+                                    <option>Large</option>
+                                    <option>X-Large</option>
+                                </select>
+                            </div>
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw">
+                                    <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <div>
+                                    <div class="sett-notif-title">Reduce animations</div>
+                                </div>
+                            </div>
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw">
+                                    <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
+                                    <span class="toggle-track"></span>
+                                </label>
+                                <div>
+                                    <div class="sett-notif-title">Enhanced Focus Ring</div>
+                                    <div class="sett-notif-sub">Makes keyboard focus outlines more visible</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                    </div><!-- /sett-grid -->
+                </div><!-- /sett-grid -->
 
-                                    <!-- Advanced / Danger Zone (preserved from old settings) -->
-                                    <div class="sett-danger-wrap">
-                                        <div class="sett-card sett-danger-bdr">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
-                                                <h3 style="color:var(--danger)">Advanced</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Show Asset IDs</div>
-                                                        <div class="sett-notif-sub">Display equipment item IDs in tables</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Verbose Error Messages</div>
-                                                        <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-adv-reset-row">
-                                                    <div>
-                                                        <div class="sett-notif-title" style="color:var(--danger)">Reset All Settings</div>
-                                                        <div class="sett-notif-sub">Restore all appearance and accessibility defaults</div>
-                                                    </div>
-                                                    <button class="sett-reset-btn" data-action="reset-settings">
-                                                        <span class="material-symbols-outlined">restart_alt</span> Reset
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                <!-- Advanced / Danger Zone (preserved from old settings) -->
+                <div class="sett-danger-wrap">
+                    <div class="sett-card sett-danger-bdr">
+                        <div class="sett-card-head">
+                            <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
+                            <h3 style="color:var(--danger)">Advanced</h3>
+                        </div>
+                        <div class="sett-card-body">
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                <div>
+                                    <div class="sett-notif-title">Show Asset IDs</div>
+                                    <div class="sett-notif-sub">Display equipment item IDs in tables</div>
+                                </div>
+                            </div>
+                            <div class="sett-notif-row">
+                                <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                <div>
+                                    <div class="sett-notif-title">Verbose Error Messages</div>
+                                    <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
+                                </div>
+                            </div>
+                            <div class="sett-adv-reset-row">
+                                <div>
+                                    <div class="sett-notif-title" style="color:var(--danger)">Reset All Settings</div>
+                                    <div class="sett-notif-sub">Restore all appearance and accessibility defaults</div>
+                                </div>
+                                <button class="sett-reset-btn" data-action="reset-settings">
+                                    <span class="material-symbols-outlined">restart_alt</span> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                                </div><!-- /panel-settings -->
+            </div><!-- /panel-settings -->
 
         </main><!-- /app-main -->
 
@@ -3849,144 +3849,270 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
 
+        <!-- Redesigned Account Layout -->
         <div class="account-layout">
+
+            <!-- Sidebar -->
             <div class="account-sidebar">
-                <span class="account-sidebar-label">Admin Account</span>
+                <span class="account-sidebar-label">Account</span>
                 <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                        <rect x="2" y="5" width="20" height="14" rx="2" />
-                        <circle cx="8" cy="12" r="2" />
-                        <path d="M14 9h4" />
-                        <path d="M14 12h4" />
-                        <path d="M14 15h2" />
-                    </svg>
+                    <span class="material-symbols-outlined">account_circle</span>
                     Overview
                 </button>
                 <button class="acc-nav-btn" data-acc-tab="acc-security">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon-img">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
+                    <span class="material-symbols-outlined">lock</span>
                     Security
                 </button>
+                <button class="acc-nav-btn" data-acc-tab="acc-sessions">
+                    <span class="material-symbols-outlined">devices</span>
+                    Sessions
+                </button>
             </div>
+
+            <!-- Content -->
             <div class="account-content">
-                <!-- Overview -->
+
+                <!-- ── Overview ───────────────────────────────────── -->
                 <div id="acc-overview" class="overlay-sub-panel active">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Overview</span>
-                        <h2>Admin Profile</h2>
-                        <p>Your administrator account details.</p>
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">My Account</span>
+                        <h2>Profile Overview</h2>
+                        <p>View and update your administrator profile information.</p>
                     </div>
-                    <div class="account-hero-card">
-                        <div class="acc-avatar-large">
+
+                    <!-- Profile Hero -->
+                    <div class="ov-profile-hero" id="acctHero">
+                        <div class="ov-av-lg">
                             <?php echo htmlspecialchars($initials); ?>
                         </div>
-                        <div class="acc-hero-info">
-                            <h2>
-                                <?php echo htmlspecialchars($admin_name); ?>
-                            </h2>
-                            <p>System Administrator</p>
-                            <span class="acc-badge">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12"
-                                    style="vertical-align:middle;margin-right:4px;">
-                                    <circle cx="12" cy="12" r="7" fill="#22c55e" stroke="none" />
-                                </svg>
-                                Active Admin
-                            </span>
+                        <div class="ov-hero-body">
+                            <div class="ov-hero-name"><?php echo htmlspecialchars($admin_name); ?></div>
+                            <div class="ov-hero-role">Administrator &middot; PUPSync Biñan Campus</div>
+                            <div class="ov-hero-badge">
+                                <span class="material-symbols-outlined">verified</span>
+                                Active &middot; Full Access
+                            </div>
                         </div>
-                        <div class="acc-action-wrap">
-                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">Edit
-                                Profile</button>
+                        <div class="ov-hero-actions">
+                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
+                                <span class="material-symbols-outlined">edit</span>
+                                Edit Profile
+                            </button>
                             <button class="btn-save-acc" id="saveProfileBtn" style="display:none;"
                                 data-action="profile-save">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="14" height="14">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                                Save
+                                <span class="material-symbols-outlined">save</span>
+                                Save Changes
                             </button>
                             <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;"
-                                data-action="profile-cancel">Cancel</button>
+                                data-action="profile-cancel">
+                                Cancel
+                            </button>
                         </div>
                     </div>
-                    <div class="info-card">
+
+                    <!-- Personal Information -->
+                    <div class="info-card" id="profileInfoCard">
                         <div class="info-card-head">
-                            <h3>Admin Information</h3>
+                            <h3>
+                                <span class="material-symbols-outlined">person</span>
+                                Personal Information
+                            </h3>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Display Name</span>
                             <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
                                 data-field="admin_name">
-                                <?php
-                                echo htmlspecialchars($admin_name);
-                                ?>
+                                <?php echo !empty($admin_name) ? htmlspecialchars($admin_name) : '— Not provided'; ?>
                             </span>
                             <input class="info-input-f" data-input="admin_name"
-                                value="<?php echo htmlspecialchars($admin_name); ?>" disabled style="display:none;">
+                                value="<?php echo htmlspecialchars($admin_name ?? ''); ?>"
+                                placeholder="Display Name" disabled style="display:none;">
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Role</span>
                             <span class="info-val">Administrator</span>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Email</span>
-                            <span class="info-val 
-                                    <?php echo empty($admin_email) ? 'empty' : ''; ?>" data-field="admin_email">
-                                <?php
-                                echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided';
-                                ?>
+                            <span class="info-lbl">Email Address</span>
+                            <span class="info-val <?php echo empty($admin_email) ? 'empty' : ''; ?>"
+                                data-field="admin_email">
+                                <?php echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; ?>
                             </span>
                             <input class="info-input-f" data-input="admin_email" type="email"
                                 value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
                                 placeholder="admin@pup.edu.ph" disabled style="display:none;">
                         </div>
-                    </div>
-                </div>
-
-                <!-- Security -->
-                <div id="acc-security" class="overlay-sub-panel">
-                    <div class="overlay-section-header">
-                        <span class="section-eyebrow">My Account › Security</span>
-                        <h2>Security</h2>
-                        <p>Manage your admin password and session security.</p>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>Login & Security</h3>
+                        <div class="info-row">
+                            <span class="info-lbl">Campus</span>
+                            <span class="info-val">PUPSync Biñan Campus</span>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Password</span>
-                            <span class="info-val">••••••••••</span>
-                            <button class="btn-borrow"
-                                style="width:auto;padding:6px 16px;font-size:0.75rem;margin-left:auto;"
-                                data-action="open-change-pass">
-                                Change
-                            </button>
+                            <span class="info-lbl">Access Level</span>
+                            <span class="info-val">
+                                <span class="ov-access-badge">Full Access</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Activity Summary -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">bar_chart</span>
+                                Activity Summary
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Requests Processed</span>
+                            <span class="info-val ov-stat-val">
+                                <?php echo $stat_total_req ?? '0'; ?> total
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Faculty Accounts Created</span>
+                            <span class="info-val">
+                                <?php
+                                $fac_count = mysqli_fetch_assoc(
+                                    mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role='faculty'")
+                                )['c'] ?? 0;
+                                echo $fac_count;
+                                ?>
+                            </span>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Last Login</span>
                             <span class="info-val">
                                 <?php
-                                $last_login_display = '— Not available';
+                                $ll = '— Not available';
                                 if (!empty($_SESSION['admin_last_login'])) {
                                     $ts = strtotime($_SESSION['admin_last_login']);
-                                    if ($ts !== false) $last_login_display = date('M d, Y g:i A', $ts);
+                                    if ($ts !== false) $ll = date('M d, Y · g:i A', $ts);
                                 }
-                                echo htmlspecialchars($last_login_display);
+                                echo htmlspecialchars($ll);
                                 ?>
                             </span>
                         </div>
                         <div class="info-row">
-                            <span class="info-lbl">Session</span>
-                            <span class="info-val"><span class="stock-badge stock-avail">Active</span></span>
+                            <span class="info-lbl">Active Equipment</span>
+                            <span class="info-val"><?php echo $stat_inv_total ?? '0'; ?> items</span>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                </div><!-- /acc-overview -->
+
+                <!-- ── Security ────────────────────────────────────── -->
+                <div id="acc-security" class="overlay-sub-panel">
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">Security</span>
+                        <h2>Password &amp; Security</h2>
+                        <p>Manage your login credentials and account security settings.</p>
+                    </div>
+
+                    <!-- Password Card -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">lock</span>
+                                Password
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Current Password</span>
+                            <span class="info-val">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>
+                            <button class="btn-inline-sm" data-action="open-change-pass">Change</button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Last Changed</span>
+                            <span class="info-val" style="color:var(--text-light)">— Not tracked</span>
+                        </div>
+                    </div>
+
+                    <!-- Login Security Card -->
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">shield</span>
+                                Login Security
+                            </h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Last Login</span>
+                            <span class="info-val">
+                                <?php echo htmlspecialchars($ll ?? '— Not available'); ?>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Session Status</span>
+                            <span class="info-val">
+                                <span class="ov-status-dot">Active</span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Login Attempts</span>
+                            <span class="info-val">0 failed attempts</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Force Logout</span>
+                            <span class="info-val">
+                                <button class="btn-inline-danger" data-action="logout">
+                                    Log Out All Sessions
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </div><!-- /acc-security -->
+
+                <!-- ── Sessions ────────────────────────────────────── -->
+                <div id="acc-sessions" class="overlay-sub-panel">
+                    <div class="ov-section-head">
+                        <span class="ov-eyebrow">Security</span>
+                        <h2>Active Sessions</h2>
+                        <p>Review devices currently logged in to your admin account.</p>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>
+                                <span class="material-symbols-outlined">devices</span>
+                                Current Sessions
+                            </h3>
+                        </div>
+                        <!-- Current device row -->
+                        <div class="ov-session-row">
+                            <div class="ov-device-icon">
+                                <span class="material-symbols-outlined">computer</span>
+                            </div>
+                            <div class="ov-session-info">
+                                <div class="ov-session-device">Chrome &middot; Windows</div>
+                                <div class="ov-session-meta">
+                                    Biñan, Laguna &middot;
+                                    <?php
+                                    $ll_disp = '—';
+                                    if (!empty($_SESSION['admin_last_login'])) {
+                                        $ts = strtotime($_SESSION['admin_last_login']);
+                                        if ($ts !== false) $ll_disp = date('M d, Y · g:i A', $ts);
+                                    }
+                                    echo htmlspecialchars($ll_disp);
+                                    ?>
+                                </div>
+                            </div>
+                            <span class="ov-session-badge">Current</span>
+                        </div>
+                        <!-- Placeholder inactive session -->
+                        <div class="ov-session-row">
+                            <div class="ov-device-icon ov-device-muted">
+                                <span class="material-symbols-outlined">phone_android</span>
+                            </div>
+                            <div class="ov-session-info">
+                                <div class="ov-session-device">Mobile Safari &middot; iPhone</div>
+                                <div class="ov-session-meta">Biñan, Laguna &middot; — No data</div>
+                            </div>
+                            <button class="btn-inline-sm ov-revoke-btn">Revoke</button>
+                        </div>
+                    </div>
+                </div><!-- /acc-sessions -->
+
+            </div><!-- /account-content -->
+        </div><!-- /account-layout -->
     </div><!-- /accountOverlay -->
 
 
@@ -4338,7 +4464,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
                                         stroke-linecap="round" stroke-linejoin="round"
                                         style="color:var(--accent-maroon);vertical-align:middle;">
-                                        <polyline points="20 6 9 17 4 12" />
+                                        <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </div>
                             </div>
@@ -4353,7 +4479,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
                                         stroke-linecap="round" stroke-linejoin="round"
                                         style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
+                                        <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </div>
                             </div>
@@ -4368,7 +4494,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
                                         stroke-linecap="round" stroke-linejoin="round"
                                         style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
+                                        <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                 </div>
                             </div>
@@ -4916,7 +5042,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             /* Dropdown "Settings" button → trigger the sidebar Settings tab */
             var ddSettBtn = document.getElementById('dd-settings-btn');
             if (ddSettBtn) {
-                ddSettBtn.addEventListener('click', function() {
+                ddSettBtn.addEventListener('click', function () {
                     var snavSettings = document.getElementById('snav-settings');
                     if (snavSettings) snavSettings.click();
                 });
@@ -4926,17 +5052,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                admin-dashboard.js calls _switchTabDOM('lending') for those,
                but inventory is now its own #panel-inventory tab.
                setTimeout(0) runs AFTER all DOMContentLoaded handlers.     */
-            setTimeout(function() {
+            setTimeout(function () {
                 var params = new URLSearchParams(window.location.search);
                 if (params.get('edit_item') || params.get('view') === 'inventory') {
                     /* hide all tab-panels, show panel-inventory */
-                    document.querySelectorAll('.tab-panel').forEach(function(p) {
+                    document.querySelectorAll('.tab-panel').forEach(function (p) {
                         p.classList.remove('active');
                     });
                     var pInv = document.getElementById('panel-inventory');
                     if (pInv) pInv.classList.add('active');
                     /* update sidebar highlight */
-                    document.querySelectorAll('.nav-item').forEach(function(n) {
+                    document.querySelectorAll('.nav-item').forEach(function (n) {
                         n.classList.remove('active');
                     });
                     var snavInv = document.getElementById('snav-inventory');
