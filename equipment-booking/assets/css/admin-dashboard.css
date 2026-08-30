@@ -2749,24 +2749,24 @@ textarea.form-control-custom {
 
 .overlay-topbar-back {
     background: none;
-    border: 1px solid var(--khaki-border);
-    color: var(--text-dark);
-    padding: 7px 16px;
-    border-radius: 8px;
+    border: none;
+    color: var(--text-light);
+    padding: 4px 0;
+    border-radius: 0;
     cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.82rem;
+    font-weight: 500;
     font-family: 'Poppins', sans-serif;
     display: flex;
     align-items: center;
-    gap: 4px;
-    transition: background 0.2s, border-color 0.2s;
+    gap: 5px;
+    transition: color 0.15s;
 }
 
 .overlay-topbar-back:hover {
-    background: var(--hover-bg);
-    border-color: var(--accent-maroon);
-    color: var(--accent-maroon);
+    background: none;
+    border-color: transparent;
+    color: var(--text-dark);
 }
 
 .overlay-topbar-sep {
@@ -2841,7 +2841,7 @@ textarea.form-control-custom {
 .account-sidebar {
     width: 240px;
     flex-shrink: 0;
-    background: var(--sidebar-bg);
+    background: var(--primary-white);
     border-right: 1px solid var(--khaki-border);
     padding: 1.5rem 0;
     overflow-y: auto;
@@ -6368,4 +6368,763 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .fac-code-copy-btn .material-symbols-outlined {
     font-size: 16px;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   SETTINGS — as a direct tab-panel page (matches screenshot design)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Page Header ─────────────────────────────────────────────────── */
+.sett-page-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.sett-page-sub {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+    margin-top: 2px;
+}
+
+/* ── Profile Banner ──────────────────────────────────────────────── */
+.sett-profile-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: linear-gradient(135deg, #5c0a14 0%, #3a0008 100%);
+    border-radius: 14px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.sett-profile-banner::after {
+    content: '';
+    position: absolute;
+    right: -50px;
+    top: -50px;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.sett-profile-avatar {
+    width: 56px;
+    height: 56px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.sett-profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.sett-profile-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.sett-profile-meta {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.68);
+    margin-top: 3px;
+}
+
+.sett-edit-btn {
+    padding: 0.5rem 1.1rem;
+    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    border-radius: 8px;
+    background: transparent;
+    color: #fff;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.sett-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Settings Grid ───────────────────────────────────────────────── */
+.sett-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+/* ── Settings Card ───────────────────────────────────────────────── */
+.sett-card {
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.sett-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.sett-card-head .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--accent-maroon);
+}
+
+.sett-card-head h3 {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.sett-card-body {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sett-card-body .form-group {
+    margin: 0;
+}
+
+/* ── Field label ─────────────────────────────────────────────────── */
+.sett-field-lbl {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+}
+
+/* ── Theme picker ────────────────────────────────────────────────── */
+.sett-theme-row {
+    display: flex;
+    gap: 8px;
+}
+
+.sett-theme-opt {
+    flex: 1;
+    padding: 0.6rem 0.5rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    transition: all 0.15s;
+}
+
+.sett-theme-opt:hover {
+    border-color: var(--accent-maroon);
+    color: var(--text-dark);
+}
+
+.sett-theme-sel,
+.sett-theme-opt.sett-theme-sel {
+    border-color: var(--accent-maroon) !important;
+    color: var(--accent-maroon) !important;
+    background: var(--primary-white) !important;
+}
+
+/* ── Compact mode row (inline label after toggle) ────────────────── */
+.sett-toggle-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.25rem;
+}
+
+.sett-toggle-lbl {
+    flex: 1;
+}
+
+.sett-tgl-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    display: block;
+}
+
+.sett-tgl-sub {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* ── Notifications card: toggles on the LEFT, text on the right ──── */
+.sett-card-body--notifs {
+    gap: 0.75rem;
+}
+
+.sett-notif-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.sett-notif-row .toggle-sw {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.sett-notif-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.sett-notif-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+}
+
+/* ── Update Password button ──────────────────────────────────────── */
+.sett-update-pw-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    background: var(--accent-maroon);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 0.25rem;
+}
+
+.sett-update-pw-btn:hover {
+    background: var(--accent-dark);
+}
+
+/* ── Danger / Advanced zone ──────────────────────────────────────── */
+.sett-danger-wrap {
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.sett-danger-bdr {
+    border-color: rgba(180, 20, 20, 0.2);
+}
+
+.sett-adv-reset-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--khaki-border);
+}
+
+.sett-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.45rem 0.9rem;
+    border: 1.5px solid var(--danger);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--danger);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.sett-reset-btn:hover {
+    background: #fdecea;
+}
+
+.sett-reset-btn .material-symbols-outlined {
+    font-size: 15px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .sett-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sett-profile-banner {
+        flex-wrap: wrap;
+    }
+
+    .sett-edit-btn {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   ACCOUNT OVERLAY — REDESIGN
+   Uses new ov-* prefixed classes to avoid conflicts.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar nav buttons (upgrade existing acc-nav-btn) ─────────── */
+.acc-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 0.65rem 1rem;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+}
+
+.acc-nav-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.acc-nav-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text-dark);
+}
+
+.acc-nav-btn.active {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    font-weight: 600;
+}
+
+/* ── Section Header ──────────────────────────────────────────────── */
+.ov-section-head {
+    margin-bottom: 1.5rem;
+}
+
+.ov-eyebrow {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-maroon);
+    margin-bottom: 4px;
+}
+
+.ov-section-head h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0 0 4px;
+}
+
+.ov-section-head p {
+    font-size: 13px;
+    color: var(--text-light);
+    margin: 0;
+}
+
+/* ── Profile Hero ────────────────────────────────────────────────── */
+/* ── Profile Hero — dark wine card matching screenshot ──────────── */
+.ov-profile-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.35rem;
+    background: linear-gradient(135deg, #4a0010 0%, #2c0008 100%);
+    border: none;
+    border-radius: 14px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    position: relative;
+    overflow: hidden;
+}
+
+.ov-profile-hero::after {
+    content: '';
+    position: absolute;
+    right: -60px;
+    top: -60px;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.ov-av-lg {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.ov-hero-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.ov-hero-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.ov-hero-role {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 2px;
+}
+
+.ov-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.ov-hero-badge .material-symbols-outlined {
+    font-size: 13px;
+}
+
+.ov-hero-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Edit / Save / Cancel buttons — context-aware */
+.btn-edit-acc {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 0.9rem;
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn-edit-acc .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.btn-edit-acc:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-save-acc {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 0.9rem;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #3a0008;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.btn-save-acc .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.btn-save-acc:hover {
+    background: #fff;
+}
+
+.btn-cancel-acc {
+    padding: 0.45rem 0.75rem;
+    background: transparent;
+    border: none;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.65);
+    cursor: pointer;
+}
+
+.btn-cancel-acc:hover {
+    color: #fff;
+}
+
+/* ── Info Card ───────────────────────────────────────────────────── */
+.info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+}
+
+.info-card-head {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.info-card-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.info-card-head h3 .material-symbols-outlined {
+    font-size: 17px;
+    color: var(--accent-maroon);
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-lbl {
+    width: 160px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+}
+
+.info-val {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-dark);
+}
+
+.info-val.empty {
+    color: var(--text-light);
+}
+
+.info-input-f {
+    flex: 1;
+    padding: 0.4rem 0.75rem;
+    border: 1.5px solid var(--accent-maroon);
+    border-radius: 7px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 13px;
+    color: var(--text-dark);
+    background: var(--primary-white);
+    outline: none;
+}
+
+/* ── Access level badge ──────────────────────────────────────────── */
+.ov-access-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border: 1px solid rgba(100, 0, 20, 0.15);
+}
+
+/* ── Stat value highlight ────────────────────────────────────────── */
+.ov-stat-val {
+    font-weight: 600;
+    color: var(--accent-maroon);
+}
+
+/* ── Inline action buttons ───────────────────────────────────────── */
+.btn-inline-sm {
+    padding: 0.35rem 0.75rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 7px;
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-inline-sm:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.btn-inline-danger {
+    padding: 0.35rem 0.75rem;
+    border: 1.5px solid var(--danger);
+    border-radius: 7px;
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--danger);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.btn-inline-danger:hover {
+    background: #fdecea;
+}
+
+/* ── Status dot ──────────────────────────────────────────────────── */
+.ov-status-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #16a34a;
+}
+
+.ov-status-dot::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+/* ── Session rows ────────────────────────────────────────────────── */
+.ov-session-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.ov-session-row:last-child {
+    border-bottom: none;
+}
+
+.ov-device-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--secondary-cream);
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.ov-device-icon .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--accent-maroon);
+}
+
+.ov-device-muted .material-symbols-outlined {
+    color: var(--text-light);
+}
+
+.ov-session-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.ov-session-device {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.ov-session-meta {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+}
+
+.ov-session-badge {
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background: #dcfce7;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+    flex-shrink: 0;
+}
+
+.ov-revoke-btn {
+    flex-shrink: 0;
 }
