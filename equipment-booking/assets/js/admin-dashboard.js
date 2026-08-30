@@ -611,6 +611,29 @@
                     closeDropdown();
                     if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
+
+                /* \u2500\u2500 ps-modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+                case 'ps-open-modal':
+                    psOpenModal(el.dataset.modal);
+                    break;
+                case 'ps-close-modal':
+                    psCloseModal(el.dataset.modal);
+                    break;
+                case 'ps-switch-modal':
+                    psCloseModal(el.dataset.close);
+                    psOpenModal(el.dataset.open);
+                    break;
+
+                /* \u2500\u2500 inv-modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+                case 'inv-open-modal':
+                    openInvModal(el.dataset.modal);
+                    break;
+                case 'inv-close-modal':
+                    closeInvModal(el.dataset.modal);
+                    break;
+                case 'inv-backdrop':
+                    if (e.target === el) closeInvModal(el.dataset.modal);
+                    break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
     });
@@ -1705,6 +1728,16 @@ function psOpenModal(id) {
 function psCloseModal(id) {
     var el = document.getElementById(id);
     if (el) el.classList.remove('ps-modal-open');
+}
+
+/* ── inv-modal open / close ────────────────────────────── */
+function openInvModal(id) {
+    var m = document.getElementById(id);
+    if (m) m.style.display = 'flex';
+}
+function closeInvModal(id) {
+    var m = document.getElementById(id);
+    if (m) m.style.display = 'none';
 }
 
 /* Close modal when clicking the backdrop */
