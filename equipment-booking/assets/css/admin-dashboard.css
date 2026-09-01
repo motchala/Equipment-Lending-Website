@@ -1195,6 +1195,69 @@ select.ps-form-control {
     display: block;
 }
 
+/* ── Filter chips (Requests tab) ──────────────────────────────────
+   Pill-shaped, individually-bordered buttons — visually distinct from
+   the rectangular .rq-sub-tab used for Rooms/Settings sub-navigation,
+   so the "filter a single list" pattern reads differently from the
+   "switch between screens" pattern. ── */
+.rq-filter-chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.rq-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 1rem;
+    border-radius: 50px;
+    border: 1.5px solid var(--khaki-border);
+    background: var(--primary-white);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.rq-filter-chip:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.rq-filter-chip.active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: white;
+    font-weight: 600;
+}
+
+.rq-chip-count {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 50px;
+    min-width: 18px;
+    text-align: center;
+    background: var(--danger);
+    color: white;
+}
+
+.rq-chip-count--ok {
+    background: rgba(39, 174, 96, 0.18);
+    color: var(--success);
+}
+
+.rq-filter-chip.active .rq-chip-count {
+    background: rgba(255, 255, 255, 0.28);
+    color: white;
+}
+
 /* ── MODAL SYSTEM ─────────────────────────────────────────────── */
 .ps-modal-backdrop {
     position: fixed;
@@ -7152,8 +7215,16 @@ body:has(#roomScheduleModal:not(.hidden)) {
     text-align: left;
     transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.hc-nav-btn .material-symbols-outlined { font-size: 20px; }
-.hc-nav-btn:hover { background: var(--hover-bg); color: var(--accent-maroon); }
+
+.hc-nav-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.hc-nav-btn:hover {
+    background: var(--hover-bg);
+    color: var(--accent-maroon);
+}
+
 .hc-nav-btn.active {
     background: var(--accent-light);
     color: var(--accent-maroon);
@@ -7168,6 +7239,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-top: 1px solid var(--khaki-border);
     margin-top: 2rem;
 }
+
 .hc-sidebar-version {
     display: flex;
     align-items: center;
@@ -7176,8 +7248,16 @@ body:has(#roomScheduleModal:not(.hidden)) {
     font-weight: 600;
     color: var(--accent-maroon);
 }
-.hc-sidebar-version .material-symbols-outlined { font-size: 14px; }
-.hc-sidebar-campus { font-size: 10.5px; color: var(--text-light); margin-top: 3px; }
+
+.hc-sidebar-version .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.hc-sidebar-campus {
+    font-size: 10.5px;
+    color: var(--text-light);
+    margin-top: 3px;
+}
 
 /* ── Section label (divider text) ────────────────────────────── */
 .hc-section-label {
@@ -7200,28 +7280,59 @@ body:has(#roomScheduleModal:not(.hidden)) {
     margin-bottom: 2rem;
     color: #fff;
 }
+
 .hc-hero-icon-wrap {
-    width: 56px; height: 56px;
+    width: 56px;
+    height: 56px;
     border-radius: 14px;
-    background: rgba(255,255,255,0.15);
-    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
-.hc-hero-icon-wrap .material-symbols-outlined { font-size: 32px; color: #fff; }
-.hc-hero-text h2 { font-size: 1.25rem; font-weight: 700; color: #fff; margin: 0 0 6px; }
-.hc-hero-text p  { font-size: 0.86rem; color: rgba(255,255,255,0.78); margin: 0 0 14px; line-height: 1.5; }
-.hc-hero-tags {
-    display: flex; flex-wrap: wrap; gap: 8px;
+
+.hc-hero-icon-wrap .material-symbols-outlined {
+    font-size: 32px;
+    color: #fff;
 }
+
+.hc-hero-text h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 6px;
+}
+
+.hc-hero-text p {
+    font-size: 0.86rem;
+    color: rgba(255, 255, 255, 0.78);
+    margin: 0 0 14px;
+    line-height: 1.5;
+}
+
+.hc-hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .hc-hero-tags span {
-    display: inline-flex; align-items: center; gap: 5px;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 50px;
     padding: 3px 12px;
-    font-size: 11.5px; font-weight: 500; color: #fff;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #fff;
 }
-.hc-hero-tags span .material-symbols-outlined { font-size: 14px; }
+
+.hc-hero-tags span .material-symbols-outlined {
+    font-size: 14px;
+}
 
 /* ── Quick action grid ───────────────────────────────────────── */
 .hc-quick-grid {
@@ -7230,6 +7341,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     gap: 10px;
     margin-bottom: 0.5rem;
 }
+
 .hc-quick-card {
     display: flex;
     align-items: center;
@@ -7244,23 +7356,52 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
     box-shadow: var(--shadow);
 }
+
 .hc-quick-card:hover {
     border-color: var(--accent-maroon);
-    box-shadow: 0 4px 16px rgba(96,3,2,0.1);
+    box-shadow: 0 4px 16px rgba(96, 3, 2, 0.1);
     transform: translateY(-2px);
 }
+
 .hc-qc-icon {
-    width: 40px; height: 40px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
-.hc-qc-icon .material-symbols-outlined { font-size: 22px; }
-.hc-qc-body { flex: 1; }
-.hc-qc-title { font-size: 13px; font-weight: 600; color: var(--text-dark); }
-.hc-qc-sub   { font-size: 11.5px; color: var(--text-light); margin-top: 1px; }
-.hc-qc-arrow { font-size: 18px; color: var(--text-light); flex-shrink: 0; }
-.hc-quick-card:hover .hc-qc-arrow { color: var(--accent-maroon); }
+
+.hc-qc-icon .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.hc-qc-body {
+    flex: 1;
+}
+
+.hc-qc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.hc-qc-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+}
+
+.hc-qc-arrow {
+    font-size: 18px;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+
+.hc-quick-card:hover .hc-qc-arrow {
+    color: var(--accent-maroon);
+}
 
 /* ── How it works steps ──────────────────────────────────────── */
 .hc-steps-grid {
@@ -7269,6 +7410,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     gap: 12px;
     margin-bottom: 1.5rem;
 }
+
 .hc-step-card {
     background: var(--card-bg);
     border: 1.5px solid var(--khaki-border);
@@ -7277,23 +7419,45 @@ body:has(#roomScheduleModal:not(.hidden)) {
     position: relative;
     box-shadow: var(--shadow);
 }
+
 .hc-step-badge {
     position: absolute;
-    top: -10px; left: 1rem;
+    top: -10px;
+    left: 1rem;
     background: var(--accent-maroon);
     color: #fff;
-    width: 22px; height: 22px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
 }
+
 .hc-step-icon {
     margin-bottom: 10px;
     margin-top: 6px;
 }
-.hc-step-icon .material-symbols-outlined { font-size: 28px; color: var(--accent-maroon); }
-.hc-step-title { font-size: 13px; font-weight: 700; color: var(--text-dark); margin-bottom: 6px; }
-.hc-step-body  { font-size: 12px; color: var(--text-light); line-height: 1.6; }
+
+.hc-step-icon .material-symbols-outlined {
+    font-size: 28px;
+    color: var(--accent-maroon);
+}
+
+.hc-step-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+}
+
+.hc-step-body {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.6;
+}
 
 /* ── Tip / note box ──────────────────────────────────────────── */
 .hc-tip-box {
@@ -7308,10 +7472,20 @@ body:has(#roomScheduleModal:not(.hidden)) {
     color: var(--text-dark);
     line-height: 1.6;
 }
-.hc-tip-box > .material-symbols-outlined { color: #e67e22; font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+
+.hc-tip-box>.material-symbols-outlined {
+    color: #e67e22;
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
 
 /* ── FAQ accordion ───────────────────────────────────────────── */
-.hc-faq-list { display: flex; flex-direction: column; gap: 8px; }
+.hc-faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 
 .hc-faq-item {
     background: var(--card-bg);
@@ -7321,7 +7495,10 @@ body:has(#roomScheduleModal:not(.hidden)) {
     box-shadow: var(--shadow);
     transition: border-color 0.15s;
 }
-.hc-faq-item[open] { border-color: var(--accent-maroon); }
+
+.hc-faq-item[open] {
+    border-color: var(--accent-maroon);
+}
 
 .hc-faq-q {
     display: flex;
@@ -7333,11 +7510,34 @@ body:has(#roomScheduleModal:not(.hidden)) {
     list-style: none;
     user-select: none;
 }
-.hc-faq-q::-webkit-details-marker { display: none; }
-.hc-faq-q-text { font-size: 13px; font-weight: 600; color: var(--text-dark); flex: 1; line-height: 1.4; }
-.hc-faq-chevron { font-size: 20px; color: var(--text-light); flex-shrink: 0; transition: transform 0.2s; }
-.hc-faq-item[open] .hc-faq-chevron { transform: rotate(180deg); color: var(--accent-maroon); }
-.hc-faq-item[open] .hc-faq-q-text  { color: var(--accent-maroon); }
+
+.hc-faq-q::-webkit-details-marker {
+    display: none;
+}
+
+.hc-faq-q-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    flex: 1;
+    line-height: 1.4;
+}
+
+.hc-faq-chevron {
+    font-size: 20px;
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.hc-faq-item[open] .hc-faq-chevron {
+    transform: rotate(180deg);
+    color: var(--accent-maroon);
+}
+
+.hc-faq-item[open] .hc-faq-q-text {
+    color: var(--accent-maroon);
+}
 
 .hc-faq-a {
     padding: 0 1.25rem 1.1rem;
@@ -7347,28 +7547,82 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-top: 1px solid var(--khaki-border);
     padding-top: 0.9rem;
 }
-.hc-faq-a strong { color: var(--text-dark); }
+
+.hc-faq-a strong {
+    color: var(--text-dark);
+}
 
 /* Status table inside FAQ answer */
-.hc-status-table { display: flex; flex-direction: column; gap: 7px; }
-.hc-st-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-light); }
+.hc-status-table {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.hc-st-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
 .hc-st-pill {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 11px; font-weight: 600;
-    padding: 2px 9px; border-radius: 50px;
-    min-width: 80px; justify-content: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 50px;
+    min-width: 80px;
+    justify-content: center;
     flex-shrink: 0;
 }
+
 .hc-st-pill::before {
-    content: ''; width: 6px; height: 6px;
-    border-radius: 50%; background: currentColor;
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
 }
-.hc-st-pill.pending   { color: #e67e22; background: #fef6e4; border: 1.5px solid #f5cba7; }
-.hc-st-pill.approved  { color: #27ae60; background: #eafaf2; border: 1.5px solid #a9dfbf; }
-.hc-st-pill.declined  { color: #c0392b; background: #fdecea; border: 1.5px solid #e5b8bb; }
-.hc-st-pill.cancelled { color: #6b7280; background: #f1f3f5; border: 1.5px solid #d1d5db; }
-.hc-st-pill.returned  { color: #2980b9; background: #eaf4fc; border: 1.5px solid #aed6f1; }
-.hc-st-pill.overdue   { color: #c0392b; background: #fdecea; border: 1.5px solid #e5b8bb; }
+
+.hc-st-pill.pending {
+    color: #e67e22;
+    background: #fef6e4;
+    border: 1.5px solid #f5cba7;
+}
+
+.hc-st-pill.approved {
+    color: #27ae60;
+    background: #eafaf2;
+    border: 1.5px solid #a9dfbf;
+}
+
+.hc-st-pill.declined {
+    color: #c0392b;
+    background: #fdecea;
+    border: 1.5px solid #e5b8bb;
+}
+
+.hc-st-pill.cancelled {
+    color: #6b7280;
+    background: #f1f3f5;
+    border: 1.5px solid #d1d5db;
+}
+
+.hc-st-pill.returned {
+    color: #2980b9;
+    background: #eaf4fc;
+    border: 1.5px solid #aed6f1;
+}
+
+.hc-st-pill.overdue {
+    color: #c0392b;
+    background: #fdecea;
+    border: 1.5px solid #e5b8bb;
+}
 
 /* ── Guide cards grid ────────────────────────────────────────── */
 .hc-guide-grid {
@@ -7376,6 +7630,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
 }
+
 .hc-guide-card {
     background: var(--card-bg);
     border: 1.5px solid var(--khaki-border);
@@ -7384,21 +7639,55 @@ body:has(#roomScheduleModal:not(.hidden)) {
     box-shadow: var(--shadow);
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.hc-guide-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+
+.hc-guide-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
 .hc-gc-banner {
     height: 76px;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
-.hc-gc-banner .material-symbols-outlined { font-size: 36px; color: rgba(255,255,255,0.5); }
-.hc-gc-body { padding: 0.9rem 1rem; }
-.hc-gc-title { font-size: 13px; font-weight: 700; color: var(--text-dark); margin-bottom: 5px; }
-.hc-gc-desc  { font-size: 11.5px; color: var(--text-light); line-height: 1.55; margin-bottom: 10px; }
-.hc-gc-topics { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.hc-gc-banner .material-symbols-outlined {
+    font-size: 36px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.hc-gc-body {
+    padding: 0.9rem 1rem;
+}
+
+.hc-gc-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+}
+
+.hc-gc-desc {
+    font-size: 11.5px;
+    color: var(--text-light);
+    line-height: 1.55;
+    margin-bottom: 10px;
+}
+
+.hc-gc-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
 .hc-gc-topics span {
-    font-size: 10.5px; color: var(--text-light);
+    font-size: 10.5px;
+    color: var(--text-light);
     background: var(--secondary-cream);
     border: 1px solid var(--khaki-border);
-    padding: 2px 8px; border-radius: 20px;
+    padding: 2px 8px;
+    border-radius: 20px;
 }
 
 /* ── About hero ──────────────────────────────────────────────── */
@@ -7413,32 +7702,68 @@ body:has(#roomScheduleModal:not(.hidden)) {
     margin-bottom: 1.25rem;
     box-shadow: var(--shadow);
 }
+
 .hc-about-logo {
-    width: 56px; height: 56px;
+    width: 56px;
+    height: 56px;
     background: var(--accent-maroon);
     border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
-.hc-about-logo svg { width: 28px; height: 28px; stroke: #fff; }
-.hc-about-name    { font-size: 1.3rem; font-weight: 800; color: var(--accent-maroon); }
-.hc-about-tagline { font-size: 12.5px; color: var(--text-light); margin: 2px 0 6px; }
+
+.hc-about-logo svg {
+    width: 28px;
+    height: 28px;
+    stroke: #fff;
+}
+
+.hc-about-name {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--accent-maroon);
+}
+
+.hc-about-tagline {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin: 2px 0 6px;
+}
+
 .hc-about-ver {
     display: inline-block;
-    font-size: 10.5px; font-weight: 600;
+    font-size: 10.5px;
+    font-weight: 600;
     background: var(--secondary-cream);
     border: 1px solid var(--khaki-border);
-    padding: 2px 10px; border-radius: 50px;
+    padding: 2px 10px;
+    border-radius: 50px;
     color: var(--text-light);
 }
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 900px) {
-    .hc-quick-grid { grid-template-columns: 1fr; }
-    .hc-steps-grid { grid-template-columns: 1fr; }
-    .hc-guide-grid { grid-template-columns: repeat(2, 1fr); }
-    .hc-hero { flex-direction: column; }
+    .hc-quick-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hc-steps-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hc-guide-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hc-hero {
+        flex-direction: column;
+    }
 }
+
 @media (max-width: 640px) {
-    .hc-guide-grid { grid-template-columns: 1fr; }
+    .hc-guide-grid {
+        grid-template-columns: 1fr;
+    }
 }

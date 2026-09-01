@@ -98,7 +98,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div>
                 <div class="dd-menu">
-                    <button class="dd-item" data-action="open-overlay" data-target="accountOverlay">
+                    <button class="dd-item" id="dd-account-btn">
                         <div class="dd-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -106,7 +106,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                                 <circle cx="12" cy="7" r="4" />
                             </svg>
-                        </div>Account
+                        </div>My Account
                     </button>
                     <button class="dd-item" data-action="open-overlay" data-target="notifOverlay">
                         <div class="dd-icon">
@@ -173,7 +173,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </a>
             <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
                 <span class="material-symbols-outlined">inventory_2</span>
-                <span>Inventory</span>
+                <span>Equipment</span>
             </a>
             <a class="nav-item" data-tab="rooms" href="#">
                 <span class="material-symbols-outlined">meeting_room</span>
@@ -183,10 +183,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <span class="material-symbols-outlined">group</span>
                 <span>Faculty</span>
             </a>
-            <a class="nav-item" data-tab="arbitration" id="snav-arbitration" href="#">
-                <span class="material-symbols-outlined">balance</span>
-                <span>Arbitration</span>
-            </a>
 
             <hr class="nav-divider">
 
@@ -194,10 +190,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <a class="nav-item" data-tab="settings" id="snav-settings" href="#">
                     <span class="material-symbols-outlined">settings</span>
                     <span>Settings</span>
-                </a>
-                <a class="nav-item" data-action="open-overlay" data-target="helpCenterOverlay" href="#">
-                    <span class="material-symbols-outlined">help</span>
-                    <span>Help Center</span>
                 </a>
             </div>
 
@@ -532,22 +524,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
 
                 <!-- Sub-tabs -->
-                <div class="rq-sub-tabs" id="rqTabs">
-                    <button class="rq-sub-tab active" data-rq-panel="rq-waiting">
+                <div class="rq-filter-chips" id="rqTabs">
+                    <button class="rq-filter-chip active" data-rq-panel="rq-waiting">
                         Waiting
                         <?php if ($stat_waiting > 0): ?>
-                            <span class="rq-tab-badge"><?php echo $stat_waiting; ?></span>
+                            <span class="rq-chip-count"><?php echo $stat_waiting; ?></span>
                         <?php endif; ?>
                     </button>
-                    <button class="rq-sub-tab" data-rq-panel="rq-active">Active Borrowings</button>
-                    <button class="rq-sub-tab" data-rq-panel="rq-overdue">
+                    <button class="rq-filter-chip" data-rq-panel="rq-active">
+                        Active
+                        <?php if ($stat_approved > 0): ?>
+                            <span class="rq-chip-count rq-chip-count--ok"><?php echo $stat_approved; ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <button class="rq-filter-chip" data-rq-panel="rq-overdue">
                         Overdue
                         <?php if ($stat_overdue > 0): ?>
-                            <span class="rq-tab-badge"><?php echo $stat_overdue; ?></span>
+                            <span class="rq-chip-count"><?php echo $stat_overdue; ?></span>
                         <?php endif; ?>
                     </button>
-                    <button class="rq-sub-tab" data-rq-panel="rq-history">History</button>
-                    <button class="rq-sub-tab" data-rq-panel="rq-all">All Requests</button>
+                    <button class="rq-filter-chip" data-rq-panel="rq-all">Returned</button>
                 </div>
 
                 <!-- ── WAITING ───────────────────────────────────────────── -->
@@ -768,79 +764,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /rq-overdue -->
 
-                <!-- ── HISTORY ────────────────────────────────────────────── -->
-                <div class="rq-sub-panel" id="rq-history">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Request History</h3>
-                            <select class="ps-form-control" style="width:160px">
-                                <option>All time</option>
-                                <option>This week</option>
-                                <option>This month</option>
-                            </select>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Request ID</th>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Status</th>
-                                        <th>Returned</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $history_q = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status IN ('Returned','Declined') ORDER BY request_date DESC LIMIT 50");
-                                    if ($history_q && mysqli_num_rows($history_q) > 0):
-                                        while ($r = mysqli_fetch_assoc($history_q)):
-                                            $hbadge = $r['status'] === 'Returned' ? 'ps-badge--returned' : 'ps-badge--overdue';
-                                    ?>
-                                            <tr>
-                                                <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
-                                                    #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><span class="ps-badge ps-badge--dot <?php echo $hbadge; ?>"><?php echo htmlspecialchars($r['status']); ?></span></td>
-                                                <td><?php echo date('M d', strtotime($r['return_date'])); ?></td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">history</span>
-                                                    <p>No request history yet.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-history -->
-
-                <!-- ── ALL REQUESTS ──────────────────────────────────────── -->
+                <!-- ── RETURNED (merged: was "History" + "All Requests") ──── -->
                 <div class="rq-sub-panel" id="rq-all">
+                    <div class="ps-help-note">
+                        <span class="material-symbols-outlined">info</span>
+                        Shows returned requests by default. Use the status filter to browse declined items or any other status.
+                    </div>
                     <div class="ps-card">
                         <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">list_alt</span> All Requests</h3>
+                            <h3><span class="material-symbols-outlined">history</span> Returned Requests</h3>
                             <div style="display:flex;gap:6px">
                                 <input class="ps-form-control" style="width:220px" placeholder="Search..." id="rq-all-search">
                                 <select class="ps-form-control" style="width:140px" id="rq-all-status">
                                     <option value="">All statuses</option>
                                     <option value="Waiting">Waiting</option>
                                     <option value="Approved">Active</option>
-                                    <option value="Returned">Returned</option>
+                                    <option value="Returned" selected>Returned</option>
                                     <option value="Overdue">Overdue</option>
                                     <option value="Declined">Declined</option>
                                 </select>
@@ -934,176 +873,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
             <!-- ============================================================
-         TAB: ARBITRATION  (Phase 3 redesign)
-    ============================================================ -->
-            <div class="tab-panel" id="panel-arbitration">
-
-                <div class="ps-page-header-row">
-                    <div class="ps-page-header">
-                        <h1>Arbitration Engine</h1>
-                        <p>Configure automatic request processing rules and view the decision log.</p>
-                    </div>
-                </div>
-
-                <!-- Sub-tabs -->
-                <div class="rq-sub-tabs" id="arbSubTabs">
-                    <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
-                    <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
-                </div>
-
-                <!-- ── CONFIGURATION ─────────────────────────────────────── -->
-                <div class="arb-sub-panel active" id="arb-sub-config">
-                    <div class="ps-help-note">
-                        <span class="material-symbols-outlined">info</span>
-                        These rules determine how the system automatically approves or declines requests. Changes take effect immediately.
-                    </div>
-                    <div class="ps-two-col">
-                        <!-- Left: Rules -->
-                        <div class="ps-card">
-                            <div class="ps-card-header">
-                                <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
-                            </div>
-                            <div class="ps-card-body">
-                                <div class="arb-rule">
-                                    <h4>
-                                        <span class="material-symbols-outlined">check_circle</span>
-                                        Auto-approve Faculty Requests
-                                        <label class="ps-toggle" style="margin-left:auto">
-                                            <input type="checkbox" checked>
-                                            <span class="ps-toggle-track"></span>
-                                        </label>
-                                    </h4>
-                                    <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
-                                </div>
-                                <div class="arb-rule">
-                                    <h4>
-                                        <span class="material-symbols-outlined">block</span>
-                                        Block Overdue Borrowers
-                                        <label class="ps-toggle" style="margin-left:auto">
-                                            <input type="checkbox"
-                                                <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
-                                            <span class="ps-toggle-track"></span>
-                                        </label>
-                                    </h4>
-                                    <p>Automatically decline new requests from users with overdue items.</p>
-                                </div>
-                                <div class="arb-rule">
-                                    <h4>
-                                        <span class="material-symbols-outlined">inventory</span>
-                                        Stock-Based Rejection
-                                        <label class="ps-toggle" style="margin-left:auto">
-                                            <input type="checkbox"
-                                                <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
-                                            <span class="ps-toggle-track"></span>
-                                        </label>
-                                    </h4>
-                                    <p>Automatically decline if available stock falls below minimum threshold.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Right: Thresholds -->
-                        <div class="ps-card">
-                            <div class="ps-card-header">
-                                <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
-                            </div>
-                            <div class="ps-card-body">
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Maximum Borrow Days</label>
-                                    <input class="ps-form-control" type="number" min="1" max="60"
-                                        value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
-                                    <div class="ps-form-hint">Items must be returned within this many days.</div>
-                                </div>
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Max Items Per Borrower</label>
-                                    <input class="ps-form-control" type="number" min="1" max="20"
-                                        value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
-                                    <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
-                                </div>
-                                <div class="ps-form-group">
-                                    <label class="ps-form-label">Low Stock Threshold</label>
-                                    <input class="ps-form-control" type="number" min="0" max="10"
-                                        value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
-                                    <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
-                                </div>
-                                <button type="button" class="ps-btn ps-btn--primary"
-                                    style="width:100%;justify-content:center;margin-top:0.25rem">
-                                    <span class="material-symbols-outlined">save</span> Save Configuration
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div><!-- /arb-sub-config -->
-
-                <!-- ── DECISION LOG ───────────────────────────────────────── -->
-                <div class="arb-sub-panel" id="arb-sub-log">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
-                            <select class="ps-form-control" style="width:160px" id="arb-log-filter">
-                                <option value="">All decisions</option>
-                                <option value="Approved">Auto-approved</option>
-                                <option value="Declined">Auto-declined</option>
-                            </select>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table" id="arb-log-new-table">
-                                <thead>
-                                    <tr>
-                                        <th>Request ID</th>
-                                        <th>Decision</th>
-                                        <th>Rule Triggered</th>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Timestamp</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
-                                    ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">history</span>
-                                                    <p>No arbitration log entries yet.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        <?php else:
-                                        mysqli_data_seek($arb_log_result, 0);
-                                        while ($r = mysqli_fetch_assoc($arb_log_result)):
-                                            $dec    = $r['decision'];
-                                            $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
-                                        ?>
-                                            <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
-                                                <td style="font-weight:600;color:var(--accent-maroon)">
-                                                    <?php echo htmlspecialchars($r['request_id']); ?>
-                                                </td>
-                                                <td>
-                                                    <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
-                                                        <?php echo htmlspecialchars($dec); ?>
-                                                    </span>
-                                                </td>
-                                                <td style="font-size:12px;color:var(--text-light)">
-                                                    <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td style="font-size:12px;color:var(--text-light)">
-                                                    <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
-                                                </td>
-                                            </tr>
-                                    <?php endwhile;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /arb-sub-log -->
-
-            </div><!-- /panel-arbitration -->
-
-
             <!-- ============================================================
          TAB: LENDING  (legacy — Inventory and Arbitration still use this)
     ============================================================ -->
@@ -1963,10 +1732,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <h1 class="pr-page-title">Room Management</h1>
                         <p class="pr-page-subtitle">Manage campus rooms, reservations, and reported issues. <?php echo $stat_rooms_total; ?> active room<?php echo $stat_rooms_total !== 1 ? 's' : ''; ?> — <?php echo $stat_rooms_available; ?> Available, <?php echo $stat_rooms_maintenance; ?> Maintenance, <?php echo $stat_rooms_notbookable; ?> Not Bookable.</p>
                     </div>
-                    <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
-                        <span class="material-symbols-outlined">add</span>
-                        Add Room
-                    </button>
+                    <div style="display:flex;gap:8px;flex-shrink:0;">
+                        <button class="pr-btn pr-btn-ghost pr-btn-sm" data-rooms-tab="rooms-archived" title="View archived rooms">
+                            <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                            Archived
+                            <?php if (!empty($rooms_archived)): ?>
+                                <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo count($rooms_archived); ?></span>
+                            <?php endif; ?>
+                        </button>
+                        <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
+                            <span class="material-symbols-outlined">add</span>
+                            Add Room
+                        </button>
+                    </div>
                 </div>
 
                 <!-- ── Add / Edit Room form (hidden by default) ────────── -->
@@ -2184,21 +1962,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div><!-- /.eq-card.form-card -->
                 </div><!-- /#room-form-wrap -->
 
-                <!-- ── Tab navigation (prototype redesign) ───────────────── -->
+                <!-- ── Tab navigation (streamlined: 2 tabs — Rooms + Issues) ── -->
                 <div class="pr-sub-tabs" id="rooms-toggle-wrap">
-                    <button class="pr-sub-tab active" data-rooms-tab="rooms-active">Active Rooms</button>
-                    <button class="pr-sub-tab" data-rooms-tab="rooms-archived">
-                        Archived
-                        <?php if (!empty($rooms_archived)): ?>
-                            <span class="pr-tab-badge"><?php echo count($rooms_archived); ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="pr-sub-tab" data-rooms-tab="rooms-reservations">
-                        Reservations
-                        <?php if (!empty($admin_room_reservations)): ?>
-                            <span class="pr-tab-badge"><?php echo count($admin_room_reservations); ?></span>
-                        <?php endif; ?>
-                    </button>
+                    <button class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
                     <button class="pr-sub-tab" data-rooms-tab="rooms-issues">
                         Issues
                         <?php if (!empty($admin_room_issues_open)): ?>
@@ -2211,6 +1977,88 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      SUB-PANEL: ACTIVE ROOMS
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
+
+                    <div class="pr-card">
+                        <div class="pr-card-header">
+                            <h3>
+                                <span class="material-symbols-outlined">calendar_month</span>
+                                Reservations
+                            </h3>
+                        </div>
+                        <div class="pr-card-note">
+                            Reservations across all rooms and faculty. Cancel any Approved reservation below.
+                        </div>
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Room</th>
+                                        <th>Location</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Faculty</th>
+                                        <th>Submitted As</th>
+                                        <th>Purpose</th>
+                                        <th>Status</th>
+                                        <th>Reason</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($admin_room_reservations)): ?>
+                                        <tr>
+                                            <td colspan="11" style="text-align:center;padding:2.5rem;color:var(--text-light);">No reservations yet.</td>
+                                        </tr>
+                                        <?php else: foreach ($admin_room_reservations as $ar):
+                                            $ar_pill = 'pr-pill-approved';
+                                            if ($ar['status'] === 'Declined')  $ar_pill = 'pr-pill-declined';
+                                            if ($ar['status'] === 'Cancelled') $ar_pill = 'pr-pill-cancelled';
+
+                                            $ar_submitted = match ($ar['submitted_as']) {
+                                                'adviser' => 'Adviser',
+                                                'student' => 'Student (via code)',
+                                                default   => 'Personal',
+                                            };
+                                            $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
+                                                ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
+                                                : htmlspecialchars($ar['faculty_name']);
+                                        ?>
+                                            <tr>
+                                                <td class="td-sm">#<?php echo (int)$ar['id']; ?></td>
+                                                <td class="td-fw"><?php echo htmlspecialchars($ar['room_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($ar['floor_label'] . ', ' . $ar['building_name']); ?></td>
+                                                <td><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></td>
+                                                <td style="white-space:nowrap;"><?php echo htmlspecialchars($ar['start_fmt'] . ' – ' . $ar['end_fmt']); ?></td>
+                                                <td><?php echo $ar_who; ?></td>
+                                                <td><?php echo htmlspecialchars($ar_submitted); ?></td>
+                                                <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
+                                                <td><span class="pr-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
+                                                <td class="td-sm"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
+                                                <td>
+                                                    <?php if ($ar['status'] === 'Approved'): ?>
+                                                        <button class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
+                                                            data-action="admin-cancel-reservation"
+                                                            data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                            data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                            data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
+                                                            title="Cancel this reservation">
+                                                            <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
+                                                            Cancel
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <span class="td-sm">—</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                    <?php endforeach;
+                                    endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <p style="font-size:0.67rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text-light);margin:1.5rem 0 0.75rem;">All Rooms</p>
 
                     <?php if (empty($rooms_list)): ?>
                         <div class="pr-empty">
@@ -2365,91 +2213,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             </div>
                                         </div>
                                     </div><!-- /#rooms-archived-panel -->
-
-                                    <!-- ════════════════════════════════════════════════════
-                     SUB-PANEL: RESERVATIONS
-                     ════════════════════════════════════════════════════ -->
-                                    <div class="rooms-sub-panel" id="rooms-reservations-panel">
-                                        <div class="pr-card">
-                                            <div class="pr-card-header">
-                                                <h3>
-                                                    <span class="material-symbols-outlined">calendar_month</span>
-                                                    All Reservations
-                                                </h3>
-                                            </div>
-                                            <div class="pr-card-note">
-                                                All room reservations across all faculty and rooms. Admin can cancel any Approved reservation.
-                                            </div>
-                                            <div class="pr-tbl-wrap">
-                                                <table class="pr-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>#</th>
-                                                            <th>Room</th>
-                                                            <th>Location</th>
-                                                            <th>Date</th>
-                                                            <th>Time</th>
-                                                            <th>Faculty</th>
-                                                            <th>Submitted As</th>
-                                                            <th>Purpose</th>
-                                                            <th>Status</th>
-                                                            <th>Reason</th>
-                                                            <th>Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <?php if (empty($admin_room_reservations)): ?>
-                                                            <tr>
-                                                                <td colspan="11" style="text-align:center;padding:2.5rem;color:var(--text-light);">No reservations yet.</td>
-                                                            </tr>
-                                                            <?php else: foreach ($admin_room_reservations as $ar):
-                                                                $ar_pill = 'pr-pill-approved';
-                                                                if ($ar['status'] === 'Declined')  $ar_pill = 'pr-pill-declined';
-                                                                if ($ar['status'] === 'Cancelled') $ar_pill = 'pr-pill-cancelled';
-
-                                                                $ar_submitted = match ($ar['submitted_as']) {
-                                                                    'adviser' => 'Adviser',
-                                                                    'student' => 'Student (via code)',
-                                                                    default   => 'Personal',
-                                                                };
-                                                                $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
-                                                                    ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
-                                                                    : htmlspecialchars($ar['faculty_name']);
-                                                            ?>
-                                                                <tr>
-                                                                    <td class="td-sm">#<?php echo (int)$ar['id']; ?></td>
-                                                                    <td class="td-fw"><?php echo htmlspecialchars($ar['room_name']); ?></td>
-                                                                    <td><?php echo htmlspecialchars($ar['floor_label'] . ', ' . $ar['building_name']); ?></td>
-                                                                    <td><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></td>
-                                                                    <td style="white-space:nowrap;"><?php echo htmlspecialchars($ar['start_fmt'] . ' – ' . $ar['end_fmt']); ?></td>
-                                                                    <td><?php echo $ar_who; ?></td>
-                                                                    <td><?php echo htmlspecialchars($ar_submitted); ?></td>
-                                                                    <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
-                                                                    <td><span class="pr-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
-                                                                    <td class="td-sm"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
-                                                                    <td>
-                                                                        <?php if ($ar['status'] === 'Approved'): ?>
-                                                                            <button class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
-                                                                                data-action="admin-cancel-reservation"
-                                                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
-                                                                                data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
-                                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
-                                                                                title="Cancel this reservation">
-                                                                                <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
-                                                                                Cancel
-                                                                            </button>
-                                                                        <?php else: ?>
-                                                                            <span class="td-sm">—</span>
-                                                                        <?php endif; ?>
-                                                                    </td>
-                                                                </tr>
-                                                        <?php endforeach;
-                                                        endif; ?>
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div><!-- /#rooms-reservations-panel -->
 
                                     <!-- ════════════════════════════════════════════════════
                      SUB-PANEL: ROOM ISSUES
@@ -3153,15 +2916,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <h1 class="inv-page-title">Equipment Inventory</h1>
                                                 <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
                                             </div>
-                                            <button class="btn-add-item btn-inv-add-primary" type="button">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                                    stroke-linejoin="round" width="15" height="15">
-                                                    <line x1="12" y1="5" x2="12" y2="19" />
-                                                    <line x1="5" y1="12" x2="19" y2="12" />
-                                                </svg>
-                                                Add Equipment
-                                            </button>
                                         </div>
 
                                         <!-- Split Layout -->
@@ -3451,203 +3205,1060 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div><!-- /panel-inventory -->
 
                                 <!-- ============================================================
-         TAB: SETTINGS
+    <!-- ============================================================
+         TAB: SETTINGS  (streamlined — consolidates the old Settings tab,
+         Account overlay, Arbitration tab, and Help Center overlay into
+         one screen with four sub-tabs)
     ============================================================ -->
                                 <div class="tab-panel" id="panel-settings">
 
                                     <!-- Page Header -->
                                     <div class="sett-page-header">
                                         <h1 class="sett-page-title">Settings</h1>
-                                        <p class="sett-page-sub">Manage your admin account, appearance, and notification preferences.</p>
+                                        <p class="sett-page-sub">Manage your account, preferences, borrowing rules, and get help.</p>
                                     </div>
 
-                                    <!-- Profile Banner -->
-                                    <div class="sett-profile-banner">
-                                        <div class="sett-profile-avatar">
-                                            <?php echo strtoupper(substr($admin_name, 0, 1)); ?>
-                                        </div>
-                                        <div class="sett-profile-info">
-                                            <div class="sett-profile-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                                            <div class="sett-profile-meta">Administrator &middot; Full Access &middot; <?php echo htmlspecialchars($admin_email); ?></div>
-                                        </div>
-                                        <button class="sett-edit-btn" data-action="show-change-pass">Edit Profile</button>
+                                    <!-- Settings mega sub-tabs -->
+                                    <div class="rq-sub-tabs" id="settMainTabs">
+                                        <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
+                                        <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
+                                        <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
+                                        <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                                     </div>
 
-                                    <!-- 2-Column Card Grid -->
-                                    <div class="sett-grid">
+                                    <!-- ── MY ACCOUNT ─────────────────────────────────────── -->
+                                    <div class="rq-sub-panel active" id="sett-account">
+                                        <div class="account-layout">
 
-                                        <!-- Appearance -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">palette</span>
-                                                <h3>Appearance</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="sett-field-lbl">Theme</div>
-                                                <div class="sett-theme-row">
-                                                    <div class="sett-theme-opt sett-theme-sel" id="tp-light" data-action="apply-theme" data-theme="light">
-                                                        &#9728;&#65039; Light
-                                                    </div>
-                                                    <div class="sett-theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
-                                                        &#127769; Dark
-                                                    </div>
-                                                    <div class="sett-theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
-                                                        &#9889; High Contrast
-                                                    </div>
-                                                </div>
-                                                <div class="sett-toggle-row">
-                                                    <div class="sett-toggle-lbl">
-                                                        <span class="sett-tgl-title">Compact Mode</span>
-                                                    </div>
-                                                    <div style="display:flex;align-items:center;gap:10px;">
-                                                        <label class="toggle-sw">
-                                                            <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
-                                                            <span class="toggle-track"></span>
-                                                        </label>
-                                                        <span class="sett-tgl-sub">Reduce spacing for denser view</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Notification Preferences -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">notifications</span>
-                                                <h3>Notification Preferences</h3>
-                                            </div>
-                                            <div class="sett-card-body sett-card-body--notifs">
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" checked>
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">New Requests</div>
-                                                        <div class="sett-notif-sub">Alert when faculty submits a request</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" checked>
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Overdue Alerts</div>
-                                                        <div class="sett-notif-sub">Alert when an item becomes overdue</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Room Issues</div>
-                                                        <div class="sett-notif-sub">Alert when a room issue is reported</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <!-- Security -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">lock</span>
-                                                <h3>Security</h3>
-                                            </div>
-                                            <div class="sett-card-body">
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Current Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">New Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Confirm New Password</label>
-                                                    <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                                                </div>
-                                                <button class="sett-update-pw-btn" data-action="show-change-pass">
-                                                    Update Password
+                                            <!-- Sidebar -->
+                                            <div class="account-sidebar">
+                                                <span class="account-sidebar-label">Account</span>
+                                                <button class="acc-nav-btn active" data-acc-tab="acc-overview">
+                                                    <span class="material-symbols-outlined">account_circle</span>
+                                                    Overview
+                                                </button>
+                                                <button class="acc-nav-btn" data-acc-tab="acc-security">
+                                                    <span class="material-symbols-outlined">lock</span>
+                                                    Security
+                                                </button>
+                                                <button class="acc-nav-btn" data-acc-tab="acc-sessions">
+                                                    <span class="material-symbols-outlined">devices</span>
+                                                    Sessions
                                                 </button>
                                             </div>
+
+                                            <!-- Content -->
+                                            <div class="account-content">
+
+                                                <!-- ── Overview ───────────────────────────────────── -->
+                                                <div id="acc-overview" class="overlay-sub-panel active">
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">My Account</span>
+                                                        <h2>Profile Overview</h2>
+                                                        <p>View and update your administrator profile information.</p>
+                                                    </div>
+
+                                                    <!-- Profile Hero -->
+                                                    <div class="ov-profile-hero" id="acctHero">
+                                                        <div class="ov-av-lg">
+                                                            <?php echo htmlspecialchars($initials); ?>
+                                                        </div>
+                                                        <div class="ov-hero-body">
+                                                            <div class="ov-hero-name"><?php echo htmlspecialchars($admin_name); ?></div>
+                                                            <div class="ov-hero-role">Administrator &middot; PUPSync Biñan Campus</div>
+                                                            <div class="ov-hero-badge">
+                                                                <span class="material-symbols-outlined">verified</span>
+                                                                Active &middot; Full Access
+                                                            </div>
+                                                        </div>
+                                                        <div class="ov-hero-actions">
+                                                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
+                                                                <span class="material-symbols-outlined">edit</span>
+                                                                Edit Profile
+                                                            </button>
+                                                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;"
+                                                                data-action="profile-save">
+                                                                <span class="material-symbols-outlined">save</span>
+                                                                Save Changes
+                                                            </button>
+                                                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;"
+                                                                data-action="profile-cancel">
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Personal Information -->
+                                                    <div class="info-card" id="profileInfoCard">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">person</span>
+                                                                Personal Information
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Display Name</span>
+                                                            <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
+                                                                data-field="admin_name">
+                                                                <?php echo !empty($admin_name) ? htmlspecialchars($admin_name) : '— Not provided'; ?>
+                                                            </span>
+                                                            <input class="info-input-f" data-input="admin_name"
+                                                                value="<?php echo htmlspecialchars($admin_name ?? ''); ?>"
+                                                                placeholder="Display Name" disabled style="display:none;">
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Role</span>
+                                                            <span class="info-val">Administrator</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Email Address</span>
+                                                            <span class="info-val <?php echo empty($admin_email) ? 'empty' : ''; ?>"
+                                                                data-field="admin_email">
+                                                                <?php echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; ?>
+                                                            </span>
+                                                            <input class="info-input-f" data-input="admin_email" type="email"
+                                                                value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
+                                                                placeholder="admin@pup.edu.ph" disabled style="display:none;">
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Campus</span>
+                                                            <span class="info-val">PUPSync Biñan Campus</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Access Level</span>
+                                                            <span class="info-val">
+                                                                <span class="ov-access-badge">Full Access</span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Activity Summary -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">bar_chart</span>
+                                                                Activity Summary
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Requests Processed</span>
+                                                            <span class="info-val ov-stat-val">
+                                                                <?php echo $stat_total_req ?? '0'; ?> total
+                                                            </span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Faculty Accounts Created</span>
+                                                            <span class="info-val">
+                                                                <?php
+                                                                $fac_count = mysqli_fetch_assoc(
+                                                                    mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role='faculty'")
+                                                                )['c'] ?? 0;
+                                                                echo $fac_count;
+                                                                ?>
+                                                            </span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Last Login</span>
+                                                            <span class="info-val">
+                                                                <?php
+                                                                $ll = '— Not available';
+                                                                if (!empty($_SESSION['admin_last_login'])) {
+                                                                    $ts = strtotime($_SESSION['admin_last_login']);
+                                                                    if ($ts !== false) $ll = date('M d, Y · g:i A', $ts);
+                                                                }
+                                                                echo htmlspecialchars($ll);
+                                                                ?>
+                                                            </span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Active Equipment</span>
+                                                            <span class="info-val"><?php echo $stat_inv_total ?? '0'; ?> items</span>
+                                                        </div>
+                                                    </div>
+                                                </div><!-- /acc-overview -->
+
+                                                <!-- ── Security ────────────────────────────────────── -->
+                                                <div id="acc-security" class="overlay-sub-panel">
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">Security</span>
+                                                        <h2>Password &amp; Security</h2>
+                                                        <p>Manage your login credentials and account security settings.</p>
+                                                    </div>
+
+                                                    <!-- Password Card -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">lock</span>
+                                                                Password
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Current Password</span>
+                                                            <span class="info-val">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>
+                                                            <button class="btn-inline-sm" data-action="open-change-pass">Change</button>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Last Changed</span>
+                                                            <span class="info-val" style="color:var(--text-light)">— Not tracked</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Login Security Card -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">shield</span>
+                                                                Login Security
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Last Login</span>
+                                                            <span class="info-val">
+                                                                <?php echo htmlspecialchars($ll ?? '— Not available'); ?>
+                                                            </span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Session Status</span>
+                                                            <span class="info-val">
+                                                                <span class="ov-status-dot">Active</span>
+                                                            </span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Login Attempts</span>
+                                                            <span class="info-val">0 failed attempts</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Force Logout</span>
+                                                            <span class="info-val">
+                                                                <button class="btn-inline-danger" data-action="logout">
+                                                                    Log Out All Sessions
+                                                                </button>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div><!-- /acc-security -->
+
+                                                <!-- ── Sessions ────────────────────────────────────── -->
+                                                <div id="acc-sessions" class="overlay-sub-panel">
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">Security</span>
+                                                        <h2>Active Sessions</h2>
+                                                        <p>Review devices currently logged in to your admin account.</p>
+                                                    </div>
+
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">devices</span>
+                                                                Current Sessions
+                                                            </h3>
+                                                        </div>
+                                                        <!-- Current device row -->
+                                                        <div class="ov-session-row">
+                                                            <div class="ov-device-icon">
+                                                                <span class="material-symbols-outlined">computer</span>
+                                                            </div>
+                                                            <div class="ov-session-info">
+                                                                <div class="ov-session-device">Chrome &middot; Windows</div>
+                                                                <div class="ov-session-meta">
+                                                                    Biñan, Laguna &middot;
+                                                                    <?php
+                                                                    $ll_disp = '—';
+                                                                    if (!empty($_SESSION['admin_last_login'])) {
+                                                                        $ts = strtotime($_SESSION['admin_last_login']);
+                                                                        if ($ts !== false) $ll_disp = date('M d, Y · g:i A', $ts);
+                                                                    }
+                                                                    echo htmlspecialchars($ll_disp);
+                                                                    ?>
+                                                                </div>
+                                                            </div>
+                                                            <span class="ov-session-badge">Current</span>
+                                                        </div>
+                                                        <!-- Placeholder inactive session -->
+                                                        <div class="ov-session-row">
+                                                            <div class="ov-device-icon ov-device-muted">
+                                                                <span class="material-symbols-outlined">phone_android</span>
+                                                            </div>
+                                                            <div class="ov-session-info">
+                                                                <div class="ov-session-device">Mobile Safari &middot; iPhone</div>
+                                                                <div class="ov-session-meta">Biñan, Laguna &middot; — No data</div>
+                                                            </div>
+                                                            <button class="btn-inline-sm ov-revoke-btn">Revoke</button>
+                                                        </div>
+                                                    </div>
+                                                </div><!-- /acc-sessions -->
+
+                                            </div><!-- /account-content -->
+                                        </div><!-- /account-layout -->
+                                    </div><!-- /sett-account -->
+
+                                    <!-- ── PREFERENCES ────────────────────────────────────── -->
+                                    <div class="rq-sub-panel" id="sett-prefs">
+                                        <div class="sett-grid">
+                                            <div class="sett-card">
+                                                <div class="sett-card-head">
+                                                    <span class="material-symbols-outlined">palette</span>
+                                                    <h3>Appearance</h3>
+                                                </div>
+                                                <div class="sett-card-body">
+                                                    <div class="sett-field-lbl">Theme</div>
+                                                    <div class="sett-theme-row">
+                                                        <div class="sett-theme-opt sett-theme-sel" id="tp-light" data-action="apply-theme" data-theme="light">
+                                                            &#9728;&#65039; Light
+                                                        </div>
+                                                        <div class="sett-theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
+                                                            &#127769; Dark
+                                                        </div>
+                                                        <div class="sett-theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
+                                                            &#9889; High Contrast
+                                                        </div>
+                                                    </div>
+                                                    <div class="sett-toggle-row">
+                                                        <div class="sett-toggle-lbl">
+                                                            <span class="sett-tgl-title">Compact Mode</span>
+                                                        </div>
+                                                        <div style="display:flex;align-items:center;gap:10px;">
+                                                            <label class="toggle-sw">
+                                                                <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
+                                                                <span class="toggle-track"></span>
+                                                            </label>
+                                                            <span class="sett-tgl-sub">Reduce spacing for denser view</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="sett-card">
+                                                <div class="sett-card-head">
+                                                    <span class="material-symbols-outlined">notifications</span>
+                                                    <h3>Notification Preferences</h3>
+                                                </div>
+                                                <div class="sett-card-body sett-card-body--notifs">
+                                                    <div class="sett-notif-row">
+                                                        <label class="toggle-sw">
+                                                            <input type="checkbox" checked>
+                                                            <span class="toggle-track"></span>
+                                                        </label>
+                                                        <div>
+                                                            <div class="sett-notif-title">New Requests</div>
+                                                            <div class="sett-notif-sub">Alert when faculty submits a request</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="sett-notif-row">
+                                                        <label class="toggle-sw">
+                                                            <input type="checkbox" checked>
+                                                            <span class="toggle-track"></span>
+                                                        </label>
+                                                        <div>
+                                                            <div class="sett-notif-title">Overdue Alerts</div>
+                                                            <div class="sett-notif-sub">Alert when an item becomes overdue</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="sett-notif-row">
+                                                        <label class="toggle-sw">
+                                                            <input type="checkbox">
+                                                            <span class="toggle-track"></span>
+                                                        </label>
+                                                        <div>
+                                                            <div class="sett-notif-title">Room Issues</div>
+                                                            <div class="sett-notif-sub">Alert when a room issue is reported</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="sett-card">
+                                                <div class="sett-card-head">
+                                                    <span class="material-symbols-outlined">accessibility</span>
+                                                    <h3>Accessibility</h3>
+                                                </div>
+                                                <div class="sett-card-body">
+                                                    <div class="form-group">
+                                                        <label class="sett-field-lbl">Text Size</label>
+                                                        <select class="form-control-custom">
+                                                            <option>Normal</option>
+                                                            <option>Large</option>
+                                                            <option>X-Large</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="sett-notif-row">
+                                                        <label class="toggle-sw">
+                                                            <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
+                                                            <span class="toggle-track"></span>
+                                                        </label>
+                                                        <div>
+                                                            <div class="sett-notif-title">Reduce animations</div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="sett-notif-row">
+                                                        <label class="toggle-sw">
+                                                            <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
+                                                            <span class="toggle-track"></span>
+                                                        </label>
+                                                        <div>
+                                                            <div class="sett-notif-title">Enhanced Focus Ring</div>
+                                                            <div class="sett-notif-sub">Makes keyboard focus outlines more visible</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div><!-- /sett-grid -->
+
+                                        <div class="sett-danger-wrap">
+                                            <div class="sett-danger-wrap">
+                                                <div class="sett-card sett-danger-bdr">
+                                                    <div class="sett-card-head">
+                                                        <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
+                                                        <h3 style="color:var(--danger)">Advanced</h3>
+                                                    </div>
+                                                    <div class="sett-card-body">
+                                                        <div class="sett-notif-row">
+                                                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                                            <div>
+                                                                <div class="sett-notif-title">Show Asset IDs</div>
+                                                                <div class="sett-notif-sub">Display equipment item IDs in tables</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="sett-notif-row">
+                                                            <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                                            <div>
+                                                                <div class="sett-notif-title">Verbose Error Messages</div>
+                                                                <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="sett-adv-reset-row">
+                                                            <div>
+                                                                <div class="sett-notif-title" style="color:var(--danger)">Reset All Settings</div>
+                                                                <div class="sett-notif-sub">Restore all appearance and accessibility defaults</div>
+                                                            </div>
+                                                            <button class="sett-reset-btn" data-action="reset-settings">
+                                                                <span class="material-symbols-outlined">restart_alt</span> Reset
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div><!-- /sett-prefs -->
+
+                                    <!-- ── BORROWING RULES (was the standalone Arbitration tab) ── -->
+                                    <div class="rq-sub-panel" id="sett-rules">
+                                        <div class="ps-help-note" style="margin-top:0">
+                                            <span class="material-symbols-outlined">info</span>
+                                            These rules control how the system automatically handles incoming requests. Changes take effect immediately.
                                         </div>
 
-                                        <!-- Accessibility -->
-                                        <div class="sett-card">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined">accessibility</span>
-                                                <h3>Accessibility</h3>
+                                        <!-- Sub-tabs -->
+                                        <div class="rq-sub-tabs" id="arbSubTabs">
+                                            <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
+                                            <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
+                                        </div>
+
+                                        <!-- ── CONFIGURATION ─────────────────────────────────────── -->
+                                        <div class="arb-sub-panel active" id="arb-sub-config">
+                                            <div class="ps-two-col">
+                                                <!-- Left: Rules -->
+                                                <div class="ps-card">
+                                                    <div class="ps-card-header">
+                                                        <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
+                                                    </div>
+                                                    <div class="ps-card-body">
+                                                        <div class="arb-rule">
+                                                            <h4>
+                                                                <span class="material-symbols-outlined">check_circle</span>
+                                                                Auto-approve Faculty Requests
+                                                                <label class="ps-toggle" style="margin-left:auto">
+                                                                    <input type="checkbox" checked>
+                                                                    <span class="ps-toggle-track"></span>
+                                                                </label>
+                                                            </h4>
+                                                            <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
+                                                        </div>
+                                                        <div class="arb-rule">
+                                                            <h4>
+                                                                <span class="material-symbols-outlined">block</span>
+                                                                Block Overdue Borrowers
+                                                                <label class="ps-toggle" style="margin-left:auto">
+                                                                    <input type="checkbox"
+                                                                        <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
+                                                                    <span class="ps-toggle-track"></span>
+                                                                </label>
+                                                            </h4>
+                                                            <p>Automatically decline new requests from users with overdue items.</p>
+                                                        </div>
+                                                        <div class="arb-rule">
+                                                            <h4>
+                                                                <span class="material-symbols-outlined">inventory</span>
+                                                                Stock-Based Rejection
+                                                                <label class="ps-toggle" style="margin-left:auto">
+                                                                    <input type="checkbox"
+                                                                        <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
+                                                                    <span class="ps-toggle-track"></span>
+                                                                </label>
+                                                            </h4>
+                                                            <p>Automatically decline if available stock falls below minimum threshold.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- Right: Thresholds -->
+                                                <div class="ps-card">
+                                                    <div class="ps-card-header">
+                                                        <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
+                                                    </div>
+                                                    <div class="ps-card-body">
+                                                        <div class="ps-form-group">
+                                                            <label class="ps-form-label">Maximum Borrow Days</label>
+                                                            <input class="ps-form-control" type="number" min="1" max="60"
+                                                                value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
+                                                            <div class="ps-form-hint">Items must be returned within this many days.</div>
+                                                        </div>
+                                                        <div class="ps-form-group">
+                                                            <label class="ps-form-label">Max Items Per Borrower</label>
+                                                            <input class="ps-form-control" type="number" min="1" max="20"
+                                                                value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
+                                                            <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
+                                                        </div>
+                                                        <div class="ps-form-group">
+                                                            <label class="ps-form-label">Low Stock Threshold</label>
+                                                            <input class="ps-form-control" type="number" min="0" max="10"
+                                                                value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
+                                                            <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
+                                                        </div>
+                                                        <button type="button" class="ps-btn ps-btn--primary"
+                                                            style="width:100%;justify-content:center;margin-top:0.25rem">
+                                                            <span class="material-symbols-outlined">save</span> Save Configuration
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="sett-card-body">
-                                                <div class="form-group">
-                                                    <label class="sett-field-lbl">Text Size</label>
-                                                    <select class="form-control-custom">
-                                                        <option>Normal</option>
-                                                        <option>Large</option>
-                                                        <option>X-Large</option>
+                                        </div><!-- /arb-sub-config -->
+
+                                        <!-- ── DECISION LOG ───────────────────────────────────────── -->
+                                        <div class="arb-sub-panel" id="arb-sub-log">
+                                            <div class="ps-card">
+                                                <div class="ps-card-header">
+                                                    <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
+                                                    <select class="ps-form-control" style="width:160px" id="arb-log-filter">
+                                                        <option value="">All decisions</option>
+                                                        <option value="Approved">Auto-approved</option>
+                                                        <option value="Declined">Auto-declined</option>
                                                     </select>
                                                 </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Reduce animations</div>
-                                                    </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw">
-                                                        <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
-                                                        <span class="toggle-track"></span>
-                                                    </label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Enhanced Focus Ring</div>
-                                                        <div class="sett-notif-sub">Makes keyboard focus outlines more visible</div>
-                                                    </div>
+                                                <div class="ps-table-wrap">
+                                                    <table class="ps-table" id="arb-log-new-table">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Request ID</th>
+                                                                <th>Decision</th>
+                                                                <th>Rule Triggered</th>
+                                                                <th>Borrower</th>
+                                                                <th>Equipment</th>
+                                                                <th>Timestamp</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php
+                                                            if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
+                                                            ?>
+                                                                <tr>
+                                                                    <td colspan="6">
+                                                                        <div class="ps-empty-state">
+                                                                            <span class="material-symbols-outlined">history</span>
+                                                                            <p>No arbitration log entries yet.</p>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                <?php else:
+                                                                mysqli_data_seek($arb_log_result, 0);
+                                                                while ($r = mysqli_fetch_assoc($arb_log_result)):
+                                                                    $dec    = $r['decision'];
+                                                                    $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
+                                                                ?>
+                                                                    <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
+                                                                        <td style="font-weight:600;color:var(--accent-maroon)">
+                                                                            <?php echo htmlspecialchars($r['request_id']); ?>
+                                                                        </td>
+                                                                        <td>
+                                                                            <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
+                                                                                <?php echo htmlspecialchars($dec); ?>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td style="font-size:12px;color:var(--text-light)">
+                                                                            <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
+                                                                        </td>
+                                                                        <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
+                                                                        <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                                                        <td style="font-size:12px;color:var(--text-light)">
+                                                                            <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
+                                                                        </td>
+                                                                    </tr>
+                                                            <?php endwhile;
+                                                            endif; ?>
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </div><!-- /arb-sub-log -->
 
-                                    </div><!-- /sett-grid -->
+                                    </div><!-- /sett-rules -->
 
-                                    <!-- Advanced / Danger Zone (preserved from old settings) -->
-                                    <div class="sett-danger-wrap">
-                                        <div class="sett-card sett-danger-bdr">
-                                            <div class="sett-card-head">
-                                                <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
-                                                <h3 style="color:var(--danger)">Advanced</h3>
+                                    <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->
+                                    <div class="rq-sub-panel" id="sett-help">
+                                        <div class="account-layout">
+
+                                            <!-- Sidebar -->
+                                            <div class="account-sidebar">
+                                                <span class="account-sidebar-label">Help Center</span>
+                                                <button class="hc-nav-btn active" data-hc-tab="hc-start">
+                                                    <span class="material-symbols-outlined">rocket_launch</span>
+                                                    Getting Started
+                                                </button>
+                                                <button class="hc-nav-btn" data-hc-tab="hc-faq">
+                                                    <span class="material-symbols-outlined">quiz</span>
+                                                    FAQ
+                                                </button>
+                                                <button class="hc-nav-btn" data-hc-tab="hc-guides">
+                                                    <span class="material-symbols-outlined">menu_book</span>
+                                                    User Guides
+                                                </button>
+                                                <button class="hc-nav-btn" data-hc-tab="hc-about">
+                                                    <span class="material-symbols-outlined">info</span>
+                                                    About PUPSync
+                                                </button>
+
+                                                <div class="hc-sidebar-footer">
+                                                    <div class="hc-sidebar-version">
+                                                        <span class="material-symbols-outlined">verified</span>
+                                                        PUPSync v2.0 &middot; Stable
+                                                    </div>
+                                                    <div class="hc-sidebar-campus">Biñan Campus Admin Portal</div>
+                                                </div>
                                             </div>
-                                            <div class="sett-card-body">
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Show Asset IDs</div>
-                                                        <div class="sett-notif-sub">Display equipment item IDs in tables</div>
+
+                                            <!-- Main content area -->
+                                            <div class="account-content">
+
+                                                <!-- ══════════════════════════════════════════════
+                     PANEL: Getting Started
+                ══════════════════════════════════════════════ -->
+                                                <div id="hc-start" class="overlay-sub-panel active">
+
+                                                    <!-- Welcome hero -->
+                                                    <div class="hc-hero">
+                                                        <div class="hc-hero-icon-wrap">
+                                                            <span class="material-symbols-outlined">help_center</span>
+                                                        </div>
+                                                        <div class="hc-hero-text">
+                                                            <h2>Welcome to the PUPSync Help Center</h2>
+                                                            <p>Everything you need to confidently manage equipment lending and room reservations for your campus.</p>
+                                                            <div class="hc-hero-tags">
+                                                                <span><span class="material-symbols-outlined">inventory_2</span> Equipment Lending</span>
+                                                                <span><span class="material-symbols-outlined">meeting_room</span> Room Reservations</span>
+                                                                <span><span class="material-symbols-outlined">group</span> Faculty Management</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div class="sett-notif-row">
-                                                    <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                                                    <div>
-                                                        <div class="sett-notif-title">Verbose Error Messages</div>
-                                                        <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
+
+
+
+                                                    <!-- How it works -->
+                                                    <p class="hc-section-label" style="margin-top:2rem;">How PUPSync Works</p>
+                                                    <div class="hc-steps-grid">
+                                                        <div class="hc-step-card">
+                                                            <div class="hc-step-badge">1</div>
+                                                            <div class="hc-step-icon">
+                                                                <span class="material-symbols-outlined">person_add</span>
+                                                            </div>
+                                                            <div class="hc-step-title">Faculty Submits</div>
+                                                            <div class="hc-step-body">Faculty members log in to their portal and request equipment or room reservations, specifying dates, times, and purpose.</div>
+                                                        </div>
+                                                        <div class="hc-step-card">
+                                                            <div class="hc-step-badge">2</div>
+                                                            <div class="hc-step-icon">
+                                                                <span class="material-symbols-outlined">admin_panel_settings</span>
+                                                            </div>
+                                                            <div class="hc-step-title">Admin Reviews</div>
+                                                            <div class="hc-step-body">You review the request here in the admin dashboard, verify availability, and approve or decline — optionally with a reason.</div>
+                                                        </div>
+                                                        <div class="hc-step-card">
+                                                            <div class="hc-step-badge">3</div>
+                                                            <div class="hc-step-icon">
+                                                                <span class="material-symbols-outlined">check_circle</span>
+                                                            </div>
+                                                            <div class="hc-step-title">Fulfilled</div>
+                                                            <div class="hc-step-body">Approved loans are tracked until return. Room reservations appear on the room schedule automatically and block that slot.</div>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <div class="sett-adv-reset-row">
-                                                    <div>
-                                                        <div class="sett-notif-title" style="color:var(--danger)">Reset All Settings</div>
-                                                        <div class="sett-notif-sub">Restore all appearance and accessibility defaults</div>
+
+                                                    <!-- Tip -->
+                                                    <div class="hc-tip-box">
+                                                        <span class="material-symbols-outlined">lightbulb</span>
+                                                        <div>
+                                                            <strong>Pro tip:</strong> Use the <strong>Arbitration</strong> panel to resolve conflicts when two faculty members request the same resource at the same time. The admin's ruling is final.
+                                                        </div>
                                                     </div>
-                                                    <button class="sett-reset-btn" data-action="reset-settings">
-                                                        <span class="material-symbols-outlined">restart_alt</span> Reset
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+
+                                                </div><!-- /#hc-start -->
+
+
+                                                <!-- ══════════════════════════════════════════════
+                     PANEL: FAQ
+                ══════════════════════════════════════════════ -->
+                                                <div id="hc-faq" class="overlay-sub-panel">
+
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">Help Center</span>
+                                                        <h2>Frequently Asked Questions</h2>
+                                                        <p>Quick answers to the most common admin questions about PUPSync.</p>
+                                                    </div>
+
+                                                    <div class="hc-faq-list">
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do I approve or decline a borrow request?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Go to <strong>Requests</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do I add new equipment to the inventory?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Go to <strong>Inventory</strong> and click <strong>+ Add Equipment</strong>. Fill in the item name, description, quantity, condition, and category. Items become available for borrowing immediately after saving. You can also set an item to "Not Available" if it's under repair.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">What happens when I archive a room?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do faculty members submit room reservations?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Faculty log in to their portal and go to <strong>Room Reservations</strong>. They select the campus, building, room, date, time slot, and purpose. The request appears in your <strong>Rooms → Reservations</strong> panel. The room slot is not blocked until you confirm it.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do I manage or create faculty accounts?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Go to <strong>Faculty</strong> in the sidebar. You can view all active faculty accounts, review their request history, and reset passwords. Click <strong>+ Add Faculty</strong> to create a new account. New accounts receive a default password that must be changed on first login.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">What is the Arbitration panel used for?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Arbitration handles conflicts when two or more faculty members compete for the same resource — a room or equipment — at the same time. You review both claims, see who has stronger grounds, and make a final ruling. The ruling overrides the normal approval flow and is logged.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do I handle a reported room issue?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                In <strong>Rooms → Issues</strong>, you'll see all open reports submitted by faculty. Click <strong>Review</strong> on any open issue. You can mark it as <em>Resolved</em> (problem fixed, room stays active) or <em>Dismissed</em> (not a valid concern). Note: rooms are <strong>not</strong> automatically set to Maintenance — you must edit the room status separately if needed.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">Can I restore an archived room or equipment item?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Yes. For rooms, go to <strong>Rooms → Archived</strong> and click <strong>Restore</strong> next to the room. For equipment, go to <strong>Inventory → Archived</strong> and click <strong>Restore</strong>. The item or room returns to the active list immediately and is available again.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">How do I cancel an approved room reservation?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                Go to <strong>Rooms → Reservations</strong>. Find the reservation with an <em>Approved</em> status and click <strong>Cancel</strong>. You can add a reason for the cancellation. Please note: you cannot cancel a reservation within 1 hour of its scheduled start time — this restriction is enforced to protect faculty planning.
+                                                            </div>
+                                                        </details>
+
+                                                        <details class="hc-faq-item">
+                                                            <summary class="hc-faq-q">
+                                                                <span class="hc-faq-q-text">What do the different request statuses mean?</span>
+                                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                            </summary>
+                                                            <div class="hc-faq-a">
+                                                                <div class="hc-status-table">
+                                                                    <div class="hc-st-row"><span class="hc-st-pill pending">Pending</span><span>Awaiting admin review and action.</span></div>
+                                                                    <div class="hc-st-row"><span class="hc-st-pill approved">Approved</span><span>Admin confirmed — item loaned or room reserved.</span></div>
+                                                                    <div class="hc-st-row"><span class="hc-st-pill declined">Declined</span><span>Admin rejected the request.</span></div>
+                                                                    <div class="hc-st-row"><span class="hc-st-pill cancelled">Cancelled</span><span>Cancelled by the admin or the faculty member.</span></div>
+                                                                    <div class="hc-st-row"><span class="hc-st-pill returned">Returned</span><span>Equipment was returned and processed (lending only).</span></div>
+                                                                    <div class="hc-st-row"><span class="hc-st-pill overdue">Overdue</span><span>Item not returned by the agreed return date.</span></div>
+                                                                </div>
+                                                            </div>
+                                                        </details>
+
+                                                    </div><!-- /.hc-faq-list -->
+
+                                                </div><!-- /#hc-faq -->
+
+
+                                                <!-- ══════════════════════════════════════════════
+                     PANEL: User Guides
+                ══════════════════════════════════════════════ -->
+                                                <div id="hc-guides" class="overlay-sub-panel">
+
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">Help Center</span>
+                                                        <h2>User Guides</h2>
+                                                        <p>Step-by-step guides for every major feature of the PUPSync Admin Portal.</p>
+                                                    </div>
+
+                                                    <div class="hc-guide-grid">
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#27ae60,#1e8449);">
+                                                                <span class="material-symbols-outlined">inventory_2</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Equipment &amp; Inventory</div>
+                                                                <div class="hc-gc-desc">Learn how to add, edit, archive, and restore equipment items. Manage stock levels and item conditions.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>Adding items</span>
+                                                                    <span>Archiving</span>
+                                                                    <span>Stock levels</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#e67e22,#ca6f1e);">
+                                                                <span class="material-symbols-outlined">task_alt</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Processing Borrow Requests</div>
+                                                                <div class="hc-gc-desc">Understand the full request lifecycle — from submission to return — and how to handle overdue items.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>Approve / Decline</span>
+                                                                    <span>Overdue items</span>
+                                                                    <span>History log</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,var(--accent-maroon),#8a1a1a);">
+                                                                <span class="material-symbols-outlined">meeting_room</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Room Management</div>
+                                                                <div class="hc-gc-desc">Set up rooms, manage availability, confirm reservations, review weekly schedules, and handle issue reports.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>Room setup</span>
+                                                                    <span>Reservations</span>
+                                                                    <span>Issue reports</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#3949ab,#283593);">
+                                                                <span class="material-symbols-outlined">group</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Faculty Administration</div>
+                                                                <div class="hc-gc-desc">Create and manage faculty accounts, reset passwords, review activity logs, and control access levels.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>New accounts</span>
+                                                                    <span>Password reset</span>
+                                                                    <span>Activity</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#0097a7,#00838f);">
+                                                                <span class="material-symbols-outlined">dashboard</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Dashboard &amp; Reports</div>
+                                                                <div class="hc-gc-desc">Understand the dashboard widgets, key metrics, and how to read the activity summaries shown on the main screen.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>Metrics</span>
+                                                                    <span>Widgets</span>
+                                                                    <span>Activity feed</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="hc-guide-card">
+                                                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#6d4c41,#4e342e);">
+                                                                <span class="material-symbols-outlined">gavel</span>
+                                                            </div>
+                                                            <div class="hc-gc-body">
+                                                                <div class="hc-gc-title">Arbitration &amp; Disputes</div>
+                                                                <div class="hc-gc-desc">Step-by-step process for reviewing and resolving conflicts between faculty members over shared resources.</div>
+                                                                <div class="hc-gc-topics">
+                                                                    <span>Conflict review</span>
+                                                                    <span>Ruling</span>
+                                                                    <span>Override</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                    </div><!-- /.hc-guide-grid -->
+
+                                                    <div class="hc-tip-box" style="margin-top:1.5rem;">
+                                                        <span class="material-symbols-outlined">info</span>
+                                                        <div>Detailed step-by-step documentation for each guide is available from your system administrator or the PUPSync project team.</div>
+                                                    </div>
+
+                                                </div><!-- /#hc-guides -->
+
+
+                                                <!-- ══════════════════════════════════════════════
+                     PANEL: About PUPSync
+                ══════════════════════════════════════════════ -->
+                                                <div id="hc-about" class="overlay-sub-panel">
+
+                                                    <div class="ov-section-head">
+                                                        <span class="ov-eyebrow">Help Center</span>
+                                                        <h2>About PUPSync</h2>
+                                                        <p>System information, version details, and contact information.</p>
+                                                    </div>
+
+                                                    <!-- Brand hero -->
+                                                    <div class="hc-about-hero">
+                                                        <div class="hc-about-logo">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                                                                <polyline points="2 17 12 22 22 17" />
+                                                                <polyline points="2 12 12 17 22 12" />
+                                                            </svg>
+                                                        </div>
+                                                        <div class="hc-about-brand-text">
+                                                            <div class="hc-about-name">PUPSync</div>
+                                                            <div class="hc-about-tagline">Equipment Lending &amp; Room Reservation System</div>
+                                                            <div class="hc-about-ver">Version 2.0 &middot; Stable Release</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- System info -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">info</span>
+                                                                System Information
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">System Name</span>
+                                                            <span class="info-val">PUPSync Admin Portal</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Version</span>
+                                                            <span class="info-val">2.0 (Stable)</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Campus</span>
+                                                            <span class="info-val">PUP Biñan Campus</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Module Coverage</span>
+                                                            <span class="info-val">Equipment Lending, Room Reservations, Faculty Management, Arbitration</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Environment</span>
+                                                            <span class="info-val">
+                                                                <span class="ov-access-badge">Production</span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Tech stack -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">code</span>
+                                                                Technology Stack
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Backend</span>
+                                                            <span class="info-val">PHP 8 &middot; MySQL</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Frontend</span>
+                                                            <span class="info-val">HTML5 &middot; CSS3 &middot; Vanilla JavaScript</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Icons</span>
+                                                            <span class="info-val">Google Material Symbols</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Typography</span>
+                                                            <span class="info-val">Poppins (Google Fonts)</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Authentication</span>
+                                                            <span class="info-val">PHP Sessions &middot; CSRF Token Protection</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Support contact -->
+                                                    <div class="info-card">
+                                                        <div class="info-card-head">
+                                                            <h3>
+                                                                <span class="material-symbols-outlined">support_agent</span>
+                                                                Support &amp; Contact
+                                                            </h3>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Development Team</span>
+                                                            <span class="info-val">PUPSync Project Team &middot; PUP Biñan</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Issue Reporting</span>
+                                                            <span class="info-val">Contact your system administrator or IT department.</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-lbl">Academic Use</span>
+                                                            <span class="info-val">Developed as a capstone project for academic purposes.</span>
+                                                        </div>
+                                                    </div>
+
+                                                </div><!-- /#hc-about -->
+
+                                            </div><!-- /.account-content -->
+                                        </div><!-- /.account-layout -->
+                                    </div><!-- /sett-help -->
 
                                 </div><!-- /panel-settings -->
 
@@ -3965,783 +4576,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
 
-    <!-- ================================================================
-     OVERLAY: ACCOUNT
-================================================================ -->
-
-    <!-- ================================================================
-         OVERLAY: HELP CENTER
-    ================================================================ -->
-    <div class="overlay-page" id="helpCenterOverlay">
-
-        <!-- Top bar -->
-        <div class="overlay-topbar">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="helpCenterOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                    style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg>
-                Back to Dashboard
-            </button>
-            <div class="overlay-topbar-sep"></div>
-            <span class="overlay-topbar-title">Help Center</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
-        </div>
-
-        <!-- Two-column layout (reuses account-layout CSS) -->
-        <div class="account-layout">
-
-            <!-- Sidebar -->
-            <div class="account-sidebar">
-                <span class="account-sidebar-label">Help Center</span>
-                <button class="hc-nav-btn active" data-hc-tab="hc-start">
-                    <span class="material-symbols-outlined">rocket_launch</span>
-                    Getting Started
-                </button>
-                <button class="hc-nav-btn" data-hc-tab="hc-faq">
-                    <span class="material-symbols-outlined">quiz</span>
-                    FAQ
-                </button>
-                <button class="hc-nav-btn" data-hc-tab="hc-guides">
-                    <span class="material-symbols-outlined">menu_book</span>
-                    User Guides
-                </button>
-                <button class="hc-nav-btn" data-hc-tab="hc-about">
-                    <span class="material-symbols-outlined">info</span>
-                    About PUPSync
-                </button>
-
-                <div class="hc-sidebar-footer">
-                    <div class="hc-sidebar-version">
-                        <span class="material-symbols-outlined">verified</span>
-                        PUPSync v2.0 &middot; Stable
-                    </div>
-                    <div class="hc-sidebar-campus">Biñan Campus Admin Portal</div>
-                </div>
-            </div>
-
-            <!-- Main content area -->
-            <div class="account-content">
-
-                <!-- ══════════════════════════════════════════════
-                     PANEL: Getting Started
-                ══════════════════════════════════════════════ -->
-                <div id="hc-start" class="overlay-sub-panel active">
-
-                    <!-- Welcome hero -->
-                    <div class="hc-hero">
-                        <div class="hc-hero-icon-wrap">
-                            <span class="material-symbols-outlined">help_center</span>
-                        </div>
-                        <div class="hc-hero-text">
-                            <h2>Welcome to the PUPSync Help Center</h2>
-                            <p>Everything you need to confidently manage equipment lending and room reservations for your campus.</p>
-                            <div class="hc-hero-tags">
-                                <span><span class="material-symbols-outlined">inventory_2</span> Equipment Lending</span>
-                                <span><span class="material-symbols-outlined">meeting_room</span> Room Reservations</span>
-                                <span><span class="material-symbols-outlined">group</span> Faculty Management</span>
-                            </div>
-                        </div>
-                    </div>
-
-
-
-                    <!-- How it works -->
-                    <p class="hc-section-label" style="margin-top:2rem;">How PUPSync Works</p>
-                    <div class="hc-steps-grid">
-                        <div class="hc-step-card">
-                            <div class="hc-step-badge">1</div>
-                            <div class="hc-step-icon">
-                                <span class="material-symbols-outlined">person_add</span>
-                            </div>
-                            <div class="hc-step-title">Faculty Submits</div>
-                            <div class="hc-step-body">Faculty members log in to their portal and request equipment or room reservations, specifying dates, times, and purpose.</div>
-                        </div>
-                        <div class="hc-step-card">
-                            <div class="hc-step-badge">2</div>
-                            <div class="hc-step-icon">
-                                <span class="material-symbols-outlined">admin_panel_settings</span>
-                            </div>
-                            <div class="hc-step-title">Admin Reviews</div>
-                            <div class="hc-step-body">You review the request here in the admin dashboard, verify availability, and approve or decline — optionally with a reason.</div>
-                        </div>
-                        <div class="hc-step-card">
-                            <div class="hc-step-badge">3</div>
-                            <div class="hc-step-icon">
-                                <span class="material-symbols-outlined">check_circle</span>
-                            </div>
-                            <div class="hc-step-title">Fulfilled</div>
-                            <div class="hc-step-body">Approved loans are tracked until return. Room reservations appear on the room schedule automatically and block that slot.</div>
-                        </div>
-                    </div>
-
-                    <!-- Tip -->
-                    <div class="hc-tip-box">
-                        <span class="material-symbols-outlined">lightbulb</span>
-                        <div>
-                            <strong>Pro tip:</strong> Use the <strong>Arbitration</strong> panel to resolve conflicts when two faculty members request the same resource at the same time. The admin's ruling is final.
-                        </div>
-                    </div>
-
-                </div><!-- /#hc-start -->
-
-
-                <!-- ══════════════════════════════════════════════
-                     PANEL: FAQ
-                ══════════════════════════════════════════════ -->
-                <div id="hc-faq" class="overlay-sub-panel">
-
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">Help Center</span>
-                        <h2>Frequently Asked Questions</h2>
-                        <p>Quick answers to the most common admin questions about PUPSync.</p>
-                    </div>
-
-                    <div class="hc-faq-list">
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do I approve or decline a borrow request?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Go to <strong>Requests</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do I add new equipment to the inventory?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Go to <strong>Inventory</strong> and click <strong>+ Add Equipment</strong>. Fill in the item name, description, quantity, condition, and category. Items become available for borrowing immediately after saving. You can also set an item to "Not Available" if it's under repair.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">What happens when I archive a room?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do faculty members submit room reservations?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Faculty log in to their portal and go to <strong>Room Reservations</strong>. They select the campus, building, room, date, time slot, and purpose. The request appears in your <strong>Rooms → Reservations</strong> panel. The room slot is not blocked until you confirm it.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do I manage or create faculty accounts?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Go to <strong>Faculty</strong> in the sidebar. You can view all active faculty accounts, review their request history, and reset passwords. Click <strong>+ Add Faculty</strong> to create a new account. New accounts receive a default password that must be changed on first login.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">What is the Arbitration panel used for?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Arbitration handles conflicts when two or more faculty members compete for the same resource — a room or equipment — at the same time. You review both claims, see who has stronger grounds, and make a final ruling. The ruling overrides the normal approval flow and is logged.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do I handle a reported room issue?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                In <strong>Rooms → Issues</strong>, you'll see all open reports submitted by faculty. Click <strong>Review</strong> on any open issue. You can mark it as <em>Resolved</em> (problem fixed, room stays active) or <em>Dismissed</em> (not a valid concern). Note: rooms are <strong>not</strong> automatically set to Maintenance — you must edit the room status separately if needed.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">Can I restore an archived room or equipment item?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Yes. For rooms, go to <strong>Rooms → Archived</strong> and click <strong>Restore</strong> next to the room. For equipment, go to <strong>Inventory → Archived</strong> and click <strong>Restore</strong>. The item or room returns to the active list immediately and is available again.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">How do I cancel an approved room reservation?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                Go to <strong>Rooms → Reservations</strong>. Find the reservation with an <em>Approved</em> status and click <strong>Cancel</strong>. You can add a reason for the cancellation. Please note: you cannot cancel a reservation within 1 hour of its scheduled start time — this restriction is enforced to protect faculty planning.
-                            </div>
-                        </details>
-
-                        <details class="hc-faq-item">
-                            <summary class="hc-faq-q">
-                                <span class="hc-faq-q-text">What do the different request statuses mean?</span>
-                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                            </summary>
-                            <div class="hc-faq-a">
-                                <div class="hc-status-table">
-                                    <div class="hc-st-row"><span class="hc-st-pill pending">Pending</span><span>Awaiting admin review and action.</span></div>
-                                    <div class="hc-st-row"><span class="hc-st-pill approved">Approved</span><span>Admin confirmed — item loaned or room reserved.</span></div>
-                                    <div class="hc-st-row"><span class="hc-st-pill declined">Declined</span><span>Admin rejected the request.</span></div>
-                                    <div class="hc-st-row"><span class="hc-st-pill cancelled">Cancelled</span><span>Cancelled by the admin or the faculty member.</span></div>
-                                    <div class="hc-st-row"><span class="hc-st-pill returned">Returned</span><span>Equipment was returned and processed (lending only).</span></div>
-                                    <div class="hc-st-row"><span class="hc-st-pill overdue">Overdue</span><span>Item not returned by the agreed return date.</span></div>
-                                </div>
-                            </div>
-                        </details>
-
-                    </div><!-- /.hc-faq-list -->
-
-                </div><!-- /#hc-faq -->
-
-
-                <!-- ══════════════════════════════════════════════
-                     PANEL: User Guides
-                ══════════════════════════════════════════════ -->
-                <div id="hc-guides" class="overlay-sub-panel">
-
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">Help Center</span>
-                        <h2>User Guides</h2>
-                        <p>Step-by-step guides for every major feature of the PUPSync Admin Portal.</p>
-                    </div>
-
-                    <div class="hc-guide-grid">
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#27ae60,#1e8449);">
-                                <span class="material-symbols-outlined">inventory_2</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Equipment &amp; Inventory</div>
-                                <div class="hc-gc-desc">Learn how to add, edit, archive, and restore equipment items. Manage stock levels and item conditions.</div>
-                                <div class="hc-gc-topics">
-                                    <span>Adding items</span>
-                                    <span>Archiving</span>
-                                    <span>Stock levels</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#e67e22,#ca6f1e);">
-                                <span class="material-symbols-outlined">task_alt</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Processing Borrow Requests</div>
-                                <div class="hc-gc-desc">Understand the full request lifecycle — from submission to return — and how to handle overdue items.</div>
-                                <div class="hc-gc-topics">
-                                    <span>Approve / Decline</span>
-                                    <span>Overdue items</span>
-                                    <span>History log</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,var(--accent-maroon),#8a1a1a);">
-                                <span class="material-symbols-outlined">meeting_room</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Room Management</div>
-                                <div class="hc-gc-desc">Set up rooms, manage availability, confirm reservations, review weekly schedules, and handle issue reports.</div>
-                                <div class="hc-gc-topics">
-                                    <span>Room setup</span>
-                                    <span>Reservations</span>
-                                    <span>Issue reports</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#3949ab,#283593);">
-                                <span class="material-symbols-outlined">group</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Faculty Administration</div>
-                                <div class="hc-gc-desc">Create and manage faculty accounts, reset passwords, review activity logs, and control access levels.</div>
-                                <div class="hc-gc-topics">
-                                    <span>New accounts</span>
-                                    <span>Password reset</span>
-                                    <span>Activity</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#0097a7,#00838f);">
-                                <span class="material-symbols-outlined">dashboard</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Dashboard &amp; Reports</div>
-                                <div class="hc-gc-desc">Understand the dashboard widgets, key metrics, and how to read the activity summaries shown on the main screen.</div>
-                                <div class="hc-gc-topics">
-                                    <span>Metrics</span>
-                                    <span>Widgets</span>
-                                    <span>Activity feed</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="hc-guide-card">
-                            <div class="hc-gc-banner" style="background:linear-gradient(135deg,#6d4c41,#4e342e);">
-                                <span class="material-symbols-outlined">gavel</span>
-                            </div>
-                            <div class="hc-gc-body">
-                                <div class="hc-gc-title">Arbitration &amp; Disputes</div>
-                                <div class="hc-gc-desc">Step-by-step process for reviewing and resolving conflicts between faculty members over shared resources.</div>
-                                <div class="hc-gc-topics">
-                                    <span>Conflict review</span>
-                                    <span>Ruling</span>
-                                    <span>Override</span>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div><!-- /.hc-guide-grid -->
-
-                    <div class="hc-tip-box" style="margin-top:1.5rem;">
-                        <span class="material-symbols-outlined">info</span>
-                        <div>Detailed step-by-step documentation for each guide is available from your system administrator or the PUPSync project team.</div>
-                    </div>
-
-                </div><!-- /#hc-guides -->
-
-
-                <!-- ══════════════════════════════════════════════
-                     PANEL: About PUPSync
-                ══════════════════════════════════════════════ -->
-                <div id="hc-about" class="overlay-sub-panel">
-
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">Help Center</span>
-                        <h2>About PUPSync</h2>
-                        <p>System information, version details, and contact information.</p>
-                    </div>
-
-                    <!-- Brand hero -->
-                    <div class="hc-about-hero">
-                        <div class="hc-about-logo">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                                <polyline points="2 17 12 22 22 17" />
-                                <polyline points="2 12 12 17 22 12" />
-                            </svg>
-                        </div>
-                        <div class="hc-about-brand-text">
-                            <div class="hc-about-name">PUPSync</div>
-                            <div class="hc-about-tagline">Equipment Lending &amp; Room Reservation System</div>
-                            <div class="hc-about-ver">Version 2.0 &middot; Stable Release</div>
-                        </div>
-                    </div>
-
-                    <!-- System info -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">info</span>
-                                System Information
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">System Name</span>
-                            <span class="info-val">PUPSync Admin Portal</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Version</span>
-                            <span class="info-val">2.0 (Stable)</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Campus</span>
-                            <span class="info-val">PUP Biñan Campus</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Module Coverage</span>
-                            <span class="info-val">Equipment Lending, Room Reservations, Faculty Management, Arbitration</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Environment</span>
-                            <span class="info-val">
-                                <span class="ov-access-badge">Production</span>
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Tech stack -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">code</span>
-                                Technology Stack
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Backend</span>
-                            <span class="info-val">PHP 8 &middot; MySQL</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Frontend</span>
-                            <span class="info-val">HTML5 &middot; CSS3 &middot; Vanilla JavaScript</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Icons</span>
-                            <span class="info-val">Google Material Symbols</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Typography</span>
-                            <span class="info-val">Poppins (Google Fonts)</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Authentication</span>
-                            <span class="info-val">PHP Sessions &middot; CSRF Token Protection</span>
-                        </div>
-                    </div>
-
-                    <!-- Support contact -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">support_agent</span>
-                                Support &amp; Contact
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Development Team</span>
-                            <span class="info-val">PUPSync Project Team &middot; PUP Biñan</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Issue Reporting</span>
-                            <span class="info-val">Contact your system administrator or IT department.</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Academic Use</span>
-                            <span class="info-val">Developed as a capstone project for academic purposes.</span>
-                        </div>
-                    </div>
-
-                </div><!-- /#hc-about -->
-
-            </div><!-- /.account-content -->
-        </div><!-- /.account-layout -->
-    </div><!-- /#helpCenterOverlay -->
-
-    <div class="overlay-page" id="accountOverlay">
-        <div class="overlay-topbar">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="accountOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                    style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg>
-                Back to Dashboard
-            </button>
-            <div class="overlay-topbar-sep"></div>
-            <span class="overlay-topbar-title">My Account</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
-        </div>
-
-        <!-- Redesigned Account Layout -->
-        <div class="account-layout">
-
-            <!-- Sidebar -->
-            <div class="account-sidebar">
-                <span class="account-sidebar-label">Account</span>
-                <button class="acc-nav-btn active" data-acc-tab="acc-overview">
-                    <span class="material-symbols-outlined">account_circle</span>
-                    Overview
-                </button>
-                <button class="acc-nav-btn" data-acc-tab="acc-security">
-                    <span class="material-symbols-outlined">lock</span>
-                    Security
-                </button>
-                <button class="acc-nav-btn" data-acc-tab="acc-sessions">
-                    <span class="material-symbols-outlined">devices</span>
-                    Sessions
-                </button>
-            </div>
-
-            <!-- Content -->
-            <div class="account-content">
-
-                <!-- ── Overview ───────────────────────────────────── -->
-                <div id="acc-overview" class="overlay-sub-panel active">
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">My Account</span>
-                        <h2>Profile Overview</h2>
-                        <p>View and update your administrator profile information.</p>
-                    </div>
-
-                    <!-- Profile Hero -->
-                    <div class="ov-profile-hero" id="acctHero">
-                        <div class="ov-av-lg">
-                            <?php echo htmlspecialchars($initials); ?>
-                        </div>
-                        <div class="ov-hero-body">
-                            <div class="ov-hero-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                            <div class="ov-hero-role">Administrator &middot; PUPSync Biñan Campus</div>
-                            <div class="ov-hero-badge">
-                                <span class="material-symbols-outlined">verified</span>
-                                Active &middot; Full Access
-                            </div>
-                        </div>
-                        <div class="ov-hero-actions">
-                            <button class="btn-edit-acc" id="editProfileBtn" data-action="profile-edit">
-                                <span class="material-symbols-outlined">edit</span>
-                                Edit Profile
-                            </button>
-                            <button class="btn-save-acc" id="saveProfileBtn" style="display:none;"
-                                data-action="profile-save">
-                                <span class="material-symbols-outlined">save</span>
-                                Save Changes
-                            </button>
-                            <button class="btn-cancel-acc" id="cancelProfileBtn" style="display:none;"
-                                data-action="profile-cancel">
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Personal Information -->
-                    <div class="info-card" id="profileInfoCard">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">person</span>
-                                Personal Information
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Display Name</span>
-                            <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
-                                data-field="admin_name">
-                                <?php echo !empty($admin_name) ? htmlspecialchars($admin_name) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="admin_name"
-                                value="<?php echo htmlspecialchars($admin_name ?? ''); ?>"
-                                placeholder="Display Name" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Role</span>
-                            <span class="info-val">Administrator</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Email Address</span>
-                            <span class="info-val <?php echo empty($admin_email) ? 'empty' : ''; ?>"
-                                data-field="admin_email">
-                                <?php echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; ?>
-                            </span>
-                            <input class="info-input-f" data-input="admin_email" type="email"
-                                value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
-                                placeholder="admin@pup.edu.ph" disabled style="display:none;">
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Campus</span>
-                            <span class="info-val">PUPSync Biñan Campus</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Access Level</span>
-                            <span class="info-val">
-                                <span class="ov-access-badge">Full Access</span>
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Activity Summary -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">bar_chart</span>
-                                Activity Summary
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Requests Processed</span>
-                            <span class="info-val ov-stat-val">
-                                <?php echo $stat_total_req ?? '0'; ?> total
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Faculty Accounts Created</span>
-                            <span class="info-val">
-                                <?php
-                                $fac_count = mysqli_fetch_assoc(
-                                    mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role='faculty'")
-                                )['c'] ?? 0;
-                                echo $fac_count;
-                                ?>
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Last Login</span>
-                            <span class="info-val">
-                                <?php
-                                $ll = '— Not available';
-                                if (!empty($_SESSION['admin_last_login'])) {
-                                    $ts = strtotime($_SESSION['admin_last_login']);
-                                    if ($ts !== false) $ll = date('M d, Y · g:i A', $ts);
-                                }
-                                echo htmlspecialchars($ll);
-                                ?>
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Active Equipment</span>
-                            <span class="info-val"><?php echo $stat_inv_total ?? '0'; ?> items</span>
-                        </div>
-                    </div>
-                </div><!-- /acc-overview -->
-
-                <!-- ── Security ────────────────────────────────────── -->
-                <div id="acc-security" class="overlay-sub-panel">
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">Security</span>
-                        <h2>Password &amp; Security</h2>
-                        <p>Manage your login credentials and account security settings.</p>
-                    </div>
-
-                    <!-- Password Card -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">lock</span>
-                                Password
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Current Password</span>
-                            <span class="info-val">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>
-                            <button class="btn-inline-sm" data-action="open-change-pass">Change</button>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Last Changed</span>
-                            <span class="info-val" style="color:var(--text-light)">— Not tracked</span>
-                        </div>
-                    </div>
-
-                    <!-- Login Security Card -->
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">shield</span>
-                                Login Security
-                            </h3>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Last Login</span>
-                            <span class="info-val">
-                                <?php echo htmlspecialchars($ll ?? '— Not available'); ?>
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Session Status</span>
-                            <span class="info-val">
-                                <span class="ov-status-dot">Active</span>
-                            </span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Login Attempts</span>
-                            <span class="info-val">0 failed attempts</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-lbl">Force Logout</span>
-                            <span class="info-val">
-                                <button class="btn-inline-danger" data-action="logout">
-                                    Log Out All Sessions
-                                </button>
-                            </span>
-                        </div>
-                    </div>
-                </div><!-- /acc-security -->
-
-                <!-- ── Sessions ────────────────────────────────────── -->
-                <div id="acc-sessions" class="overlay-sub-panel">
-                    <div class="ov-section-head">
-                        <span class="ov-eyebrow">Security</span>
-                        <h2>Active Sessions</h2>
-                        <p>Review devices currently logged in to your admin account.</p>
-                    </div>
-
-                    <div class="info-card">
-                        <div class="info-card-head">
-                            <h3>
-                                <span class="material-symbols-outlined">devices</span>
-                                Current Sessions
-                            </h3>
-                        </div>
-                        <!-- Current device row -->
-                        <div class="ov-session-row">
-                            <div class="ov-device-icon">
-                                <span class="material-symbols-outlined">computer</span>
-                            </div>
-                            <div class="ov-session-info">
-                                <div class="ov-session-device">Chrome &middot; Windows</div>
-                                <div class="ov-session-meta">
-                                    Biñan, Laguna &middot;
-                                    <?php
-                                    $ll_disp = '—';
-                                    if (!empty($_SESSION['admin_last_login'])) {
-                                        $ts = strtotime($_SESSION['admin_last_login']);
-                                        if ($ts !== false) $ll_disp = date('M d, Y · g:i A', $ts);
-                                    }
-                                    echo htmlspecialchars($ll_disp);
-                                    ?>
-                                </div>
-                            </div>
-                            <span class="ov-session-badge">Current</span>
-                        </div>
-                        <!-- Placeholder inactive session -->
-                        <div class="ov-session-row">
-                            <div class="ov-device-icon ov-device-muted">
-                                <span class="material-symbols-outlined">phone_android</span>
-                            </div>
-                            <div class="ov-session-info">
-                                <div class="ov-session-device">Mobile Safari &middot; iPhone</div>
-                                <div class="ov-session-meta">Biñan, Laguna &middot; — No data</div>
-                            </div>
-                            <button class="btn-inline-sm ov-revoke-btn">Revoke</button>
-                        </div>
-                    </div>
-                </div><!-- /acc-sessions -->
-
-            </div><!-- /account-content -->
-        </div><!-- /account-layout -->
-    </div><!-- /accountOverlay -->
-
 
     <!-- ================================================================
      OVERLAY: NOTIFICATIONS
@@ -5023,266 +4857,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div><!-- /notifOverlay -->
 
 
-    <!-- ================================================================
-     OVERLAY: SETTINGS
-================================================================ -->
-    <div class="overlay-page" id="settingsOverlay">
-        <div class="overlay-topbar">
-            <button class="overlay-topbar-back" data-action="close-overlay" data-target="settingsOverlay">
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                    style="vertical-align:middle;margin-right:4px;">
-                    <line x1="19" y1="12" x2="5" y2="12" />
-                    <polyline points="12 5 5 12 12 19" />
-                </svg>
-                Back to Dashboard
-            </button>
-            <div class="overlay-topbar-sep"></div>
-            <span class="overlay-topbar-title">Settings</span>
-            <div class="overlay-topbar-brand">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-                <span>PUPSYNC</span>
-            </div>
-        </div>
-
-        <!-- ── SETTINGS BODY ────────────────────────────────────────── -->
-        <div class="sett-body">
-
-            <!-- Profile Banner -->
-            <div class="sett-profile-banner">
-                <div class="sett-profile-avatar">
-                    <?php echo strtoupper(substr($admin_name, 0, 1)); ?>
-                </div>
-                <div class="sett-profile-info">
-                    <div class="sett-profile-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                    <div class="sett-profile-meta">Administrator &middot; Full Access &middot; <?php echo htmlspecialchars($admin_email); ?></div>
-                </div>
-                <button class="sett-edit-profile-btn" data-action="show-change-pass">
-                    <span class="material-symbols-outlined">manage_accounts</span>
-                    Edit Profile
-                </button>
-            </div>
-
-            <!-- Cards Grid -->
-            <div class="sett-two-col">
-
-                <!-- Appearance -->
-                <div class="sett-card">
-                    <div class="sett-card-head">
-                        <span class="material-symbols-outlined">palette</span>
-                        <h3>Appearance</h3>
-                    </div>
-                    <div class="sett-card-body">
-                        <div class="sett-field-label">Theme</div>
-                        <div class="theme-grid">
-                            <div class="theme-opt selected" id="tp-light" data-action="apply-theme" data-theme="light">
-                                <div class="theme-prev tp-light">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">&#9728;&#65039; Light
-                                    <svg id="tc-light" xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        style="color:var(--accent-maroon);vertical-align:middle;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
-                                <div class="theme-prev tp-dark">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">&#127769; Dark
-                                    <svg id="tc-dark" xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
-                                <div class="theme-prev tp-hc">
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                    <div class="theme-prev-bar"></div>
-                                </div>
-                                <div class="theme-lbl">&#9889; High Contrast
-                                    <svg id="tc-hc" xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        style="color:var(--accent-maroon);vertical-align:middle;display:none;">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Compact Mode</span>
-                                <span class="sett-toggle-sub">Reduce spacing for a denser view</span>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Notification Preferences -->
-                <div class="sett-card">
-                    <div class="sett-card-head">
-                        <span class="material-symbols-outlined">notifications</span>
-                        <h3>Notification Preferences</h3>
-                    </div>
-                    <div class="sett-card-body">
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">New Requests</span>
-                                <span class="sett-toggle-sub">Alert when faculty submits a request</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Overdue Alerts</span>
-                                <span class="sett-toggle-sub">Alert when a borrowed item becomes overdue</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Low Stock Warning</span>
-                                <span class="sett-toggle-sub">Alert when any item drops to 2 or fewer units</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Room Issues</span>
-                                <span class="sett-toggle-sub">Alert when a room issue is reported</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Security -->
-                <div class="sett-card">
-                    <div class="sett-card-head">
-                        <span class="material-symbols-outlined">lock</span>
-                        <h3>Security</h3>
-                    </div>
-                    <div class="sett-card-body">
-                        <div class="form-group">
-                            <label class="sett-field-label">Current Password</label>
-                            <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label class="sett-field-label">New Password</label>
-                            <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label class="sett-field-label">Confirm New Password</label>
-                            <input type="password" class="form-control-custom" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" disabled>
-                        </div>
-                        <button class="btn-sett-primary" data-action="show-change-pass">
-                            <span class="material-symbols-outlined">lock_reset</span>
-                            Change Password
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Accessibility -->
-                <div class="sett-card">
-                    <div class="sett-card-head">
-                        <span class="material-symbols-outlined">accessibility</span>
-                        <h3>Accessibility</h3>
-                    </div>
-                    <div class="sett-card-body">
-                        <div class="form-group">
-                            <label class="sett-field-label">Text Size</label>
-                            <select class="form-control-custom">
-                                <option>Normal</option>
-                                <option>Large</option>
-                                <option>X-Large</option>
-                            </select>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Reduce Motion</span>
-                                <span class="sett-toggle-sub">Disables fade-in and slide animations</span>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Enhanced Focus Ring</span>
-                                <span class="sett-toggle-sub">Makes keyboard focus outlines more visible</span>
-                            </div>
-                            <label class="toggle-sw">
-                                <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
-                                <span class="toggle-track"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-            </div><!-- /sett-two-col -->
-
-            <!-- Danger Zone -->
-            <div class="sett-danger-zone">
-                <div class="sett-card sett-danger-card">
-                    <div class="sett-card-head">
-                        <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
-                        <h3 style="color:var(--danger)">Danger Zone</h3>
-                    </div>
-                    <div class="sett-card-body">
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Show Asset IDs</span>
-                                <span class="sett-toggle-sub">Display equipment item IDs in tables</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="sett-toggle-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title">Verbose Error Messages</span>
-                                <span class="sett-toggle-sub">Show detailed database error information (not recommended in production)</span>
-                            </div>
-                            <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                        </div>
-                        <div class="sett-danger-row">
-                            <div class="sett-toggle-label">
-                                <span class="sett-toggle-title" style="color:var(--danger)">Reset All Settings</span>
-                                <span class="sett-toggle-sub">Restore all appearance and accessibility defaults</span>
-                            </div>
-                            <button class="btn-sett-danger" data-action="reset-settings">
-                                <span class="material-symbols-outlined">restart_alt</span>
-                                Reset
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div><!-- /sett-body -->
-
-    </div><!-- /settingsOverlay -->
-
     <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="spinner"></div>
@@ -5553,12 +5127,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Requests sub-tab switching */
+            /* Requests filter-chip switching */
             var rqTabs = document.getElementById('rqTabs');
             if (rqTabs) {
-                rqTabs.querySelectorAll('.rq-sub-tab').forEach(function(tab) {
+                rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(tab) {
                     tab.addEventListener('click', function() {
-                        rqTabs.querySelectorAll('.rq-sub-tab').forEach(function(t) {
+                        rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(t) {
                             t.classList.remove('active');
                         });
                         document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function(p) {
@@ -5600,6 +5174,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             }
             if (allSearch) allSearch.addEventListener('input', filterAll);
             if (allStatus) allStatus.addEventListener('change', filterAll);
+            filterAll(); // apply the default "Returned" pre-selection immediately
         });
 
         /* data-action delegation for ps-modal and inv-modal */
@@ -5666,14 +5241,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            /* Dropdown "Settings" button → trigger the sidebar Settings tab */
-            var ddSettBtn = document.getElementById('dd-settings-btn');
-            if (ddSettBtn) {
-                ddSettBtn.addEventListener('click', function() {
-                    var snavSettings = document.getElementById('snav-settings');
-                    if (snavSettings) snavSettings.click();
-                });
-            }
+            /* Dropdown "My Account" / "Settings" buttons are bound in
+               admin-dashboard.js (routes to the correct Settings sub-tab). */
 
             /* Override initView() for ?edit_item= and ?view=inventory.
                admin-dashboard.js calls _switchTabDOM('lending') for those,

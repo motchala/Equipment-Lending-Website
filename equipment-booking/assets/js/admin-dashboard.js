@@ -164,14 +164,8 @@
         if (el) {
             el.classList.add('active');
             // Reset to default tab when opening overlay
-            if (id === 'accountOverlay') {
-                switchAccTab('acc-overview');
-            } else if (id === 'settingsOverlay') {
-                switchSettTab('st-appearance');
-            } else if (id === 'notifOverlay') {
+            if (id === 'notifOverlay') {
                 filterNotifs('all');
-            } else if (id === 'helpCenterOverlay') {
-                switchHcTab('hc-start');
             }
         }
     }
@@ -181,17 +175,8 @@
         if (el) {
             el.classList.remove('active');
             // Clear active states from overlay sub-navigation buttons
-            if (id === 'accountOverlay') {
-                document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-            } else if (id === 'settingsOverlay') {
-                document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-            } else if (id === 'notifOverlay') {
+            if (id === 'notifOverlay') {
                 document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-            } else if (id === 'helpCenterOverlay') {
-                document.querySelectorAll('.hc-nav-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('#helpCenterOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
             }
         }
     }
@@ -239,9 +224,9 @@
         document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
     }
 
-    /* ── Account sub-tabs ────────────────────────────────────── */
+    /* ── Account / Help sub-tabs (nested inside the Settings tab) ── */
     function switchHcTab(panelId) {
-        document.querySelectorAll('#helpCenterOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('#sett-help .overlay-sub-panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.hc-nav-btn').forEach(b => b.classList.remove('active'));
         const panel = document.getElementById(panelId);
         if (panel) panel.classList.add('active');
@@ -250,12 +235,29 @@
     }
 
     function switchAccTab(panelId) {
-        document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('#sett-account .overlay-sub-panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
         const p = document.getElementById(panelId);
         const b = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
         if (p) p.classList.add('active');
         if (b) b.classList.add('active');
+    }
+
+    /* ── Settings mega sub-tabs (My Account / Preferences / Borrowing
+       Rules / Help & FAQ) — the streamlined consolidation of what used
+       to be the Account overlay, Arbitration tab, and Help Center
+       overlay. Scoped to #panel-settings so it never touches other
+       tabs' sub-panels. ── */
+    function switchSettMainTab(panelId) {
+        const settPanel = document.getElementById('panel-settings');
+        if (!settPanel) return;
+        settPanel.querySelectorAll(':scope > .rq-sub-panel').forEach(p => p.classList.remove('active'));
+        const tabsWrap = document.getElementById('settMainTabs');
+        if (tabsWrap) tabsWrap.querySelectorAll('.rq-sub-tab').forEach(t => t.classList.remove('active'));
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('active');
+        const btn = tabsWrap && tabsWrap.querySelector('[data-sett-panel="' + panelId + '"]');
+        if (btn) btn.classList.add('active');
     }
 
     /* ── Borrow History toggle ───────────────────────────────── */
@@ -332,15 +334,9 @@
         });
     }
 
-    /* ── Settings sub-tabs ───────────────────────────────────── */
-    function switchSettTab(panelId) {
-        document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-        const p = document.getElementById(panelId);
-        const b = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
-        if (p) p.classList.add('active');
-        if (b) b.classList.add('active');
-    }
+    /* switchSettTab (legacy Settings-overlay tab helper) removed —
+       the overlay it served no longer exists; Settings navigation
+       now goes through switchSettMainTab(). */
 
     /* ── Notifications ───────────────────────────────────────── */
     function filterNotifs(cat) {
@@ -530,7 +526,6 @@
                     if (t) t.style.display = 'none'; break;
                 }
                 case 'hc-go': {
-                    closeOverlay('helpCenterOverlay');
                     const hcTab = el.dataset.tab;
                     if (hcTab) {
                         _switchTabDOM(hcTab, true);
@@ -901,6 +896,30 @@
         btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
     });
 
+    /* ── Settings mega sub-tabs (My Account / Preferences /
+       Borrowing Rules / Help & FAQ) ─────────────────────────── */
+    document.querySelectorAll('#settMainTabs .rq-sub-tab').forEach(btn => {
+        btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
+    });
+
+    /* ── Header dropdown → Settings tab shortcuts ────────────── */
+    const ddAccountBtn = document.getElementById('dd-account-btn');
+    if (ddAccountBtn) {
+        ddAccountBtn.addEventListener('click', function () {
+            closeDropdown();
+            _switchTabDOM('settings');
+            switchSettMainTab('sett-account');
+        });
+    }
+    const ddSettingsBtn = document.getElementById('dd-settings-btn');
+    if (ddSettingsBtn) {
+        ddSettingsBtn.addEventListener('click', function () {
+            closeDropdown();
+            _switchTabDOM('settings');
+            switchSettMainTab('sett-prefs');
+        });
+    }
+
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
         const modal = document.getElementById('adminCancelRrModal');
@@ -1144,10 +1163,8 @@
         btn.addEventListener('click', function () { switchHcTab(this.dataset.hcTab); });
     });
 
-    /* ── Settings sub-nav ────────────────────────────────────── */
-    document.querySelectorAll('.s-nav-item').forEach(btn => {
-        btn.addEventListener('click', function () { switchSettTab(this.dataset.settTab); });
-    });
+    /* Legacy Settings-overlay sub-nav (.s-nav-item) removed with
+       switchSettTab — the overlay no longer exists. */
 
     /* ── Notification filter tabs ────────────────────────────── */
     document.querySelectorAll('.notif-tab').forEach(btn => {
@@ -1973,22 +1990,22 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     });
 });
 
-/* ── Requests sub-tab switcher ────────────────────────────────── */
+/* ── Requests filter-chip switcher ────────────────────────────── */
 (function () {
     var tabGroup = document.getElementById('rqTabs');
     if (!tabGroup) return;
 
-    tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+    tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (tab) {
         tab.addEventListener('click', function () {
-            /* Deactivate all tabs and panels */
-            tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (t) {
+            /* Deactivate all chips and panels */
+            tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (t) {
                 t.classList.remove('active');
             });
             document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
                 p.classList.remove('active');
             });
 
-            /* Activate clicked tab and its panel */
+            /* Activate clicked chip and its panel */
             tab.classList.add('active');
             var panelId = tab.dataset.rqPanel;
             var panel = document.getElementById(panelId);
@@ -2031,6 +2048,7 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     }
     if (searchInput) searchInput.addEventListener('input', filterAll);
     if (statusSel) statusSel.addEventListener('change', filterAll);
+    filterAll(); // apply the default "Returned" pre-selection immediately
 })();
 /* ════════════════════════════════════════════════════════════════
    PHASE 3 — ARBITRATION + EXPORT HELPERS
@@ -2043,7 +2061,7 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
             arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('#panel-arbitration .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
+            document.querySelectorAll('#sett-rules .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
             tab.classList.add('active');
             var panel = document.getElementById(tab.dataset.arbPanel);
             if (panel) panel.classList.add('active');
