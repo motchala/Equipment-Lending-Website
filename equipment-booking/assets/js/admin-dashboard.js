@@ -275,79 +275,6 @@
         if (activeBtn) activeBtn.classList.add('active');
     }
 
-    /* ── Rooms Registry: building tabs (scoped to #panel-rooms) ──
-       One building panel is shown at a time — mirrors switchRoomsTab's
-       pattern so it stays consistent with the rest of the file. */
-    function switchRoomBuildingTab(targetId) {
-        const roomsPanel = document.getElementById('panel-rooms');
-        if (!roomsPanel) return;
-        roomsPanel.querySelectorAll('[data-building-panel]').forEach(p => p.classList.remove('active'));
-        roomsPanel.querySelectorAll('.pr-building-tab').forEach(b => b.classList.remove('active'));
-        const activePanel = document.getElementById(targetId);
-        const activeBtn = roomsPanel.querySelector('.pr-building-tab[data-building-tab="' + targetId + '"]');
-        if (activePanel) activePanel.classList.add('active');
-        if (activeBtn) activeBtn.classList.add('active');
-    }
-
-    /* ── Rooms Registry: search + status filter ───────────────────
-       Filters room rows across every building table at once (so
-       switching tabs while a filter is active stays consistent),
-       hides floor-divider rows and floor-jump chips that end up with
-       no visible rooms under them, and dims building tabs that have
-       no matches while a search/filter is active. */
-    function filterRoomsRegistry() {
-        const roomsPanel = document.getElementById('panel-rooms');
-        if (!roomsPanel) return;
-
-        const searchInput = document.getElementById('roomSearchInput');
-        const query = (searchInput && searchInput.value ? searchInput.value : '').trim().toLowerCase();
-        const activeChip = roomsPanel.querySelector('.pr-filter-chip.active');
-        const statusFilter = activeChip ? activeChip.dataset.statusFilter : 'all';
-        const isFiltering = !!query || statusFilter !== 'all';
-
-        roomsPanel.querySelectorAll('[data-building-panel]').forEach(function (bp) {
-            let anyVisible = false;
-            let currentDivider = null;
-            let currentDividerHasVisible = false;
-
-            bp.querySelectorAll('tbody tr').forEach(function (row) {
-                if (row.classList.contains('pr-floor-divider')) {
-                    if (currentDivider) currentDivider.style.display = currentDividerHasVisible ? '' : 'none';
-                    currentDivider = row;
-                    currentDividerHasVisible = false;
-                    return;
-                }
-                if (row.classList.contains('pr-no-match-row')) return;
-                if (!row.classList.contains('room-card')) return;
-
-                const name = (row.dataset.roomName || '').toLowerCase();
-                const status = row.dataset.roomStatus || '';
-                const matchesQuery = !query || name.indexOf(query) !== -1;
-                const matchesStatus = statusFilter === 'all' || status === statusFilter;
-                const visible = matchesQuery && matchesStatus;
-
-                row.style.display = visible ? '' : 'none';
-                if (visible) {
-                    currentDividerHasVisible = true;
-                    anyVisible = true;
-                }
-            });
-            if (currentDivider) currentDivider.style.display = currentDividerHasVisible ? '' : 'none';
-
-            const noMatchRow = bp.querySelector('.pr-no-match-row');
-            if (noMatchRow) noMatchRow.style.display = anyVisible ? 'none' : '';
-
-            bp.querySelectorAll('[data-floor-jump]').forEach(function (chip) {
-                const href = chip.getAttribute('href') || '';
-                const target = href ? document.getElementById(href.slice(1)) : null;
-                chip.style.display = (target && target.style.display !== 'none') ? '' : 'none';
-            });
-
-            const tab = roomsPanel.querySelector('.pr-building-tab[data-building-tab="' + bp.id + '"]');
-            if (tab) tab.classList.toggle('pr-tab-nomatch', isFiltering && !anyVisible);
-        });
-    }
-
     function _getUnreadCount() {
         return document.querySelectorAll('.notif-item.unread').length;
     }
@@ -959,34 +886,6 @@
     document.querySelectorAll('[data-rooms-tab]').forEach(btn => {
         btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
     });
-
-    /* ── Rooms Registry: building tabs ─────────────────────────── */
-    document.querySelectorAll('.pr-building-tab').forEach(btn => {
-        btn.addEventListener('click', function () { switchRoomBuildingTab(this.dataset.buildingTab); });
-    });
-
-    /* ── Rooms Registry: status filter chips ───────────────────── */
-    document.querySelectorAll('#panel-rooms .pr-filter-chip').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('#panel-rooms .pr-filter-chip').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            filterRoomsRegistry();
-        });
-    });
-
-    /* ── Rooms Registry: search input ───────────────────────────── */
-    const roomSearchInputEl = document.getElementById('roomSearchInput');
-    if (roomSearchInputEl) roomSearchInputEl.addEventListener('input', filterRoomsRegistry);
-
-    /* ── Rooms Registry: floor quick-jump (smooth scroll) ──────── */
-    document.querySelectorAll('#panel-rooms [data-floor-jump]').forEach(chip => {
-        chip.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    });
-
 
     /* ── Settings mega sub-tabs (My Account / Preferences /
        Borrowing Rules / Help & FAQ) ─────────────────────────── */

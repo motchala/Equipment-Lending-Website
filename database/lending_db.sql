@@ -640,7 +640,7 @@ VALUES
 (1, 1, 'main-building-a', 'Building A (Old)', 'South Wing', 5,
  'assets/images/faculty/pup-main-building-a-image.jpg', 'domain',
  'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.', 1),
-(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 6,
+(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 5,
  'assets/images/faculty/pup-main-building-b-image.jpg', 'business',
  'Modern laboratories, smart classrooms, and collaborative study spaces.', 2),
 (3, 2, 'cite-main', 'PUP CITE Building', 'Main Block', 4,
@@ -715,28 +715,7 @@ VALUES
 (2, 'Room 506', 5, '5th Floor', 'Available', 6),
 (2, 'Room 507', 5, '5th Floor', 'Available', 7),
 (2, 'Room 508', 5, '5th Floor', 'Available', 8),
-(2, 'Room 509', 5, '5th Floor', 'Available', 9),
--- 6th Floor
-(2, 'Room 601', 6, '6th Floor', 'Available', 1),
-(2, 'Room 602', 6, '6th Floor', 'Available', 2),
-(2, 'Room 603', 6, '6th Floor', 'Available', 3),
-(2, 'Room 604', 6, '6th Floor', 'Available', 4),
-(2, 'Room 605', 6, '6th Floor', 'Available', 5),
-(2, 'Room 606', 6, '6th Floor', 'Available', 6),
-(2, 'Room 607', 6, '6th Floor', 'Available', 7),
-(2, 'Room 608', 6, '6th Floor', 'Available', 8),
-(2, 'Room 609', 6, '6th Floor', 'Available', 9),
-(2, 'Room 610', 6, '6th Floor', 'Available', 10),
-(2, 'Room 611', 6, '6th Floor', 'Available', 11),
-(2, 'Room 612', 6, '6th Floor', 'Available', 12),
-(2, 'Room 613', 6, '6th Floor', 'Available', 13),
-(2, 'Room 614', 6, '6th Floor', 'Available', 14),
-(2, 'Room 615', 6, '6th Floor', 'Available', 15),
-(2, 'Room 616', 6, '6th Floor', 'Available', 16),
-(2, 'Room 617', 6, '6th Floor', 'Available', 17),
-(2, 'Room 618', 6, '6th Floor', 'Available', 18),
-(2, 'Room 619', 6, '6th Floor', 'Available', 19),
-(2, 'Room 620', 6, '6th Floor', 'Available', 20);
+(2, 'Room 509', 5, '5th Floor', 'Available', 9);
 
 -- ── PUP CITE Building  (building_id = 3) ─────────────────────────────────
 INSERT IGNORE INTO `tbl_rooms`

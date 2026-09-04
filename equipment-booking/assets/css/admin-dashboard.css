@@ -5504,25 +5504,27 @@ input[type="range"] {
     color: var(--accent-maroon);
 }
 
-/* ── Toolbar: search + status filter chips ────────────────── */
+/* ── Toolbar: search + Building/Floor/Status dropdowns ──────
+   Kept to one row of plain, familiar controls (a text box and
+   three <select>s) instead of custom tabs/chips — easier to
+   read at a glance for a non-technical admin. ─────────────── */
 #panel-rooms .pr-rooms-toolbar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
-    margin-bottom: 0.85rem;
+    margin-bottom: 1rem;
 }
 
 #panel-rooms .pr-search-wrap {
     position: relative;
     flex: 1;
-    min-width: 220px;
-    max-width: 360px;
+    min-width: 200px;
 }
 
 #panel-rooms .pr-search-wrap .material-symbols-outlined {
     position: absolute;
-    left: 0.85rem;
+    left: 0.8rem;
     top: 50%;
     transform: translateY(-50%);
     font-size: 16px;
@@ -5532,9 +5534,10 @@ input[type="range"] {
 
 #panel-rooms .pr-search-wrap input {
     width: 100%;
-    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    height: 36px;
+    padding: 0 0.9rem 0 2.4rem;
     border: 1.5px solid var(--khaki-border);
-    border-radius: 50px;
+    border-radius: 9px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
     color: var(--text-dark);
@@ -5552,141 +5555,37 @@ input[type="range"] {
     color: var(--text-light);
 }
 
-#panel-rooms .pr-status-filters {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-#panel-rooms .pr-filter-chip {
-    padding: 0.38rem 0.9rem;
-    border-radius: 50px;
+#panel-rooms .pr-filter-select {
+    height: 36px;
+    padding: 0 2rem 0 0.85rem;
     border: 1.5px solid var(--khaki-border);
-    background: transparent;
-    font-family: 'Poppins', sans-serif;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--text-light);
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-}
-
-#panel-rooms .pr-filter-chip:hover {
-    border-color: var(--accent-maroon);
-    color: var(--accent-maroon);
-}
-
-#panel-rooms .pr-filter-chip.active {
-    background: var(--accent-maroon);
-    border-color: var(--accent-maroon);
-    color: #fff;
-}
-
-/* ── Building tabs — pick a building, see just its rooms ───── */
-#panel-rooms .pr-building-tabs {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 1.1rem;
-    border-bottom: 1.5px solid var(--khaki-border);
-    padding-bottom: 0.85rem;
-}
-
-#panel-rooms .pr-building-tab {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
-    border: 1.5px solid var(--khaki-border);
+    border-radius: 9px;
     background: var(--card-bg);
     font-family: 'Poppins', sans-serif;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text-dark);
     cursor: pointer;
-    transition: all 0.15s;
+    outline: none;
+    transition: border-color 0.2s;
+    max-width: 220px;
 }
 
-#panel-rooms .pr-building-tab:hover {
+#panel-rooms .pr-filter-select:focus {
     border-color: var(--accent-maroon);
-    color: var(--accent-maroon);
 }
 
-#panel-rooms .pr-building-tab.active {
-    background: var(--accent-maroon);
-    border-color: var(--accent-maroon);
-    color: #fff;
+#panel-rooms .pr-filter-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
-#panel-rooms .pr-building-tab-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(96, 3, 2, 0.09);
-    color: var(--accent-maroon);
-    border-radius: 50px;
-    padding: 1px 8px;
-    font-size: 10.5px;
-    font-weight: 700;
-}
-
-#panel-rooms .pr-building-tab.active .pr-building-tab-count {
-    background: rgba(255, 255, 255, 0.28);
-    color: #fff;
-}
-
-#panel-rooms .pr-building-tab.pr-tab-nomatch {
-    opacity: 0.42;
-}
-
-/* ── Building panels — only the active one is shown ─────────── */
-#panel-rooms .pr-building-panel {
-    display: none;
-}
-
-#panel-rooms .pr-building-panel.active {
-    display: block;
-}
-
-/* ── Floor quick-jump chips ──────────────────────────────────── */
-#panel-rooms .pr-floor-jump {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 0.85rem;
-}
-
-#panel-rooms .pr-floor-chip {
-    padding: 0.28rem 0.75rem;
-    border-radius: 50px;
-    background: var(--secondary-cream);
-    border: 1px solid var(--khaki-border);
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-light);
-    text-decoration: none !important;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-#panel-rooms .pr-floor-chip:hover {
-    border-color: var(--accent-maroon);
-    color: var(--accent-maroon);
-    background: var(--accent-light);
-}
-
-/* ── Room registry table (rows replace the old banner cards) ── */
+/* ── Room registry table ─────────────────────────────────────
+   One flat table (not per-building panels) — floor/building
+   divider rows do the grouping, so the DOM and the CSS both
+   stay simple. Rows are compact; only 4 plain columns. ─────── */
 #panel-rooms .pr-rooms-table tbody tr.room-card td {
-    padding: 0.62rem 1.1rem;
-}
-
-#panel-rooms .pr-rooms-table .rr-icon {
-    font-size: 16px;
-    color: var(--accent-maroon);
-    vertical-align: middle;
-    margin-right: 7px;
+    padding: 0.55rem 1.1rem;
 }
 
 /* Status badge (rc-status) — used in the rooms table now */
@@ -5723,13 +5622,7 @@ input[type="range"] {
 
 /* Amenity chips */
 
-/* ── Amenities cell — single line, truncates with a tooltip ── */
-#panel-rooms .pr-amenities-cell {
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+/* Amenities cell */
 
 /* ── Row actions: Schedule / Edit / Archive icon buttons ─────── */
 #panel-rooms .pr-row-actions {
@@ -5742,9 +5635,9 @@ input[type="range"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
     border: 1.5px solid var(--khaki-border);
     background: transparent;
     color: var(--text-dark);
@@ -5755,7 +5648,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-icon-btn .material-symbols-outlined {
-    font-size: 16px;
+    font-size: 15px;
 }
 
 #panel-rooms .pr-icon-btn:hover {
@@ -5770,15 +5663,18 @@ input[type="range"] {
     background: #fdecea;
 }
 
-/* ── Floor divider row inside the rooms table ────────────────── */
+/* ── Floor/building divider row inside the rooms table ────────
+   One label per group ("Building B (New) — 3rd Floor · 5
+   rooms") so it reads clearly even when Building is set to
+   "All Buildings". ───────────────────────────────────────── */
 #panel-rooms .pr-rooms-table tr.pr-floor-divider td {
     background: var(--secondary-cream);
     font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.75px;
     color: var(--text-light);
-    padding: 0.5rem 1.1rem;
+    padding: 0.45rem 1.1rem;
     border-bottom: 1px solid var(--khaki-border);
 }
 
@@ -6035,12 +5931,10 @@ input[type="range"] {
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 900px) {
-    #panel-rooms .pr-amenities-cell {
-        display: none;
-    }
+@media (max-width: 640px) {
 
-    #panel-rooms .pr-rooms-table thead th:nth-child(3) {
+    #panel-rooms .pr-rooms-table thead th:nth-child(2),
+    #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
         display: none;
     }
 }
@@ -6055,7 +5949,7 @@ input[type="range"] {
         align-items: stretch;
     }
 
-    #panel-rooms .pr-search-wrap {
+    #panel-rooms .pr-filter-select {
         max-width: none;
     }
 }

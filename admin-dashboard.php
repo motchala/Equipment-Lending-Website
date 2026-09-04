@@ -2046,6 +2046,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         }
                         $rooms_grouped[$bId][$fNum]['rooms'][] = $r;
                     }
+                    foreach ($rooms_grouped as $bId => $floorsTmp) {
+                        ksort($rooms_grouped[$bId]);
+                    }
+
+                    // Floors-per-building, for the Floor <select> (rendered for the
+                    // default building below, and re-populated by JS on change).
+                    $floors_by_building_js = [];
+                    foreach ($rooms_buildings as $bid => $b) {
+                        $floors_by_building_js[$bid] = [];
+                        foreach (($rooms_grouped[$bid] ?? []) as $fNum => $fData) {
+                            $floors_by_building_js[$bid][] = ['num' => (int)$fNum, 'label' => $fData['label']];
+                        }
+                    }
+                    $first_building_id = array_key_first($rooms_buildings);
                     ?>
 
                     <?php if (empty($rooms_buildings)): ?>
@@ -2054,156 +2068,201 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     <?php else: ?>
 
-                        <!-- ── Toolbar: search + status filter ─────────────────────── -->
+                        <!-- ── Toolbar: search + Building / Floor / Status filters ── -->
                         <div class="pr-rooms-toolbar">
                             <div class="pr-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="roomSearchInput" placeholder="Search rooms by name…" autocomplete="off">
+                                <input type="text" id="roomSearchInput" placeholder="Search rooms…" autocomplete="off">
                             </div>
-                            <div class="pr-status-filters" id="roomStatusFilters">
-                                <button type="button" class="pr-filter-chip active" data-status-filter="all">All</button>
-                                <button type="button" class="pr-filter-chip" data-status-filter="Available">Available</button>
-                                <button type="button" class="pr-filter-chip" data-status-filter="Maintenance">Maintenance</button>
-                                <button type="button" class="pr-filter-chip" data-status-filter="Not Bookable">Not Bookable</button>
-                            </div>
+                            <select id="roomBuildingSelect" class="pr-filter-select">
+                                <option value="all">All Buildings</option>
+                                <?php foreach ($rooms_buildings as $bid => $b): ?>
+                                    <option value="<?php echo (int)$bid; ?>" <?php echo $bid === $first_building_id ? ' selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($b['campus_name'] . ' · ' . $b['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="roomFloorSelect" class="pr-filter-select">
+                                <option value="all">All Floors</option>
+                                <?php foreach (($floors_by_building_js[$first_building_id] ?? []) as $f): ?>
+                                    <option value="<?php echo (int)$f['num']; ?>"><?php echo htmlspecialchars($f['label']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="roomStatusSelect" class="pr-filter-select">
+                                <option value="all">All Statuses</option>
+                                <option value="Available">Available</option>
+                                <option value="Maintenance">Maintenance</option>
+                                <option value="Not Bookable">Not Bookable</option>
+                            </select>
                         </div>
 
-                        <!-- ── Building tabs — one building's rooms shown at a time ── -->
-                        <div class="pr-building-tabs" id="roomBuildingTabs">
-                            <?php $rb_i = 0;
-                            foreach ($rooms_buildings as $bid => $b):
-                                $bCount = $rooms_count_by_building[$bid] ?? 0;
-                            ?>
-                                <button type="button" class="pr-building-tab<?php echo $rb_i === 0 ? ' active' : ''; ?>" data-building-tab="bpanel-<?php echo (int)$bid; ?>">
-                                    <?php echo htmlspecialchars($b['campus_name'] . ' · ' . $b['name']); ?>
-                                    <span class="pr-building-tab-count"><?php echo $bCount; ?></span>
-                                </button>
-                            <?php $rb_i++;
-                            endforeach; ?>
-                        </div>
-
-                        <!-- ── One panel per building, with floor-grouped room table ── -->
-                        <?php $rb_i = 0;
-                        foreach ($rooms_buildings as $bid => $b):
-                            $floors = $rooms_grouped[$bid] ?? [];
-                            ksort($floors);
-                        ?>
-                            <div class="pr-building-panel<?php echo $rb_i === 0 ? ' active' : ''; ?>" id="bpanel-<?php echo (int)$bid; ?>" data-building-panel>
-
-                                <?php if (!empty($floors)): ?>
-                                    <div class="pr-floor-jump">
-                                        <?php foreach ($floors as $fNum => $fData): ?>
-                                            <a href="#floor-<?php echo (int)$bid; ?>-<?php echo (int)$fNum; ?>" class="pr-floor-chip" data-floor-jump>
-                                                <?php echo htmlspecialchars($fData['label']); ?>
-                                            </a>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="pr-tbl-wrap">
-                                    <table class="pr-table pr-rooms-table" data-room-table>
-                                        <thead>
-                                            <tr>
-                                                <th>Room</th>
-                                                <th>Capacity</th>
-                                                <th>Amenities</th>
-                                                <th>Status</th>
-                                                <th style="text-align:right;">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php if (empty($floors)): ?>
-                                                <tr>
-                                                    <td colspan="5" style="text-align:center;padding:2.5rem;color:var(--text-light);">
-                                                        No rooms in this building yet.
-                                                    </td>
-                                                </tr>
-                                                <?php else:
-                                                foreach ($floors as $fNum => $fData): ?>
-                                                    <tr class="pr-floor-divider" id="floor-<?php echo (int)$bid; ?>-<?php echo (int)$fNum; ?>">
-                                                        <td colspan="5">
-                                                            <?php echo htmlspecialchars($fData['label']); ?>
-                                                            <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
-                                                        </td>
-                                                    </tr>
-                                                    <?php foreach ($fData['rooms'] as $room):
-                                                        $amenities_arr = [];
-                                                        if (!empty($room['amenities'])) {
-                                                            $dec = json_decode($room['amenities'], true);
-                                                            if (is_array($dec)) $amenities_arr = $dec;
-                                                        }
-
-                                                        $rc_status_cls = 'avail';
-                                                        if ($room['status'] === 'Maintenance')  $rc_status_cls = 'maint';
-                                                        if ($room['status'] === 'Not Bookable') $rc_status_cls = 'nobk';
-
-                                                        $room_icon = 'meeting_room';
-                                                        $rn = strtolower($room['room_name']);
-                                                        if (str_contains($rn, 'computer') || str_contains($rn, 'lab'))         $room_icon = 'computer';
-                                                        elseif (str_contains($rn, 'lecture') || str_contains($rn, 'hall'))     $room_icon = 'school';
-                                                        elseif (str_contains($rn, 'discussion') || str_contains($rn, 'conf'))  $room_icon = 'group_work';
-                                                        elseif (str_contains($rn, 'library'))                                   $room_icon = 'local_library';
-                                                        elseif (str_contains($rn, 'science') || str_contains($rn, 'chem'))     $room_icon = 'science';
-
-                                                        $fl = $fData['label'];
-                                                    ?>
-                                                        <tr class="room-card pr-room-row"
-                                                            data-room-id="<?php echo (int)$room['room_id']; ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
-                                                            data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
-                                                            data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
-                                                            data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
-                                                            data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
-                                                            data-room-building-id="<?php echo (int)$room['building_id']; ?>"
-                                                            data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
-                                                            data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
-                                                            data-room-status="<?php echo htmlspecialchars($room['status'], ENT_QUOTES); ?>"
-                                                            data-room-sort="<?php echo (int)$room['sort_order']; ?>"
-                                                            data-room-amenities="<?php
-                                                                                    $am_raw = isset($room['amenities']) && $room['amenities'] ? $room['amenities'] : '[]';
-                                                                                    $am_arr = json_decode($am_raw, true);
-                                                                                    echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
-                                                                                    ?>">
-                                                            <td class="td-fw">
-                                                                <span class="rr-icon material-symbols-outlined"><?php echo $room_icon; ?></span>
-                                                                <?php echo htmlspecialchars($room['room_name']); ?>
-                                                            </td>
-                                                            <td class="td-sm"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
-                                                            <td class="td-sm pr-amenities-cell" <?php echo !empty($amenities_arr) ? ' title="' . htmlspecialchars(implode(', ', $amenities_arr)) . '"' : ''; ?>>
-                                                                <?php echo !empty($amenities_arr) ? htmlspecialchars(implode(', ', $amenities_arr)) : '—'; ?>
-                                                            </td>
-                                                            <td>
-                                                                <span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span>
-                                                            </td>
-                                                            <td class="pr-row-actions">
-                                                                <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
-                                                                    <span class="material-symbols-outlined">calendar_month</span>
-                                                                </button>
-                                                                <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room">
-                                                                    <span class="material-symbols-outlined">edit</span>
-                                                                </button>
-                                                                <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
-                                                                    class="pr-icon-btn danger"
-                                                                    title="Archive room"
-                                                                    onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
-                                                                    <span class="material-symbols-outlined">archive</span>
-                                                                </a>
-                                                            </td>
-                                                        </tr>
-                                                    <?php endforeach; ?>
-                                            <?php endforeach;
-                                            endif; ?>
-                                            <tr class="pr-no-match-row" style="display:none;">
-                                                <td colspan="5" style="text-align:center;padding:2.5rem;color:var(--text-light);">
-                                                    No rooms match your search.
+                        <!-- ── One flat, floor-grouped table for every building ────── -->
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table pr-rooms-table" id="roomsRegistryTable">
+                                <thead>
+                                    <tr>
+                                        <th>Room</th>
+                                        <th style="text-align:right;">Capacity</th>
+                                        <th>Status</th>
+                                        <th style="text-align:right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($rooms_buildings as $bid => $b):
+                                        $floors = $rooms_grouped[$bid] ?? [];
+                                        foreach ($floors as $fNum => $fData): ?>
+                                            <tr class="pr-floor-divider" data-building-id="<?php echo (int)$bid; ?>" data-floor-num="<?php echo (int)$fNum; ?>">
+                                                <td colspan="4">
+                                                    <?php echo htmlspecialchars($b['name'] . ' — ' . $fData['label']); ?>
+                                                    <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
                                                 </td>
                                             </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div><!-- /.pr-building-panel -->
-                        <?php $rb_i++;
-                        endforeach; ?>
+                                            <?php foreach ($fData['rooms'] as $room):
+                                                $rc_status_cls = 'avail';
+                                                if ($room['status'] === 'Maintenance')  $rc_status_cls = 'maint';
+                                                if ($room['status'] === 'Not Bookable') $rc_status_cls = 'nobk';
+                                                $fl = $fData['label'];
+                                            ?>
+                                                <tr class="room-card pr-room-row"
+                                                    data-room-id="<?php echo (int)$room['room_id']; ?>"
+                                                    data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
+                                                    data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
+                                                    data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
+                                                    data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
+                                                    data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
+                                                    data-room-building-id="<?php echo (int)$room['building_id']; ?>"
+                                                    data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
+                                                    data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
+                                                    data-room-status="<?php echo htmlspecialchars($room['status'], ENT_QUOTES); ?>"
+                                                    data-room-sort="<?php echo (int)$room['sort_order']; ?>"
+                                                    data-room-amenities="<?php
+                                                                            $am_raw = isset($room['amenities']) && $room['amenities'] ? $room['amenities'] : '[]';
+                                                                            $am_arr = json_decode($am_raw, true);
+                                                                            echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
+                                                                            ?>">
+                                                    <td class="td-fw"><?php echo htmlspecialchars($room['room_name']); ?></td>
+                                                    <td class="td-sm" style="text-align:right;"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
+                                                    <td><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
+                                                    <td class="pr-row-actions">
+                                                        <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
+                                                            <span class="material-symbols-outlined">calendar_month</span>
+                                                        </button>
+                                                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room">
+                                                            <span class="material-symbols-outlined">edit</span>
+                                                        </button>
+                                                        <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
+                                                            class="pr-icon-btn danger"
+                                                            title="Archive room"
+                                                            onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
+                                                            <span class="material-symbols-outlined">archive</span>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                    <?php endforeach;
+                                    endforeach; ?>
+                                    <tr class="pr-no-match-row" style="display:none;">
+                                        <td colspan="4" style="text-align:center;padding:2.5rem;color:var(--text-light);">
+                                            No rooms match your filters.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <script nonce="<?php echo $csp_nonce; ?>">
+                            /* ── PUPSync Room Registry filter module ─────────────────
+                               Search + Building/Floor/Status dropdowns. Depends on
+                               PHP-emitted floor data, so it lives inline (same pattern
+                               as the Room Schedule module below). */
+                            (function() {
+                                'use strict';
+                                const FLOORS_BY_BUILDING = <?php echo json_encode($floors_by_building_js); ?>;
+                                const DEFAULT_BUILDING = '<?php echo (int)$first_building_id; ?>';
+
+                                const table = document.getElementById('roomsRegistryTable');
+                                const bldSel = document.getElementById('roomBuildingSelect');
+                                const flrSel = document.getElementById('roomFloorSelect');
+                                const stSel = document.getElementById('roomStatusSelect');
+                                const search = document.getElementById('roomSearchInput');
+                                if (!table || !bldSel || !flrSel || !stSel || !search) return;
+
+                                function populateFloorSelect(buildingId) {
+                                    flrSel.innerHTML = '';
+                                    const allOpt = document.createElement('option');
+                                    allOpt.value = 'all';
+                                    allOpt.textContent = 'All Floors';
+                                    flrSel.appendChild(allOpt);
+
+                                    if (buildingId === 'all') {
+                                        flrSel.disabled = true;
+                                        return;
+                                    }
+                                    flrSel.disabled = false;
+                                    (FLOORS_BY_BUILDING[buildingId] || []).forEach(function(f) {
+                                        const opt = document.createElement('option');
+                                        opt.value = String(f.num);
+                                        opt.textContent = f.label;
+                                        flrSel.appendChild(opt);
+                                    });
+                                }
+
+                                function applyFilters() {
+                                    const bId = bldSel.value;
+                                    const fNum = flrSel.value;
+                                    const status = stSel.value;
+                                    const query = (search.value || '').trim().toLowerCase();
+                                    const searching = query.length > 0;
+
+                                    let anyVisible = false;
+                                    let currentDivider = null;
+                                    let dividerHasVisible = false;
+
+                                    table.querySelectorAll('tbody tr').forEach(function(row) {
+                                        if (row.classList.contains('pr-floor-divider')) {
+                                            if (currentDivider) currentDivider.style.display = dividerHasVisible ? '' : 'none';
+                                            const dB = row.dataset.buildingId;
+                                            const dF = row.dataset.floorNum;
+                                            const inScope = searching || ((bId === 'all' || dB === bId) && (fNum === 'all' || dF === fNum));
+                                            currentDivider = inScope ? row : null;
+                                            if (!inScope) row.style.display = 'none';
+                                            dividerHasVisible = false;
+                                            return;
+                                        }
+                                        if (row.classList.contains('pr-no-match-row')) return;
+                                        if (!row.classList.contains('room-card')) return;
+
+                                        const rB = row.dataset.roomBuildingId;
+                                        const rF = row.dataset.roomFloorNum;
+                                        const inScope = searching || ((bId === 'all' || rB === bId) && (fNum === 'all' || rF === fNum));
+                                        const matchesStatus = status === 'all' || row.dataset.roomStatus === status;
+                                        const matchesQuery = !searching || (row.dataset.roomName || '').toLowerCase().indexOf(query) !== -1;
+                                        const visible = inScope && matchesStatus && matchesQuery;
+
+                                        row.style.display = visible ? '' : 'none';
+                                        if (visible) {
+                                            dividerHasVisible = true;
+                                            anyVisible = true;
+                                        }
+                                    });
+                                    if (currentDivider) currentDivider.style.display = dividerHasVisible ? '' : 'none';
+
+                                    const noMatch = table.querySelector('.pr-no-match-row');
+                                    if (noMatch) noMatch.style.display = anyVisible ? 'none' : '';
+                                }
+
+                                bldSel.addEventListener('change', function() {
+                                    populateFloorSelect(this.value);
+                                    applyFilters();
+                                });
+                                flrSel.addEventListener('change', applyFilters);
+                                stSel.addEventListener('change', applyFilters);
+                                search.addEventListener('input', applyFilters);
+
+                                populateFloorSelect(DEFAULT_BUILDING);
+                                applyFilters();
+                            })();
+                        </script>
 
                     <?php endif; ?>
 
