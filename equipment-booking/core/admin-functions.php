@@ -115,6 +115,7 @@ if (isset($_POST['add_item'])) {
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
     $qty = (int) $_POST['quantity'];
+    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
 
     // Default image path
     $image_path = "uploads/default.png";
@@ -141,8 +142,8 @@ if (isset($_POST['add_item'])) {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssis", $name, $category, $qty, $image_path);
+    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path, `condition`) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssiss", $name, $category, $qty, $image_path, $condition);
 
     if ($stmt->execute()) {
         $stmt->close();
@@ -165,6 +166,7 @@ if (isset($_POST['update_item'])) {
     $name = $_POST['item_name'];
     $category = $_POST['category'];
     $qty = intval($_POST['quantity']);
+    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
 
     $image_path = $_POST['old_image'];
 
@@ -194,7 +196,8 @@ if (isset($_POST['update_item'])) {
             SET item_name='$name',
                 category='$category',
                 quantity=$qty,
-                image_path='$image_path'
+                image_path='$image_path',
+                `condition`='$condition'
             WHERE item_id=$item_id";
 
     mysqli_query($conn, $sql);
@@ -258,7 +261,10 @@ if (isset($_GET['force_delete'])) {
 
 // ================= FETCH ALL REQUESTS =================
 
-$waiting_sql = "SELECT * FROM tbl_requests WHERE status='Waiting'";
+$waiting_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
+                FROM tbl_requests
+                LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
+                WHERE tbl_requests.status='Waiting'";
 
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";
@@ -278,7 +284,10 @@ if (!empty($_GET['waiting_search'])) {
 }
 
 
-$approved_sql = "SELECT * FROM tbl_requests WHERE status IN ('Approved','Overdue')";
+$approved_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
+                  FROM tbl_requests
+                  LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
+                  WHERE tbl_requests.status IN ('Approved','Overdue')";
 if (!empty($_GET['approved_search'])) {
     $search = "%" . $_GET['approved_search'] . "%";
     $approved_sql .= " AND (

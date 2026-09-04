@@ -225,23 +225,13 @@
     }
 
     /* ── Account / Help sub-tabs (nested inside the Settings tab) ── */
-    function switchHcTab(panelId) {
-        document.querySelectorAll('#sett-help .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.hc-nav-btn').forEach(b => b.classList.remove('active'));
-        const panel = document.getElementById(panelId);
-        if (panel) panel.classList.add('active');
-        const btn = document.querySelector('.hc-nav-btn[data-hc-tab="' + panelId + '"]');
-        if (btn) btn.classList.add('active');
-    }
+    /* switchHcTab (Help & FAQ sub-nav) removed — Help & FAQ is now a
+       flat view (Common Questions + Contact Support), no nested
+       Start/FAQ/Guides/About navigation. */
 
-    function switchAccTab(panelId) {
-        document.querySelectorAll('#sett-account .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-        const p = document.getElementById(panelId);
-        const b = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
-        if (p) p.classList.add('active');
-        if (b) b.classList.add('active');
-    }
+    /* switchAccTab (My Account sub-nav) removed — the account tab is
+       now a single flat view with no nested Overview/Security/Sessions
+       navigation. */
 
     /* ── Settings mega sub-tabs (My Account / Preferences / Borrowing
        Rules / Help & FAQ) — the streamlined consolidation of what used
@@ -1153,15 +1143,11 @@
         });
     }());
 
-    /* ── Account sub-nav ─────────────────────────────────────── */
-    document.querySelectorAll('.acc-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
-    });
+    /* Account sub-nav (.acc-nav-btn) removed — My Account is now a
+       single flat view. */
 
-    /* ── Help Center sub-nav ────────────────────────────────── */
-    document.querySelectorAll('.hc-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function () { switchHcTab(this.dataset.hcTab); });
-    });
+    /* Help Center sub-nav (.hc-nav-btn) removed — Help & FAQ is now a
+       single flat view. */
 
     /* Legacy Settings-overlay sub-nav (.s-nav-item) removed with
        switchSettTab — the overlay no longer exists. */
@@ -1579,7 +1565,7 @@
             if (!tr) return null;
             const d = tr.dataset;
             return {
-                id: d.id, status: d.status, borrower: d.borrower, idNumber: d.idNumber,
+                id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
@@ -1652,6 +1638,18 @@
                 badge.style.fontSize = '12px';
                 badge.style.padding = '4px 12px';
                 badge.textContent = info[1];
+            }
+
+            const condMap = {
+                Good: 'ps-badge--active',
+                Fair: 'ps-badge--waiting',
+                'For Repair': 'ps-badge--overdue'
+            };
+            const condBadge = document.getElementById('detail-condition-badge');
+            if (condBadge) {
+                const condClass = condMap[ctx.condition] || 'ps-badge--active';
+                condBadge.className = 'ps-badge ps-badge--dot ' + condClass;
+                condBadge.textContent = ctx.condition || 'Good';
             }
 
             const arbEl = document.getElementById('detail-arb-status');
@@ -2028,27 +2026,49 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     });
 })();
 
-/* ── Live search + status filter — All Requests table ────────── */
+/* ── Live search + return-date range filter — Returned Requests table ── */
 (function () {
     var searchInput = document.getElementById('rq-all-search');
-    var statusSel = document.getElementById('rq-all-status');
+    var rangeSel = document.getElementById('rq-all-range');
     var table = document.getElementById('rq-all-table');
     if (!table) return;
 
+    function inReturnRange(dateStr, range) {
+        if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
+        var d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return true;
+        var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (range === 'today') {
+            return d.getTime() === todayStart.getTime();
+        }
+        if (range === 'week') {
+            var weekStart = new Date(todayStart);
+            weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+            return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
+        }
+        if (range === 'month') {
+            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        }
+        if (range === 'year') {
+            return d.getFullYear() === now.getFullYear();
+        }
+        return true;
+    }
+
     function filterAll() {
         var q = searchInput ? searchInput.value.toLowerCase() : '';
-        var status = statusSel ? statusSel.value : '';
+        var range = rangeSel ? rangeSel.value : 'month';
         table.querySelectorAll('tbody tr').forEach(function (row) {
             var text = row.textContent.toLowerCase();
-            var rowStat = row.dataset.status || '';
             var matchQ = !q || text.includes(q);
-            var matchS = !status || rowStat === status;
-            row.style.display = (matchQ && matchS) ? '' : 'none';
+            var matchRange = inReturnRange(row.dataset.returnDate, range);
+            row.style.display = (matchQ && matchRange) ? '' : 'none';
         });
     }
     if (searchInput) searchInput.addEventListener('input', filterAll);
-    if (statusSel) statusSel.addEventListener('change', filterAll);
-    filterAll(); // apply the default "Returned" pre-selection immediately
+    if (rangeSel) rangeSel.addEventListener('change', filterAll);
+    filterAll(); // apply the default "This Month" range immediately
 })();
 /* ════════════════════════════════════════════════════════════════
    PHASE 3 — ARBITRATION + EXPORT HELPERS
