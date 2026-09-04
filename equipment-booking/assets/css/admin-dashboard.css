@@ -5325,7 +5325,7 @@ input[type="range"] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ROOMS PANEL — Prototype V2 Redesign (Applied Aug 2026)
+   ROOMS PANEL — Prototype V3 Redesign (Building tabs + floor-grouped table, Sept 2026)
    All rules are either scoped to #panel-rooms or use a pr- prefix so
    they cannot bleed into any other panel. JS hooks (.rooms-sub-panel,
    data-rooms-tab, #rooms-*-panel, #room-form-wrap, #addRoomBtn) are
@@ -5504,88 +5504,192 @@ input[type="range"] {
     color: var(--accent-maroon);
 }
 
-/* ── Room groups + grid ──────────────────────────────────── */
-#panel-rooms .pr-room-group {
-    margin-bottom: 2rem;
-}
-
-#panel-rooms .pr-room-group-label {
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-light);
-    margin: 0 0 0.75rem;
-}
-
-#panel-rooms .pr-room-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-/* ── Room card — override global .room-card for vertical grid ── */
-#panel-rooms .room-card {
-    background: var(--card-bg);
-    border: 1.5px solid var(--khaki-border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    gap: 0;
-    align-items: stretch;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-#panel-rooms .room-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 32px rgba(96, 3, 2, 0.13);
-}
-
-/* Banner */
-#panel-rooms .rc-banner {
-    height: 96px;
-    background: linear-gradient(135deg, var(--accent-maroon) 0%, #8a1a1a 100%);
+/* ── Toolbar: search + status filter chips ────────────────── */
+#panel-rooms .pr-rooms-toolbar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.85rem;
 }
 
-#panel-rooms .rc-banner .material-symbols-outlined {
-    font-size: 42px;
-    color: rgba(255, 255, 255, 0.42);
-}
-
-/* Body */
-#panel-rooms .rc-body {
-    padding: 0.9rem 1rem;
+#panel-rooms .pr-search-wrap {
+    position: relative;
     flex: 1;
+    min-width: 220px;
+    max-width: 360px;
 }
 
-#panel-rooms .rc-body h4 {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin: 0 0 5px;
-}
-
-#panel-rooms .rc-meta {
-    font-size: 11.5px;
+#panel-rooms .pr-search-wrap .material-symbols-outlined {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
     color: var(--text-light);
+    pointer-events: none;
+}
+
+#panel-rooms .pr-search-wrap input {
+    width: 100%;
+    padding: 0.5rem 1rem 0.5rem 2.5rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 50px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-dark);
+    background: var(--secondary-cream);
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+#panel-rooms .pr-search-wrap input:focus {
+    border-color: var(--accent-maroon);
+    background: var(--primary-white);
+}
+
+#panel-rooms .pr-search-wrap input::placeholder {
+    color: var(--text-light);
+}
+
+#panel-rooms .pr-status-filters {
     display: flex;
-    align-items: center;
-    gap: 5px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
-#panel-rooms .rc-meta svg {
-    flex-shrink: 0;
+#panel-rooms .pr-filter-chip {
+    padding: 0.38rem 0.9rem;
+    border-radius: 50px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
 }
 
-/* Status badge inside rc-meta */
+#panel-rooms .pr-filter-chip:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-filter-chip.active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+}
+
+/* ── Building tabs — pick a building, see just its rooms ───── */
+#panel-rooms .pr-building-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 1.1rem;
+    border-bottom: 1.5px solid var(--khaki-border);
+    padding-bottom: 0.85rem;
+}
+
+#panel-rooms .pr-building-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+    border: 1.5px solid var(--khaki-border);
+    background: var(--card-bg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#panel-rooms .pr-building-tab:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-building-tab.active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+}
+
+#panel-rooms .pr-building-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(96, 3, 2, 0.09);
+    color: var(--accent-maroon);
+    border-radius: 50px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+}
+
+#panel-rooms .pr-building-tab.active .pr-building-tab-count {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+}
+
+#panel-rooms .pr-building-tab.pr-tab-nomatch {
+    opacity: 0.42;
+}
+
+/* ── Building panels — only the active one is shown ─────────── */
+#panel-rooms .pr-building-panel {
+    display: none;
+}
+
+#panel-rooms .pr-building-panel.active {
+    display: block;
+}
+
+/* ── Floor quick-jump chips ──────────────────────────────────── */
+#panel-rooms .pr-floor-jump {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 0.85rem;
+}
+
+#panel-rooms .pr-floor-chip {
+    padding: 0.28rem 0.75rem;
+    border-radius: 50px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-light);
+    text-decoration: none !important;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#panel-rooms .pr-floor-chip:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+}
+
+/* ── Room registry table (rows replace the old banner cards) ── */
+#panel-rooms .pr-rooms-table tbody tr.room-card td {
+    padding: 0.62rem 1.1rem;
+}
+
+#panel-rooms .pr-rooms-table .rr-icon {
+    font-size: 16px;
+    color: var(--accent-maroon);
+    vertical-align: middle;
+    margin-right: 7px;
+}
+
+/* Status badge (rc-status) — used in the rooms table now */
 #panel-rooms .rc-status {
     display: inline-flex;
     align-items: center;
@@ -5618,30 +5722,72 @@ input[type="range"] {
 }
 
 /* Amenity chips */
-#panel-rooms .rc-chips {
+
+/* ── Amenities cell — single line, truncates with a tooltip ── */
+#panel-rooms .pr-amenities-cell {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Row actions: Schedule / Edit / Archive icon buttons ─────── */
+#panel-rooms .pr-row-actions {
     display: flex;
-    flex-wrap: wrap;
     gap: 5px;
-    margin-top: 8px;
+    justify-content: flex-end;
 }
 
-#panel-rooms .rc-chips span {
-    font-size: 10.5px;
-    color: var(--text-light);
-    background: var(--secondary-cream);
-    border: 1px solid var(--khaki-border);
-    padding: 2px 8px;
-    border-radius: 20px;
-}
-
-/* Footer */
-#panel-rooms .rc-footer {
-    padding: 0.65rem 0.85rem;
-    border-top: 1px solid var(--khaki-border);
-    display: flex;
-    gap: 6px;
+#panel-rooms .pr-icon-btn {
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none !important;
     flex-shrink: 0;
+}
+
+#panel-rooms .pr-icon-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+#panel-rooms .pr-icon-btn:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+}
+
+#panel-rooms .pr-icon-btn.danger:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: #fdecea;
+}
+
+/* ── Floor divider row inside the rooms table ────────────────── */
+#panel-rooms .pr-rooms-table tr.pr-floor-divider td {
+    background: var(--secondary-cream);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-light);
+    padding: 0.5rem 1.1rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+#panel-rooms .pr-floor-count {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    margin-left: 6px;
+    opacity: 0.75;
 }
 
 /* ── Card wrapper for sub-panels (archived / reservations / issues) ── */
@@ -5889,19 +6035,28 @@ input[type="range"] {
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 1100px) {
-    #panel-rooms .pr-room-grid {
-        grid-template-columns: repeat(2, 1fr);
+@media (max-width: 900px) {
+    #panel-rooms .pr-amenities-cell {
+        display: none;
+    }
+
+    #panel-rooms .pr-rooms-table thead th:nth-child(3) {
+        display: none;
     }
 }
 
 @media (max-width: 700px) {
-    #panel-rooms .pr-room-grid {
-        grid-template-columns: 1fr;
-    }
-
     #panel-rooms .pr-page-header-row {
         flex-direction: column;
+    }
+
+    #panel-rooms .pr-rooms-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #panel-rooms .pr-search-wrap {
+        max-width: none;
     }
 }
 
@@ -6326,17 +6481,6 @@ body:has(#roomScheduleModal:not(.hidden)) {
     justify-content: flex-end;
     gap: 8px;
     flex-shrink: 0;
-}
-
-/* ── Room card footer tweak: View Schedule button ─────────── */
-#panel-rooms .rc-schedule-btn {
-    text-align: left;
-    font-size: 12px;
-    color: var(--text-dark);
-}
-
-#panel-rooms .rc-schedule-btn:hover {
-    color: var(--accent-maroon);
 }
 
 /* ================================================================
