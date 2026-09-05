@@ -542,11 +542,12 @@
     }
 
     /* ── Image upload handlers ───────────────────────────────── */
-    function initImageUpload() {
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('itemImageInput');
-        const preview = document.getElementById('imagePreview');
-        const removeBtn = document.getElementById('removeImageBtn');
+    function initImageUpload(ids) {
+        ids = ids || {};
+        const dropZone = document.getElementById(ids.dropZone || 'dropZone');
+        const fileInput = document.getElementById(ids.fileInput || 'itemImageInput');
+        const preview = document.getElementById(ids.preview || 'imagePreview');
+        const removeBtn = document.getElementById(ids.removeBtn || 'removeImageBtn');
 
         function handleFile(file) {
             if (!file.type.startsWith('image/')) { showToast('Only image files allowed.'); return; }
@@ -565,6 +566,7 @@
         }
         if (fileInput) fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
         document.addEventListener('paste', e => {
+            if (!dropZone || dropZone.offsetParent === null) return; // ignore paste unless this zone is visible
             const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image'));
             if (item) handleFile(item.getAsFile());
         });
@@ -743,17 +745,6 @@
                 case 'ps-switch-modal':
                     psCloseModal(el.dataset.close);
                     psOpenModal(el.dataset.open);
-                    break;
-
-                /* \u2500\u2500 inv-modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-                case 'inv-open-modal':
-                    openInvModal(el.dataset.modal);
-                    break;
-                case 'inv-close-modal':
-                    closeInvModal(el.dataset.modal);
-                    break;
-                case 'inv-backdrop':
-                    if (e.target === el) closeInvModal(el.dataset.modal);
                     break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
@@ -1440,7 +1431,13 @@
         restoreState();
 
         initView();
-        initImageUpload();
+        initImageUpload(); // Add-equipment form (right column)
+        initImageUpload({ // Edit-equipment modal
+            dropZone: 'eqm-dropZone',
+            fileInput: 'eqm-itemImageInput',
+            preview: 'eqm-imagePreview',
+            removeBtn: 'eqm-removeImageBtn'
+        });
         initNotifCards();
 
         // Live search
@@ -2099,16 +2096,6 @@ function psOpenModal(id) {
 function psCloseModal(id) {
     var el = document.getElementById(id);
     if (el) el.classList.remove('ps-modal-open');
-}
-
-/* ── inv-modal open / close ────────────────────────────── */
-function openInvModal(id) {
-    var m = document.getElementById(id);
-    if (m) m.style.display = 'flex';
-}
-function closeInvModal(id) {
-    var m = document.getElementById(id);
-    if (m) m.style.display = 'none';
 }
 
 /* Close modal when clicking the backdrop */

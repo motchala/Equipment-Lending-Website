@@ -3043,7 +3043,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <p>Inventory is empty.</p>
                                         </div>
                                         <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
-                                            <div class="inv-row-item">
+                                            <div class="inv-row-item"
+                                                data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                                data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
+                                                data-item-quantity="<?php echo (int)$item['quantity']; ?>"
+                                                data-item-condition="<?php echo htmlspecialchars($item['condition'] ?? 'Good', ENT_QUOTES); ?>"
+                                                data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
+                                                data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
                                                 <div class="inv-row-thumb">
                                                     <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
                                                         alt="<?php echo htmlspecialchars($item['item_name']); ?>"
@@ -3070,8 +3077,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                         ?></div>
                                                 </div>
                                                 <div class="inv-row-actions">
-                                                    <a href="admin-dashboard.php?edit_item=<?php echo $item['item_id']; ?>"
-                                                        class="btn-inv-edit" title="Edit item">
+                                                    <button type="button" class="btn-inv-edit" title="Edit item"
+                                                        data-action="eq-open-edit">
                                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                             fill="none" stroke="currentColor" stroke-width="2"
                                                             stroke-linecap="round" stroke-linejoin="round"
@@ -3079,7 +3086,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                                         </svg>
-                                                    </a>
+                                                    </button>
                                                 </div>
                                             </div>
                                     <?php endwhile;
@@ -3201,9 +3208,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
                                             </button>
                                             <?php if ($edit_item): ?>
-                                                <button type="button" class="btn-inv-delete"
-                                                    title="Archive item"
-                                                    data-action="inv-open-modal" data-modal="deleteEquipModal">
+                                                <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
+                                                    class="btn-inv-delete" title="Archive item"
+                                                    onclick="return confirm('Archive this item? It will no longer be available for lending, but borrow history is preserved.');">
                                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                         fill="none" stroke="currentColor" stroke-width="2"
                                                         stroke-linecap="round" stroke-linejoin="round"
@@ -3214,7 +3221,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                         <path d="M14 11v6" />
                                                         <path d="M9 6V4h6v2" />
                                                     </svg>
-                                                </button>
+                                                </a>
                                             <?php endif; ?>
                                         </div>
 
@@ -4903,70 +4910,97 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             if (allRange) allRange.addEventListener('change', filterAll);
             filterAll(); // apply the default "This Month" range immediately
         });
-
-        /* data-action delegation for ps-modal and inv-modal */
-        document.addEventListener('click', function(e) {
-            var btn = e.target.closest('[data-action]');
-            if (!btn) return;
-            var action = btn.dataset.action;
-            if (action === 'ps-open-modal') {
-                psOpenModal(btn.dataset.modal);
-            } else if (action === 'ps-close-modal') {
-                psCloseModal(btn.dataset.modal);
-            } else if (action === 'ps-switch-modal') {
-                psCloseModal(btn.dataset.close);
-                psOpenModal(btn.dataset.open);
-            } else if (action === 'inv-open-modal') {
-                openInvModal(btn.dataset.modal);
-            } else if (action === 'inv-close-modal') {
-                closeInvModal(btn.dataset.modal);
-            } else if (action === 'inv-backdrop') {
-                if (e.target === btn) closeInvModal(btn.dataset.modal);
-            }
-        });
     </script>
 
 
-    <!-- ── INVENTORY: Archive Equipment Modal ─────────────────────── -->
-    <div class="inv-modal-backdrop" id="deleteEquipModal" style="display:none"
-        data-action="inv-backdrop" data-modal="deleteEquipModal">
-        <div class="inv-modal inv-modal-sm">
-            <div class="inv-modal-head">
-                <div class="inv-modal-head-icon danger">
-                    <span class="material-symbols-outlined">archive</span>
+    <!-- ── MODAL: EDIT EQUIPMENT ────────────────────────────────── -->
+    <div class="ps-modal-backdrop" id="eq-edit-modal">
+        <div class="ps-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">inventory_2</span>
                 </div>
-                <h3>Archive Equipment</h3>
-                <button class="inv-modal-close" data-action="inv-close-modal" data-modal="deleteEquipModal">
+                <h3>Edit Equipment</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="eq-edit-modal" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div class="inv-modal-body">
-                <p style="margin-bottom:0.75rem">Archive <strong><?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : 'this item'; ?></strong> from the inventory?</p>
-                <div class="inv-alert-banner danger">
-                    <span class="material-symbols-outlined">warning</span>
-                    All borrow history will be preserved, but this item will no longer be available for lending.
-                </div>
+            <div class="ps-modal-body">
+                <form method="POST" enctype="multipart/form-data" id="eqEditForm">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="item_id" id="eqm-item-id">
+                    <input type="hidden" name="old_image" id="eqm-old-image">
+
+                    <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Name <span class="inv-req">*</span></label>
+                        <input type="text" name="item_name" id="eqm-item-name" class="form-control-custom"
+                            placeholder="e.g. Extension Cord" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Category <span class="inv-req">*</span></label>
+                        <select name="category" id="eqm-category" class="form-control-custom" required>
+                            <option value="">Select category...</option>
+                            <?php
+                            foreach (['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'] as $c) {
+                                echo "<option value=\"$c\">$c</option>";
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Quantity <span class="inv-req">*</span></label>
+                            <input type="number" name="quantity" id="eqm-quantity" class="form-control-custom" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Condition</label>
+                            <select name="condition" id="eqm-condition" class="form-control-custom">
+                                <option value="Good">Good</option>
+                                <option value="Fair">Fair</option>
+                                <option value="For Repair">For Repair</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Image</label>
+                        <div class="drop-zone" id="eqm-dropZone">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"
+                                style="color:var(--text-light)">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                            <p>Click to upload, drag &amp; drop, or paste an image</p>
+                            <input type="file" name="item_image" id="eqm-itemImageInput" accept="image/*" style="display:none;">
+                            <img id="eqm-imagePreview" class="drop-zone-preview" style="display:none;">
+                        </div>
+                        <button type="button" id="eqm-removeImageBtn" class="hidden"
+                            style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">
+                            &#x2715; Remove image
+                        </button>
+                    </div>
+
+                    <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
+                        <a href="#" id="eqm-archive-link" class="ps-btn ps-btn--danger" style="text-decoration:none;display:inline-flex;">
+                            <span class="material-symbols-outlined">archive</span> Archive Item
+                        </a>
+                    </div>
+                </form>
             </div>
-            <div class="inv-modal-foot">
-                <button class="btn-inv-cancel" data-action="inv-close-modal" data-modal="deleteEquipModal">Cancel</button>
-                <a href="admin-dashboard.php?delete_item=<?php echo $edit_item ? $edit_item['item_id'] : ''; ?>"
-                    class="btn-inv-danger"><span class="material-symbols-outlined">archive</span>Archive</a>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" type="button" data-action="ps-close-modal" data-modal="eq-edit-modal">Cancel</button>
+                <button class="ps-btn ps-btn--primary" type="submit" form="eqEditForm" name="update_item">
+                    <span class="material-symbols-outlined">save</span> Update Item
+                </button>
             </div>
         </div>
     </div>
 
     <script nonce="<?php echo $csp_nonce; ?>">
-        /* ── Inventory helpers ───────────────────────────────────── */
-        function openInvModal(id) {
-            var m = document.getElementById(id);
-            if (m) m.style.display = 'flex';
-        }
-
-        function closeInvModal(id) {
-            var m = document.getElementById(id);
-            if (m) m.style.display = 'none';
-        }
-
         document.addEventListener('DOMContentLoaded', function() {
             /* Dropdown "My Account" / "Settings" buttons are bound in
                admin-dashboard.js (routes to the correct Settings sub-tab). */
@@ -4992,6 +5026,47 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     if (snavInv) snavInv.classList.add('active');
                 }
             }, 0);
+        });
+
+        /* ── Edit Equipment modal: populate from the clicked row's
+           data-* attributes, then open it. (ps-open-modal/close-modal
+           are already handled by the main delegation in
+           admin-dashboard.js — no need to duplicate that here.) ── */
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-action="eq-open-edit"]');
+            if (!btn) return;
+            var row = btn.closest('.inv-row-item');
+            if (!row) return;
+            var d = row.dataset;
+
+            document.getElementById('eqm-item-id').value = d.itemId;
+            document.getElementById('eqm-old-image').value = d.itemImage;
+            document.getElementById('eqm-item-name').value = d.itemName;
+            document.getElementById('eqm-category').value = d.itemCategory;
+            document.getElementById('eqm-quantity').value = d.itemQuantity;
+            document.getElementById('eqm-condition').value = d.itemCondition || 'Good';
+
+            var preview = document.getElementById('eqm-imagePreview');
+            var removeBtn = document.getElementById('eqm-removeImageBtn');
+            var fileInput = document.getElementById('eqm-itemImageInput');
+            if (fileInput) fileInput.value = '';
+            if (d.itemImage && d.itemImage.indexOf('default.png') === -1) {
+                preview.src = d.itemImageFull;
+                preview.style.display = 'block';
+                removeBtn.classList.remove('hidden');
+            } else {
+                preview.src = '';
+                preview.style.display = 'none';
+                removeBtn.classList.add('hidden');
+            }
+
+            var archiveLink = document.getElementById('eqm-archive-link');
+            archiveLink.href = 'admin-dashboard.php?delete_item=' + d.itemId;
+            archiveLink.onclick = function() {
+                return confirm('Archive "' + d.itemName + '"? It will no longer be available for lending, but borrow history is preserved.');
+            };
+
+            psOpenModal('eq-edit-modal');
         });
     </script>
 
