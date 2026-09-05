@@ -142,6 +142,7 @@ CREATE TABLE `tbl_inventory` (
   `category` varchar(100) NOT NULL,
   `quantity` int(11) NOT NULL,
   `condition` varchar(20) NOT NULL DEFAULT 'Good',
+  `description` varchar(500) DEFAULT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `is_archived` tinyint(1) DEFAULT 0,
@@ -152,11 +153,11 @@ CREATE TABLE `tbl_inventory` (
 -- Dumping data for table `tbl_inventory`
 --
 
-INSERT INTO `tbl_inventory` (`item_id`, `item_name`, `category`, `quantity`, `condition`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
-(8, 'HDMI Cable', 'Electronics and Accessories', 4, 'Good', 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
-(9, 'AC Remote', 'Electronics and Accessories', 1, 'Good', 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
-(10, 'Extension', 'Electronics and Accessories', 6, 'Good', 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
-(11, 'Projector', 'Electronics and Accessories', 1, 'Good', 'uploads/1768427059_item_projector.webp', '2026-01-15 05:44:19', 0, 0);
+INSERT INTO `tbl_inventory` (`item_id`, `item_name`, `category`, `quantity`, `condition`, `description`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
+(8, 'HDMI Cable', 'Electronics and Accessories', 4, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
+(9, 'AC Remote', 'Electronics and Accessories', 1, 'Good', NULL, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
+(10, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
+(11, 'Projector', 'Electronics and Accessories', 1, 'Good', NULL, 'uploads/1768427059_item_projector.webp', '2026-01-15 05:44:19', 0, 0);
 
 -- --------------------------------------------------------
 

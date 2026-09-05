@@ -3072,6 +3072,20 @@ textarea.form-control-custom {
     background: var(--hover-bg);
 }
 
+/* Change Password modal's Cancel button sits on a light modal background, but
+   a later .btn-cancel-acc rule elsewhere (styled for a dark-background
+   context) was overriding its text to near-invisible white-on-white until
+   hovered. Scope a fix to just this modal rather than touching that other
+   rule, in case it's intentional for wherever it was originally meant. */
+#changePassModal .btn-cancel-acc {
+    color: var(--text-light);
+}
+
+#changePassModal .btn-cancel-acc:hover {
+    background: var(--hover-bg);
+    color: var(--text-light);
+}
+
 .info-card {
     background: var(--card-bg);
     border: 1px solid var(--khaki-border);
@@ -6657,6 +6671,22 @@ body:has(#roomScheduleModal:not(.hidden)) {
     gap: 10px;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--khaki-border);
+}
+
+/* Appearance / Notification Preferences / Accessibility — matches the same
+   reddish gradient header hue/weight already used on the My Account and
+   Help & FAQ info-cards (e.g. Common Questions, Contact Support). Deliberately
+   excludes the Advanced card (.sett-danger-bdr), which keeps its plain
+   danger-tinted header. */
+#sett-prefs .sett-card:not(.sett-danger-bdr)>.sett-card-head {
+    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
+}
+
+/* Auto-Approval Rules / Thresholds & Limits / Decision Log — same treatment,
+   scoped to the Borrowing Rules sub-tab only so it never touches the many
+   other .ps-card-header instances elsewhere in the app (Requests tab, etc). */
+#sett-rules .ps-card-header {
+    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
 }
 
 .sett-card-head .material-symbols-outlined {

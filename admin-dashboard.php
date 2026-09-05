@@ -3084,6 +3084,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
                                                 data-item-quantity="<?php echo (int)$item['quantity']; ?>"
                                                 data-item-condition="<?php echo htmlspecialchars($item['condition'] ?? 'Good', ENT_QUOTES); ?>"
+                                                data-item-description="<?php echo htmlspecialchars($item['description'] ?? '', ENT_QUOTES); ?>"
                                                 data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
                                                 data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
                                                 <div class="inv-row-thumb">
@@ -3678,11 +3679,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- ── BORROWING RULES (was the standalone Arbitration tab) ── -->
                 <div class="rq-sub-panel" id="sett-rules">
-                    <div class="ps-help-note" style="margin-top:0">
-                        <span class="material-symbols-outlined">info</span>
-                        These rules control how the system automatically handles incoming requests. Changes take effect immediately.
-                    </div>
-
                     <!-- Sub-tabs -->
                     <div class="rq-sub-tabs" id="arbSubTabs">
                         <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
@@ -4665,7 +4661,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="fac-pw-wrap">
                             <input type="password" id="cp-new-password" name="new_password"
                                 class="form-control-custom" minlength="4" required>
-                            <button type="button" class="fac-pw-toggle" data-target="cp-new-password"
+                            <button type="button" class="fac-pw-toggle" data-target="cp-new-password,cp-confirm-password"
                                 aria-label="Toggle password">
                                 <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                             </button>
@@ -4676,7 +4672,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="fac-pw-wrap">
                             <input type="password" id="cp-confirm-password" name="confirm_password"
                                 class="form-control-custom" minlength="4" required>
-                            <button type="button" class="fac-pw-toggle" data-target="cp-confirm-password"
+                            <button type="button" class="fac-pw-toggle" data-target="cp-new-password,cp-confirm-password"
                                 aria-label="Toggle password">
                                 <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                             </button>
@@ -5000,6 +4996,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
 
                     <div class="form-group">
+                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Description</label>
+                        <textarea name="description" id="eqm-description" class="form-control-custom" rows="3"
+                            placeholder="Short description of the item..."></textarea>
+                    </div>
+
+                    <div class="form-group">
                         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Image</label>
                         <div class="drop-zone" id="eqm-dropZone">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -5080,6 +5082,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             document.getElementById('eqm-category').value = d.itemCategory;
             document.getElementById('eqm-quantity').value = d.itemQuantity;
             document.getElementById('eqm-condition').value = d.itemCondition || 'Good';
+            document.getElementById('eqm-description').value = d.itemDescription || '';
 
             var preview = document.getElementById('eqm-imagePreview');
             var removeBtn = document.getElementById('eqm-removeImageBtn');

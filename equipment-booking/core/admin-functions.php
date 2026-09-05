@@ -209,6 +209,8 @@ if (isset($_POST['add_item'])) {
     $category = $_POST['category'];
     $qty = (int) $_POST['quantity'];
     $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $description = trim($_POST['description'] ?? '');
+    if ($description === '') $description = null;
 
     // Default image path
     $image_path = "uploads/default.png";
@@ -235,8 +237,8 @@ if (isset($_POST['add_item'])) {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path, `condition`) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssiss", $name, $category, $qty, $image_path, $condition);
+    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path, `condition`, description) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssisss", $name, $category, $qty, $image_path, $condition, $description);
 
     if ($stmt->execute()) {
         $stmt->close();
@@ -260,6 +262,7 @@ if (isset($_POST['update_item'])) {
     $category = $_POST['category'];
     $qty = intval($_POST['quantity']);
     $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $description = trim($_POST['description'] ?? '');
 
     $image_path = $_POST['old_image'];
 
@@ -285,12 +288,14 @@ if (isset($_POST['update_item'])) {
         $image_path = "uploads/" . $image_name;
     }
 
+    $description_escaped = mysqli_real_escape_string($conn, $description);
     $sql = "UPDATE tbl_inventory
             SET item_name='$name',
                 category='$category',
                 quantity=$qty,
                 image_path='$image_path',
-                `condition`='$condition'
+                `condition`='$condition',
+                description=" . ($description_escaped === '' ? 'NULL' : "'$description_escaped'") . "
             WHERE item_id=$item_id";
 
     mysqli_query($conn, $sql);
@@ -306,13 +311,9 @@ if (isset($_POST['update_item'])) {
 if (isset($_GET['delete_item'])) {
     $id = intval($_GET['delete_item']);
 
-    $res = mysqli_query($conn, "SELECT image_path FROM tbl_inventory WHERE item_id=$id");
-    $row = mysqli_fetch_assoc($res);
-
-    if ($row && $row['image_path'] !== 'uploads/default.png') {
-        unlink($row['image_path']);
-    }
-
+    // NOTE: this only archives the item (is_archived = 1) — it does NOT
+    // delete the underlying image file. Archiving is reversible via
+    // "Restore", so the uploaded photo must stay intact for that to work.
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);

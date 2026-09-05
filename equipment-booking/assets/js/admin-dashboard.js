@@ -594,6 +594,31 @@
         });
     }
 
+    /* ── Equipment search (client-side) ──────────────────────────
+       NOTE: this intentionally does NOT use setupLiveSearch(). That
+       helper replaces the container's innerHTML with whatever
+       live-search.php's ?section=inventory case returns — old
+       Bootstrap <tr>/<td> markup, meant for a <table>. #inventory-body
+       is a plain <div> of .inv-row-item cards, not a table, so that
+       swap produced invalid/garbled HTML (and it stayed garbled after
+       clearing the search, since an empty query still replaces the
+       real card markup with the old table-row markup). Filtering the
+       cards that are already in the DOM avoids all of that — nothing
+       is ever replaced, so there's nothing to garble. ── */
+    function setupInventorySearch() {
+        const input = document.getElementById('inventorySearch');
+        const body = document.getElementById('inventory-body');
+        if (!input || !body) return;
+        input.addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            body.querySelectorAll('.inv-row-item').forEach(function (row) {
+                const name = (row.dataset.itemName || '').toLowerCase();
+                const cat = (row.dataset.itemCategory || '').toLowerCase();
+                row.style.display = (!q || name.includes(q) || cat.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
     /* ── Master event delegation ─────────────────────────────── */
     document.addEventListener('click', function (e) {
         const el = e.target.closest('[data-action]');
@@ -949,17 +974,34 @@
     }
 
     /* ── Faculty: password show/hide toggles ────────────────── */
+    /* Also powers Settings → Change Password. data-target may list more
+       than one input id, comma-separated, so one button can reveal several
+       linked fields at once (New Password + Confirm New Password share a
+       single eye state); Current Password keeps its own independent target. */
     document.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            const targetId = this.dataset.target;
-            const input = document.getElementById(targetId);
-            if (!input) return;
-            const isHidden = input.type === 'password';
-            input.type = isHidden ? 'text' : 'password';
-            // Swap the eye icon
-            this.innerHTML = isHidden
-                ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
-                : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const targetIds = (this.dataset.target || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (!targetIds.length) return;
+            const firstInput = document.getElementById(targetIds[0]);
+            if (!firstInput) return;
+            const isHidden = firstInput.type === 'password';
+            const newType = isHidden ? 'text' : 'password';
+            targetIds.forEach(function (id) {
+                const inp = document.getElementById(id);
+                if (inp) inp.type = newType;
+            });
+
+            const eyeOffSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+            const eyeSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const newIcon = isHidden ? eyeOffSvg : eyeSvg;
+
+            // Keep this button's icon, and any other toggle button that shares
+            // at least one of the same target ids, in sync with the new state.
+            document.querySelectorAll('.fac-pw-toggle').forEach(function (otherBtn) {
+                const otherIds = (otherBtn.dataset.target || '').split(',').map(s => s.trim()).filter(Boolean);
+                const shared = otherIds.some(function (id) { return targetIds.includes(id); });
+                if (shared) otherBtn.innerHTML = newIcon;
+            });
         });
     });
 
@@ -983,7 +1025,25 @@
 
     /* ── Borrow History toggle ───────────────────────────────── */
     document.querySelectorAll('.history-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', function () { switchHistoryTab(this.dataset.historyTab); });
+        btn.addEventListener('click', function () {
+            const tabName = this.dataset.historyTab;
+            if (tabName === 'reg-archived') {
+                // Single standalone button (not part of a mutually-exclusive
+                // pair like Pending/Return or Approved/Declined) — so unlike
+                // switchHistoryTab, this one should collapse on a second click.
+                const panel = document.getElementById('history-' + tabName);
+                const isOpen = this.classList.contains('active');
+                if (isOpen) {
+                    this.classList.remove('active');
+                    if (panel) panel.classList.remove('active');
+                } else {
+                    this.classList.add('active');
+                    if (panel) panel.classList.add('active');
+                }
+            } else {
+                switchHistoryTab(tabName);
+            }
+        });
     });
 
     /* ── Rooms Registry toggle ───────────────────────────────── */
@@ -1445,7 +1505,7 @@
         setupLiveSearch('returnSearch', 'return-body', 'approved');
         setupLiveSearch('approvedSearch', 'approved-list', 'approved');
         setupLiveSearch('declinedSearch', 'declined-list', 'declined');
-        setupLiveSearch('inventorySearch', 'inventory-body', 'inventory');
+        setupInventorySearch(); // client-side filter — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
         // ── Arbitration log search (server-side, reload with query param) ──
