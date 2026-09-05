@@ -2099,12 +2099,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <!-- ── One flat, floor-grouped table for every building ────── -->
                         <div class="pr-tbl-wrap">
                             <table class="pr-table pr-rooms-table" id="roomsRegistryTable">
+                                <colgroup>
+                                    <col>
+                                    <col class="pr-col-capacity" style="width:110px;">
+                                    <col style="width:150px;">
+                                    <col style="width:132px;">
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <th>Room</th>
-                                        <th style="text-align:right;">Capacity</th>
+                                        <th>Capacity</th>
                                         <th>Status</th>
-                                        <th style="text-align:right;">Actions</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2123,7 +2129,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 if ($room['status'] === 'Not Bookable') $rc_status_cls = 'nobk';
                                                 $fl = $fData['label'];
                                             ?>
-                                                <tr class="room-card pr-room-row"
+                                                <tr class="pr-room-row pr-row-<?php echo $rc_status_cls; ?>"
                                                     data-room-id="<?php echo (int)$room['room_id']; ?>"
                                                     data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
                                                     data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
@@ -2141,7 +2147,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                             echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
                                                                             ?>">
                                                     <td class="td-fw"><?php echo htmlspecialchars($room['room_name']); ?></td>
-                                                    <td class="td-sm" style="text-align:right;"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
+                                                    <td class="td-sm"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
                                                     <td><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
                                                     <td class="pr-row-actions">
                                                         <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
@@ -2230,7 +2236,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             return;
                                         }
                                         if (row.classList.contains('pr-no-match-row')) return;
-                                        if (!row.classList.contains('room-card')) return;
+                                        if (!row.classList.contains('pr-room-row')) return;
 
                                         const rB = row.dataset.roomBuildingId;
                                         const rF = row.dataset.roomFloorNum;
@@ -2607,7 +2613,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                         /* — Public API — */
                         window.psOpenSchedule = function(btn) {
-                            const card = btn.closest('.room-card');
+                            const card = btn.closest('.pr-room-row');
                             if (!card) return;
                             _roomId = parseInt(card.dataset.roomId) || null;
                             _roomName = card.dataset.roomName || '';
@@ -2646,7 +2652,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         document.addEventListener('click', function(e) {
                             var btn = e.target.closest('[data-action="edit-room-inline"]');
                             if (!btn) return;
-                            var card = btn.closest('.room-card');
+                            var card = btn.closest('.pr-room-row');
                             if (!card) return;
                             var d = card.dataset;
                             var form = document.getElementById('roomForm');

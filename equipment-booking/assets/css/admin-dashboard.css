@@ -5582,10 +5582,47 @@ input[type="range"] {
 
 /* ── Room registry table ─────────────────────────────────────
    One flat table (not per-building panels) — floor/building
-   divider rows do the grouping, so the DOM and the CSS both
-   stay simple. Rows are compact; only 4 plain columns. ─────── */
-#panel-rooms .pr-rooms-table tbody tr.room-card td {
-    padding: 0.55rem 1.1rem;
+   divider rows do the grouping. Fixed column widths (set via
+   the <colgroup> in the markup, with table-layout: fixed here)
+   keep Capacity/Status/Actions aligned at the exact same spot
+   on every row, regardless of how long a room's name is — the
+   room name never decides where the next column starts. ────── */
+#panel-rooms .pr-rooms-table {
+    table-layout: fixed;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-room-row td {
+    padding: 0.72rem 1.1rem;
+}
+
+#panel-rooms .pr-rooms-table thead th:nth-child(2),
+#panel-rooms .pr-rooms-table tbody td:nth-child(2) {
+    text-align: center;
+}
+
+#panel-rooms .pr-rooms-table thead th:nth-child(4),
+#panel-rooms .pr-rooms-table tbody td:nth-child(4) {
+    text-align: right;
+}
+
+/* A slim, muted left-edge accent mirroring the status color, so
+   the list scans at a glance without reading every pill. Applied
+   to the first cell (not the row) so it renders reliably under
+   border-collapse: collapse. */
+#panel-rooms .pr-rooms-table tbody tr.pr-room-row td:first-child {
+    border-left: 3px solid transparent;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-avail td:first-child {
+    border-left-color: #a9dfbf;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-maint td:first-child {
+    border-left-color: #f5cba7;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-nobk td:first-child {
+    border-left-color: #d1d5db;
 }
 
 /* Status badge (rc-status) — used in the rooms table now */
@@ -5598,7 +5635,6 @@ input[type="range"] {
     padding: 2px 9px;
     border-radius: 50px;
     border: 1.5px solid transparent;
-    margin-left: auto;
     white-space: nowrap;
 }
 
@@ -5620,14 +5656,10 @@ input[type="range"] {
     border-color: #d1d5db;
 }
 
-/* Amenity chips */
-
-/* Amenities cell */
-
 /* ── Row actions: Schedule / Edit / Archive icon buttons ─────── */
 #panel-rooms .pr-row-actions {
     display: flex;
-    gap: 5px;
+    gap: 6px;
     justify-content: flex-end;
 }
 
@@ -5666,7 +5698,8 @@ input[type="range"] {
 /* ── Floor/building divider row inside the rooms table ────────
    One label per group ("Building B (New) — 3rd Floor · 5
    rooms") so it reads clearly even when Building is set to
-   "All Buildings". ───────────────────────────────────────── */
+   "All Buildings". Shares the same 3px left inset as the room
+   rows below it so the divider's text lines up with them. ──── */
 #panel-rooms .pr-rooms-table tr.pr-floor-divider td {
     background: var(--secondary-cream);
     font-size: 10.5px;
@@ -5674,16 +5707,9 @@ input[type="range"] {
     text-transform: uppercase;
     letter-spacing: 0.75px;
     color: var(--text-light);
-    padding: 0.45rem 1.1rem;
+    padding: 0.5rem 1.1rem;
     border-bottom: 1px solid var(--khaki-border);
-}
-
-#panel-rooms .pr-floor-count {
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: normal;
-    margin-left: 6px;
-    opacity: 0.75;
+    border-left: 3px solid transparent;
 }
 
 /* ── Card wrapper for sub-panels (archived / reservations / issues) ── */
@@ -5932,6 +5958,10 @@ input[type="range"] {
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 640px) {
+
+    #panel-rooms .pr-rooms-table .pr-col-capacity {
+        visibility: collapse;
+    }
 
     #panel-rooms .pr-rooms-table thead th:nth-child(2),
     #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
