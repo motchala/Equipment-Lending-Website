@@ -64,12 +64,6 @@
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        if (LS.get('compact') === 'true') {
-            const ct = document.getElementById('compactModeToggle');
-            if (ct) ct.checked = true;
-            document.documentElement.style.setProperty('--radius', '9px');
-        }
-
         const fs = LS.get('fontSize');
         if (fs && fs !== '100') {
             document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
@@ -351,7 +345,6 @@
     /* ── Settings ────────────────────────────────────────────── */
     function applyTheme(theme) { _applyThemeDOM(theme); LS.set('theme', theme); showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1)); }
     function applyAccent(color, light) { _applyAccentDOM(color, light); LS.set('accentColor', color); LS.set('accentLight', light); showToast('Accent color updated!'); }
-    function applyCompact(on) { document.documentElement.style.setProperty('--radius', on ? '9px' : '16px'); LS.set('compact', on); showToast(on ? 'Compact mode enabled' : 'Compact mode disabled'); }
     function applyFontSize(val) {
         const lbl = document.getElementById('fontSizeLbl');
         if (lbl) lbl.textContent = val + '%';
@@ -361,13 +354,24 @@
     function _setReduceMotion(on) {
         let s = document.getElementById('reduceMotionStyle');
         if (!s) { s = document.createElement('style'); s.id = 'reduceMotionStyle'; document.head.appendChild(s); }
-        s.textContent = on ? '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }' : '';
+        // Neutralize both CSS animations AND transitions — most of this site's
+        // motion (hover states, tab/panel switches, toasts) is transition-based,
+        // so only silencing @keyframes animations (the old behavior) had almost
+        // no visible effect.
+        s.textContent = on
+            ? '*, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: -0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: -0.001ms !important; } html { scroll-behavior: auto !important; }'
+            : '';
     }
     function applyReduceMotion(on) { _setReduceMotion(on); LS.set('reduceMotion', on); showToast(on ? 'Animations disabled' : 'Animations re-enabled'); }
     function _setFocusRing(on) {
         let s = document.getElementById('focusRingStyle');
         if (!s) { s = document.createElement('style'); s.id = 'focusRingStyle'; document.head.appendChild(s); }
-        s.textContent = on ? '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }' : '';
+        // The extra rule covers this page's custom toggle switches, whose real
+        // <input> is display:none — an outline drawn only on the hidden input
+        // would never be visible, so also ring the switch's visible track.
+        s.textContent = on
+            ? '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; } .toggle-sw input:focus + .toggle-track { outline: 3px solid var(--accent-maroon) !important; outline-offset: 2px !important; }'
+            : '';
     }
     function applyFocusRing(on) { _setFocusRing(on); LS.set('focusRing', on); showToast(on ? 'Focus rings enhanced' : 'Focus rings reset'); }
 
@@ -418,9 +422,6 @@
     function resetAllSettings() {
         applyTheme('light');
 
-        const ct = document.getElementById('compactModeToggle'); if (ct) ct.checked = false;
-        applyCompact(false);
-
         const ts = document.getElementById('textSizeSelect'); if (ts) ts.value = 'Normal';
         applyFontSize(100);
 
@@ -441,7 +442,7 @@
         LS.del('showAssetIds'); LS.del('verboseErrors');
 
         applyAccent('#600302', '#f3e5e6');
-        ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
+        ['theme', 'accentColor', 'accentLight', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
         showToast('All settings reset to defaults.');
     }
 
@@ -607,7 +608,13 @@
                     const modal = document.getElementById('changePassModal');
                     if (modal) {
                         modal.style.display = 'flex';
-                        document.getElementById('changePasswordForm').reset();
+                        const form = document.getElementById('changePasswordForm');
+                        form.reset();
+                        // Privacy: don't leave a password visible from a previous open.
+                        form.querySelectorAll('input.form-control-custom').forEach(inp => { inp.type = 'password'; });
+                        form.querySelectorAll('.fac-pw-toggle').forEach(btn => {
+                            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px">visibility</span>';
+                        });
                         document.getElementById('cp-alert').style.display = 'none';
                     }
                     break;
@@ -1265,7 +1272,6 @@
     });
 
     /* ── Settings toggles ────────────────────────────────────── */
-    const ct = document.getElementById('compactModeToggle'); if (ct) ct.addEventListener('change', function () { applyCompact(this.checked); });
     const ts = document.getElementById('textSizeSelect'); if (ts) ts.addEventListener('change', function () { applyTextSize(this.value); });
     const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.addEventListener('change', function () { applyReduceMotion(this.checked); });
     const frt = document.getElementById('focusRingToggle'); if (frt) frt.addEventListener('change', function () { applyFocusRing(this.checked); });

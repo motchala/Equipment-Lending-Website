@@ -3516,18 +3516,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         &#9889; High Contrast
                                     </div>
                                 </div>
-                                <div class="sett-toggle-row">
-                                    <div class="sett-toggle-lbl">
-                                        <span class="sett-tgl-title">Compact Mode</span>
-                                    </div>
-                                    <div style="display:flex;align-items:center;gap:10px;">
-                                        <label class="toggle-sw">
-                                            <input type="checkbox" id="compactModeToggle" data-action="apply-compact">
-                                            <span class="toggle-track"></span>
-                                        </label>
-                                        <span class="sett-tgl-sub">Reduce spacing for denser view</span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
 
@@ -4620,17 +4608,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <form id="changePasswordForm">
                     <?= csrf_field() ?>
                     <div class="form-group">
-                        <label>Current Password</label>
-                        <input type="password" name="current_password" class="form-control-custom" required>
+                        <label for="cp-current-password">Current Password</label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="cp-current-password" name="current_password"
+                                class="form-control-custom" required>
+                            <button type="button" class="fac-pw-toggle" data-target="cp-current-password"
+                                aria-label="Toggle password">
+                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>New Password</label>
-                        <input type="password" name="new_password" class="form-control-custom" minlength="4" required>
+                        <label for="cp-new-password">New Password</label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="cp-new-password" name="new_password"
+                                class="form-control-custom" minlength="4" required>
+                            <button type="button" class="fac-pw-toggle" data-target="cp-new-password"
+                                aria-label="Toggle password">
+                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Confirm New Password</label>
-                        <input type="password" name="confirm_password" class="form-control-custom" minlength="4"
-                            required>
+                        <label for="cp-confirm-password">Confirm New Password</label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="cp-confirm-password" name="confirm_password"
+                                class="form-control-custom" minlength="4" required>
+                            <button type="button" class="fac-pw-toggle" data-target="cp-confirm-password"
+                                aria-label="Toggle password">
+                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
