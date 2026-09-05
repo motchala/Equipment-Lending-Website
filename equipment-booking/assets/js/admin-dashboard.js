@@ -36,15 +36,11 @@
         const map = { light: 'light', dark: 'dark', 'high-contrast': 'hc' };
         ['light', 'dark', 'hc'].forEach(k => {
             const el = document.getElementById('tp-' + k);
-            const ch = document.getElementById('tc-' + k);
-            if (el) el.classList.remove('selected');
-            if (ch) ch.style.display = 'none';
+            if (el) el.classList.remove('sett-theme-sel');
         });
         const key = map[theme] || theme;
         const el = document.getElementById('tp-' + key);
-        const ch = document.getElementById('tc-' + key);
-        if (el) el.classList.add('selected');
-        if (ch) ch.style.display = '';
+        if (el) el.classList.add('sett-theme-sel');
     }
 
     function _applyAccentDOM(color, light) {
@@ -69,19 +65,17 @@
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
         if (LS.get('compact') === 'true') {
-            const ct = document.getElementById('compactToggle');
+            const ct = document.getElementById('compactModeToggle');
             if (ct) ct.checked = true;
             document.documentElement.style.setProperty('--radius', '9px');
         }
 
         const fs = LS.get('fontSize');
         if (fs && fs !== '100') {
-            const fr = document.getElementById('fontSizeRange');
-            if (fr) fr.value = fs;
-            const lbl = document.getElementById('fontSizeLbl');
-            if (lbl) lbl.textContent = fs + '%';
             document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
         }
+        const ts = document.getElementById('textSizeSelect');
+        if (ts) ts.value = _pctToTextSize(fs || 100);
 
         if (LS.get('reduceMotion') === 'true') {
             const rmt = document.getElementById('reduceMotionToggle');
@@ -95,25 +89,23 @@
             _setFocusRing(true);
         }
 
-        // Profile fields — only apply stored values when server did not provide a real name
-        ['admin_name', 'admin_email'].forEach(key => {
-            const val = LS.get('prof_' + key);
-            if (!val) return;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            const input = document.querySelector('[data-input="' + key + '"]');
-            if (span) {
-                const current = (span.textContent || '').trim();
-                const isPlaceholder = !current || current === '— Not provided' || current === 'Administrator';
-                if (isPlaceholder) {
-                    span.textContent = val;
-                    span.classList.remove('empty');
-                } else {
-                    // keep server-provided value; ensure the input mirrors it for edit mode
-                    if (input) input.value = current;
-                }
-            }
-            if (input && !input.value) input.value = val;
+        // Notification Preferences — checkboxes default to checked/unchecked
+        // in the markup itself, so only override when a stored value exists.
+        [['notifPrefRequestsToggle', 'notifPrefRequests'],
+        ['notifPrefOverdueToggle', 'notifPrefOverdue'],
+        ['notifPrefRoomToggle', 'notifPrefRoom']].forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const v = LS.get(key);
+            if (v !== null) el.checked = (v === 'true');
         });
+        _applyNotifPrefsDOM();
+
+        // Advanced toggles
+        const said = document.getElementById('showAssetIdsToggle');
+        if (said) { const v = LS.get('showAssetIds'); if (v !== null) said.checked = (v === 'true'); }
+        const verr = document.getElementById('verboseErrorsToggle');
+        if (verr) { const v = LS.get('verboseErrors'); if (v !== null) verr.checked = (v === 'true'); }
 
         // Notification read state
         const readArr = LS.getJ('notifRead');
@@ -379,18 +371,89 @@
     }
     function applyFocusRing(on) { _setFocusRing(on); LS.set('focusRing', on); showToast(on ? 'Focus rings enhanced' : 'Focus rings reset'); }
 
+    /* Text Size (Preferences → Accessibility) — maps the Normal/Large/X-Large
+       select to the same underlying percentage-based font scaling already
+       used elsewhere, so it shares one source of truth (LS 'fontSize'). */
+    function _textSizeToPct(size) { return size === 'Large' ? 115 : (size === 'X-Large' ? 130 : 100); }
+    function _pctToTextSize(pct) {
+        pct = parseFloat(pct);
+        if (pct >= 125) return 'X-Large';
+        if (pct >= 110) return 'Large';
+        return 'Normal';
+    }
+    function applyTextSize(size) {
+        applyFontSize(_textSizeToPct(size));
+        showToast('Text size: ' + size);
+    }
+
+    /* Notification Preferences (Preferences → Notification Preferences) —
+       mutes/unmutes categories of notification directly in the bell overlay,
+       via an injected stylesheet so it stays in effect regardless of which
+       overlay filter tab (All/Unread/etc.) is active. */
+    function _applyNotifPrefsDOM() {
+        let s = document.getElementById('notifPrefStyle');
+        if (!s) { s = document.createElement('style'); s.id = 'notifPrefStyle'; document.head.appendChild(s); }
+        const hiddenCats = [];
+        if (LS.get('notifPrefRequests') === 'false') hiddenCats.push('request');
+        if (LS.get('notifPrefOverdue') === 'false') hiddenCats.push('overdue');
+        // "Room Issues" has no matching notif-item category yet — the
+        // preference is saved and ready for when that category is added.
+        s.textContent = hiddenCats.length
+            ? hiddenCats.map(c => '.notif-item[data-cat="' + c + '"]').join(',') + '{display:none !important;}'
+            : '';
+    }
+    function applyNotifPref(key, on) {
+        LS.set(key, on);
+        _applyNotifPrefsDOM();
+        showToast(on ? 'Notifications enabled.' : 'Notifications muted.');
+    }
+
+    /* Advanced (Preferences → Advanced) — persisted browser-level flags.
+       Verbose Error Messages intentionally never surfaces raw server/DB
+       errors (that was the exact issue the OWASP error-disclosure fix
+       addressed); it's kept as a saved preference only. */
+    function applyShowAssetIds(on) { LS.set('showAssetIds', on); showToast(on ? 'Asset IDs will be shown where available.' : 'Asset IDs hidden.'); }
+    function applyVerboseErrors(on) { LS.set('verboseErrors', on); showToast(on ? 'Verbose error messages enabled.' : 'Verbose error messages disabled.'); }
+
     function resetAllSettings() {
         applyTheme('light');
-        const ct = document.getElementById('compactToggle'); if (ct) { ct.checked = false; applyCompact(false); }
-        const fr = document.getElementById('fontSizeRange'); if (fr) { fr.value = 100; applyFontSize(100); }
-        const rmt = document.getElementById('reduceMotionToggle'); if (rmt) { rmt.checked = false; applyReduceMotion(false); }
-        const frt = document.getElementById('focusRingToggle'); if (frt) { frt.checked = false; applyFocusRing(false); }
+
+        const ct = document.getElementById('compactModeToggle'); if (ct) ct.checked = false;
+        applyCompact(false);
+
+        const ts = document.getElementById('textSizeSelect'); if (ts) ts.value = 'Normal';
+        applyFontSize(100);
+
+        const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.checked = false;
+        applyReduceMotion(false);
+
+        const frt = document.getElementById('focusRingToggle'); if (frt) frt.checked = false;
+        applyFocusRing(false);
+
+        const nReq = document.getElementById('notifPrefRequestsToggle'); if (nReq) nReq.checked = true;
+        const nOver = document.getElementById('notifPrefOverdueToggle'); if (nOver) nOver.checked = true;
+        const nRoom = document.getElementById('notifPrefRoomToggle'); if (nRoom) nRoom.checked = false;
+        LS.del('notifPrefRequests'); LS.del('notifPrefOverdue'); LS.del('notifPrefRoom');
+        _applyNotifPrefsDOM();
+
+        const said = document.getElementById('showAssetIdsToggle'); if (said) said.checked = true;
+        const verr = document.getElementById('verboseErrorsToggle'); if (verr) verr.checked = false;
+        LS.del('showAssetIds'); LS.del('verboseErrors');
+
         applyAccent('#600302', '#f3e5e6');
         ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
         showToast('All settings reset to defaults.');
     }
 
     /* ── Profile edit ────────────────────────────────────────── */
+    function _computeInitials(name) {
+        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '';
+        let ini = parts[0].charAt(0).toUpperCase();
+        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
+        return ini;
+    }
+
     function toggleProfileEdit() {
         const eb = document.getElementById('editProfileBtn');
         const sb = document.getElementById('saveProfileBtn');
@@ -422,16 +485,59 @@
     }
 
     function saveProfileEdit() {
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            if (!span) return;
-            const val = input.value.trim();
-            if (val) { span.textContent = val; span.classList.remove('empty'); LS.set('prof_' + key, val); }
-            else { span.textContent = '— Not provided'; span.classList.add('empty'); LS.del('prof_' + key); }
-        });
-        cancelProfileEdit();
-        showToast('Profile updated successfully!');
+        const nameInput = document.querySelector('[data-input="admin_name"]');
+        const emailInput = document.querySelector('[data-input="admin_email"]');
+        const saveBtn = document.getElementById('saveProfileBtn');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const email = emailInput ? emailInput.value.trim() : '';
+
+        if (!name) { showToast('Display name cannot be empty.'); return; }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email address.'); return; }
+
+        if (saveBtn) saveBtn.disabled = true;
+
+        const fd = new FormData();
+        fd.append('ajax_action', 'update_profile');
+        fd.append('admin_name', name);
+        fd.append('admin_email', email);
+        fd.append('csrf_token', getCsrfToken());
+
+        fetch('admin-dashboard.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const nameSpan = document.querySelector('[data-field="admin_name"]');
+                    if (nameSpan) { nameSpan.textContent = data.admin_name; nameSpan.classList.remove('empty'); }
+                    const emailSpan = document.querySelector('[data-field="admin_email"]');
+                    if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
+
+                    // Reflect the change everywhere else the admin's name/initials
+                    // appear on this page (header, dropdown, hero, greeting) without
+                    // requiring a reload.
+                    document.querySelectorAll('.u-name, .dd-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
+                    const greetEl = document.getElementById('greetName');
+                    if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
+                    const initials = _computeInitials(data.admin_name);
+                    if (initials) {
+                        const avatarBtn = document.getElementById('avatarBtn');
+                        if (avatarBtn) avatarBtn.textContent = initials;
+                        document.querySelectorAll('.dd-avatar').forEach(el => { el.textContent = initials; });
+                    }
+
+                    // The database is now the source of truth for these fields —
+                    // drop any stale locally-cached copy from before this fix.
+                    LS.del('prof_admin_name');
+                    LS.del('prof_admin_email');
+
+                    cancelProfileEdit();
+                    showToast('Profile updated successfully!');
+                } else {
+                    showToast(data.message || 'Could not save changes. Please try again.');
+                }
+            })
+            .catch(() => showToast('Network error — please check your connection and try again.'))
+            .finally(() => { if (saveBtn) saveBtn.disabled = false; });
     }
 
     /* ── Image upload handlers ───────────────────────────────── */
@@ -1159,10 +1265,17 @@
     });
 
     /* ── Settings toggles ────────────────────────────────────── */
-    const ct = document.getElementById('compactToggle'); if (ct) ct.addEventListener('change', function () { applyCompact(this.checked); });
-    const fr = document.getElementById('fontSizeRange'); if (fr) fr.addEventListener('input', function () { applyFontSize(this.value); });
+    const ct = document.getElementById('compactModeToggle'); if (ct) ct.addEventListener('change', function () { applyCompact(this.checked); });
+    const ts = document.getElementById('textSizeSelect'); if (ts) ts.addEventListener('change', function () { applyTextSize(this.value); });
     const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.addEventListener('change', function () { applyReduceMotion(this.checked); });
     const frt = document.getElementById('focusRingToggle'); if (frt) frt.addEventListener('change', function () { applyFocusRing(this.checked); });
+
+    const nReqT = document.getElementById('notifPrefRequestsToggle'); if (nReqT) nReqT.addEventListener('change', function () { applyNotifPref('notifPrefRequests', this.checked); });
+    const nOverT = document.getElementById('notifPrefOverdueToggle'); if (nOverT) nOverT.addEventListener('change', function () { applyNotifPref('notifPrefOverdue', this.checked); });
+    const nRoomT = document.getElementById('notifPrefRoomToggle'); if (nRoomT) nRoomT.addEventListener('change', function () { applyNotifPref('notifPrefRoom', this.checked); });
+
+    const saidT = document.getElementById('showAssetIdsToggle'); if (saidT) saidT.addEventListener('change', function () { applyShowAssetIds(this.checked); });
+    const verrT = document.getElementById('verboseErrorsToggle'); if (verrT) verrT.addEventListener('change', function () { applyVerboseErrors(this.checked); });
 
     /* ── Change Password Form Handler ───────────────────────── */
     const cpForm = document.getElementById('changePasswordForm');
@@ -1199,6 +1312,16 @@
                         alertBox.style.backgroundColor = '#e3fcef';
                         alertBox.style.color = '#00875a';
                         alertBox.innerHTML = '✅ ' + data.message;
+
+                        const lastChangedEl = document.getElementById('pwLastChangedVal');
+                        if (lastChangedEl && data.last_pw_change) {
+                            const d = new Date(data.last_pw_change.replace(' ', 'T'));
+                            if (!isNaN(d.getTime())) {
+                                lastChangedEl.textContent = d.toLocaleString('en-US', {
+                                    month: 'short', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+                                }).replace(',', ' ·');
+                            }
+                        }
 
                         setTimeout(() => {
                             document.getElementById('changePassModal').style.display = 'none';

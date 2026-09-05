@@ -273,7 +273,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <h1>Good <?php
                                     $hour = (int)date('H');
                                     echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
-                                    ?>, <?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?>.</h1>
+                                    ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
                         <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
                     </div>
                     <a href="?export=1" class="ps-btn ps-btn--outline">
@@ -3472,7 +3472,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Last Changed</span>
-                                    <span class="info-val" style="color:var(--text-light)">— Not tracked</span>
+                                    <span class="info-val" id="pwLastChangedVal" style="color:var(--text-light)">
+                                        <?php
+                                        $pwc = '— Not tracked';
+                                        if (!empty($admin_last_pw_change)) {
+                                            $ts_pwc = strtotime($admin_last_pw_change);
+                                            if ($ts_pwc !== false) $pwc = date('M d, Y · g:i A', $ts_pwc);
+                                        }
+                                        echo htmlspecialchars($pwc);
+                                        ?>
+                                    </span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Session Status</span>
@@ -3530,7 +3539,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="sett-card-body sett-card-body--notifs">
                                 <div class="sett-notif-row">
                                     <label class="toggle-sw">
-                                        <input type="checkbox" checked>
+                                        <input type="checkbox" id="notifPrefRequestsToggle" checked>
                                         <span class="toggle-track"></span>
                                     </label>
                                     <div>
@@ -3540,7 +3549,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
                                 <div class="sett-notif-row">
                                     <label class="toggle-sw">
-                                        <input type="checkbox" checked>
+                                        <input type="checkbox" id="notifPrefOverdueToggle" checked>
                                         <span class="toggle-track"></span>
                                     </label>
                                     <div>
@@ -3550,7 +3559,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
                                 <div class="sett-notif-row">
                                     <label class="toggle-sw">
-                                        <input type="checkbox">
+                                        <input type="checkbox" id="notifPrefRoomToggle">
                                         <span class="toggle-track"></span>
                                     </label>
                                     <div>
@@ -3569,10 +3578,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="sett-card-body">
                                 <div class="form-group">
                                     <label class="sett-field-lbl">Text Size</label>
-                                    <select class="form-control-custom">
-                                        <option>Normal</option>
-                                        <option>Large</option>
-                                        <option>X-Large</option>
+                                    <select class="form-control-custom" id="textSizeSelect">
+                                        <option value="Normal">Normal</option>
+                                        <option value="Large">Large</option>
+                                        <option value="X-Large">X-Large</option>
                                     </select>
                                 </div>
                                 <div class="sett-notif-row">
@@ -3608,14 +3617,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
                                 <div class="sett-card-body">
                                     <div class="sett-notif-row">
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                        <label class="toggle-sw"><input type="checkbox" id="showAssetIdsToggle" checked><span class="toggle-track"></span></label>
                                         <div>
                                             <div class="sett-notif-title">Show Asset IDs</div>
                                             <div class="sett-notif-sub">Display equipment item IDs in tables</div>
                                         </div>
                                     </div>
                                     <div class="sett-notif-row">
-                                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                        <label class="toggle-sw"><input type="checkbox" id="verboseErrorsToggle"><span class="toggle-track"></span></label>
                                         <div>
                                             <div class="sett-notif-title">Verbose Error Messages</div>
                                             <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
