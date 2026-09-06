@@ -4968,6 +4968,7 @@ input[type="range"] {
 .inv-row-qty {
     text-align: center;
     flex-shrink: 0;
+    width: 72px;
 }
 
 .inv-row-qty .q-val {

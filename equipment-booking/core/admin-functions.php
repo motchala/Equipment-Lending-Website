@@ -204,6 +204,8 @@ mysqli_query($conn, "
 
 if (isset($_POST['add_item'])) {
     csrf_verify();
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+
     // Sanitize and format basic inputs
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
@@ -217,16 +219,18 @@ if (isset($_POST['add_item'])) {
 
     // Handle image upload
     if (!empty($_FILES['item_image']['name'])) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $allowed_types = ['image/jpeg', 'image/png'];
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
-            die("Only JPG, PNG, and WEBP images are allowed.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
-            die("Image too large. Maximum size is 2MB.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
+            exit();
         }
 
         $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
@@ -242,12 +246,12 @@ if (isset($_POST['add_item'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
-        $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
         error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
-        die("Error saving to database. Please try again later.");
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
+        exit();
     }
 }
 
@@ -256,6 +260,7 @@ if (isset($_POST['add_item'])) {
 
 if (isset($_POST['update_item'])) {
     csrf_verify();
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 
     $item_id = intval($_POST['item_id']);
     $name = $_POST['item_name'];
@@ -269,16 +274,18 @@ if (isset($_POST['update_item'])) {
     // Upload new image if provided
     if (!empty($_FILES['item_image']['name'])) {
 
-        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $allowed_types = ['image/jpeg', 'image/png'];
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
-            die("Only JPG, PNG, and WEBP images are allowed.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
-            die("Image too large. Maximum size is 2MB.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
+            exit();
         }
 
         $image_name = time() . "_" . $_FILES['item_image']['name'];
@@ -286,6 +293,18 @@ if (isset($_POST['update_item'])) {
 
         move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
         $image_path = "uploads/" . $image_name;
+    } elseif (($_POST['remove_image'] ?? '0') === '1') {
+        // Explicit "Remove image" click — revert to the default placeholder.
+        // Unlike archiving (which must never touch the file), this really is
+        // a deliberate request to get rid of this specific image, so it's
+        // safe — and expected — to also delete the old upload from disk.
+        if ($image_path !== 'uploads/default.png') {
+            $old_file = __DIR__ . '/../../' . $image_path;
+            if (is_file($old_file)) {
+                @unlink($old_file);
+            }
+        }
+        $image_path = 'uploads/default.png';
     }
 
     $description_escaped = mysqli_real_escape_string($conn, $description);
@@ -300,7 +319,6 @@ if (isset($_POST['update_item'])) {
 
     mysqli_query($conn, $sql);
 
-    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();
 }

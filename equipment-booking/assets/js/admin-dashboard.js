@@ -27,6 +27,9 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
     }
+    window.showToast = showToast; // exposed globally — inline <script> blocks
+    // elsewhere in admin-dashboard.php (which run outside this closure) need
+    // to call this too, e.g. to report a failed upload after a redirect.
 
     /* ── Theme DOM helpers ───────────────────────────────────── */
     function _applyThemeDOM(theme) {
@@ -548,14 +551,21 @@
         const fileInput = document.getElementById(ids.fileInput || 'itemImageInput');
         const preview = document.getElementById(ids.preview || 'imagePreview');
         const removeBtn = document.getElementById(ids.removeBtn || 'removeImageBtn');
+        // Optional — only present on the Edit modal, where there's a saved
+        // image on the server that "Remove" needs to actually clear.
+        const removeFlag = ids.removeFlag ? document.getElementById(ids.removeFlag) : null;
 
         function handleFile(file) {
-            if (!file.type.startsWith('image/')) { showToast('Only image files allowed.'); return; }
+            if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+                showToast('Only JPG and PNG images are allowed.');
+                return;
+            }
             const reader = new FileReader();
             reader.onload = e => { if (preview) { preview.src = e.target.result; preview.style.display = 'block'; } };
             reader.readAsDataURL(file);
             if (fileInput) { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; }
             if (removeBtn) removeBtn.classList.remove('hidden');
+            if (removeFlag) removeFlag.value = '0'; // picking a new file cancels any pending "remove"
         }
 
         if (dropZone) {
@@ -576,6 +586,10 @@
                 if (preview) { preview.src = ''; preview.style.display = 'none'; }
                 if (fileInput) fileInput.value = '';
                 removeBtn.classList.add('hidden');
+                // Tell the backend the saved image should actually be
+                // cleared (reverted to default) — just hiding the preview
+                // client-side never reached the server before.
+                if (removeFlag) removeFlag.value = '1';
             });
         }
     }
@@ -1496,7 +1510,8 @@
             dropZone: 'eqm-dropZone',
             fileInput: 'eqm-itemImageInput',
             preview: 'eqm-imagePreview',
-            removeBtn: 'eqm-removeImageBtn'
+            removeBtn: 'eqm-removeImageBtn',
+            removeFlag: 'eqm-remove-image-flag'
         });
         initNotifCards();
 
