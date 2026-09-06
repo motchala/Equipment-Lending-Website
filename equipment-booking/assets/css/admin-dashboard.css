@@ -537,7 +537,7 @@ main#app-main {
 }
 
 .dd-logout:hover {
-    background: #ffeaea !important;
+    background: var(--hover-bg) !important;
 }
 
 .notif-badge {
@@ -845,7 +845,7 @@ main#app-main {
 }
 
 .ps-table tr:hover td {
-    background: var(--secondary-cream);
+    background: var(--hover-bg);
 }
 
 /* Status badges */
@@ -3072,20 +3072,6 @@ textarea.form-control-custom {
     background: var(--hover-bg);
 }
 
-/* Change Password modal's Cancel button sits on a light modal background, but
-   a later .btn-cancel-acc rule elsewhere (styled for a dark-background
-   context) was overriding its text to near-invisible white-on-white until
-   hovered. Scope a fix to just this modal rather than touching that other
-   rule, in case it's intentional for wherever it was originally meant. */
-#changePassModal .btn-cancel-acc {
-    color: var(--text-light);
-}
-
-#changePassModal .btn-cancel-acc:hover {
-    background: var(--hover-bg);
-    color: var(--text-light);
-}
-
 .info-card {
     background: var(--card-bg);
     border: 1px solid var(--khaki-border);
@@ -3320,6 +3306,10 @@ textarea.form-control-custom {
 
 .toggle-sw input:checked+.toggle-track::after {
     transform: translateX(20px);
+}
+
+.toggle-sw:hover .toggle-track {
+    box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Theme grid */
@@ -4653,6 +4643,11 @@ input[type="range"] {
     outline-offset: 2px;
 }
 
+/* Hover — matches the .toggle-sw glow ring used by every other toggle switch */
+.faculty-toggle-label:hover .faculty-toggle-track {
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
 /* ── RESPONSIVE: stack to single column below 900 px ─────────── */
 @media (max-width: 900px) {
     .faculty-layout {
@@ -5130,7 +5125,7 @@ input[type="range"] {
 }
 
 .btn-inv-delete:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
     color: var(--danger);
     border-color: var(--danger);
 }
@@ -5490,7 +5485,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-sub-tab:hover {
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--secondary-cream);
     color: var(--text-dark);
 }
 
@@ -5719,7 +5714,7 @@ input[type="range"] {
 #panel-rooms .pr-icon-btn.danger:hover {
     border-color: var(--danger);
     color: var(--danger);
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 /* ── Floor/building divider row inside the rooms table ────────
@@ -5846,7 +5841,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-table tbody tr:hover td {
-    background: #faf8f4;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-table .td-fw {
@@ -5954,7 +5949,7 @@ input[type="range"] {
 #panel-rooms .pr-tbl-btn:hover {
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
-    background: #fdf8f8;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.restore {
@@ -5963,7 +5958,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.restore:hover {
-    background: #eafaf2;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.cancel-r {
@@ -5972,7 +5967,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.cancel-r:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.review {
@@ -5981,7 +5976,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.review:hover {
-    background: #f3e5e6;
+    background: var(--hover-bg);
 }
 
 /* ── Add/Edit room form card — visual refresh ────────────── */
@@ -6398,7 +6393,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     font-weight: 600;
     width: 100%;
     text-align: center;
-    background: #f3e5e6;
+    background: var(--accent-light);
     color: var(--accent-maroon);
     white-space: nowrap;
     overflow: hidden;
@@ -6409,7 +6404,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .rsm-block:hover {
-    background: #ead0d1;
+    background: var(--hover-bg);
 }
 
 /* Legend */
@@ -6870,7 +6865,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .sett-reset-btn:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 .sett-reset-btn .material-symbols-outlined {
@@ -6925,7 +6920,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .acc-nav-btn:hover {
     background: var(--hover-bg);
-    color: var(--text-dark);
+    color: var(--accent-maroon);
 }
 
 .acc-nav-btn.active {
@@ -7047,8 +7042,14 @@ body:has(#roomScheduleModal:not(.hidden)) {
     flex-shrink: 0;
 }
 
-/* Edit / Save / Cancel buttons — context-aware */
-.btn-edit-acc {
+/* Edit / Save / Cancel buttons as they appear inside the fixed dark-wine
+   Profile Hero card specifically — .ov-profile-hero's background never
+   changes with the site theme, so these stay fixed light-on-dark colors.
+   Scoped to .ov-profile-hero so they no longer leak onto the many other
+   .btn-edit-acc/.btn-save-acc/.btn-cancel-acc buttons used elsewhere in
+   theme-aware (light/dark/high-contrast) modals — that leakage was why the
+   Change Password Cancel button (and others) went invisible on hover. */
+.ov-profile-hero .btn-edit-acc {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -7064,16 +7065,16 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: all 0.15s;
 }
 
-.btn-edit-acc .material-symbols-outlined {
+.ov-profile-hero .btn-edit-acc .material-symbols-outlined {
     font-size: 14px;
 }
 
-.btn-edit-acc:hover {
+.ov-profile-hero .btn-edit-acc:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.7);
 }
 
-.btn-save-acc {
+.ov-profile-hero .btn-save-acc {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -7089,15 +7090,15 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: background 0.15s;
 }
 
-.btn-save-acc .material-symbols-outlined {
+.ov-profile-hero .btn-save-acc .material-symbols-outlined {
     font-size: 14px;
 }
 
-.btn-save-acc:hover {
+.ov-profile-hero .btn-save-acc:hover {
     background: #fff;
 }
 
-.btn-cancel-acc {
+.ov-profile-hero .btn-cancel-acc {
     padding: 0.45rem 0.75rem;
     background: transparent;
     border: none;
@@ -7107,7 +7108,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     cursor: pointer;
 }
 
-.btn-cancel-acc:hover {
+.ov-profile-hero .btn-cancel-acc:hover {
     color: #fff;
 }
 
@@ -7239,7 +7240,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .btn-inline-danger:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 /* ── Status dot ──────────────────────────────────────────────────── */
