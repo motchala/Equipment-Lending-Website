@@ -678,16 +678,35 @@
                     break;
                 }
                 case 'go-lending': {
+                    // NOTE: this used to jump to a standalone "Lending" panel
+                    // (Borrow Requests / Equipment Registry / Raw Data /
+                    // Arbitration Log) that's since been removed — Requests
+                    // and Inventory are now their own real top-level tabs.
                     const dest = el.dataset.lending || 'waiting';
-                    _switchTabDOM('lending');
-                    if (dest === 'approved' || dest === 'declined') {
-                        switchLendingSub('history');
-                        switchHistoryTab(dest);
-                    } else if (dest === 'archive') {
-                        switchLendingSub('inventory');
-                        switchHistoryTab('reg-archived');
+                    if (dest === 'inventory') {
+                        _switchTabDOM('inventory');
+                        // Open the Add Equipment form directly, matching a
+                        // click on the real "+ Add Equipment" button.
+                        const fw = document.getElementById('item-form-wrap');
+                        if (fw && fw.classList.contains('hidden')) {
+                            const regToggle = document.getElementById('registry-toggle-wrap');
+                            const regActive = document.getElementById('history-reg-active');
+                            const regArchived = document.getElementById('history-reg-archived');
+                            const addBtn = document.querySelector('.btn-add-item');
+                            fw.classList.remove('hidden');
+                            if (regToggle) regToggle.style.display = 'none';
+                            if (regActive) regActive.classList.remove('active');
+                            if (regArchived) regArchived.classList.remove('active');
+                            if (addBtn) addBtn.style.display = 'none';
+                        }
+                        if (fw) fw.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                        switchLendingSub(dest);
+                        // "waiting" (Review Requests / View All) — go to the
+                        // Requests tab and make sure the waiting-for-approval
+                        // filter is the one showing.
+                        _switchTabDOM('requests');
+                        const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="rq-waiting"]');
+                        if (chip) chip.click();
                     }
                     break;
                 }
@@ -1423,32 +1442,14 @@
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
         const editItem = params.get('edit_item');
-        const hash = window.location.hash.replace('#lending-', '');
-        const validSubs = ['waiting', 'history', 'inventory', 'raw'];
 
         if (editItem) {
-            _switchTabDOM('lending', false);
-            switchLendingSub('inventory', false);
+            _switchTabDOM('inventory', false);
             _enterEditMode();
-            history.replaceState({ tab: 'lending', sub: 'inventory', editItem: editItem }, '');
-        } else if (view && validSubs.includes(view)) {
-            _switchTabDOM('lending', false);
-            switchLendingSub(view, false);
-            history.replaceState({ tab: 'lending', sub: view }, '');
-        } else if (view === 'approved') {
-            _switchTabDOM('lending', false);
-            switchLendingSub('history', false);
-            switchHistoryTab('approved');
-            history.replaceState({ tab: 'lending', sub: 'history' }, '');
-        } else if (view === 'declined') {
-            _switchTabDOM('lending', false);
-            switchLendingSub('history', false);
-            switchHistoryTab('declined');
-            history.replaceState({ tab: 'lending', sub: 'history' }, '');
-        } else if (hash && validSubs.includes(hash)) {
-            _switchTabDOM('lending', false);
-            switchLendingSub(hash, false);
-            history.replaceState({ tab: 'lending', sub: hash }, '');
+            history.replaceState({ tab: 'inventory', editItem: editItem }, '');
+        } else if (view === 'inventory') {
+            _switchTabDOM('inventory', false);
+            history.replaceState({ tab: 'inventory' }, '');
         } else if (view === 'faculty') {
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
