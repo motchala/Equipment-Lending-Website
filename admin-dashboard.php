@@ -63,6 +63,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
         <!-- Right: Notification + User + Avatar + Dropdown (unchanged) -->
         <div class="header-right">
+            <!-- Scan Return QR — opens #qrScannerModal (admin-dashboard.js) -->
+            <button id="openQrScannerBtn" class="qr-scan-btn" title="Scan a faculty member's return QR code">
+                <span class="material-symbols-outlined">qr_code_scanner</span>
+                <span class="qr-scan-btn-label">Scan Return</span>
+            </button>
+
             <!-- Notification Bell -->
             <button class="notif-btn" data-action="open-notif-modal" title="Notifications">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -3758,19 +3764,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <!-- QR Scanner Modal -->
-    <div id="qrScannerModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
-        <div style="background:var(--surface,#fff);border-radius:20px;padding:2rem;max-width:420px;width:90%;text-align:center;position:relative;">
-            <button id="closeQrScanner" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:22px;color:#555;">✕</button>
-            <h3 style="font-size:1rem;font-weight:700;margin-bottom:4px;color:var(--text-dark,#1a1a1a);">Scan Return QR Code</h3>
-            <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Point the camera at the faculty member's QR code.</p>
-            <div style="position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;">
-                <video id="qrVideo" style="width:100%;display:block;" playsinline autoplay></video>
+    <div id="qrScannerModal" class="qr-scanner-backdrop">
+        <div class="qr-scanner-card">
+            <button id="closeQrScanner" class="qr-scanner-close" title="Close scanner">✕</button>
+            <h3>Scan Return QR Code</h3>
+            <p>Point the camera at the faculty member's QR code.</p>
+            <div class="qr-video-wrap">
+                <video id="qrVideo" playsinline autoplay></video>
                 <!-- Scan guide overlay -->
-                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">
-                    <div style="width:200px;height:200px;border:3px solid rgba(255,255,255,0.8);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,0.35);"></div>
+                <div class="qr-scan-guide">
+                    <div class="qr-scan-guide-box"></div>
                 </div>
             </div>
-            <p id="qrScanStatus" style="margin-top:14px;font-size:0.85rem;color:#888;">
+            <p id="qrScanStatus">
                 Initializing camera...
             </p>
         </div>

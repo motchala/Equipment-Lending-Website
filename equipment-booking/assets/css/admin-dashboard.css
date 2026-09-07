@@ -252,6 +252,128 @@ header.app-header {
     position: relative;
 }
 
+/* ── QR Return Scanner trigger — lives in the header so it's reachable
+   from any tab, since a return can come in while the admin is looking
+   at anything. Opens #qrScannerModal (wired up in admin-dashboard.js).
+   Collapses to icon-only on narrow screens, same pattern already used
+   for .header-user-info below. ──────────────────────────────────── */
+.qr-scan-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-maroon);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 50px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.qr-scan-btn:hover {
+    background: var(--accent-dark);
+}
+
+.qr-scan-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+/* ── QR Return Scanner modal ─────────────────────────────────────
+   Was hardcoded inline with var(--surface,#fff) — --surface isn't
+   an actual token in this file, so it silently always fell back to
+   plain white, ignoring dark/high-contrast mode. Moved to real
+   tokens here so it matches whichever theme is active. ─────────── */
+.qr-scanner-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-scanner-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+}
+
+.qr-scanner-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 22px;
+    color: var(--text-light);
+    line-height: 1;
+}
+
+.qr-scanner-close:hover {
+    color: var(--accent-maroon);
+}
+
+.qr-scanner-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--text-dark);
+}
+
+.qr-scanner-card>p {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 0 0 16px;
+}
+
+.qr-video-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.qr-video-wrap video {
+    width: 100%;
+    display: block;
+}
+
+.qr-scan-guide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.qr-scan-guide-box {
+    width: 200px;
+    height: 200px;
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+
+#qrScanStatus {
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
 /* ── APP BODY — sidebar + scrollable main ─────────────────────── */
 .app-body {
     display: flex;
@@ -3822,6 +3944,15 @@ input[type="range"] {
 
     .header-user-info {
         display: none;
+    }
+
+    .qr-scan-btn .qr-scan-btn-label {
+        display: none;
+    }
+
+    .qr-scan-btn {
+        padding: 8px;
+        border-radius: 50%;
     }
 
     /* Main padding */

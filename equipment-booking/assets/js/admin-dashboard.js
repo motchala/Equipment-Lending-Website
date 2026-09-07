@@ -1956,6 +1956,7 @@
         let stream = null;
         let animFrame = null;
         let scanning = false;
+        let scannedCount = 0;
 
         function stopScanner() {
             scanning = false;
@@ -1963,6 +1964,10 @@
             if (stream) stream.getTracks().forEach(t => t.stop());
             stream = null;
             modal.style.display = 'none';
+            if (scannedCount > 0) {
+                showToast(`✅ ${scannedCount} return${scannedCount > 1 ? 's' : ''} confirmed this session. Refresh to see updated tables.`);
+            }
+            scannedCount = 0;
         }
 
         function processFrame(canvas, ctx) {
@@ -2012,10 +2017,21 @@
                         .then(r => r.json())
                         .then(data => {
                             if (data.success) {
-                                status.textContent = '✅ Return confirmed! Updating tables...';
+                                scannedCount++;
+                                status.textContent = '✅ Return confirmed!';
                                 status.style.color = '#22c55e';
                                 showToast('✅ Equipment return confirmed via QR.');
-                                setTimeout(stopScanner, 1800);
+                                // Stay open and keep scanning — a return day usually
+                                // means several faculty in a row, not just one, so
+                                // don't force reopening the modal for every scan.
+                                setTimeout(() => {
+                                    status.textContent = scannedCount > 1
+                                        ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
+                                        : 'Point camera at the next QR code.';
+                                    status.style.color = '#888';
+                                    scanning = true;
+                                    tick();
+                                }, 1500);
                             } else {
                                 status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
                                 status.style.color = '#e53e3e';
@@ -2030,6 +2046,12 @@
                         .catch(() => {
                             status.textContent = '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
+                            setTimeout(() => {
+                                status.textContent = 'Point camera at a valid QR code.';
+                                status.style.color = '#888';
+                                scanning = true;
+                                tick();
+                            }, 2500);
                         });
                     return;
                 }
