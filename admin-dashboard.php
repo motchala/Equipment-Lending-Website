@@ -1910,8 +1910,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="rmod-archive-zone<?php echo $edit_room ? '' : ' hidden'; ?>" id="room-archive-zone">
                                 <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
                                     id="room-archive-link"
-                                    class="pr-btn pr-btn-danger pr-btn-sm"
-                                    onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
+                                    class="pr-btn pr-btn-danger pr-btn-sm">
                                     <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
                                     Archive Room
                                 </a>
@@ -1950,7 +1949,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
 
                     <div class="pr-card">
-                        <div class="pr-card-header">
+                        <div class="pr-card-header pr-card-header-maroon">
                             <h3>
                                 <span class="material-symbols-outlined">calendar_month</span>
                                 Reservations
@@ -2027,53 +2026,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
 
                     <?php
-                    // ── Group active rooms by building → floor. $rooms_list is already
-                    //    sorted (campus, building, floor, sort_order, room_id) by the
-                    //    query above, so this just buckets that existing order — it does
-                    //    not re-sort anything. ─────────────────────────────────────────
-                    $rooms_grouped = [];
-                    foreach ($rooms_list as $r) {
-                        $bId  = $r['building_id'];
-                        $fNum = $r['floor_number'];
-                        if (!isset($rooms_grouped[$bId])) $rooms_grouped[$bId] = [];
-                        if (!isset($rooms_grouped[$bId][$fNum])) {
-                            $rooms_grouped[$bId][$fNum] = [
-                                'label' => !empty($r['floor_label']) ? $r['floor_label'] : ($fNum . 'F'),
-                                'rooms' => [],
-                            ];
-                        }
-                        $rooms_grouped[$bId][$fNum]['rooms'][] = $r;
-                    }
-                    foreach ($rooms_grouped as $bId => $floorsTmp) {
-                        ksort($rooms_grouped[$bId]);
-                    }
-
-                    // Floors-per-building, for the Floor <select> (rendered for the
-                    // default building below, and re-populated by JS on change).
-                    $floors_by_building_js = [];
-                    foreach ($rooms_buildings as $bid => $b) {
-                        $floors_by_building_js[$bid] = [];
-                        foreach (($rooms_grouped[$bid] ?? []) as $fNum => $fData) {
-                            $floors_by_building_js[$bid][] = ['num' => (int)$fNum, 'label' => $fData['label']];
-                        }
-                    }
-                    $first_building_id = array_key_first($rooms_buildings);
-
-                    // A distinct accent color per building (cycles through 4 palette
-                    // slots, so it scales if more buildings get added later), used to
-                    // tell buildings apart at a glance in the divider rows below.
-                    $building_palette = ['var(--building-color-1)', 'var(--building-color-2)', 'var(--building-color-3)', 'var(--building-color-4)'];
-                    $building_accent = [];
-                    $bi = 0;
-                    foreach ($rooms_buildings as $bid => $b) {
-                        $building_accent[$bid] = $building_palette[$bi % count($building_palette)];
-                        $bi++;
-                    }
+                    // ── Group active rooms by building → floor, and assign each
+                    //    building a display accent color. Shared with the AJAX
+                    //    responses in admin-rooms-functions.php via
+                    //    ps_prepare_rooms_registry_view() so both paths compute
+                    //    this identically. ─────────────────────────────────────
+                    $rv = ps_prepare_rooms_registry_view($rooms_buildings, $rooms_list);
+                    $rooms_grouped         = $rv['grouped'];
+                    $floors_by_building_js = $rv['floors_by_building'];
+                    $first_building_id     = $rv['first_building_id'];
+                    $building_accent       = $rv['accent'];
                     ?>
 
                     <?php if (empty($rooms_buildings)): ?>
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header">
+                            <div class="pr-card-header pr-card-header-maroon">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -2086,7 +2053,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <?php else: ?>
 
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header">
+                            <div class="pr-card-header pr-card-header-maroon">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -2139,67 +2106,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($rooms_buildings as $bid => $b):
-                                            $floors = $rooms_grouped[$bid] ?? [];
-                                            $isFirstFloorOfBuilding = true;
-                                            foreach ($floors as $fNum => $fData): ?>
-                                                <tr class="pr-floor-divider<?php echo $isFirstFloorOfBuilding ? ' pr-floor-divider-first' : ''; ?>" data-building-id="<?php echo (int)$bid; ?>" data-floor-num="<?php echo (int)$fNum; ?>">
-                                                    <td colspan="4" style="--b-accent: <?php echo $building_accent[$bid]; ?>;">
-                                                        <span class="material-symbols-outlined pr-building-icon"><?php echo htmlspecialchars($b['icon'] ?: 'domain'); ?></span>
-                                                        <?php echo htmlspecialchars($b['name'] . ' — ' . $fData['label']); ?>
-                                                        <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
-                                                    </td>
-                                                </tr>
-                                                <?php $isFirstFloorOfBuilding = false; ?>
-                                                <?php foreach ($fData['rooms'] as $room):
-                                                    $rc_status_cls = 'avail';
-                                                    if ($room['status'] === 'Maintenance')  $rc_status_cls = 'maint';
-                                                    if ($room['status'] === 'Not Bookable') $rc_status_cls = 'nobk';
-                                                    $fl = $fData['label'];
-                                                ?>
-                                                    <tr class="pr-room-row pr-row-<?php echo $rc_status_cls; ?>"
-                                                        data-room-id="<?php echo (int)$room['room_id']; ?>"
-                                                        data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
-                                                        data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
-                                                        data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
-                                                        data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
-                                                        data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
-                                                        data-room-building-id="<?php echo (int)$room['building_id']; ?>"
-                                                        data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
-                                                        data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
-                                                        data-room-status="<?php echo htmlspecialchars($room['status'], ENT_QUOTES); ?>"
-                                                        data-room-sort="<?php echo (int)$room['sort_order']; ?>"
-                                                        data-room-amenities="<?php
-                                                                                $am_raw = isset($room['amenities']) && $room['amenities'] ? $room['amenities'] : '[]';
-                                                                                $am_arr = json_decode($am_raw, true);
-                                                                                echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
-                                                                                ?>">
-                                                        <td class="td-fw"><?php echo htmlspecialchars($room['room_name']); ?></td>
-                                                        <td class="td-sm"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
-                                                        <td><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
-                                                        <td class="pr-row-actions">
-                                                            <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
-                                                                <span class="material-symbols-outlined">calendar_month</span>
-                                                            </button>
-                                                            <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room">
-                                                                <span class="material-symbols-outlined">edit</span>
-                                                            </button>
-                                                            <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
-                                                                class="pr-icon-btn danger"
-                                                                title="Archive room"
-                                                                onclick="return confirm('Archive this room? It will be hidden from the registry and can be restored later.')">
-                                                                <span class="material-symbols-outlined">archive</span>
-                                                            </a>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                        <?php endforeach;
-                                        endforeach; ?>
-                                        <tr class="pr-no-match-row" style="display:none;">
-                                            <td colspan="4" style="text-align:center;padding:2.5rem;color:var(--text-light);">
-                                                No rooms match your filters.
-                                            </td>
-                                        </tr>
+                                        <?php echo ps_render_rooms_tbody($rooms_buildings, $rooms_grouped, $building_accent); ?>
                                     </tbody>
                                 </table>
                             </div>
@@ -2212,7 +2119,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                as the Room Schedule module below). */
                             (function() {
                                 'use strict';
-                                const FLOORS_BY_BUILDING = <?php echo json_encode($floors_by_building_js); ?>;
+                                let FLOORS_BY_BUILDING = <?php echo json_encode($floors_by_building_js); ?>;
                                 const DEFAULT_BUILDING = '<?php echo (int)$first_building_id; ?>';
 
                                 const table = document.getElementById('roomsRegistryTable');
@@ -2296,6 +2203,150 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                                 populateFloorSelect(DEFAULT_BUILDING);
                                 applyFilters();
+
+                                /* ── Exposed for the AJAX module below: after an add/
+                                   update/archive succeeds, drop the fresh <tbody> HTML
+                                   in, refresh the Floor dropdown's options for whichever
+                                   Building is currently selected (a new floor number may
+                                   now exist), and re-apply the current search/filter
+                                   state so the admin's view doesn't reset. ──────────── */
+                                window.psRefreshRoomsRegistry = function(html, freshFloorsByBuilding) {
+                                    if (freshFloorsByBuilding) {
+                                        FLOORS_BY_BUILDING = freshFloorsByBuilding;
+                                    }
+                                    if (typeof html === 'string') {
+                                        const tbody = table.querySelector('tbody');
+                                        if (tbody) tbody.innerHTML = html;
+                                    }
+                                    if (bldSel.value !== 'all') {
+                                        const keepFloor = flrSel.value;
+                                        populateFloorSelect(bldSel.value);
+                                        if ([...flrSel.options].some(function(o) {
+                                                return o.value === keepFloor;
+                                            })) {
+                                            flrSel.value = keepFloor;
+                                        }
+                                    }
+                                    applyFilters();
+                                };
+                            })();
+                        </script>
+
+                        <script nonce="<?php echo $csp_nonce; ?>">
+                            /* ── PUPSync Room Registry: AJAX add/update/archive ──────
+                               Progressive enhancement — the <form> and the Archive
+                               <a> links still have their real method="POST"/href, so
+                               they keep working with JS disabled. When JS runs, this
+                               intercepts both, sends an extra ajax=1 flag, and swaps
+                               in the fresh table HTML the server sends back instead
+                               of letting the browser navigate at all. */
+                            (function() {
+                                'use strict';
+                                const roomForm = document.getElementById('roomForm');
+                                if (!roomForm) return;
+
+                                function closeRoomModal() {
+                                    const rfw = document.getElementById('room-form-wrap');
+                                    const addRoomBtn = document.getElementById('addRoomBtn');
+                                    if (rfw) rfw.classList.add('hidden');
+                                    if (addRoomBtn) addRoomBtn.style.display = '';
+                                    // If the modal was opened via ?edit_room=ID, drop that
+                                    // param now — otherwise a later refresh would silently
+                                    // reopen the modal on a room that's already saved.
+                                    const params = new URLSearchParams(window.location.search);
+                                    if (params.get('edit_room')) {
+                                        params.delete('edit_room');
+                                        const qs = params.toString();
+                                        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+                                    }
+                                }
+
+                                function afterMutation(json) {
+                                    if (json && json.status === 'success') {
+                                        if (window.psRefreshRoomsRegistry) {
+                                            window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                        }
+                                        closeRoomModal();
+                                        if (typeof showToast === 'function') showToast(json.message || 'Saved.');
+                                    } else {
+                                        if (typeof showToast === 'function') {
+                                            showToast((json && json.message) || 'Something went wrong. Please try again.');
+                                        }
+                                    }
+                                }
+
+                                function onNetworkError() {
+                                    if (typeof showToast === 'function') showToast('Network error — please try again.');
+                                }
+
+                                const submitBtns = ['room-form-submit-inner', 'room-form-submit-foot']
+                                    .map(function(id) {
+                                        return document.getElementById(id);
+                                    })
+                                    .filter(Boolean);
+
+                                roomForm.addEventListener('submit', function(e) {
+                                    e.preventDefault();
+
+                                    const fd = new FormData(roomForm);
+                                    // A submit event's .submitter is the exact button that
+                                    // was clicked — needed here because FormData(form) alone
+                                    // does not include a submit button's name/value (the
+                                    // browser only adds that for a real, non-JS submit).
+                                    // Both buttons carry name="add_room" or "update_room"
+                                    // depending on the modal's current mode, so this is how
+                                    // the server knows which action to run.
+                                    const clicked = e.submitter || submitBtns[0];
+                                    if (clicked && clicked.name) fd.set(clicked.name, clicked.value || '1');
+                                    fd.set('ajax', '1');
+
+                                    submitBtns.forEach(function(b) {
+                                        b.disabled = true;
+                                    });
+
+                                    fetch('admin-dashboard.php', {
+                                            method: 'POST',
+                                            body: fd,
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            submitBtns.forEach(function(b) {
+                                                b.disabled = false;
+                                            });
+                                            afterMutation(json);
+                                        })
+                                        .catch(function() {
+                                            submitBtns.forEach(function(b) {
+                                                b.disabled = false;
+                                            });
+                                            onNetworkError();
+                                        });
+                                });
+
+                                /* Archive: both the per-row icon (in the table) and the
+                                   modal's own Archive Room link share the same href
+                                   pattern, so one delegated listener catches both. */
+                                document.addEventListener('click', function(e) {
+                                    const link = e.target.closest('a[href*="archive_room="]');
+                                    if (!link) return;
+                                    e.preventDefault();
+                                    if (!confirm('Archive this room? It will be hidden from the registry and can be restored later.')) return;
+
+                                    const href = link.getAttribute('href');
+                                    const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+
+                                    fetch(url, {
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(afterMutation)
+                                        .catch(onNetworkError);
+                                });
                             })();
                         </script>
 
@@ -2359,7 +2410,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel" id="rooms-issues-panel">
                     <div class="pr-card">
-                        <div class="pr-card-header">
+                        <div class="pr-card-header pr-card-header-maroon">
                             <h3>
                                 <span class="material-symbols-outlined">report_problem</span>
                                 Room Issues

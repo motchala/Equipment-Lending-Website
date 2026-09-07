@@ -5797,6 +5797,22 @@ input[type="range"] {
     flex-shrink: 0;
 }
 
+/* ── Gradient maroon header — Reservations / All Rooms / Room
+   Issues, so each section's title reads as a clear, emphasized
+   banner rather than blending in with the card body. ────────── */
+#panel-rooms .pr-card-header.pr-card-header-maroon {
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
+    border-bottom: none;
+}
+
+#panel-rooms .pr-card-header.pr-card-header-maroon h3 {
+    color: #fff;
+}
+
+#panel-rooms .pr-card-header.pr-card-header-maroon h3 .material-symbols-outlined {
+    color: rgba(255, 255, 255, 0.85);
+}
+
 #panel-rooms .pr-card-note {
     padding: 0.6rem 1.25rem;
     font-size: 0.79rem;
