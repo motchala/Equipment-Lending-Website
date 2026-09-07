@@ -4538,7 +4538,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
     <!-- Faculty Panel JS -->
-    <script>
+    <script nonce="<?php echo $csp_nonce; ?>">
         (function() {
             function openFacModal(id) {
                 var el = document.getElementById(id);

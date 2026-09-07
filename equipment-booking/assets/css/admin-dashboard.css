@@ -4519,6 +4519,22 @@ input[type="range"] {
     box-shadow: 0 0 0 3px var(--accent-light);
 }
 
+/* .form-group label (used for every other field label) sets display:block,
+   uppercase text, and a bottom margin — and it wins over .faculty-toggle-label
+   on specificity when a toggle sits inside a .form-group (e.g. the
+   Organization Adviser toggle in Create Faculty Account), breaking the
+   switch/text alignment. Restore the intended flex layout here. */
+.form-group label.faculty-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
 /* ── RESPONSIVE: stack to single column below 900 px ─────────── */
 @media (max-width: 900px) {
     .faculty-layout {
