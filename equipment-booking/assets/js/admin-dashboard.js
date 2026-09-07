@@ -145,30 +145,9 @@
         if (btn) btn.classList.add('active');
     }
 
-    /* ── Overlays ────────────────────────────────────────────── */
-    function openOverlay(id) {
-        closeDropdown();
-        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
-        const el = document.getElementById(id);
-        if (el) {
-            el.classList.add('active');
-            // Reset to default tab when opening overlay
-            if (id === 'notifOverlay') {
-                filterNotifs('all');
-            }
-        }
-    }
-
-    function closeOverlay(id) {
-        const el = document.getElementById(id);
-        if (el) {
-            el.classList.remove('active');
-            // Clear active states from overlay sub-navigation buttons
-            if (id === 'notifOverlay') {
-                document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-            }
-        }
-    }
+    /* openOverlay/closeOverlay removed — Notifications (their last use)
+       is now a proper ps-modal (see psOpenModal/psCloseModal below and
+       the 'open-notif-modal' case in the click delegation switch). */
 
     /* ── Edit mode helpers ───────────────────────────────────── */
     function _enterEditMode() {
@@ -320,8 +299,8 @@
 
     /* ── Notifications ───────────────────────────────────────── */
     function filterNotifs(cat) {
-        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
+        document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(t => t.classList.remove('active'));
+        const btn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="' + cat + '"]');
         if (btn) btn.classList.add('active');
         document.querySelectorAll('.notif-item').forEach(item => {
             if (cat === 'all') item.style.display = '';
@@ -640,10 +619,11 @@
         const action = el.dataset.action;
         try {
             switch (action) {
-                case 'open-overlay':
-                    openOverlay(el.dataset.target); break;
-                case 'close-overlay':
-                    closeOverlay(el.dataset.target); break;
+                case 'open-notif-modal':
+                    filterNotifs('all');
+                    psOpenModal('notifOverlay');
+                    closeDropdown();
+                    break;
 
                 case 'open-change-pass': {
                     const modal = document.getElementById('changePassModal');
@@ -1350,8 +1330,8 @@
     /* Legacy Settings-overlay sub-nav (.s-nav-item) removed with
        switchSettTab — the overlay no longer exists. */
 
-    /* ── Notification filter tabs ────────────────────────────── */
-    document.querySelectorAll('.notif-tab').forEach(btn => {
+    /* ── Notification filter chips ───────────────────────────── */
+    document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(btn => {
         btn.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
     });
 
