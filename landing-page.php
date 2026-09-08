@@ -85,108 +85,103 @@ if (isset($_POST['login'])) {
     }
 
     // ===== ADMIN LOGIN =====
+    // NOTE: previously hardcoded to only accept email === 'main@admin.edu'.
+    // Generalized to look up whichever email was submitted against
+    // tbl_accounts, since the admin's email is now editable from
+    // Settings → My Account and must not be able to lock them out.
     if ($user_type === 'admin') {
-        if ($email === 'main@admin.edu') {
-            $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
-            if ($stmt_acc) {
-                $stmt_acc->bind_param("s", $email);
-                $stmt_acc->execute();
-                $res_acc = $stmt_acc->get_result();
-                if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
-                    if ($password === $row_acc['password']) {
-                        // ── Successful admin login ─────────────────────────
-                        $_SESSION['admin']      = true;
-                        $_SESSION['login_time'] = time();
+        $stmt_acc = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
+        if ($stmt_acc) {
+            $stmt_acc->bind_param("s", $email);
+            $stmt_acc->execute();
+            $res_acc = $stmt_acc->get_result();
+            if ($res_acc && $row_acc = $res_acc->fetch_assoc()) {
+                if ($password === $row_acc['password']) {
+                    // ── Successful admin login ─────────────────────────
+                    $_SESSION['admin']      = true;
+                    $_SESSION['login_time'] = time();
 
-                        $admin_name_db = 'Administrator';
+                    $admin_name_db = 'Administrator';
 
-                        $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
-                        if ($col_check && mysqli_num_rows($col_check) === 0) {
-                            @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
-                        }
-
-                        $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
-                        if ($stmt_last) {
-                            $stmt_last->bind_param("s", $email);
-                            $stmt_last->execute();
-                            $res_last = $stmt_last->get_result();
-                            if ($res_last && $row_last = $res_last->fetch_assoc()) {
-                                $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
-                            }
-                            $stmt_last->close();
-                        }
-
-                        $now_dt  = date('Y-m-d H:i:s');
-                        $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
-                        if ($stmt_up) {
-                            $stmt_up->bind_param("ss", $now_dt, $email);
-                            $stmt_up->execute();
-                            $stmt_up->close();
-                        }
-
-                        $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
-                        if ($stmt_admin) {
-                            $stmt_admin->bind_param("s", $email);
-                            $stmt_admin->execute();
-                            $res_admin = $stmt_admin->get_result();
-                            if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
-                                if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
-                            }
-                        }
-
-                        if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
-                            $admin_name_db = $row_acc['fullName'];
-                        }
-
-                        $_SESSION['admin_name']  = $admin_name_db;
-                        $_SESSION['admin_email'] = $email;
-
-                        // Clear flash_login_email — no longer needed on success.
-                        unset($_SESSION['flash_login_email']);
-
-                        recordSuccessfulLogin($email, $rl_ip, $conn);
-                        header("Location: admin-dashboard.php");
-                        exit();
-
-                    } else {
-                        // ── Wrong admin password ───────────────────────────
-                        $rl_result = recordFailedAttempt($email, $rl_ip, true, $row_acc['fullName'] ?? 'Administrator', $conn);
-                        $_SESSION['flash_login_error'] = $rl_result['message'];
-                        $_SESSION['flash_panel_role']  = 'admin';
-                        if ($rl_result['locked']) {
-                            $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
-                            $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
-                        }
-                        header("Location: landing-page.php");
-                        exit();
+                    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
+                    if ($col_check && mysqli_num_rows($col_check) === 0) {
+                        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_login DATETIME NULL");
                     }
-                } else {
-                    // ── Admin DB row not found ─────────────────────────────
-                    $rl_result  = recordFailedAttempt($email, $rl_ip, false, '', $conn);
-                    $ip_result  = recordIpFailedAttempt($rl_ip, $conn);
 
-                    if ($ip_result['locked']) {
-                        $_SESSION['flash_login_error']     = $ip_result['message'];
-                        $_SESSION['flash_lockout_seconds'] = $ip_result['seconds_left'];
-                        $_SESSION['flash_lockout_until']   = $ip_result['locked_until'];
-                    } elseif ($rl_result['locked']) {
-                        $_SESSION['flash_login_error']     = $rl_result['message'];
+                    $stmt_last = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
+                    if ($stmt_last) {
+                        $stmt_last->bind_param("s", $email);
+                        $stmt_last->execute();
+                        $res_last = $stmt_last->get_result();
+                        if ($res_last && $row_last = $res_last->fetch_assoc()) {
+                            $_SESSION['admin_last_login'] = $row_last['last_login'] ?? null;
+                        }
+                        $stmt_last->close();
+                    }
+
+                    $now_dt  = date('Y-m-d H:i:s');
+                    $stmt_up = $conn->prepare("UPDATE tbl_accounts SET last_login = ? WHERE email = ?");
+                    if ($stmt_up) {
+                        $stmt_up->bind_param("ss", $now_dt, $email);
+                        $stmt_up->execute();
+                        $stmt_up->close();
+                    }
+
+                    $stmt_admin = $conn->prepare("SELECT fullname FROM tbl_users WHERE email = ? LIMIT 1");
+                    if ($stmt_admin) {
+                        $stmt_admin->bind_param("s", $email);
+                        $stmt_admin->execute();
+                        $res_admin = $stmt_admin->get_result();
+                        if ($res_admin && $row_admin = $res_admin->fetch_assoc()) {
+                            if (!empty($row_admin['fullname'])) $admin_name_db = $row_admin['fullname'];
+                        }
+                    }
+
+                    if ($admin_name_db === 'Administrator' && !empty($row_acc['fullName'])) {
+                        $admin_name_db = $row_acc['fullName'];
+                    }
+
+                    $_SESSION['admin_name']  = $admin_name_db;
+                    $_SESSION['admin_email'] = $email;
+
+                    // Clear flash_login_email — no longer needed on success.
+                    unset($_SESSION['flash_login_email']);
+
+                    recordSuccessfulLogin($email, $rl_ip, $conn);
+                    header("Location: admin-dashboard.php");
+                    exit();
+                } else {
+                    // ── Wrong admin password ───────────────────────────
+                    $rl_result = recordFailedAttempt($email, $rl_ip, true, $row_acc['fullName'] ?? 'Administrator', $conn);
+                    $_SESSION['flash_login_error'] = $rl_result['message'];
+                    $_SESSION['flash_panel_role']  = 'admin';
+                    if ($rl_result['locked']) {
                         $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
                         $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
-                    } else {
-                        $_SESSION['flash_login_error'] = $rl_result['message'];
                     }
-                    $_SESSION['flash_panel_role'] = 'admin';
                     header("Location: landing-page.php");
                     exit();
                 }
+            } else {
+                // ── Admin DB row not found ─────────────────────────────
+                $rl_result  = recordFailedAttempt($email, $rl_ip, false, '', $conn);
+                $ip_result  = recordIpFailedAttempt($rl_ip, $conn);
+
+                if ($ip_result['locked']) {
+                    $_SESSION['flash_login_error']     = $ip_result['message'];
+                    $_SESSION['flash_lockout_seconds'] = $ip_result['seconds_left'];
+                    $_SESSION['flash_lockout_until']   = $ip_result['locked_until'];
+                } elseif ($rl_result['locked']) {
+                    $_SESSION['flash_login_error']     = $rl_result['message'];
+                    $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
+                    $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
+                } else {
+                    $_SESSION['flash_login_error'] = $rl_result['message'];
+                }
+                $_SESSION['flash_panel_role'] = 'admin';
+                header("Location: landing-page.php");
+                exit();
             }
-        } else {
-            // ── Wrong admin email (not main@admin.edu) — no attempt tracked ──
-            $_SESSION['flash_login_error'] = "Admin account not found. Please use the correct admin email.";
-            $_SESSION['flash_panel_role']  = 'admin';
-            header("Location: landing-page.php");
-            exit();
         }
     }
 
@@ -374,7 +369,7 @@ if (isset($_POST['login'])) {
                     </div>
 
                     <?php
-                        $faculty_show_banner = $login_error && $panel_target_role === 'faculty';
+                    $faculty_show_banner = $login_error && $panel_target_role === 'faculty';
                     ?>
                     <?php if ($faculty_show_banner): ?>
                         <div class="auth-alert error">
@@ -417,8 +412,8 @@ if (isset($_POST['login'])) {
                         <button type="submit" name="login" class="btn-auth"
                             id="facultySubmitBtn"
                             <?php if ($lockout_seconds > 0 && $panel_target_role === 'faculty'): ?>
-                                disabled
-                                data-lockout-seconds="<?= (int)$lockout_seconds ?>"
+                            disabled
+                            data-lockout-seconds="<?= (int)$lockout_seconds ?>"
                             <?php endif; ?>>
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
                             Sign In
@@ -441,7 +436,7 @@ if (isset($_POST['login'])) {
                     </div>
 
                     <?php
-                        $admin_show_banner = $login_error && $panel_target_role === 'admin';
+                    $admin_show_banner = $login_error && $panel_target_role === 'admin';
                     ?>
                     <?php if ($admin_show_banner): ?>
                         <div class="auth-alert error">
@@ -481,8 +476,8 @@ if (isset($_POST['login'])) {
                         <button type="submit" name="login" class="btn-auth"
                             id="adminSubmitBtn"
                             <?php if ($lockout_seconds > 0 && $panel_target_role === 'admin'): ?>
-                                disabled
-                                data-lockout-seconds="<?= (int)$lockout_seconds ?>"
+                            disabled
+                            data-lockout-seconds="<?= (int)$lockout_seconds ?>"
                             <?php endif; ?>>
                             <i class="fa-solid fa-arrow-right-to-bracket"></i>
                             Sign In

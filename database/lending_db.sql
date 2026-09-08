@@ -141,6 +141,8 @@ CREATE TABLE `tbl_inventory` (
   `item_name` varchar(255) NOT NULL,
   `category` varchar(100) NOT NULL,
   `quantity` int(11) NOT NULL,
+  `condition` varchar(20) NOT NULL DEFAULT 'Good',
+  `description` varchar(500) DEFAULT NULL,
   `image_path` varchar(255) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   `is_archived` tinyint(1) DEFAULT 0,
@@ -151,11 +153,11 @@ CREATE TABLE `tbl_inventory` (
 -- Dumping data for table `tbl_inventory`
 --
 
-INSERT INTO `tbl_inventory` (`item_id`, `item_name`, `category`, `quantity`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
-(8, 'HDMI Cable', 'Electronics and Accessories', 4, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
-(9, 'AC Remote', 'Electronics and Accessories', 1, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
-(10, 'Extension', 'Electronics and Accessories', 6, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
-(11, 'Projector', 'Electronics and Accessories', 1, 'uploads/1768427059_item_projector.webp', '2026-01-15 05:44:19', 0, 0);
+INSERT INTO `tbl_inventory` (`item_id`, `item_name`, `category`, `quantity`, `condition`, `description`, `image_path`, `created_at`, `is_archived`, `is_high_value`) VALUES
+(8, 'HDMI Cable', 'Electronics and Accessories', 4, 'Good', NULL, 'uploads/1768426958_item_hdmicable.webp', '2026-01-15 05:42:38', 0, 0),
+(9, 'AC Remote', 'Electronics and Accessories', 1, 'Good', NULL, 'uploads/1768427004_item_remoteAc.jpg', '2026-01-15 05:43:24', 0, 0),
+(10, 'Extension', 'Electronics and Accessories', 6, 'Good', NULL, 'uploads/1768427033_item_extension.webp', '2026-01-15 05:43:53', 0, 0),
+(11, 'Projector', 'Electronics and Accessories', 1, 'Good', NULL, 'uploads/1768427059_item_projector.webp', '2026-01-15 05:44:19', 0, 0);
 
 -- --------------------------------------------------------
 
@@ -639,7 +641,7 @@ VALUES
 (1, 1, 'main-building-a', 'Building A (Old)', 'South Wing', 5,
  'assets/images/faculty/pup-main-building-a-image.jpg', 'domain',
  'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.', 1),
-(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 6,
+(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 5,
  'assets/images/faculty/pup-main-building-b-image.jpg', 'business',
  'Modern laboratories, smart classrooms, and collaborative study spaces.', 2),
 (3, 2, 'cite-main', 'PUP CITE Building', 'Main Block', 4,
@@ -714,28 +716,7 @@ VALUES
 (2, 'Room 506', 5, '5th Floor', 'Available', 6),
 (2, 'Room 507', 5, '5th Floor', 'Available', 7),
 (2, 'Room 508', 5, '5th Floor', 'Available', 8),
-(2, 'Room 509', 5, '5th Floor', 'Available', 9),
--- 6th Floor
-(2, 'Room 601', 6, '6th Floor', 'Available', 1),
-(2, 'Room 602', 6, '6th Floor', 'Available', 2),
-(2, 'Room 603', 6, '6th Floor', 'Available', 3),
-(2, 'Room 604', 6, '6th Floor', 'Available', 4),
-(2, 'Room 605', 6, '6th Floor', 'Available', 5),
-(2, 'Room 606', 6, '6th Floor', 'Available', 6),
-(2, 'Room 607', 6, '6th Floor', 'Available', 7),
-(2, 'Room 608', 6, '6th Floor', 'Available', 8),
-(2, 'Room 609', 6, '6th Floor', 'Available', 9),
-(2, 'Room 610', 6, '6th Floor', 'Available', 10),
-(2, 'Room 611', 6, '6th Floor', 'Available', 11),
-(2, 'Room 612', 6, '6th Floor', 'Available', 12),
-(2, 'Room 613', 6, '6th Floor', 'Available', 13),
-(2, 'Room 614', 6, '6th Floor', 'Available', 14),
-(2, 'Room 615', 6, '6th Floor', 'Available', 15),
-(2, 'Room 616', 6, '6th Floor', 'Available', 16),
-(2, 'Room 617', 6, '6th Floor', 'Available', 17),
-(2, 'Room 618', 6, '6th Floor', 'Available', 18),
-(2, 'Room 619', 6, '6th Floor', 'Available', 19),
-(2, 'Room 620', 6, '6th Floor', 'Available', 20);
+(2, 'Room 509', 5, '5th Floor', 'Available', 9);
 
 -- ── PUP CITE Building  (building_id = 3) ─────────────────────────────────
 INSERT IGNORE INTO `tbl_rooms`
@@ -935,4 +916,22 @@ CREATE TABLE IF NOT EXISTS `tbl_room_issues` (
   KEY `idx_issues_status` (`status`),
   CONSTRAINT `fk_issue_room`
     FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- NOTIFICATION SYSTEM (Admin bell/modal)
+-- Notifications themselves are computed live from tbl_requests,
+-- tbl_room_issues and tbl_inventory (see equipment-booking/core/notif-functions.php)
+-- rather than stored — this table only tracks per-notification read/deleted
+-- state, keyed by a stable synthetic id (e.g. "overdue-12", "roomissue-3").
+-- Fully idempotent — safe to run on an existing lending_db.
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS `tbl_notif_state` (
+  `id`         int(11)      NOT NULL AUTO_INCREMENT,
+  `notif_key`  varchar(64)  NOT NULL,
+  `is_read`    tinyint(1)   NOT NULL DEFAULT 0,
+  `is_deleted` tinyint(1)   NOT NULL DEFAULT 0,
+  `updated_at` datetime     DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notif_key` (`notif_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

@@ -27,6 +27,9 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
     }
+    window.showToast = showToast; // exposed globally — inline <script> blocks
+    // elsewhere in admin-dashboard.php (which run outside this closure) need
+    // to call this too, e.g. to report a failed upload after a redirect.
 
     /* ── Theme DOM helpers ───────────────────────────────────── */
     function _applyThemeDOM(theme) {
@@ -36,15 +39,11 @@
         const map = { light: 'light', dark: 'dark', 'high-contrast': 'hc' };
         ['light', 'dark', 'hc'].forEach(k => {
             const el = document.getElementById('tp-' + k);
-            const ch = document.getElementById('tc-' + k);
-            if (el) el.classList.remove('selected');
-            if (ch) ch.style.display = 'none';
+            if (el) el.classList.remove('sett-theme-sel');
         });
         const key = map[theme] || theme;
         const el = document.getElementById('tp-' + key);
-        const ch = document.getElementById('tc-' + key);
-        if (el) el.classList.add('selected');
-        if (ch) ch.style.display = '';
+        if (el) el.classList.add('sett-theme-sel');
     }
 
     function _applyAccentDOM(color, light) {
@@ -68,20 +67,12 @@
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        if (LS.get('compact') === 'true') {
-            const ct = document.getElementById('compactToggle');
-            if (ct) ct.checked = true;
-            document.documentElement.style.setProperty('--radius', '9px');
-        }
-
         const fs = LS.get('fontSize');
         if (fs && fs !== '100') {
-            const fr = document.getElementById('fontSizeRange');
-            if (fr) fr.value = fs;
-            const lbl = document.getElementById('fontSizeLbl');
-            if (lbl) lbl.textContent = fs + '%';
             document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
         }
+        const ts = document.getElementById('textSizeSelect');
+        if (ts) ts.value = _pctToTextSize(fs || 100);
 
         if (LS.get('reduceMotion') === 'true') {
             const rmt = document.getElementById('reduceMotionToggle');
@@ -95,44 +86,29 @@
             _setFocusRing(true);
         }
 
-        // Profile fields — only apply stored values when server did not provide a real name
-        ['admin_name', 'admin_email'].forEach(key => {
-            const val = LS.get('prof_' + key);
-            if (!val) return;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            const input = document.querySelector('[data-input="' + key + '"]');
-            if (span) {
-                const current = (span.textContent || '').trim();
-                const isPlaceholder = !current || current === '— Not provided' || current === 'Administrator';
-                if (isPlaceholder) {
-                    span.textContent = val;
-                    span.classList.remove('empty');
-                } else {
-                    // keep server-provided value; ensure the input mirrors it for edit mode
-                    if (input) input.value = current;
-                }
-            }
-            if (input && !input.value) input.value = val;
+        // Notification Preferences — checkboxes default to checked/unchecked
+        // in the markup itself, so only override when a stored value exists.
+        [['notifPrefRequestsToggle', 'notifPrefRequests'],
+        ['notifPrefOverdueToggle', 'notifPrefOverdue'],
+        ['notifPrefRoomToggle', 'notifPrefRoom']].forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const v = LS.get(key);
+            if (v !== null) el.checked = (v === 'true');
         });
+        _applyNotifPrefsDOM();
 
-        // Notification read state
-        const readArr = LS.getJ('notifRead');
-        if (readArr && readArr.length) {
-            let unread = 0;
-            document.querySelectorAll('.notif-item').forEach((item, i) => {
-                if (readArr.includes(i)) {
-                    item.classList.remove('unread');
-                    const dot = item.querySelector('.unread-dot');
-                    if (dot) dot.style.display = 'none';
-                } else if (item.classList.contains('unread')) unread++;
-            });
-            const uc = document.getElementById('unreadCount');
-            if (uc) uc.textContent = unread + ' unread';
-            document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
-                if (unread === 0) b.style.display = 'none';
-                else { b.style.display = ''; b.textContent = unread; }
-            });
-        }
+        // Advanced toggles
+        const said = document.getElementById('showAssetIdsToggle');
+        if (said) { const v = LS.get('showAssetIds'); if (v !== null) said.checked = (v === 'true'); }
+        const verr = document.getElementById('verboseErrorsToggle');
+        if (verr) { const v = LS.get('verboseErrors'); if (v !== null) verr.checked = (v === 'true'); }
+
+        // Notification read/unread state is no longer a client-side guess —
+        // it's rendered straight from tbl_notif_state on page load (see
+        // notif-functions.php) and kept in sync via the notif-*.php AJAX
+        // endpoints from here on. See the "Notifications (server-backed)"
+        // section further down for markRead/delete/poll wiring.
     }
 
     /* ── Tab switcher ────────────────────────────────────────── */
@@ -156,40 +132,9 @@
         if (btn) btn.classList.add('active');
     }
 
-    /* ── Overlays ────────────────────────────────────────────── */
-    function openOverlay(id) {
-        closeDropdown();
-        document.querySelectorAll('.overlay-page.active').forEach(o => o.classList.remove('active'));
-        const el = document.getElementById(id);
-        if (el) {
-            el.classList.add('active');
-            // Reset to default tab when opening overlay
-            if (id === 'accountOverlay') {
-                switchAccTab('acc-overview');
-            } else if (id === 'settingsOverlay') {
-                switchSettTab('st-appearance');
-            } else if (id === 'notifOverlay') {
-                filterNotifs('all');
-            }
-        }
-    }
-
-    function closeOverlay(id) {
-        const el = document.getElementById(id);
-        if (el) {
-            el.classList.remove('active');
-            // Clear active states from overlay sub-navigation buttons
-            if (id === 'accountOverlay') {
-                document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-            } else if (id === 'settingsOverlay') {
-                document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-            } else if (id === 'notifOverlay') {
-                document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-            }
-        }
-    }
+    /* openOverlay/closeOverlay removed — Notifications (their last use)
+       is now a proper ps-modal (see psOpenModal/psCloseModal below and
+       the 'open-notif-modal' case in the click delegation switch). */
 
     /* ── Edit mode helpers ───────────────────────────────────── */
     function _enterEditMode() {
@@ -234,14 +179,30 @@
         document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
     }
 
-    /* ── Account sub-tabs ────────────────────────────────────── */
-    function switchAccTab(panelId) {
-        document.querySelectorAll('#accountOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.acc-nav-btn').forEach(b => b.classList.remove('active'));
-        const p = document.getElementById(panelId);
-        const b = document.querySelector('.acc-nav-btn[data-acc-tab="' + panelId + '"]');
-        if (p) p.classList.add('active');
-        if (b) b.classList.add('active');
+    /* ── Account / Help sub-tabs (nested inside the Settings tab) ── */
+    /* switchHcTab (Help & FAQ sub-nav) removed — Help & FAQ is now a
+       flat view (Common Questions + Contact Support), no nested
+       Start/FAQ/Guides/About navigation. */
+
+    /* switchAccTab (My Account sub-nav) removed — the account tab is
+       now a single flat view with no nested Overview/Security/Sessions
+       navigation. */
+
+    /* ── Settings mega sub-tabs (My Account / Preferences / Borrowing
+       Rules / Help & FAQ) — the streamlined consolidation of what used
+       to be the Account overlay, Arbitration tab, and Help Center
+       overlay. Scoped to #panel-settings so it never touches other
+       tabs' sub-panels. ── */
+    function switchSettMainTab(panelId) {
+        const settPanel = document.getElementById('panel-settings');
+        if (!settPanel) return;
+        settPanel.querySelectorAll(':scope > .rq-sub-panel').forEach(p => p.classList.remove('active'));
+        const tabsWrap = document.getElementById('settMainTabs');
+        if (tabsWrap) tabsWrap.querySelectorAll('.rq-sub-tab').forEach(t => t.classList.remove('active'));
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('active');
+        const btn = tabsWrap && tabsWrap.querySelector('[data-sett-panel="' + panelId + '"]');
+        if (btn) btn.classList.add('active');
     }
 
     /* ── Borrow History toggle ───────────────────────────────── */
@@ -268,17 +229,75 @@
         if (activePanel) activePanel.classList.add('active');
         if (activeBtn) activeBtn.classList.add('active');
     }
+
+    /* switchSettTab (legacy Settings-overlay tab helper) removed —
+       the overlay it served no longer exists; Settings navigation
+       now goes through switchSettMainTab(). */
+
+    /* ════════════════════════════════════════════════════════════
+       NOTIFICATIONS (server-backed)
+       The feed itself (which notifications exist) is computed live
+       server-side from tbl_requests / tbl_room_issues / tbl_inventory
+       — see notif-functions.php. This section only handles: marking
+       read/deleted (persisted via equipment-booking/api/notif-*.php),
+       filtering the visible list, navigating to the right screen when
+       a notification is opened, and short-polling for new ones.
+    ════════════════════════════════════════════════════════════════ */
     function _getUnreadCount() {
-        return document.querySelectorAll('.notif-item.unread').length;
+        return document.querySelectorAll('#notifList .notif-item.unread').length;
     }
 
     function _updateBadges(count) {
         const uc = document.getElementById('unreadCount');
         if (uc) uc.textContent = count + ' unread';
+        const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
+        if (markAllBtn) markAllBtn.disabled = (count === 0);
         document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
-            if (count === 0) b.style.display = 'none';
-            else { b.style.display = ''; b.textContent = count; }
+            const prev = parseInt(b.textContent, 10) || 0;
+            if (count === 0) {
+                b.style.display = 'none';
+            } else {
+                b.style.display = '';
+                b.textContent = count;
+                if (count > prev) {
+                    b.classList.remove('notif-badge-pulse');
+                    void b.offsetWidth; // restart animation
+                    b.classList.add('notif-badge-pulse');
+                }
+            }
         });
+    }
+
+    function _notifPost(url, key) {
+        const body = new URLSearchParams();
+        if (key) body.set('key', key);
+        body.set('csrf_token', getCsrfToken());
+        return fetch(url, { method: 'POST', body })
+            .then(r => r.json())
+            .catch(() => null);
+    }
+
+    /* Cheap, local recount of the chip badges (no network round-trip) —
+       called after any instant local action (read/delete/mark-all-read)
+       so the numbers never lag behind what's actually in the list. Chip
+       add/remove (a category appearing/disappearing entirely) is handled
+       by the next poll via _syncFilterChips. */
+    function _updateChipCounts() {
+        const bar = document.getElementById('notifFilterChips');
+        if (!bar) return;
+        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
+        let unread = 0;
+        document.querySelectorAll('#notifList .notif-item[data-notif-key]').forEach(item => {
+            if (counts.hasOwnProperty(item.dataset.cat)) counts[item.dataset.cat]++;
+            if (item.classList.contains('unread')) unread++;
+        });
+        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(counts).forEach(cat => {
+            const chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
+            if (chip) chip.innerHTML = _esc(labels[cat]) + (counts[cat] > 0 ? ' <span class="notif-chip-count">' + counts[cat] + '</span>' : '');
+        });
+        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
+        if (unreadChip) unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
     }
 
     function _markCardRead(card) {
@@ -287,16 +306,116 @@
         const dot = card.querySelector('.unread-dot');
         if (dot) dot.style.display = 'none';
         _updateBadges(_getUnreadCount());
+        _updateChipCounts();
+        const key = card.dataset.notifKey;
+        if (key) _notifPost('equipment-booking/api/notif-mark-read.php', key);
+    }
+
+    function _deleteCard(card) {
+        const key = card.dataset.notifKey;
+        const wasUnread = card.classList.contains('unread');
+        card.classList.add('notif-removing');
+        setTimeout(() => {
+            const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
+                ? card.previousElementSibling : null;
+            card.remove();
+            // If that was the last card in its group, drop the now-empty group label too.
+            if (group) {
+                const next = group.nextElementSibling;
+                if (!next || !next.classList.contains('notif-item')) group.remove();
+            }
+            if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+            _updateChipCounts();
+        }, 220);
+        if (wasUnread) _updateBadges(Math.max(0, _getUnreadCount() - 1));
+        if (key) _notifPost('equipment-booking/api/notif-delete.php', key);
+        showToast('Notification deleted.');
+    }
+
+    function _showEmptyState() {
+        const list = document.getElementById('notifList');
+        if (!list || document.getElementById('notifEmptyState')) return;
+        const div = document.createElement('div');
+        div.className = 'ps-empty-state notif-empty-state';
+        div.id = 'notifEmptyState';
+        div.innerHTML = '<span class="material-symbols-outlined">notifications_off</span><p>You\'re all caught up. No notifications right now.</p>';
+        list.appendChild(div);
+    }
+
+    /* ── Navigate to the screen a notification is about ─────────
+       Different categories go different places on purpose:
+         overdue  → Requests tab, Overdue filter, flash the row
+         request  → Requests tab, Waiting filter, opens the exact
+                     request's detail modal (same one the table uses)
+         room     → Rooms tab, Issues sub-tab, opens the exact
+                     issue's review modal
+         system   → Inventory tab, scrolls to + flashes that item  */
+    function _notifGoto(card) {
+        const tab = card.dataset.linkTab;
+        if (!tab) return;
+        _markCardRead(card);
+        psCloseModal('notifOverlay');
+
+        if (tab === 'requests') {
+            _switchTabDOM('requests');
+            const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + card.dataset.linkChip + '"]');
+            if (chip) chip.click();
+
+            const reqId = card.dataset.linkRequestId;
+            if (!reqId) return;
+            setTimeout(() => {
+                const row = document.querySelector('.ps-req-row[data-id="' + reqId + '"]');
+                if (!row) return;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('notif-target-flash');
+                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                // Waiting-table rows can open the real detail modal directly —
+                // reuse the exact trigger the table itself uses.
+                const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
+                if (trigger) setTimeout(() => trigger.click(), 280);
+            }, 120);
+        } else if (tab === 'rooms') {
+            _switchTabDOM('rooms');
+            if (card.dataset.linkSub) switchRoomsTab(card.dataset.linkSub);
+
+            const issueId = card.dataset.linkIssueId;
+            if (!issueId) return;
+            setTimeout(() => {
+                const reviewBtn = document.querySelector('[data-action="open-issue-review"][data-issue-id="' + issueId + '"]');
+                if (reviewBtn) {
+                    reviewBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const row = reviewBtn.closest('tr');
+                    if (row) {
+                        row.classList.add('notif-target-flash');
+                        setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                    }
+                    setTimeout(() => reviewBtn.click(), 280);
+                }
+            }, 120);
+        } else if (tab === 'inventory') {
+            _switchTabDOM('inventory');
+            const itemId = card.dataset.linkItemId;
+            if (!itemId) return;
+            setTimeout(() => {
+                const row = document.querySelector('.inv-row-item[data-item-id="' + itemId + '"]');
+                if (!row) return;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('notif-target-flash');
+                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+            }, 120);
+        }
     }
 
     function initNotifCards() {
         document.querySelectorAll('.notif-card').forEach(card => {
+            if (card.dataset.notifWired) return;
+            card.dataset.notifWired = '1';
+
             const mainRow = card.querySelector('.notif-card-main');
             if (mainRow) {
                 mainRow.addEventListener('click', () => {
                     const isExpanded = card.classList.contains('expanded');
-                    // Collapse all others
-                    document.querySelectorAll('.notif-card.expanded').forEach(c => c.classList.remove('expanded'));
+                    document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
                     if (!isExpanded) {
                         card.classList.add('expanded');
                         _markCardRead(card);
@@ -306,59 +425,217 @@
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); mainRow.click(); }
                 });
             }
-            const dismissBtn = card.querySelector('[data-notif-dismiss]');
-            if (dismissBtn) {
-                dismissBtn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    _markCardRead(card);
-                    card.classList.remove('expanded');
-                    showToast('Notification dismissed.');
-                });
+            const gotoBtn = card.querySelector('[data-notif-goto]');
+            if (gotoBtn) {
+                gotoBtn.addEventListener('click', e => { e.stopPropagation(); _notifGoto(card); });
+            }
+            const deleteBtn = card.querySelector('[data-notif-delete]');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', e => { e.stopPropagation(); _deleteCard(card); });
             }
         });
     }
 
-    /* ── Settings sub-tabs ───────────────────────────────────── */
-    function switchSettTab(panelId) {
-        document.querySelectorAll('#settingsOverlay .overlay-sub-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.s-nav-item').forEach(b => b.classList.remove('active'));
-        const p = document.getElementById(panelId);
-        const b = document.querySelector('.s-nav-item[data-sett-tab="' + panelId + '"]');
-        if (p) p.classList.add('active');
-        if (b) b.classList.add('active');
+    function filterNotifs(cat) {
+        document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(t => t.classList.remove('active'));
+        const btn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="' + cat + '"]');
+        if (btn) btn.classList.add('active');
+        else {
+            // The active filter's chip vanished (its category emptied out
+            // since it was picked) — fall back to "All" rather than showing
+            // a stuck, unlabeled filter.
+            cat = 'all';
+            const allBtn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="all"]');
+            if (allBtn) allBtn.classList.add('active');
+        }
+
+        let anyCardVisible = false;
+        document.querySelectorAll('#notifList .notif-item').forEach(item => {
+            let show;
+            if (cat === 'all') show = true;
+            else if (cat === 'unread') show = item.classList.contains('unread');
+            else show = item.dataset.cat === cat;
+            item.style.display = show ? '' : 'none';
+            if (show) anyCardVisible = true;
+        });
+        document.querySelectorAll('#notifList .notif-group-label').forEach(label => {
+            let anyVisible = false;
+            let sib = label.nextElementSibling;
+            while (sib && sib.classList.contains('notif-item')) {
+                if (sib.style.display !== 'none') anyVisible = true;
+                sib = sib.nextElementSibling;
+            }
+            label.style.display = anyVisible ? '' : 'none';
+        });
+
+        const filterEmpty = document.getElementById('notifFilterEmptyState');
+        const hasAnyCardAtAll = !!document.querySelector('#notifList .notif-item');
+        if (filterEmpty) filterEmpty.style.display = (hasAnyCardAtAll && !anyCardVisible) ? '' : 'none';
     }
 
-    /* ── Notifications ───────────────────────────────────────── */
-    function filterNotifs(cat) {
-        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('.notif-item').forEach(item => {
-            if (cat === 'all') item.style.display = '';
-            else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
-            else item.style.display = item.dataset.cat === cat ? '' : 'none';
+    /* Keep the filter chip row honest against live data: add a chip for
+       a category that just got its first notification, refresh the
+       counts on every chip, and drop a chip whose category emptied out
+       (unless it's the one currently active — filterNotifs() handles
+       falling back to "All" for that case). */
+    function _syncFilterChips(notifications) {
+        const bar = document.getElementById('notifFilterChips');
+        if (!bar) return;
+        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
+        let unread = 0;
+        notifications.forEach(n => {
+            if (counts.hasOwnProperty(n.cat)) counts[n.cat]++;
+            if (!n.is_read) unread++;
         });
+
+        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(counts).forEach(cat => {
+            let chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
+            if (counts[cat] > 0) {
+                if (!chip) {
+                    chip = document.createElement('button');
+                    chip.className = 'rq-filter-chip';
+                    chip.dataset.notifFilter = cat;
+                    chip.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
+                    bar.appendChild(chip);
+                }
+                chip.innerHTML = _esc(labels[cat]) + ' <span class="notif-chip-count">' + counts[cat] + '</span>';
+            } else if (chip && !chip.classList.contains('active')) {
+                chip.remove();
+            }
+        });
+
+        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
+        if (unreadChip) {
+            unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
+        }
     }
 
     function markAllRead() {
-        const readArr = [];
-        document.querySelectorAll('.notif-item').forEach((item, i) => {
+        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
             item.classList.remove('unread');
             const dot = item.querySelector('.unread-dot');
             if (dot) dot.style.display = 'none';
-            readArr.push(i);
         });
-        const uc = document.getElementById('unreadCount');
-        if (uc) uc.textContent = '0 unread';
-        document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => b.style.display = 'none');
-        LS.setJ('notifRead', readArr);
+        _updateBadges(0);
+        _updateChipCounts();
+        _notifPost('equipment-booking/api/notif-mark-all-read.php');
         showToast('All notifications marked as read.');
+    }
+
+    /* ── Poll for genuinely new notifications (new request submitted,
+       item went overdue, room issue reported, stock dropped, etc.)
+       without a full page reload. Only adds/removes cards + updates
+       badges; never disturbs a card the admin has expanded. ── */
+    function _buildNotifCardEl(n) {
+        const wrap = document.createElement('div');
+        wrap.className = 'notif-item notif-card notif-fresh' + (n.urgent ? ' notif-urgent' : '') + (n.is_read ? '' : ' unread');
+        wrap.dataset.cat = n.cat;
+        wrap.dataset.notifKey = n.key;
+        wrap.dataset.linkTab = (n.link && n.link.tab) || '';
+        wrap.dataset.linkChip = (n.link && n.link.chip) || '';
+        wrap.dataset.linkSub = (n.link && n.link.sub) || '';
+        wrap.dataset.linkRequestId = (n.link && n.link.request_id) || '';
+        wrap.dataset.linkIssueId = (n.link && n.link.issue_id) || '';
+        wrap.dataset.linkItemId = (n.link && n.link.item_id) || '';
+
+        const detailRows = (n.detail || []).map(d =>
+            '<div class="ps-detail-item"><div class="ps-detail-label">' + _esc(d.label) +
+            '</div><div class="ps-detail-value"' + (d.danger ? ' style="color:var(--danger);font-weight:700;"' : '') +
+            '>' + _esc(String(d.value)) + '</div></div>'
+        ).join('');
+
+        wrap.innerHTML =
+            '<div class="notif-card-main" role="button" tabindex="0">' +
+            '<div class="notif-icon ' + _esc(n.icon_class) + '"><span class="material-symbols-outlined">' + _esc(n.icon) + '</span></div>' +
+            '<div class="notif-body-wrap"><h4>' + _esc(n.title) + '</h4><p>' + n.body + '</p></div>' +
+            '<div class="notif-meta"><span class="notif-time">' + _esc(n.time_label) + '</span><div class="unread-dot"></div>' +
+            '<span class="material-symbols-outlined notif-chevron">expand_more</span></div>' +
+            '</div>' +
+            '<div class="notif-card-detail"><div class="ps-detail-grid">' + detailRows + '</div>' +
+            '<div class="notif-card-actions">' +
+            '<button type="button" class="ps-btn ps-btn--primary ps-btn--sm" data-notif-goto><span class="material-symbols-outlined">visibility</span>' + _esc(n.view_label) + '</button>' +
+            '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification"><span class="material-symbols-outlined">delete</span>Delete</button>' +
+            '</div></div>';
+        return wrap;
+    }
+
+    function _esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+    }
+
+    function _notifPoll() {
+        fetch('equipment-booking/api/notif-list.php')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || data.status !== 'success') return;
+                const list = document.getElementById('notifList');
+                if (!list) return;
+
+                const serverKeys = new Set(data.notifications.map(n => n.key));
+                const domCards = list.querySelectorAll('.notif-item[data-notif-key]');
+
+                // Remove cards for notifications that no longer exist server-side
+                // (e.g. the request was approved/declined by another admin tab,
+                // or the item's stock was replenished) — but never touch one the
+                // admin currently has expanded, mid-review.
+                domCards.forEach(card => {
+                    if (!serverKeys.has(card.dataset.notifKey) && !card.classList.contains('expanded')) {
+                        _deleteCardSilent(card);
+                    }
+                });
+
+                // Add cards for genuinely new notifications, newest group-appropriate spot.
+                const existingKeys = new Set(Array.from(list.querySelectorAll('.notif-item[data-notif-key]')).map(c => c.dataset.notifKey));
+                let addedAny = false;
+                data.notifications.forEach(n => {
+                    if (existingKeys.has(n.key)) return;
+                    addedAny = true;
+                    const el = _buildNotifCardEl(n);
+                    const groupLabel = Array.from(list.querySelectorAll('.notif-group-label')).find(g => g.textContent.trim().indexOf(n.group_label) === 0);
+                    if (groupLabel) {
+                        groupLabel.insertAdjacentElement('afterend', el);
+                    } else {
+                        const div = document.createElement('div');
+                        div.className = 'notif-group-label' + (n.group_danger ? ' notif-group-label--danger' : '');
+                        div.innerHTML = '<span class="material-symbols-outlined">' + _esc(n.group_icon) + '</span>' + _esc(n.group_label);
+                        list.insertBefore(div, list.firstChild);
+                        div.insertAdjacentElement('afterend', el);
+                    }
+                });
+                _syncFilterChips(data.notifications);
+                if (addedAny) {
+                    const empty = document.getElementById('notifEmptyState');
+                    if (empty) empty.remove();
+                    initNotifCards();
+                }
+                const activeFilter = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
+                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all');
+
+                _updateBadges(data.unread_count);
+            })
+            .catch(() => { /* silent — polling shouldn't be noisy on network hiccups */ });
+    }
+
+    function _deleteCardSilent(card) {
+        card.classList.add('notif-removing');
+        setTimeout(() => {
+            const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
+                ? card.previousElementSibling : null;
+            card.remove();
+            if (group) {
+                const next = group.nextElementSibling;
+                if (!next || !next.classList.contains('notif-item')) group.remove();
+            }
+            if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+        }, 220);
     }
 
     /* ── Settings ────────────────────────────────────────────── */
     function applyTheme(theme) { _applyThemeDOM(theme); LS.set('theme', theme); showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1)); }
     function applyAccent(color, light) { _applyAccentDOM(color, light); LS.set('accentColor', color); LS.set('accentLight', light); showToast('Accent color updated!'); }
-    function applyCompact(on) { document.documentElement.style.setProperty('--radius', on ? '9px' : '16px'); LS.set('compact', on); showToast(on ? 'Compact mode enabled' : 'Compact mode disabled'); }
     function applyFontSize(val) {
         const lbl = document.getElementById('fontSizeLbl');
         if (lbl) lbl.textContent = val + '%';
@@ -368,28 +645,107 @@
     function _setReduceMotion(on) {
         let s = document.getElementById('reduceMotionStyle');
         if (!s) { s = document.createElement('style'); s.id = 'reduceMotionStyle'; document.head.appendChild(s); }
-        s.textContent = on ? '*, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }' : '';
+        // Neutralize both CSS animations AND transitions — most of this site's
+        // motion (hover states, tab/panel switches, toasts) is transition-based,
+        // so only silencing @keyframes animations (the old behavior) had almost
+        // no visible effect.
+        s.textContent = on
+            ? '*, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: -0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: -0.001ms !important; } html { scroll-behavior: auto !important; }'
+            : '';
     }
     function applyReduceMotion(on) { _setReduceMotion(on); LS.set('reduceMotion', on); showToast(on ? 'Animations disabled' : 'Animations re-enabled'); }
     function _setFocusRing(on) {
         let s = document.getElementById('focusRingStyle');
         if (!s) { s = document.createElement('style'); s.id = 'focusRingStyle'; document.head.appendChild(s); }
-        s.textContent = on ? '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; }' : '';
+        // The extra rule covers this page's custom toggle switches, whose real
+        // <input> is display:none — an outline drawn only on the hidden input
+        // would never be visible, so also ring the switch's visible track.
+        s.textContent = on
+            ? '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; } .toggle-sw input:focus + .toggle-track { outline: 3px solid var(--accent-maroon) !important; outline-offset: 2px !important; }'
+            : '';
     }
     function applyFocusRing(on) { _setFocusRing(on); LS.set('focusRing', on); showToast(on ? 'Focus rings enhanced' : 'Focus rings reset'); }
 
+    /* Text Size (Preferences → Accessibility) — maps the Normal/Large/X-Large
+       select to the same underlying percentage-based font scaling already
+       used elsewhere, so it shares one source of truth (LS 'fontSize'). */
+    function _textSizeToPct(size) { return size === 'Large' ? 115 : (size === 'X-Large' ? 130 : 100); }
+    function _pctToTextSize(pct) {
+        pct = parseFloat(pct);
+        if (pct >= 125) return 'X-Large';
+        if (pct >= 110) return 'Large';
+        return 'Normal';
+    }
+    function applyTextSize(size) {
+        applyFontSize(_textSizeToPct(size));
+        showToast('Text size: ' + size);
+    }
+
+    /* Notification Preferences (Preferences → Notification Preferences) —
+       mutes/unmutes categories of notification directly in the bell overlay,
+       via an injected stylesheet so it stays in effect regardless of which
+       overlay filter tab (All/Unread/etc.) is active. */
+    function _applyNotifPrefsDOM() {
+        let s = document.getElementById('notifPrefStyle');
+        if (!s) { s = document.createElement('style'); s.id = 'notifPrefStyle'; document.head.appendChild(s); }
+        const hiddenCats = [];
+        if (LS.get('notifPrefRequests') === 'false') hiddenCats.push('request');
+        if (LS.get('notifPrefOverdue') === 'false') hiddenCats.push('overdue');
+        // "Room Issues" has no matching notif-item category yet — the
+        // preference is saved and ready for when that category is added.
+        s.textContent = hiddenCats.length
+            ? hiddenCats.map(c => '.notif-item[data-cat="' + c + '"]').join(',') + '{display:none !important;}'
+            : '';
+    }
+    function applyNotifPref(key, on) {
+        LS.set(key, on);
+        _applyNotifPrefsDOM();
+        showToast(on ? 'Notifications enabled.' : 'Notifications muted.');
+    }
+
+    /* Advanced (Preferences → Advanced) — persisted browser-level flags.
+       Verbose Error Messages intentionally never surfaces raw server/DB
+       errors (that was the exact issue the OWASP error-disclosure fix
+       addressed); it's kept as a saved preference only. */
+    function applyShowAssetIds(on) { LS.set('showAssetIds', on); showToast(on ? 'Asset IDs will be shown where available.' : 'Asset IDs hidden.'); }
+    function applyVerboseErrors(on) { LS.set('verboseErrors', on); showToast(on ? 'Verbose error messages enabled.' : 'Verbose error messages disabled.'); }
+
     function resetAllSettings() {
         applyTheme('light');
-        const ct = document.getElementById('compactToggle'); if (ct) { ct.checked = false; applyCompact(false); }
-        const fr = document.getElementById('fontSizeRange'); if (fr) { fr.value = 100; applyFontSize(100); }
-        const rmt = document.getElementById('reduceMotionToggle'); if (rmt) { rmt.checked = false; applyReduceMotion(false); }
-        const frt = document.getElementById('focusRingToggle'); if (frt) { frt.checked = false; applyFocusRing(false); }
+
+        const ts = document.getElementById('textSizeSelect'); if (ts) ts.value = 'Normal';
+        applyFontSize(100);
+
+        const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.checked = false;
+        applyReduceMotion(false);
+
+        const frt = document.getElementById('focusRingToggle'); if (frt) frt.checked = false;
+        applyFocusRing(false);
+
+        const nReq = document.getElementById('notifPrefRequestsToggle'); if (nReq) nReq.checked = true;
+        const nOver = document.getElementById('notifPrefOverdueToggle'); if (nOver) nOver.checked = true;
+        const nRoom = document.getElementById('notifPrefRoomToggle'); if (nRoom) nRoom.checked = false;
+        LS.del('notifPrefRequests'); LS.del('notifPrefOverdue'); LS.del('notifPrefRoom');
+        _applyNotifPrefsDOM();
+
+        const said = document.getElementById('showAssetIdsToggle'); if (said) said.checked = true;
+        const verr = document.getElementById('verboseErrorsToggle'); if (verr) verr.checked = false;
+        LS.del('showAssetIds'); LS.del('verboseErrors');
+
         applyAccent('#600302', '#f3e5e6');
-        ['theme', 'accentColor', 'accentLight', 'compact', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
+        ['theme', 'accentColor', 'accentLight', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
         showToast('All settings reset to defaults.');
     }
 
     /* ── Profile edit ────────────────────────────────────────── */
+    function _computeInitials(name) {
+        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+        if (!parts.length) return '';
+        let ini = parts[0].charAt(0).toUpperCase();
+        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
+        return ini;
+    }
+
     function toggleProfileEdit() {
         const eb = document.getElementById('editProfileBtn');
         const sb = document.getElementById('saveProfileBtn');
@@ -421,32 +777,83 @@
     }
 
     function saveProfileEdit() {
-        document.querySelectorAll('[data-input]').forEach(input => {
-            const key = input.dataset.input;
-            const span = document.querySelector('[data-field="' + key + '"]');
-            if (!span) return;
-            const val = input.value.trim();
-            if (val) { span.textContent = val; span.classList.remove('empty'); LS.set('prof_' + key, val); }
-            else { span.textContent = '— Not provided'; span.classList.add('empty'); LS.del('prof_' + key); }
-        });
-        cancelProfileEdit();
-        showToast('Profile updated successfully!');
+        const nameInput = document.querySelector('[data-input="admin_name"]');
+        const emailInput = document.querySelector('[data-input="admin_email"]');
+        const saveBtn = document.getElementById('saveProfileBtn');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const email = emailInput ? emailInput.value.trim() : '';
+
+        if (!name) { showToast('Display name cannot be empty.'); return; }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email address.'); return; }
+
+        if (saveBtn) saveBtn.disabled = true;
+
+        const fd = new FormData();
+        fd.append('ajax_action', 'update_profile');
+        fd.append('admin_name', name);
+        fd.append('admin_email', email);
+        fd.append('csrf_token', getCsrfToken());
+
+        fetch('admin-dashboard.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const nameSpan = document.querySelector('[data-field="admin_name"]');
+                    if (nameSpan) { nameSpan.textContent = data.admin_name; nameSpan.classList.remove('empty'); }
+                    const emailSpan = document.querySelector('[data-field="admin_email"]');
+                    if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
+
+                    // Reflect the change everywhere else the admin's name/initials
+                    // appear on this page (header, dropdown, hero, greeting) without
+                    // requiring a reload.
+                    document.querySelectorAll('.u-name, .dd-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
+                    const greetEl = document.getElementById('greetName');
+                    if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
+                    const initials = _computeInitials(data.admin_name);
+                    if (initials) {
+                        const avatarBtn = document.getElementById('avatarBtn');
+                        if (avatarBtn) avatarBtn.textContent = initials;
+                        document.querySelectorAll('.dd-avatar').forEach(el => { el.textContent = initials; });
+                    }
+
+                    // The database is now the source of truth for these fields —
+                    // drop any stale locally-cached copy from before this fix.
+                    LS.del('prof_admin_name');
+                    LS.del('prof_admin_email');
+
+                    cancelProfileEdit();
+                    showToast('Profile updated successfully!');
+                } else {
+                    showToast(data.message || 'Could not save changes. Please try again.');
+                }
+            })
+            .catch(() => showToast('Network error — please check your connection and try again.'))
+            .finally(() => { if (saveBtn) saveBtn.disabled = false; });
     }
 
     /* ── Image upload handlers ───────────────────────────────── */
-    function initImageUpload() {
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('itemImageInput');
-        const preview = document.getElementById('imagePreview');
-        const removeBtn = document.getElementById('removeImageBtn');
+    function initImageUpload(ids) {
+        ids = ids || {};
+        const dropZone = document.getElementById(ids.dropZone || 'dropZone');
+        const fileInput = document.getElementById(ids.fileInput || 'itemImageInput');
+        const preview = document.getElementById(ids.preview || 'imagePreview');
+        const removeBtn = document.getElementById(ids.removeBtn || 'removeImageBtn');
+        // Optional — only present on the Edit modal, where there's a saved
+        // image on the server that "Remove" needs to actually clear.
+        const removeFlag = ids.removeFlag ? document.getElementById(ids.removeFlag) : null;
 
         function handleFile(file) {
-            if (!file.type.startsWith('image/')) { showToast('Only image files allowed.'); return; }
+            if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+                showToast('Only JPG and PNG images are allowed.');
+                return;
+            }
             const reader = new FileReader();
             reader.onload = e => { if (preview) { preview.src = e.target.result; preview.style.display = 'block'; } };
             reader.readAsDataURL(file);
             if (fileInput) { const dt = new DataTransfer(); dt.items.add(file); fileInput.files = dt.files; }
             if (removeBtn) removeBtn.classList.remove('hidden');
+            if (removeFlag) removeFlag.value = '0'; // picking a new file cancels any pending "remove"
         }
 
         if (dropZone) {
@@ -457,6 +864,7 @@
         }
         if (fileInput) fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
         document.addEventListener('paste', e => {
+            if (!dropZone || dropZone.offsetParent === null) return; // ignore paste unless this zone is visible
             const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image'));
             if (item) handleFile(item.getAsFile());
         });
@@ -466,6 +874,10 @@
                 if (preview) { preview.src = ''; preview.style.display = 'none'; }
                 if (fileInput) fileInput.value = '';
                 removeBtn.classList.add('hidden');
+                // Tell the backend the saved image should actually be
+                // cleared (reverted to default) — just hiding the preview
+                // client-side never reached the server before.
+                if (removeFlag) removeFlag.value = '1';
             });
         }
     }
@@ -484,6 +896,31 @@
         });
     }
 
+    /* ── Equipment search (client-side) ──────────────────────────
+       NOTE: this intentionally does NOT use setupLiveSearch(). That
+       helper replaces the container's innerHTML with whatever
+       live-search.php's ?section=inventory case returns — old
+       Bootstrap <tr>/<td> markup, meant for a <table>. #inventory-body
+       is a plain <div> of .inv-row-item cards, not a table, so that
+       swap produced invalid/garbled HTML (and it stayed garbled after
+       clearing the search, since an empty query still replaces the
+       real card markup with the old table-row markup). Filtering the
+       cards that are already in the DOM avoids all of that — nothing
+       is ever replaced, so there's nothing to garble. ── */
+    function setupInventorySearch() {
+        const input = document.getElementById('inventorySearch');
+        const body = document.getElementById('inventory-body');
+        if (!input || !body) return;
+        input.addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            body.querySelectorAll('.inv-row-item').forEach(function (row) {
+                const name = (row.dataset.itemName || '').toLowerCase();
+                const cat = (row.dataset.itemCategory || '').toLowerCase();
+                row.style.display = (!q || name.includes(q) || cat.includes(q)) ? '' : 'none';
+            });
+        });
+    }
+
     /* ── Master event delegation ─────────────────────────────── */
     document.addEventListener('click', function (e) {
         const el = e.target.closest('[data-action]');
@@ -491,16 +928,23 @@
         const action = el.dataset.action;
         try {
             switch (action) {
-                case 'open-overlay':
-                    openOverlay(el.dataset.target); break;
-                case 'close-overlay':
-                    closeOverlay(el.dataset.target); break;
+                case 'open-notif-modal':
+                    filterNotifs('all');
+                    psOpenModal('notifOverlay');
+                    closeDropdown();
+                    break;
 
                 case 'open-change-pass': {
                     const modal = document.getElementById('changePassModal');
                     if (modal) {
                         modal.style.display = 'flex';
-                        document.getElementById('changePasswordForm').reset();
+                        const form = document.getElementById('changePasswordForm');
+                        form.reset();
+                        // Privacy: don't leave a password visible from a previous open.
+                        form.querySelectorAll('input.form-control-custom').forEach(inp => { inp.type = 'password'; });
+                        form.querySelectorAll('.fac-pw-toggle').forEach(btn => {
+                            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px">visibility</span>';
+                        });
                         document.getElementById('cp-alert').style.display = 'none';
                     }
                     break;
@@ -515,17 +959,43 @@
                     const t = document.getElementById(el.dataset.target);
                     if (t) t.style.display = 'none'; break;
                 }
+                case 'hc-go': {
+                    const hcTab = el.dataset.tab;
+                    if (hcTab) {
+                        _switchTabDOM(hcTab, true);
+                    }
+                    break;
+                }
                 case 'go-lending': {
+                    // NOTE: this used to jump to a standalone "Lending" panel
+                    // (Borrow Requests / Equipment Registry / Raw Data /
+                    // Arbitration Log) that's since been removed — Requests
+                    // and Inventory are now their own real top-level tabs.
                     const dest = el.dataset.lending || 'waiting';
-                    _switchTabDOM('lending');
-                    if (dest === 'approved' || dest === 'declined') {
-                        switchLendingSub('history');
-                        switchHistoryTab(dest);
-                    } else if (dest === 'archive') {
-                        switchLendingSub('inventory');
-                        switchHistoryTab('reg-archived');
+                    if (dest === 'inventory') {
+                        _switchTabDOM('inventory');
+                        // Open the Add Equipment form directly, matching a
+                        // click on the real "+ Add Equipment" button.
+                        const fw = document.getElementById('item-form-wrap');
+                        if (fw && fw.classList.contains('hidden')) {
+                            const regToggle = document.getElementById('registry-toggle-wrap');
+                            const regActive = document.getElementById('history-reg-active');
+                            const regArchived = document.getElementById('history-reg-archived');
+                            const addBtn = document.querySelector('.btn-add-item');
+                            fw.classList.remove('hidden');
+                            if (regToggle) regToggle.style.display = 'none';
+                            if (regActive) regActive.classList.remove('active');
+                            if (regArchived) regArchived.classList.remove('active');
+                            if (addBtn) addBtn.style.display = 'none';
+                        }
+                        if (fw) fw.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                        switchLendingSub(dest);
+                        // "waiting" (Review Requests / View All) — go to the
+                        // Requests tab and make sure the waiting-for-approval
+                        // filter is the one showing.
+                        _switchTabDOM('requests');
+                        const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="rq-waiting"]');
+                        if (chip) chip.click();
                     }
                     break;
                 }
@@ -622,17 +1092,6 @@
                 case 'ps-switch-modal':
                     psCloseModal(el.dataset.close);
                     psOpenModal(el.dataset.open);
-                    break;
-
-                /* \u2500\u2500 inv-modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-                case 'inv-open-modal':
-                    openInvModal(el.dataset.modal);
-                    break;
-                case 'inv-close-modal':
-                    closeInvModal(el.dataset.modal);
-                    break;
-                case 'inv-backdrop':
-                    if (e.target === el) closeInvModal(el.dataset.modal);
                     break;
             }
         } catch (err) { console.warn('Action "' + action + '" failed:', err); }
@@ -837,17 +1296,34 @@
     }
 
     /* ── Faculty: password show/hide toggles ────────────────── */
+    /* Also powers Settings → Change Password. data-target may list more
+       than one input id, comma-separated, so one button can reveal several
+       linked fields at once (New Password + Confirm New Password share a
+       single eye state); Current Password keeps its own independent target. */
     document.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
         btn.addEventListener('click', function () {
-            const targetId = this.dataset.target;
-            const input = document.getElementById(targetId);
-            if (!input) return;
-            const isHidden = input.type === 'password';
-            input.type = isHidden ? 'text' : 'password';
-            // Swap the eye icon
-            this.innerHTML = isHidden
-                ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
-                : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const targetIds = (this.dataset.target || '').split(',').map(s => s.trim()).filter(Boolean);
+            if (!targetIds.length) return;
+            const firstInput = document.getElementById(targetIds[0]);
+            if (!firstInput) return;
+            const isHidden = firstInput.type === 'password';
+            const newType = isHidden ? 'text' : 'password';
+            targetIds.forEach(function (id) {
+                const inp = document.getElementById(id);
+                if (inp) inp.type = newType;
+            });
+
+            const eyeOffSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+            const eyeSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            const newIcon = isHidden ? eyeOffSvg : eyeSvg;
+
+            // Keep this button's icon, and any other toggle button that shares
+            // at least one of the same target ids, in sync with the new state.
+            document.querySelectorAll('.fac-pw-toggle').forEach(function (otherBtn) {
+                const otherIds = (otherBtn.dataset.target || '').split(',').map(s => s.trim()).filter(Boolean);
+                const shared = otherIds.some(function (id) { return targetIds.includes(id); });
+                if (shared) otherBtn.innerHTML = newIcon;
+            });
         });
     });
 
@@ -871,13 +1347,55 @@
 
     /* ── Borrow History toggle ───────────────────────────────── */
     document.querySelectorAll('.history-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', function () { switchHistoryTab(this.dataset.historyTab); });
+        btn.addEventListener('click', function () {
+            const tabName = this.dataset.historyTab;
+            if (tabName === 'reg-archived') {
+                // Single standalone button (not part of a mutually-exclusive
+                // pair like Pending/Return or Approved/Declined) — so unlike
+                // switchHistoryTab, this one should collapse on a second click.
+                const panel = document.getElementById('history-' + tabName);
+                const isOpen = this.classList.contains('active');
+                if (isOpen) {
+                    this.classList.remove('active');
+                    if (panel) panel.classList.remove('active');
+                } else {
+                    this.classList.add('active');
+                    if (panel) panel.classList.add('active');
+                }
+            } else {
+                switchHistoryTab(tabName);
+            }
+        });
     });
 
     /* ── Rooms Registry toggle ───────────────────────────────── */
     document.querySelectorAll('[data-rooms-tab]').forEach(btn => {
         btn.addEventListener('click', function () { switchRoomsTab(this.dataset.roomsTab); });
     });
+
+    /* ── Settings mega sub-tabs (My Account / Preferences /
+       Borrowing Rules / Help & FAQ) ─────────────────────────── */
+    document.querySelectorAll('#settMainTabs .rq-sub-tab').forEach(btn => {
+        btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
+    });
+
+    /* ── Header dropdown → Settings tab shortcuts ────────────── */
+    const ddAccountBtn = document.getElementById('dd-account-btn');
+    if (ddAccountBtn) {
+        ddAccountBtn.addEventListener('click', function () {
+            closeDropdown();
+            _switchTabDOM('settings');
+            switchSettMainTab('sett-account');
+        });
+    }
+    const ddSettingsBtn = document.getElementById('dd-settings-btn');
+    if (ddSettingsBtn) {
+        ddSettingsBtn.addEventListener('click', function () {
+            closeDropdown();
+            _switchTabDOM('settings');
+            switchSettMainTab('sett-prefs');
+        });
+    }
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
@@ -1112,26 +1630,31 @@
         });
     }());
 
-    /* ── Account sub-nav ─────────────────────────────────────── */
-    document.querySelectorAll('.acc-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
-    });
+    /* Account sub-nav (.acc-nav-btn) removed — My Account is now a
+       single flat view. */
 
-    /* ── Settings sub-nav ────────────────────────────────────── */
-    document.querySelectorAll('.s-nav-item').forEach(btn => {
-        btn.addEventListener('click', function () { switchSettTab(this.dataset.settTab); });
-    });
+    /* Help Center sub-nav (.hc-nav-btn) removed — Help & FAQ is now a
+       single flat view. */
 
-    /* ── Notification filter tabs ────────────────────────────── */
-    document.querySelectorAll('.notif-tab').forEach(btn => {
+    /* Legacy Settings-overlay sub-nav (.s-nav-item) removed with
+       switchSettTab — the overlay no longer exists. */
+
+    /* ── Notification filter chips ───────────────────────────── */
+    document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(btn => {
         btn.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
     });
 
     /* ── Settings toggles ────────────────────────────────────── */
-    const ct = document.getElementById('compactToggle'); if (ct) ct.addEventListener('change', function () { applyCompact(this.checked); });
-    const fr = document.getElementById('fontSizeRange'); if (fr) fr.addEventListener('input', function () { applyFontSize(this.value); });
+    const ts = document.getElementById('textSizeSelect'); if (ts) ts.addEventListener('change', function () { applyTextSize(this.value); });
     const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.addEventListener('change', function () { applyReduceMotion(this.checked); });
     const frt = document.getElementById('focusRingToggle'); if (frt) frt.addEventListener('change', function () { applyFocusRing(this.checked); });
+
+    const nReqT = document.getElementById('notifPrefRequestsToggle'); if (nReqT) nReqT.addEventListener('change', function () { applyNotifPref('notifPrefRequests', this.checked); });
+    const nOverT = document.getElementById('notifPrefOverdueToggle'); if (nOverT) nOverT.addEventListener('change', function () { applyNotifPref('notifPrefOverdue', this.checked); });
+    const nRoomT = document.getElementById('notifPrefRoomToggle'); if (nRoomT) nRoomT.addEventListener('change', function () { applyNotifPref('notifPrefRoom', this.checked); });
+
+    const saidT = document.getElementById('showAssetIdsToggle'); if (saidT) saidT.addEventListener('change', function () { applyShowAssetIds(this.checked); });
+    const verrT = document.getElementById('verboseErrorsToggle'); if (verrT) verrT.addEventListener('change', function () { applyVerboseErrors(this.checked); });
 
     /* ── Change Password Form Handler ───────────────────────── */
     const cpForm = document.getElementById('changePasswordForm');
@@ -1169,6 +1692,16 @@
                         alertBox.style.color = '#00875a';
                         alertBox.innerHTML = '✅ ' + data.message;
 
+                        const lastChangedEl = document.getElementById('pwLastChangedVal');
+                        if (lastChangedEl && data.last_pw_change) {
+                            const d = new Date(data.last_pw_change.replace(' ', 'T'));
+                            if (!isNaN(d.getTime())) {
+                                lastChangedEl.textContent = d.toLocaleString('en-US', {
+                                    month: 'short', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
+                                }).replace(',', ' ·');
+                            }
+                        }
+
                         setTimeout(() => {
                             document.getElementById('changePassModal').style.display = 'none';
                             showToast('Password updated successfully');
@@ -1198,32 +1731,14 @@
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
         const editItem = params.get('edit_item');
-        const hash = window.location.hash.replace('#lending-', '');
-        const validSubs = ['waiting', 'history', 'inventory', 'raw'];
 
         if (editItem) {
-            _switchTabDOM('lending', false);
-            switchLendingSub('inventory', false);
+            _switchTabDOM('inventory', false);
             _enterEditMode();
-            history.replaceState({ tab: 'lending', sub: 'inventory', editItem: editItem }, '');
-        } else if (view && validSubs.includes(view)) {
-            _switchTabDOM('lending', false);
-            switchLendingSub(view, false);
-            history.replaceState({ tab: 'lending', sub: view }, '');
-        } else if (view === 'approved') {
-            _switchTabDOM('lending', false);
-            switchLendingSub('history', false);
-            switchHistoryTab('approved');
-            history.replaceState({ tab: 'lending', sub: 'history' }, '');
-        } else if (view === 'declined') {
-            _switchTabDOM('lending', false);
-            switchLendingSub('history', false);
-            switchHistoryTab('declined');
-            history.replaceState({ tab: 'lending', sub: 'history' }, '');
-        } else if (hash && validSubs.includes(hash)) {
-            _switchTabDOM('lending', false);
-            switchLendingSub(hash, false);
-            history.replaceState({ tab: 'lending', sub: hash }, '');
+            history.replaceState({ tab: 'inventory', editItem: editItem }, '');
+        } else if (view === 'inventory') {
+            _switchTabDOM('inventory', false);
+            history.replaceState({ tab: 'inventory' }, '');
         } else if (view === 'faculty') {
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
@@ -1280,15 +1795,25 @@
         restoreState();
 
         initView();
-        initImageUpload();
+        initImageUpload(); // Add-equipment form (right column)
+        initImageUpload({ // Edit-equipment modal
+            dropZone: 'eqm-dropZone',
+            fileInput: 'eqm-itemImageInput',
+            preview: 'eqm-imagePreview',
+            removeBtn: 'eqm-removeImageBtn',
+            removeFlag: 'eqm-remove-image-flag'
+        });
         initNotifCards();
+        // Poll for new notifications (new requests, overdue items, room
+        // issues, stock drops) every 25s without a full page reload.
+        setInterval(_notifPoll, 25000);
 
         // Live search
         setupLiveSearch('waitingSearch', 'waiting-body', 'waiting');
         setupLiveSearch('returnSearch', 'return-body', 'approved');
         setupLiveSearch('approvedSearch', 'approved-list', 'approved');
         setupLiveSearch('declinedSearch', 'declined-list', 'declined');
-        setupLiveSearch('inventorySearch', 'inventory-body', 'inventory');
+        setupInventorySearch(); // client-side filter — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
         // ── Arbitration log search (server-side, reload with query param) ──
@@ -1512,6 +2037,217 @@
         });
     }
 
+    /* ════════════════════════════════════════════════════════════
+       REQUESTS PANEL (redesigned) — Approve / Decline / Detail
+       Populates the ps-approve-modal / ps-decline-modal /
+       ps-req-detail-modal from the clicked row's data-* attributes
+       and submits to the existing admin-override.php endpoint —
+       the same one the Arbitration "Override" flow already uses.
+       A manual Approve/Decline from this tab is logged as an admin
+       override (requires a reason, min. 5 chars), same as it is
+       everywhere else in the app.
+    ════════════════════════════════════════════════════════════════ */
+    (function () {
+        let reqCtx = null;
+
+        const approveConfirmBtn = document.getElementById('ps-approve-confirm-btn');
+        const declineConfirmBtn = document.getElementById('ps-decline-confirm-btn');
+        const approveReasonInput = document.getElementById('approve-reason');
+        const declineReasonInput = document.getElementById('decline-reason');
+
+        function rowCtx(el) {
+            const tr = el.closest('tr[data-id]');
+            if (!tr) return null;
+            const d = tr.dataset;
+            return {
+                id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
+                reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
+                room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
+                returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
+                arbRule: d.arbRule
+            };
+        }
+
+        function reqNo(id) { return '#R-' + String(id || 0).padStart(4, '0'); }
+
+        function clearAlert(id) {
+            const el = document.getElementById(id);
+            if (el) { el.style.display = 'none'; el.textContent = ''; }
+        }
+
+        function showAlert(id, msg) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.display = 'block';
+            el.style.background = '#ffeaea';
+            el.style.color = 'var(--danger)';
+            el.textContent = msg;
+        }
+
+        function fillApprove(ctx) {
+            document.getElementById('approve-request-id').value = ctx.id;
+            document.getElementById('ps-approve-reqno').textContent = reqNo(ctx.id);
+            document.getElementById('approve-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('approve-equipment').textContent = ctx.equipment || '—';
+            document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
+            const dd = document.getElementById('approve-due-date');
+            if (dd) dd.value = ctx.returnDate || '';
+            if (approveReasonInput) approveReasonInput.value = '';
+            if (approveConfirmBtn) approveConfirmBtn.disabled = true;
+            clearAlert('ps-approve-alert');
+        }
+
+        function fillDecline(ctx) {
+            document.getElementById('decline-request-id').value = ctx.id;
+            document.getElementById('ps-decline-reqno').textContent = reqNo(ctx.id);
+            document.getElementById('decline-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
+            if (declineReasonInput) declineReasonInput.value = '';
+            if (declineConfirmBtn) declineConfirmBtn.disabled = true;
+            clearAlert('ps-decline-alert');
+        }
+
+        function fillDetail(ctx) {
+            document.getElementById('detail-request-id').value = ctx.id;
+            document.getElementById('detail-submitted').textContent = ctx.submitted || '—';
+            document.getElementById('detail-requester').textContent = ctx.borrower || '—';
+            document.getElementById('detail-id-number').textContent = ctx.idNumber || '—';
+            document.getElementById('detail-req-type').textContent = ctx.reqType || 'Faculty';
+            document.getElementById('detail-room').textContent = ctx.room || '—';
+            document.getElementById('detail-equipment').textContent = ctx.equipment || '—';
+            document.getElementById('detail-date-needed').textContent = ctx.dateNeeded || '—';
+            document.getElementById('detail-return-by').textContent = ctx.returnDateDisplay || '—';
+            document.getElementById('detail-instructor').textContent = ctx.instructor || '—';
+
+            const badgeMap = {
+                Waiting: ['ps-badge--waiting', 'Waiting for Approval'],
+                Approved: ['ps-badge--active', 'Active / Approved'],
+                Overdue: ['ps-badge--overdue', 'Overdue'],
+                Returned: ['ps-badge--returned', 'Returned'],
+                Declined: ['ps-badge--returned', 'Declined']
+            };
+            const info = badgeMap[ctx.status] || ['ps-badge--waiting', ctx.status || '—'];
+            const badge = document.getElementById('detail-status-badge');
+            if (badge) {
+                badge.className = 'ps-badge ps-badge--dot ' + info[0];
+                badge.style.fontSize = '12px';
+                badge.style.padding = '4px 12px';
+                badge.textContent = info[1];
+            }
+
+            const condMap = {
+                Good: 'ps-badge--active',
+                Fair: 'ps-badge--waiting',
+                'For Repair': 'ps-badge--overdue'
+            };
+            const condBadge = document.getElementById('detail-condition-badge');
+            if (condBadge) {
+                const condClass = condMap[ctx.condition] || 'ps-badge--active';
+                condBadge.className = 'ps-badge ps-badge--dot ' + condClass;
+                condBadge.textContent = ctx.condition || 'Good';
+            }
+
+            const arbEl = document.getElementById('detail-arb-status');
+            if (arbEl) {
+                arbEl.textContent = ctx.arbRule === 'override'
+                    ? 'Manually overridden by an admin.'
+                    : (ctx.status === 'Waiting' ? 'Pending review.' : 'Processed — rule: ' + (ctx.arbRule || 'n/a'));
+            }
+
+            // Only a Waiting request can be approved/declined from the detail view
+            const declineBtn = document.getElementById('ps-detail-decline-btn');
+            const approveBtn = document.getElementById('ps-detail-approve-btn');
+            const showActions = ctx.status === 'Waiting';
+            if (declineBtn) declineBtn.style.display = showActions ? '' : 'none';
+            if (approveBtn) approveBtn.style.display = showActions ? '' : 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            const trigger = e.target.closest('[data-modal="ps-approve-modal"], [data-modal="ps-decline-modal"], [data-modal="ps-req-detail-modal"]');
+            if (!trigger) return;
+
+            // Row click carries fresh context; the detail modal's own footer
+            // Approve/Decline buttons have no row, so fall back to what was
+            // last loaded into the detail view.
+            const ctx = rowCtx(trigger) || reqCtx;
+            if (!ctx) return;
+            reqCtx = ctx;
+
+            const modalId = trigger.dataset.modal;
+            if (modalId === 'ps-approve-modal') fillApprove(ctx);
+            else if (modalId === 'ps-decline-modal') fillDecline(ctx);
+            else if (modalId === 'ps-req-detail-modal') fillDetail(ctx);
+        });
+
+        if (approveReasonInput && approveConfirmBtn) {
+            approveReasonInput.addEventListener('input', function () {
+                approveConfirmBtn.disabled = this.value.trim().length < 5;
+            });
+        }
+        if (declineReasonInput && declineConfirmBtn) {
+            declineReasonInput.addEventListener('input', function () {
+                declineConfirmBtn.disabled = this.value.trim().length < 5;
+            });
+        }
+
+        function submitDecision(requestId, newStatus, reason, alertId, btn, busyLabel) {
+            btn.disabled = true;
+            btn.dataset.origLabel = btn.innerHTML;
+            btn.textContent = busyLabel;
+            clearAlert(alertId);
+
+            const formData = new FormData();
+            formData.append('request_id', requestId);
+            formData.append('new_status', newStatus);
+            formData.append('override_reason', reason);
+            formData.append('csrf_token', getCsrfToken());
+
+            fetch('equipment-booking/api/admin-override.php', { method: 'POST', body: formData })
+                .then(function (r) { return r.json().then(function (d) { return d; }); })
+                .then(function (data) {
+                    if (data && data.status === 'success') {
+                        showToast(newStatus === 'Approved' ? 'Request approved.' : 'Request declined.');
+                        psCloseModal('ps-approve-modal');
+                        psCloseModal('ps-decline-modal');
+                        psCloseModal('ps-req-detail-modal');
+                        setTimeout(function () { location.reload(); }, 900);
+                    } else {
+                        showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
+                        btn.disabled = false;
+                        btn.innerHTML = btn.dataset.origLabel;
+                    }
+                })
+                .catch(function () {
+                    showAlert(alertId, 'Network error. Please try again.');
+                    btn.disabled = false;
+                    btn.innerHTML = btn.dataset.origLabel;
+                });
+        }
+
+        if (approveConfirmBtn) {
+            approveConfirmBtn.addEventListener('click', function () {
+                const id = document.getElementById('approve-request-id').value;
+                const reason = (approveReasonInput.value || '').trim();
+                if (reason.length < 5) {
+                    showAlert('ps-approve-alert', 'Please enter a reason (min. 5 characters).');
+                    return;
+                }
+                submitDecision(id, 'Approved', reason, 'ps-approve-alert', approveConfirmBtn, 'Approving…');
+            });
+        }
+        if (declineConfirmBtn) {
+            declineConfirmBtn.addEventListener('click', function () {
+                const id = document.getElementById('decline-request-id').value;
+                const reason = (declineReasonInput.value || '').trim();
+                if (reason.length < 5) {
+                    showAlert('ps-decline-alert', 'Please enter a reason (min. 5 characters).');
+                    return;
+                }
+                submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
+            });
+        }
+    })();
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 
@@ -1532,6 +2268,7 @@
         let stream = null;
         let animFrame = null;
         let scanning = false;
+        let scannedCount = 0;
 
         function stopScanner() {
             scanning = false;
@@ -1539,6 +2276,10 @@
             if (stream) stream.getTracks().forEach(t => t.stop());
             stream = null;
             modal.style.display = 'none';
+            if (scannedCount > 0) {
+                showToast(`✅ ${scannedCount} return${scannedCount > 1 ? 's' : ''} confirmed this session. Refresh to see updated tables.`);
+            }
+            scannedCount = 0;
         }
 
         function processFrame(canvas, ctx) {
@@ -1588,10 +2329,21 @@
                         .then(r => r.json())
                         .then(data => {
                             if (data.success) {
-                                status.textContent = '✅ Return confirmed! Updating tables...';
+                                scannedCount++;
+                                status.textContent = '✅ Return confirmed!';
                                 status.style.color = '#22c55e';
                                 showToast('✅ Equipment return confirmed via QR.');
-                                setTimeout(stopScanner, 1800);
+                                // Stay open and keep scanning — a return day usually
+                                // means several faculty in a row, not just one, so
+                                // don't force reopening the modal for every scan.
+                                setTimeout(() => {
+                                    status.textContent = scannedCount > 1
+                                        ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
+                                        : 'Point camera at the next QR code.';
+                                    status.style.color = '#888';
+                                    scanning = true;
+                                    tick();
+                                }, 1500);
                             } else {
                                 status.textContent = '❌ ' + (data.message || 'Invalid or already-used QR token.');
                                 status.style.color = '#e53e3e';
@@ -1606,6 +2358,12 @@
                         .catch(() => {
                             status.textContent = '❌ Network error. Please try again.';
                             status.style.color = '#e53e3e';
+                            setTimeout(() => {
+                                status.textContent = 'Point camera at a valid QR code.';
+                                status.style.color = '#888';
+                                scanning = true;
+                                tick();
+                            }, 2500);
                         });
                     return;
                 }
@@ -1730,16 +2488,6 @@ function psCloseModal(id) {
     if (el) el.classList.remove('ps-modal-open');
 }
 
-/* ── inv-modal open / close ────────────────────────────── */
-function openInvModal(id) {
-    var m = document.getElementById(id);
-    if (m) m.style.display = 'flex';
-}
-function closeInvModal(id) {
-    var m = document.getElementById(id);
-    if (m) m.style.display = 'none';
-}
-
 /* Close modal when clicking the backdrop */
 document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     bd.addEventListener('click', function (e) {
@@ -1747,22 +2495,22 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     });
 });
 
-/* ── Requests sub-tab switcher ────────────────────────────────── */
+/* ── Requests filter-chip switcher ────────────────────────────── */
 (function () {
     var tabGroup = document.getElementById('rqTabs');
     if (!tabGroup) return;
 
-    tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
+    tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (tab) {
         tab.addEventListener('click', function () {
-            /* Deactivate all tabs and panels */
-            tabGroup.querySelectorAll('.rq-sub-tab').forEach(function (t) {
+            /* Deactivate all chips and panels */
+            tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (t) {
                 t.classList.remove('active');
             });
             document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
                 p.classList.remove('active');
             });
 
-            /* Activate clicked tab and its panel */
+            /* Activate clicked chip and its panel */
             tab.classList.add('active');
             var panelId = tab.dataset.rqPanel;
             var panel = document.getElementById(panelId);
@@ -1785,26 +2533,49 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     });
 })();
 
-/* ── Live search + status filter — All Requests table ────────── */
+/* ── Live search + return-date range filter — Returned Requests table ── */
 (function () {
     var searchInput = document.getElementById('rq-all-search');
-    var statusSel = document.getElementById('rq-all-status');
+    var rangeSel = document.getElementById('rq-all-range');
     var table = document.getElementById('rq-all-table');
     if (!table) return;
 
+    function inReturnRange(dateStr, range) {
+        if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
+        var d = new Date(dateStr + 'T00:00:00');
+        if (isNaN(d.getTime())) return true;
+        var now = new Date();
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (range === 'today') {
+            return d.getTime() === todayStart.getTime();
+        }
+        if (range === 'week') {
+            var weekStart = new Date(todayStart);
+            weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+            return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
+        }
+        if (range === 'month') {
+            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        }
+        if (range === 'year') {
+            return d.getFullYear() === now.getFullYear();
+        }
+        return true;
+    }
+
     function filterAll() {
         var q = searchInput ? searchInput.value.toLowerCase() : '';
-        var status = statusSel ? statusSel.value : '';
+        var range = rangeSel ? rangeSel.value : 'month';
         table.querySelectorAll('tbody tr').forEach(function (row) {
             var text = row.textContent.toLowerCase();
-            var rowStat = row.dataset.status || '';
             var matchQ = !q || text.includes(q);
-            var matchS = !status || rowStat === status;
-            row.style.display = (matchQ && matchS) ? '' : 'none';
+            var matchRange = inReturnRange(row.dataset.returnDate, range);
+            row.style.display = (matchQ && matchRange) ? '' : 'none';
         });
     }
     if (searchInput) searchInput.addEventListener('input', filterAll);
-    if (statusSel) statusSel.addEventListener('change', filterAll);
+    if (rangeSel) rangeSel.addEventListener('change', filterAll);
+    filterAll(); // apply the default "This Month" range immediately
 })();
 /* ════════════════════════════════════════════════════════════════
    PHASE 3 — ARBITRATION + EXPORT HELPERS
@@ -1817,7 +2588,7 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
     arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
         tab.addEventListener('click', function () {
             arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('#panel-arbitration .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
+            document.querySelectorAll('#sett-rules .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
             tab.classList.add('active');
             var panel = document.getElementById(tab.dataset.arbPanel);
             if (panel) panel.classList.add('active');

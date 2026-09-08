@@ -20,6 +20,10 @@
     --warning: #f39c12;
     --section-tint-start: rgba(96, 3, 2, 0.09);
     --section-tint-end: rgba(96, 3, 2, 0.00);
+    --building-color-1: var(--accent-maroon);
+    --building-color-2: #a9842c;
+    --building-color-3: #2f6f8f;
+    --building-color-4: #6a5acd;
 }
 
 [data-theme="dark"] {
@@ -39,6 +43,9 @@
     --hover-bg: #2d1f23;
     --section-tint-start: rgba(193, 83, 107, 0.13);
     --section-tint-end: rgba(193, 83, 107, 0.00);
+    --building-color-2: #e0b83f;
+    --building-color-3: #6fa8dc;
+    --building-color-4: #a08ee0;
 }
 
 [data-theme="high-contrast"] {
@@ -58,6 +65,9 @@
     --hover-bg: #1a0005;
     --section-tint-start: rgba(255, 68, 85, 0.16);
     --section-tint-end: rgba(255, 68, 85, 0.00);
+    --building-color-2: #ffcc00;
+    --building-color-3: #4dc4ff;
+    --building-color-4: #cc99ff;
 }
 
 /* ── Reset ────────────────────────────────────────────────────── */
@@ -75,7 +85,6 @@
 .dd-item,
 .acc-nav-btn,
 .s-nav-item,
-.notif-tab,
 .lending-nav-btn,
 .btn-borrow,
 .btn-submit-form,
@@ -241,6 +250,128 @@ header.app-header {
     align-items: center;
     gap: 1rem;
     position: relative;
+}
+
+/* ── QR Return Scanner trigger — lives in the header so it's reachable
+   from any tab, since a return can come in while the admin is looking
+   at anything. Opens #qrScannerModal (wired up in admin-dashboard.js).
+   Collapses to icon-only on narrow screens, same pattern already used
+   for .header-user-info below. ──────────────────────────────────── */
+.qr-scan-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-maroon);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 50px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.qr-scan-btn:hover {
+    background: var(--accent-dark);
+}
+
+.qr-scan-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+/* ── QR Return Scanner modal ─────────────────────────────────────
+   Was hardcoded inline with var(--surface,#fff) — --surface isn't
+   an actual token in this file, so it silently always fell back to
+   plain white, ignoring dark/high-contrast mode. Moved to real
+   tokens here so it matches whichever theme is active. ─────────── */
+.qr-scanner-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-scanner-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+}
+
+.qr-scanner-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 22px;
+    color: var(--text-light);
+    line-height: 1;
+}
+
+.qr-scanner-close:hover {
+    color: var(--accent-maroon);
+}
+
+.qr-scanner-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--text-dark);
+}
+
+.qr-scanner-card>p {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 0 0 16px;
+}
+
+.qr-video-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+}
+
+.qr-video-wrap video {
+    width: 100%;
+    display: block;
+}
+
+.qr-scan-guide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.qr-scan-guide-box {
+    width: 200px;
+    height: 200px;
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+
+#qrScanStatus {
+    margin-top: 14px;
+    font-size: 0.85rem;
+    color: var(--text-light);
 }
 
 /* ── APP BODY — sidebar + scrollable main ─────────────────────── */
@@ -527,7 +658,7 @@ main#app-main {
 }
 
 .dd-logout:hover {
-    background: #ffeaea !important;
+    background: var(--hover-bg) !important;
 }
 
 .notif-badge {
@@ -704,7 +835,7 @@ main#app-main {
 /* Quick action cards */
 .ps-quick-actions {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -835,7 +966,7 @@ main#app-main {
 }
 
 .ps-table tr:hover td {
-    background: var(--secondary-cream);
+    background: var(--hover-bg);
 }
 
 /* Status badges */
@@ -966,6 +1097,12 @@ main#app-main {
 
 .ps-btn .material-symbols-outlined {
     font-size: 16px;
+}
+
+.ps-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .ps-btn--primary {
@@ -1193,6 +1330,69 @@ select.ps-form-control {
 
 .rq-sub-panel.active {
     display: block;
+}
+
+/* ── Filter chips (Requests tab) ──────────────────────────────────
+   Pill-shaped, individually-bordered buttons — visually distinct from
+   the rectangular .rq-sub-tab used for Rooms/Settings sub-navigation,
+   so the "filter a single list" pattern reads differently from the
+   "switch between screens" pattern. ── */
+.rq-filter-chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.rq-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.45rem 1rem;
+    border-radius: 50px;
+    border: 1.5px solid var(--khaki-border);
+    background: var(--primary-white);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.rq-filter-chip:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.rq-filter-chip.active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: white;
+    font-weight: 600;
+}
+
+.rq-chip-count {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 50px;
+    min-width: 18px;
+    text-align: center;
+    background: var(--danger);
+    color: white;
+}
+
+.rq-chip-count--ok {
+    background: rgba(39, 174, 96, 0.18);
+    color: var(--success);
+}
+
+.rq-filter-chip.active .rq-chip-count {
+    background: rgba(255, 255, 255, 0.28);
+    color: white;
 }
 
 /* ── MODAL SYSTEM ─────────────────────────────────────────────── */
@@ -3235,6 +3435,10 @@ textarea.form-control-custom {
     transform: translateX(20px);
 }
 
+.toggle-sw:hover .toggle-track {
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
 /* Theme grid */
 .theme-grid {
     display: flex;
@@ -3369,162 +3573,194 @@ input[type="range"] {
     cursor: pointer;
 }
 
-/* ── NOTIFICATIONS OVERLAY ────────────────────────────────────── */
-.notif-wrapper {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-    flex: 1;
+/* ── NOTIFICATIONS MODAL ──────────────────────────────────────── */
+.notif-modal {
+    max-width: 620px;
+    /* Fixed height regardless of how many notifications are currently
+       showing — otherwise the modal grows/shrinks every time the filter
+       changes or the feed updates, which feels unstable. The body below
+       (flex:1 from .ps-modal-body) fills whatever's left and scrolls;
+       the max-height keeps this sane on short/mobile viewports. */
+    height: 640px;
+    max-height: 85vh;
 }
 
-.notif-filter-tabs {
+.notif-toolbar {
     display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 1.2rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 1rem 1.25rem 0;
+    flex-shrink: 0;
 }
 
-.notif-tab {
-    padding: 6px 16px;
-    border-radius: 20px;
-    border: 1px solid var(--khaki-border);
-    background: none;
-    cursor: pointer;
-    font-size: 0.78rem;
-    font-weight: 600;
+.notif-unread-line {
+    font-size: 12.5px;
     color: var(--text-light);
-    font-family: 'Poppins', sans-serif;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    margin: 0;
 }
 
-.notif-tab.active {
-    background: var(--accent-maroon);
+.notif-unread-line strong {
+    color: var(--accent-maroon);
+}
+
+.notif-filter-chips {
+    padding: 0.85rem 1.25rem 0;
+    margin-bottom: 0 !important;
+    flex-shrink: 0;
+    /* Streamlined single-row filter bar — scrolls horizontally instead
+       of wrapping to a second line when several categories are active. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.notif-filter-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.notif-filter-chips .rq-filter-chip {
+    flex-shrink: 0;
+}
+
+.notif-chip-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.08);
+    color: inherit;
+}
+
+.rq-filter-chip.active .notif-chip-count {
+    background: rgba(255, 255, 255, 0.25);
     color: #fff;
-    border-color: var(--accent-maroon);
 }
 
-.notif-group {
-    font-size: 0.72rem;
+.notif-modal-body {
+    padding: 1rem 1.25rem 1.25rem;
+}
+
+.notif-group-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.8px;
     color: var(--text-light);
-    padding: 0.6rem 0;
-    margin-top: 0.5rem;
+    padding: 0.5rem 0;
+    margin-top: 0.4rem;
+}
+
+.notif-group-label .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.notif-group-label--danger {
+    color: var(--danger);
 }
 
 .notif-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 1rem;
-    background: var(--card-bg);
-    border: 1px solid var(--khaki-border);
+    background: var(--primary-white);
+    border: 1.5px solid var(--khaki-border);
     border-radius: 12px;
     margin-bottom: 8px;
-    transition: border-color 0.2s;
+    overflow: hidden;
+    transition: border-color 0.15s;
 }
 
 .notif-item.unread {
     border-color: var(--accent-light);
-    background: linear-gradient(135deg, var(--section-tint-start), var(--card-bg));
 }
 
 .notif-item.notif-urgent {
-    border-color: #e65100;
-    background: #fff8f5;
+    border-color: var(--danger);
 }
 
 .notif-icon {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: grid;
+    place-items: center;
     flex-shrink: 0;
 }
 
-.ni-success {
-    background: #e3fcef;
-    color: var(--success);
+.notif-icon .material-symbols-outlined {
+    font-size: 18px;
 }
 
-.ni-warn {
-    background: #fff8e1;
-    color: #c67c00;
-}
-
-.ni-alert {
-    background: #ffeaea;
+.notif-icon--danger {
+    background: #fdecea;
     color: var(--danger);
 }
 
-.ni-urgent {
-    background: #fff3e0;
-    color: #e65100;
+.notif-icon--maroon {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
 }
 
-.ni-info {
-    background: #e3f2fd;
-    color: #1565c0;
+.notif-icon--info {
+    background: #eaf4fc;
+    color: #2471a3;
+}
+
+.notif-icon--success {
+    background: #eafaf2;
+    color: var(--success);
+}
+
+.notif-icon--warning {
+    background: #fef4e6;
+    color: var(--warning);
 }
 
 .notif-body-wrap {
     flex: 1;
+    min-width: 0;
 }
 
 .notif-body-wrap h4 {
-    font-size: 0.85rem;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--text-dark);
-    margin-bottom: 3px;
+    margin: 0 0 2px;
 }
 
 .notif-body-wrap p {
-    font-size: 0.78rem;
+    font-size: 12px;
     color: var(--text-light);
     line-height: 1.5;
+    margin: 0;
 }
 
 .notif-meta {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 6px;
+    gap: 5px;
     flex-shrink: 0;
 }
 
 .notif-time {
-    font-size: 0.7rem;
+    font-size: 11px;
     color: var(--text-light);
     white-space: nowrap;
 }
 
 .unread-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--accent-maroon);
-}
-
-.mark-read-btn {
-    background: none;
-    border: 1px solid var(--khaki-border);
-    color: var(--text-light);
-    padding: 7px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.78rem;
-    font-weight: 600;
-    font-family: 'Poppins', sans-serif;
-    transition: background 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.mark-read-btn:hover {
-    background: var(--hover-bg);
-    border-color: var(--accent-maroon);
-    color: var(--accent-maroon);
 }
 
 /* ── LOADING OVERLAY ──────────────────────────────────────────── */
@@ -3649,37 +3885,26 @@ input[type="range"] {
     animation: slideIn 0.2s ease;
 }
 
-/* ── NOTIFICATION CARDS ───────────────────────────────────────── */
-.notif-card {
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-    cursor: default;
-}
-
+/* ── NOTIFICATION CARDS (expand/collapse + detail) ───────────────── */
 .notif-card-main {
     display: flex;
     align-items: flex-start;
-    gap: 14px;
-    padding: 1rem;
+    gap: 12px;
+    padding: 0.85rem 1rem;
     cursor: pointer;
     transition: background 0.15s;
     width: 100%;
 }
 
 .notif-card-main:hover {
-    background: var(--hover-bg);
-}
-
-.notif-card .notif-meta {
-    align-items: flex-end;
-    gap: 5px;
+    background: var(--secondary-cream);
 }
 
 .notif-chevron {
     color: var(--text-light);
     flex-shrink: 0;
-    transition: transform 0.25s ease;
+    font-size: 18px !important;
+    transition: transform 0.2s ease;
 }
 
 .notif-card.expanded .notif-chevron {
@@ -3689,49 +3914,16 @@ input[type="range"] {
 .notif-card-detail {
     display: none;
     border-top: 1px solid var(--khaki-border);
-    padding: 1rem 1rem 0.8rem;
+    padding: 1rem;
     background: var(--secondary-cream);
-    animation: slideIn 0.2s ease;
 }
 
 .notif-card.expanded .notif-card-detail {
     display: block;
 }
 
-.notif-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 16px;
-    margin-bottom: 0.9rem;
-}
-
-.notif-detail-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.ndl {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-    color: var(--text-light);
-}
-
-.ndv {
-    font-size: 0.82rem;
-    color: var(--text-dark);
-    font-weight: 500;
-}
-
-.ndv code {
-    font-family: monospace;
-    background: var(--card-bg);
-    padding: 1px 5px;
-    border-radius: 4px;
-    font-size: 0.78rem;
-    border: 1px solid var(--khaki-border);
+.notif-card-detail .ps-detail-grid {
+    margin-bottom: 1rem;
 }
 
 .notif-card-actions {
@@ -3741,56 +3933,98 @@ input[type="range"] {
     align-items: center;
 }
 
-.notif-action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 16px;
-    border-radius: 8px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    font-family: 'Poppins', sans-serif;
-    cursor: pointer;
-    border: none;
-    text-decoration: none;
-    transition: background 0.2s, transform 0.15s;
-}
-
-.notif-action-btn:hover {
-    transform: translateY(-1px);
-}
-
-.notif-action-primary {
-    background: var(--accent-maroon);
-    color: #fff;
-}
-
-.notif-action-primary:hover {
-    background: var(--accent-dark);
-}
-
-.notif-action-danger {
-    background: #ffeaea;
-    color: var(--danger);
-    border: 1px solid #f5c6cb;
-}
-
-.notif-action-danger:hover {
-    background: var(--danger);
-    color: #fff;
-}
-
-.notif-action-dismiss {
-    background: var(--card-bg);
-    color: var(--text-light);
-    border: 1px solid var(--khaki-border);
+.notif-card-actions .ps-btn--ghost {
     margin-left: auto;
 }
 
-.notif-action-dismiss:hover {
-    background: var(--hover-bg);
-    color: var(--accent-maroon);
-    border-color: var(--accent-maroon);
+.notif-delete-btn {
+    color: var(--danger) !important;
+}
+
+.notif-delete-btn:hover {
+    background: #fdecea !important;
+}
+
+/* Card removal (delete) — brief collapse instead of an abrupt disappear */
+.notif-item.notif-removing {
+    animation: notifRemove 0.22s ease forwards;
+}
+
+@keyframes notifRemove {
+    to {
+        opacity: 0;
+        transform: scale(0.97);
+        max-height: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+
+/* Newly-arrived card from polling — quick highlight so it doesn't just pop in unnoticed */
+.notif-item.notif-fresh {
+    animation: notifFresh 1.6s ease;
+}
+
+@keyframes notifFresh {
+    0% {
+        background: var(--accent-light);
+    }
+
+    100% {
+        background: var(--primary-white);
+    }
+}
+
+.notif-empty-state {
+    padding: 2.5rem 1rem;
+    /* With the modal now a fixed height, center the empty message in
+       whatever space is available instead of leaving it pinned to the
+       top with a block of dead space underneath it. */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Bell badge — small pulse whenever the unread count changes upward */
+.notif-btn-badge.notif-badge-pulse,
+.notif-badge.notif-badge-pulse {
+    animation: notifBadgePulse 0.5s ease;
+}
+
+@keyframes notifBadgePulse {
+    0% {
+        transform: scale(1);
+    }
+
+    40% {
+        transform: scale(1.35);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Brief highlight flash for a row/card the user was just deep-linked to
+   from a notification (Requests table row, Inventory item, etc.) */
+.notif-target-flash {
+    animation: notifTargetFlash 1.8s ease;
+}
+
+@keyframes notifTargetFlash {
+    0% {
+        background: var(--accent-light);
+        box-shadow: 0 0 0 2px var(--accent-maroon) inset;
+    }
+
+    100% {
+        background: transparent;
+        box-shadow: none;
+    }
 }
 
 /* ── RESPONSIVE ───────────────────────────────────────────────── */
@@ -3851,6 +4085,15 @@ input[type="range"] {
 
     .header-user-info {
         display: none;
+    }
+
+    .qr-scan-btn .qr-scan-btn-label {
+        display: none;
+    }
+
+    .qr-scan-btn {
+        padding: 8px;
+        border-radius: 50%;
     }
 
     /* Main padding */
@@ -3987,15 +4230,6 @@ input[type="range"] {
 
     .capacity-badge {
         align-self: flex-start;
-    }
-
-    /* Notification detail grid */
-    .notif-detail-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .notif-wrapper {
-        padding: 1.2rem 1rem;
     }
 
     /* Overlays */
@@ -4206,15 +4440,6 @@ input[type="range"] {
         font-size: 0.72rem;
     }
 
-    .notif-filter-tabs {
-        gap: 5px;
-    }
-
-    .notif-tab {
-        padding: 5px 12px;
-        font-size: 0.75rem;
-    }
-
     /* Inventory page header - stack button below title */
     #lending-inventory .page-header {
         flex-direction: column !important;
@@ -4242,11 +4467,6 @@ input[type="range"] {
     .account-content,
     .settings-content {
         padding: 1rem 0.85rem;
-    }
-
-    /* Notifications overlay: tighter padding */
-    .notif-wrapper {
-        padding: 0.9rem 0.75rem;
     }
 
     /* Settings rows: allow the label + control to wrap */
@@ -4566,6 +4786,27 @@ input[type="range"] {
     outline-offset: 2px;
 }
 
+/* Hover — matches the .toggle-sw glow ring used by every other toggle switch */
+.faculty-toggle-label:hover .faculty-toggle-track {
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* .form-group label (used for every other field label) sets display:block,
+   uppercase text, and a bottom margin — and it wins over .faculty-toggle-label
+   on specificity when a toggle sits inside a .form-group (e.g. the
+   Organization Adviser toggle in Create Faculty Account), breaking the
+   switch/text alignment. Restore the intended flex layout here. */
+.form-group label.faculty-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
 /* ── RESPONSIVE: stack to single column below 900 px ─────────── */
 @media (max-width: 900px) {
     .faculty-layout {
@@ -4881,6 +5122,7 @@ input[type="range"] {
 .inv-row-qty {
     text-align: center;
     flex-shrink: 0;
+    width: 72px;
 }
 
 .inv-row-qty .q-val {
@@ -5042,7 +5284,7 @@ input[type="range"] {
 }
 
 .btn-inv-delete:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
     color: var(--danger);
     border-color: var(--danger);
 }
@@ -5262,7 +5504,7 @@ input[type="range"] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ROOMS PANEL — Prototype V2 Redesign (Applied Aug 2026)
+   ROOMS PANEL — Prototype V3 Redesign (Building tabs + floor-grouped table, Sept 2026)
    All rules are either scoped to #panel-rooms or use a pr- prefix so
    they cannot bleed into any other panel. JS hooks (.rooms-sub-panel,
    data-rooms-tab, #rooms-*-panel, #room-form-wrap, #addRoomBtn) are
@@ -5402,7 +5644,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-sub-tab:hover {
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--secondary-cream);
     color: var(--text-dark);
 }
 
@@ -5441,88 +5683,130 @@ input[type="range"] {
     color: var(--accent-maroon);
 }
 
-/* ── Room groups + grid ──────────────────────────────────── */
-#panel-rooms .pr-room-group {
-    margin-bottom: 2rem;
-}
-
-#panel-rooms .pr-room-group-label {
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-light);
-    margin: 0 0 0.75rem;
-}
-
-#panel-rooms .pr-room-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-/* ── Room card — override global .room-card for vertical grid ── */
-#panel-rooms .room-card {
-    background: var(--card-bg);
-    border: 1.5px solid var(--khaki-border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    box-shadow: var(--shadow);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    gap: 0;
-    align-items: stretch;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-#panel-rooms .room-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 32px rgba(96, 3, 2, 0.13);
-}
-
-/* Banner */
-#panel-rooms .rc-banner {
-    height: 96px;
-    background: linear-gradient(135deg, var(--accent-maroon) 0%, #8a1a1a 100%);
+/* ── Toolbar: search + Building/Floor/Status dropdowns ──────
+   Kept to one row of plain, familiar controls (a text box and
+   three <select>s) instead of custom tabs/chips — easier to
+   read at a glance for a non-technical admin. ─────────────── */
+#panel-rooms .pr-rooms-toolbar {
     display: flex;
     align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-#panel-rooms .rc-banner .material-symbols-outlined {
-    font-size: 42px;
-    color: rgba(255, 255, 255, 0.42);
-}
-
-/* Body */
-#panel-rooms .rc-body {
-    padding: 0.9rem 1rem;
-    flex: 1;
-}
-
-#panel-rooms .rc-body h4 {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin: 0 0 5px;
-}
-
-#panel-rooms .rc-meta {
-    font-size: 11.5px;
-    color: var(--text-light);
-    display: flex;
-    align-items: center;
-    gap: 5px;
+    gap: 0.6rem;
     flex-wrap: wrap;
+    padding: 1rem 1.25rem;
+    background: var(--secondary-cream);
+    border-bottom: 1px solid var(--khaki-border);
 }
 
-#panel-rooms .rc-meta svg {
-    flex-shrink: 0;
+#panel-rooms .pr-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
 }
 
-/* Status badge inside rc-meta */
+#panel-rooms .pr-search-wrap .material-symbols-outlined {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 16px;
+    color: var(--text-light);
+    pointer-events: none;
+}
+
+#panel-rooms .pr-search-wrap input {
+    width: 100%;
+    height: 36px;
+    padding: 0 0.9rem 0 2.4rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 9px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-dark);
+    background: var(--card-bg);
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+#panel-rooms .pr-search-wrap input:focus {
+    border-color: var(--accent-maroon);
+    background: var(--primary-white);
+}
+
+#panel-rooms .pr-search-wrap input::placeholder {
+    color: var(--text-light);
+}
+
+#panel-rooms .pr-filter-select {
+    height: 36px;
+    padding: 0 2rem 0 0.85rem;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 9px;
+    background: var(--card-bg);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    max-width: 220px;
+}
+
+#panel-rooms .pr-filter-select:focus {
+    border-color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-filter-select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Room registry table ─────────────────────────────────────
+   One flat table (not per-building panels) — floor/building
+   divider rows do the grouping. Fixed column widths (set via
+   the <colgroup> in the markup, with table-layout: fixed here)
+   keep Capacity/Status/Actions aligned at the exact same spot
+   on every row, regardless of how long a room's name is — the
+   room name never decides where the next column starts. ────── */
+#panel-rooms .pr-rooms-table {
+    table-layout: fixed;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-room-row td {
+    padding: 0.72rem 1.1rem;
+}
+
+#panel-rooms .pr-rooms-table thead th:nth-child(2),
+#panel-rooms .pr-rooms-table tbody td:nth-child(2) {
+    text-align: center;
+}
+
+#panel-rooms .pr-rooms-table thead th:nth-child(4),
+#panel-rooms .pr-rooms-table tbody td:nth-child(4) {
+    text-align: right;
+}
+
+/* A slim, muted left-edge accent mirroring the status color, so
+   the list scans at a glance without reading every pill. Applied
+   to the first cell (not the row) so it renders reliably under
+   border-collapse: collapse. */
+#panel-rooms .pr-rooms-table tbody tr.pr-room-row td:first-child {
+    border-left: 3px solid transparent;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-avail td:first-child {
+    border-left-color: #a9dfbf;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-maint td:first-child {
+    border-left-color: #f5cba7;
+}
+
+#panel-rooms .pr-rooms-table tbody tr.pr-row-nobk td:first-child {
+    border-left-color: #d1d5db;
+}
+
+/* Status badge (rc-status) — used in the rooms table now */
 #panel-rooms .rc-status {
     display: inline-flex;
     align-items: center;
@@ -5532,7 +5816,6 @@ input[type="range"] {
     padding: 2px 9px;
     border-radius: 50px;
     border: 1.5px solid transparent;
-    margin-left: auto;
     white-space: nowrap;
 }
 
@@ -5554,31 +5837,82 @@ input[type="range"] {
     border-color: #d1d5db;
 }
 
-/* Amenity chips */
-#panel-rooms .rc-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-top: 8px;
-}
-
-#panel-rooms .rc-chips span {
-    font-size: 10.5px;
-    color: var(--text-light);
-    background: var(--secondary-cream);
-    border: 1px solid var(--khaki-border);
-    padding: 2px 8px;
-    border-radius: 20px;
-}
-
-/* Footer */
-#panel-rooms .rc-footer {
-    padding: 0.65rem 0.85rem;
-    border-top: 1px solid var(--khaki-border);
+/* ── Row actions: Schedule / Edit / Archive icon buttons ─────── */
+#panel-rooms .pr-row-actions {
     display: flex;
     gap: 6px;
+    justify-content: flex-end;
+}
+
+#panel-rooms .pr-icon-btn {
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none !important;
     flex-shrink: 0;
+}
+
+#panel-rooms .pr-icon-btn .material-symbols-outlined {
+    font-size: 15px;
+}
+
+#panel-rooms .pr-icon-btn:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+}
+
+#panel-rooms .pr-icon-btn.danger:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: var(--hover-bg);
+}
+
+/* ── Floor/building divider row inside the rooms table ────────
+   One label per group ("Building B (New) — 3rd Floor · 5
+   rooms") so it reads clearly even when Building is set to
+   "All Buildings". A colored left bar + icon (per building,
+   cycling through --building-color-1..4) makes each building
+   visually distinct at a glance; the first divider of a new
+   building gets extra breathing room above it. ─────────────── */
+#panel-rooms .pr-rooms-table tr.pr-floor-divider td {
+    display: flex;
+    align-items: center;
+    background: var(--secondary-cream);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.75px;
+    color: var(--text-dark);
+    padding: 0.6rem 1.1rem;
+    border-bottom: 1px solid var(--khaki-border);
+    border-left: 4px solid var(--b-accent, var(--khaki-border));
+}
+
+#panel-rooms .pr-rooms-table tr.pr-floor-divider-first td {
+    padding-top: 1.1rem;
+}
+
+#panel-rooms .pr-building-icon {
+    font-size: 14px;
+    color: var(--b-accent, var(--accent-maroon));
+    margin-right: 2px;
+}
+
+#panel-rooms .pr-floor-count {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    opacity: 0.75;
+    margin-left: 6px;
 }
 
 /* ── Card wrapper for sub-panels (archived / reservations / issues) ── */
@@ -5620,6 +5954,22 @@ input[type="range"] {
     height: 16px;
     color: var(--accent-maroon);
     flex-shrink: 0;
+}
+
+/* ── Gradient maroon header — Reservations / All Rooms / Room
+   Issues, so each section's title reads as a clear, emphasized
+   banner rather than blending in with the card body. ────────── */
+#panel-rooms .pr-card-header.pr-card-header-maroon {
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
+    border-bottom: none;
+}
+
+#panel-rooms .pr-card-header.pr-card-header-maroon h3 {
+    color: #fff;
+}
+
+#panel-rooms .pr-card-header.pr-card-header-maroon h3 .material-symbols-outlined {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 #panel-rooms .pr-card-note {
@@ -5666,7 +6016,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-table tbody tr:hover td {
-    background: #faf8f4;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-table .td-fw {
@@ -5774,7 +6124,7 @@ input[type="range"] {
 #panel-rooms .pr-tbl-btn:hover {
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
-    background: #fdf8f8;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.restore {
@@ -5783,7 +6133,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.restore:hover {
-    background: #eafaf2;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.cancel-r {
@@ -5792,7 +6142,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.cancel-r:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 #panel-rooms .pr-tbl-btn.review {
@@ -5801,7 +6151,7 @@ input[type="range"] {
 }
 
 #panel-rooms .pr-tbl-btn.review:hover {
-    background: #f3e5e6;
+    background: var(--hover-bg);
 }
 
 /* ── Add/Edit room form card — visual refresh ────────────── */
@@ -5826,19 +6176,30 @@ input[type="range"] {
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 1100px) {
-    #panel-rooms .pr-room-grid {
-        grid-template-columns: repeat(2, 1fr);
+@media (max-width: 640px) {
+
+    #panel-rooms .pr-rooms-table .pr-col-capacity {
+        visibility: collapse;
+    }
+
+    #panel-rooms .pr-rooms-table thead th:nth-child(2),
+    #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
+        display: none;
     }
 }
 
 @media (max-width: 700px) {
-    #panel-rooms .pr-room-grid {
-        grid-template-columns: 1fr;
-    }
-
     #panel-rooms .pr-page-header-row {
         flex-direction: column;
+    }
+
+    #panel-rooms .pr-rooms-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #panel-rooms .pr-filter-select {
+        max-width: none;
     }
 }
 
@@ -6207,7 +6568,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     font-weight: 600;
     width: 100%;
     text-align: center;
-    background: #f3e5e6;
+    background: var(--accent-light);
     color: var(--accent-maroon);
     white-space: nowrap;
     overflow: hidden;
@@ -6218,7 +6579,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .rsm-block:hover {
-    background: #ead0d1;
+    background: var(--hover-bg);
 }
 
 /* Legend */
@@ -6263,17 +6624,6 @@ body:has(#roomScheduleModal:not(.hidden)) {
     justify-content: flex-end;
     gap: 8px;
     flex-shrink: 0;
-}
-
-/* ── Room card footer tweak: View Schedule button ─────────── */
-#panel-rooms .rc-schedule-btn {
-    text-align: left;
-    font-size: 12px;
-    color: var(--text-dark);
-}
-
-#panel-rooms .rc-schedule-btn:hover {
-    color: var(--accent-maroon);
 }
 
 /* ================================================================
@@ -6494,6 +6844,22 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-bottom: 1px solid var(--khaki-border);
 }
 
+/* Appearance / Notification Preferences / Accessibility — matches the same
+   reddish gradient header hue/weight already used on the My Account and
+   Help & FAQ info-cards (e.g. Common Questions, Contact Support). Deliberately
+   excludes the Advanced card (.sett-danger-bdr), which keeps its plain
+   danger-tinted header. */
+#sett-prefs .sett-card:not(.sett-danger-bdr)>.sett-card-head {
+    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
+}
+
+/* Auto-Approval Rules / Thresholds & Limits / Decision Log — same treatment,
+   scoped to the Borrowing Rules sub-tab only so it never touches the many
+   other .ps-card-header instances elsewhere in the app (Requests tab, etc). */
+#sett-rules .ps-card-header {
+    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
+}
+
 .sett-card-head .material-symbols-outlined {
     font-size: 18px;
     color: var(--accent-maroon);
@@ -6674,7 +7040,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .sett-reset-btn:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 .sett-reset-btn .material-symbols-outlined {
@@ -6729,7 +7095,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .acc-nav-btn:hover {
     background: var(--hover-bg);
-    color: var(--text-dark);
+    color: var(--accent-maroon);
 }
 
 .acc-nav-btn.active {
@@ -6851,8 +7217,14 @@ body:has(#roomScheduleModal:not(.hidden)) {
     flex-shrink: 0;
 }
 
-/* Edit / Save / Cancel buttons — context-aware */
-.btn-edit-acc {
+/* Edit / Save / Cancel buttons as they appear inside the fixed dark-wine
+   Profile Hero card specifically — .ov-profile-hero's background never
+   changes with the site theme, so these stay fixed light-on-dark colors.
+   Scoped to .ov-profile-hero so they no longer leak onto the many other
+   .btn-edit-acc/.btn-save-acc/.btn-cancel-acc buttons used elsewhere in
+   theme-aware (light/dark/high-contrast) modals — that leakage was why the
+   Change Password Cancel button (and others) went invisible on hover. */
+.ov-profile-hero .btn-edit-acc {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -6868,16 +7240,16 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: all 0.15s;
 }
 
-.btn-edit-acc .material-symbols-outlined {
+.ov-profile-hero .btn-edit-acc .material-symbols-outlined {
     font-size: 14px;
 }
 
-.btn-edit-acc:hover {
+.ov-profile-hero .btn-edit-acc:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.7);
 }
 
-.btn-save-acc {
+.ov-profile-hero .btn-save-acc {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -6893,15 +7265,15 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: background 0.15s;
 }
 
-.btn-save-acc .material-symbols-outlined {
+.ov-profile-hero .btn-save-acc .material-symbols-outlined {
     font-size: 14px;
 }
 
-.btn-save-acc:hover {
+.ov-profile-hero .btn-save-acc:hover {
     background: #fff;
 }
 
-.btn-cancel-acc {
+.ov-profile-hero .btn-cancel-acc {
     padding: 0.45rem 0.75rem;
     background: transparent;
     border: none;
@@ -6911,7 +7283,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
     cursor: pointer;
 }
 
-.btn-cancel-acc:hover {
+.ov-profile-hero .btn-cancel-acc:hover {
     color: #fff;
 }
 
@@ -7043,7 +7415,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .btn-inline-danger:hover {
-    background: #fdecea;
+    background: var(--hover-bg);
 }
 
 /* ── Status dot ──────────────────────────────────────────────────── */
@@ -7127,4 +7499,580 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .ov-revoke-btn {
     flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HELP CENTER OVERLAY  — hc-* classes
+   Reuses .account-layout / .account-sidebar / .account-content / .info-card
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Sidebar nav buttons (mirrors .acc-nav-btn) ──────────────── */
+.hc-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 1.2rem;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: var(--text-light);
+    font-family: 'Poppins', sans-serif;
+    text-align: left;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.hc-nav-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.hc-nav-btn:hover {
+    background: var(--hover-bg);
+    color: var(--accent-maroon);
+}
+
+.hc-nav-btn.active {
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border-left-color: var(--accent-maroon);
+    font-weight: 600;
+}
+
+/* Sidebar footer version tag */
+.hc-sidebar-footer {
+    margin-top: auto;
+    padding: 1.25rem 1.2rem 1rem;
+    border-top: 1px solid var(--khaki-border);
+    margin-top: 2rem;
+}
+
+.hc-sidebar-version {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-maroon);
+}
+
+.hc-sidebar-version .material-symbols-outlined {
+    font-size: 14px;
+}
+
+.hc-sidebar-campus {
+    font-size: 10.5px;
+    color: var(--text-light);
+    margin-top: 3px;
+}
+
+/* ── Section label (divider text) ────────────────────────────── */
+.hc-section-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-light);
+    margin: 0 0 0.85rem;
+}
+
+/* ── Welcome hero ────────────────────────────────────────────── */
+.hc-hero {
+    background: linear-gradient(135deg, var(--accent-maroon) 0%, #8a1a1a 100%);
+    border-radius: var(--radius);
+    padding: 1.8rem 2rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+    color: #fff;
+}
+
+.hc-hero-icon-wrap {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hc-hero-icon-wrap .material-symbols-outlined {
+    font-size: 32px;
+    color: #fff;
+}
+
+.hc-hero-text h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 6px;
+}
+
+.hc-hero-text p {
+    font-size: 0.86rem;
+    color: rgba(255, 255, 255, 0.78);
+    margin: 0 0 14px;
+    line-height: 1.5;
+}
+
+.hc-hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.hc-hero-tags span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 50px;
+    padding: 3px 12px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #fff;
+}
+
+.hc-hero-tags span .material-symbols-outlined {
+    font-size: 14px;
+}
+
+/* ── Quick action grid ───────────────────────────────────────── */
+.hc-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 0.5rem;
+}
+
+.hc-quick-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Poppins', sans-serif;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    box-shadow: var(--shadow);
+}
+
+.hc-quick-card:hover {
+    border-color: var(--accent-maroon);
+    box-shadow: 0 4px 16px rgba(96, 3, 2, 0.1);
+    transform: translateY(-2px);
+}
+
+.hc-qc-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hc-qc-icon .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.hc-qc-body {
+    flex: 1;
+}
+
+.hc-qc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.hc-qc-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 1px;
+}
+
+.hc-qc-arrow {
+    font-size: 18px;
+    color: var(--text-light);
+    flex-shrink: 0;
+}
+
+.hc-quick-card:hover .hc-qc-arrow {
+    color: var(--accent-maroon);
+}
+
+/* ── How it works steps ──────────────────────────────────────── */
+.hc-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.hc-step-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    position: relative;
+    box-shadow: var(--shadow);
+}
+
+.hc-step-badge {
+    position: absolute;
+    top: -10px;
+    left: 1rem;
+    background: var(--accent-maroon);
+    color: #fff;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.hc-step-icon {
+    margin-bottom: 10px;
+    margin-top: 6px;
+}
+
+.hc-step-icon .material-symbols-outlined {
+    font-size: 28px;
+    color: var(--accent-maroon);
+}
+
+.hc-step-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+}
+
+.hc-step-body {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.6;
+}
+
+/* ── Tip / note box ──────────────────────────────────────────── */
+.hc-tip-box {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: #fff8e1;
+    border: 1.5px solid #f5cba7;
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    font-size: 12.5px;
+    color: var(--text-dark);
+    line-height: 1.6;
+}
+
+.hc-tip-box>.material-symbols-outlined {
+    color: #e67e22;
+    font-size: 20px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ── FAQ accordion ───────────────────────────────────────────── */
+.hc-faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hc-faq-item {
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s;
+}
+
+.hc-faq-item[open] {
+    border-color: var(--accent-maroon);
+}
+
+.hc-faq-q {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.hc-faq-q::-webkit-details-marker {
+    display: none;
+}
+
+.hc-faq-q-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    flex: 1;
+    line-height: 1.4;
+}
+
+.hc-faq-chevron {
+    font-size: 20px;
+    color: var(--text-light);
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.hc-faq-item[open] .hc-faq-chevron {
+    transform: rotate(180deg);
+    color: var(--accent-maroon);
+}
+
+.hc-faq-item[open] .hc-faq-q-text {
+    color: var(--accent-maroon);
+}
+
+.hc-faq-a {
+    padding: 0 1.25rem 1.1rem;
+    font-size: 12.5px;
+    color: var(--text-light);
+    line-height: 1.7;
+    border-top: 1px solid var(--khaki-border);
+    padding-top: 0.9rem;
+}
+
+.hc-faq-a strong {
+    color: var(--text-dark);
+}
+
+/* Status table inside FAQ answer */
+.hc-status-table {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.hc-st-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+.hc-st-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 50px;
+    min-width: 80px;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hc-st-pill::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.hc-st-pill.pending {
+    color: #e67e22;
+    background: #fef6e4;
+    border: 1.5px solid #f5cba7;
+}
+
+.hc-st-pill.approved {
+    color: #27ae60;
+    background: #eafaf2;
+    border: 1.5px solid #a9dfbf;
+}
+
+.hc-st-pill.declined {
+    color: #c0392b;
+    background: #fdecea;
+    border: 1.5px solid #e5b8bb;
+}
+
+.hc-st-pill.cancelled {
+    color: #6b7280;
+    background: #f1f3f5;
+    border: 1.5px solid #d1d5db;
+}
+
+.hc-st-pill.returned {
+    color: #2980b9;
+    background: #eaf4fc;
+    border: 1.5px solid #aed6f1;
+}
+
+.hc-st-pill.overdue {
+    color: #c0392b;
+    background: #fdecea;
+    border: 1.5px solid #e5b8bb;
+}
+
+/* ── Guide cards grid ────────────────────────────────────────── */
+.hc-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.hc-guide-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.hc-guide-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.hc-gc-banner {
+    height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hc-gc-banner .material-symbols-outlined {
+    font-size: 36px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.hc-gc-body {
+    padding: 0.9rem 1rem;
+}
+
+.hc-gc-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 5px;
+}
+
+.hc-gc-desc {
+    font-size: 11.5px;
+    color: var(--text-light);
+    line-height: 1.55;
+    margin-bottom: 10px;
+}
+
+.hc-gc-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.hc-gc-topics span {
+    font-size: 10.5px;
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+/* ── About hero ──────────────────────────────────────────────── */
+.hc-about-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    background: var(--card-bg);
+    border: 1.5px solid var(--khaki-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.hc-about-logo {
+    width: 56px;
+    height: 56px;
+    background: var(--accent-maroon);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hc-about-logo svg {
+    width: 28px;
+    height: 28px;
+    stroke: #fff;
+}
+
+.hc-about-name {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--accent-maroon);
+}
+
+.hc-about-tagline {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin: 2px 0 6px;
+}
+
+.hc-about-ver {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+    padding: 2px 10px;
+    border-radius: 50px;
+    color: var(--text-light);
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .hc-quick-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hc-steps-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hc-guide-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .hc-hero {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 640px) {
+    .hc-guide-grid {
+        grid-template-columns: 1fr;
+    }
 }

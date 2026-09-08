@@ -1,4 +1,5 @@
 <?php
+
 /**
  * admin-rooms-functions.php
  * Room Registry — admin-side CRUD handlers for tbl_campuses, tbl_buildings, tbl_rooms.
@@ -37,10 +38,223 @@ if (empty($conn) || !($conn instanceof mysqli)) {
 
 
 // ════════════════════════════════════════════════════════════════
+// AJAX helpers — Rooms Registry
+// Added so add/update/archive can respond with fresh table HTML
+// instead of a full-page redirect, without duplicating the
+// buildings/rooms queries or the row-rendering markup anywhere.
+// The non-AJAX behavior below (header("Location: ...")) is
+// completely unchanged and still runs whenever these aren't used —
+// this is purely additive.
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Re-fetch the buildings + active-rooms lists fresh from the DB.
+ * Same two queries the page normally runs on load; pulled out here
+ * so an AJAX handler can re-run them right after a mutation without
+ * a page reload.
+ */
+function ps_load_rooms_and_buildings(mysqli $conn): array
+{
+    $buildings_result = $conn->query(
+        "SELECT b.building_id, b.campus_id, b.building_key, b.name,
+                b.wing, b.floor_count, b.icon, b.description, b.sort_order,
+                c.campus_name
+         FROM tbl_buildings b
+         JOIN tbl_campuses c ON c.campus_id = b.campus_id
+         ORDER BY b.campus_id ASC, b.sort_order ASC, b.building_id ASC"
+    );
+    $buildings = [];
+    if ($buildings_result) {
+        while ($row = $buildings_result->fetch_assoc()) {
+            $buildings[$row['building_id']] = $row;
+        }
+    }
+
+    $rooms_result = $conn->query(
+        "SELECT r.room_id, r.building_id, r.room_name, r.floor_number,
+                r.floor_label, r.seating_capacity, r.amenities, r.status,
+                r.sort_order, r.is_archived,
+                b.name AS building_name, b.campus_id,
+                c.campus_name
+         FROM tbl_rooms r
+         JOIN tbl_buildings b ON b.building_id = r.building_id
+         JOIN tbl_campuses  c ON c.campus_id  = b.campus_id
+         WHERE r.is_archived = 0
+         ORDER BY b.campus_id ASC, r.building_id ASC,
+                  r.floor_number ASC, r.sort_order ASC, r.room_id ASC"
+    );
+    $rooms = [];
+    if ($rooms_result) {
+        while ($row = $rooms_result->fetch_assoc()) {
+            $rooms[] = $row;
+        }
+    }
+
+    return [$buildings, $rooms];
+}
+
+/**
+ * Group $rooms_list by building → floor and assign each building a
+ * display accent color. Identical logic to what admin-dashboard.php
+ * used to do inline — kept here so both the normal page render and
+ * the AJAX responses compute it the exact same way.
+ */
+function ps_prepare_rooms_registry_view(array $rooms_buildings, array $rooms_list): array
+{
+    $rooms_grouped = [];
+    foreach ($rooms_list as $r) {
+        $bId  = $r['building_id'];
+        $fNum = $r['floor_number'];
+        if (!isset($rooms_grouped[$bId])) $rooms_grouped[$bId] = [];
+        if (!isset($rooms_grouped[$bId][$fNum])) {
+            $rooms_grouped[$bId][$fNum] = [
+                'label' => !empty($r['floor_label']) ? $r['floor_label'] : ($fNum . 'F'),
+                'rooms' => [],
+            ];
+        }
+        $rooms_grouped[$bId][$fNum]['rooms'][] = $r;
+    }
+    foreach ($rooms_grouped as $bId => $floorsTmp) {
+        ksort($rooms_grouped[$bId]);
+    }
+
+    $floors_by_building_js = [];
+    foreach ($rooms_buildings as $bid => $b) {
+        $floors_by_building_js[$bid] = [];
+        foreach (($rooms_grouped[$bid] ?? []) as $fNum => $fData) {
+            $floors_by_building_js[$bid][] = ['num' => (int)$fNum, 'label' => $fData['label']];
+        }
+    }
+
+    $building_palette = ['var(--building-color-1)', 'var(--building-color-2)', 'var(--building-color-3)', 'var(--building-color-4)'];
+    $building_accent = [];
+    $bi = 0;
+    foreach ($rooms_buildings as $bid => $b) {
+        $building_accent[$bid] = $building_palette[$bi % count($building_palette)];
+        $bi++;
+    }
+
+    return [
+        'grouped'            => $rooms_grouped,
+        'floors_by_building' => $floors_by_building_js,
+        'first_building_id'  => array_key_first($rooms_buildings),
+        'accent'             => $building_accent,
+    ];
+}
+
+/**
+ * Render the #roomsRegistryTable <tbody> rows to a string — the single
+ * source of truth for what a room row looks like. Called from exactly
+ * two places: admin-dashboard.php echoes this directly on a normal page
+ * load, and ps_send_rooms_ajax_response() below puts the same return
+ * value into a JSON response after add/update/archive. Keeping it as
+ * one function (rather than duplicating this markup at both call
+ * sites) is the whole reason it's reusable — either page can call it
+ * and get byte-identical rows.
+ */
+function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, array $building_accent): string
+{
+    ob_start();
+    foreach ($rooms_buildings as $bid => $b):
+        $floors = $rooms_grouped[$bid] ?? [];
+        $isFirstFloorOfBuilding = true;
+        foreach ($floors as $fNum => $fData): ?>
+            <tr class="pr-floor-divider<?php echo $isFirstFloorOfBuilding ? ' pr-floor-divider-first' : ''; ?>" data-building-id="<?php echo (int)$bid; ?>" data-floor-num="<?php echo (int)$fNum; ?>">
+                <td colspan="4" style="--b-accent: <?php echo $building_accent[$bid]; ?>;">
+                    <span class="material-symbols-outlined pr-building-icon"><?php echo htmlspecialchars($b['icon'] ?: 'domain'); ?></span>
+                    <?php echo htmlspecialchars($b['name'] . ' — ' . $fData['label']); ?>
+                    <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
+                </td>
+            </tr>
+            <?php $isFirstFloorOfBuilding = false; ?>
+            <?php foreach ($fData['rooms'] as $room):
+                $rc_status_cls = 'avail';
+                if ($room['status'] === 'Maintenance')  $rc_status_cls = 'maint';
+                if ($room['status'] === 'Not Bookable') $rc_status_cls = 'nobk';
+                $fl = $fData['label'];
+            ?>
+                <tr class="pr-room-row pr-row-<?php echo $rc_status_cls; ?>"
+                    data-room-id="<?php echo (int)$room['room_id']; ?>"
+                    data-room-name="<?php echo htmlspecialchars($room['room_name'], ENT_QUOTES); ?>"
+                    data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
+                    data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
+                    data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
+                    data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
+                    data-room-building-id="<?php echo (int)$room['building_id']; ?>"
+                    data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
+                    data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
+                    data-room-status="<?php echo htmlspecialchars($room['status'], ENT_QUOTES); ?>"
+                    data-room-sort="<?php echo (int)$room['sort_order']; ?>"
+                    data-room-amenities="<?php
+                                            $am_raw = isset($room['amenities']) && $room['amenities'] ? $room['amenities'] : '[]';
+                                            $am_arr = json_decode($am_raw, true);
+                                            echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
+                                            ?>">
+                    <td class="td-fw"><?php echo htmlspecialchars($room['room_name']); ?></td>
+                    <td class="td-sm"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
+                    <td><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
+                    <td class="pr-row-actions">
+                        <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
+                            <span class="material-symbols-outlined">calendar_month</span>
+                        </button>
+                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room">
+                            <span class="material-symbols-outlined">edit</span>
+                        </button>
+                        <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
+                            class="pr-icon-btn danger"
+                            title="Archive room">
+                            <span class="material-symbols-outlined">archive</span>
+                        </a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+    <?php endforeach;
+    endforeach; ?>
+    <tr class="pr-no-match-row" style="display:none;">
+        <td colspan="4" style="text-align:center;padding:2.5rem;color:var(--text-light);">
+            No rooms match your filters.
+        </td>
+    </tr>
+<?php
+    return ob_get_clean();
+}
+
+/**
+ * Common AJAX success response for add/update/archive: re-fetch the
+ * current room data, re-render the table body, and send it back as
+ * JSON so the client can swap it in without a page reload.
+ * Always exits — never returns.
+ */
+function ps_send_rooms_ajax_response(mysqli $conn, string $message): void
+{
+    [$buildings, $rooms] = ps_load_rooms_and_buildings($conn);
+    $rv   = ps_prepare_rooms_registry_view($buildings, $rooms);
+    $html = ps_render_rooms_tbody($buildings, $rv['grouped'], $rv['accent']);
+
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status'             => 'success',
+        'message'            => $message,
+        'html'               => $html,
+        'floors_by_building' => $rv['floors_by_building'],
+    ]);
+    exit();
+}
+
+function ps_send_rooms_ajax_error(string $message): void
+{
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => $message]);
+    exit();
+}
+
+
+// ════════════════════════════════════════════════════════════════
 // ADD ROOM
 // ════════════════════════════════════════════════════════════════
 if (isset($_POST['add_room'])) {
     csrf_verify();
+    $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     $building_id      = intval($_POST['building_id'] ?? 0);
     $room_name        = trim($_POST['room_name'] ?? '');
@@ -67,6 +281,7 @@ if (isset($_POST['add_room'])) {
 
     if ($building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] add_room: missing required fields');
+        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a room name.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -80,17 +295,25 @@ if (isset($_POST['add_room'])) {
     );
     $stmt->bind_param(
         'isisisis',
-        $building_id, $room_name, $floor_number, $floor_label,
-        $seating_capacity, $amenities_json, $status, $sort_order
+        $building_id,
+        $room_name,
+        $floor_number,
+        $floor_label,
+        $seating_capacity,
+        $amenities_json,
+        $status,
+        $sort_order
     );
 
     if ($stmt->execute()) {
         $stmt->close();
+        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room added.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_added=1");
     } else {
         error_log('[PUPSync] add_room DB insert failed: ' . $conn->error);
         $stmt->close();
+        if ($is_ajax) ps_send_rooms_ajax_error('Could not save the room. Please try again.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
     }
@@ -103,6 +326,7 @@ if (isset($_POST['add_room'])) {
 // ════════════════════════════════════════════════════════════════
 if (isset($_POST['update_room'])) {
     csrf_verify();
+    $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     $room_id          = intval($_POST['room_id'] ?? 0);
     $building_id      = intval($_POST['building_id'] ?? 0);
@@ -127,6 +351,7 @@ if (isset($_POST['update_room'])) {
 
     if ($room_id <= 0 || $building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] update_room: missing required fields');
+        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a room name.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -140,18 +365,26 @@ if (isset($_POST['update_room'])) {
     );
     $stmt->bind_param(
         'isisissii',
-        $building_id, $room_name, $floor_number, $floor_label,
-        $seating_capacity, $amenities_json, $status, $sort_order,
+        $building_id,
+        $room_name,
+        $floor_number,
+        $floor_label,
+        $seating_capacity,
+        $amenities_json,
+        $status,
+        $sort_order,
         $room_id
     );
 
     if ($stmt->execute()) {
         $stmt->close();
+        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room updated.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_updated=1");
     } else {
         error_log('[PUPSync] update_room DB update failed: ' . $conn->error);
         $stmt->close();
+        if ($is_ajax) ps_send_rooms_ajax_error('Could not save the changes. Please try again.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
     }
@@ -168,6 +401,7 @@ if (isset($_GET['archive_room'])) {
     $stmt->bind_param('i', $room_id);
     $stmt->execute();
     $stmt->close();
+    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Room archived.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_archived=1");
     exit();
@@ -309,7 +543,8 @@ foreach ($rooms_list as $r) {
 }
 
 // Archived rooms (for the Archived sub-panel)
-$rooms_archived_result = $conn->query(    "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label,
+$rooms_archived_result = $conn->query(
+    "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label,
             r.status, b.name AS building_name, c.campus_name
      FROM tbl_rooms r
      JOIN tbl_buildings b ON b.building_id = r.building_id

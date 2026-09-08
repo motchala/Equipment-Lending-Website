@@ -53,30 +53,123 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
         echo json_encode(['status' => 'error', 'message' => 'New password must be at least 4 characters.']);
         exit();
     }
+    // tbl_accounts.password is varchar(16) — enforce so the UPDATE below
+    // never silently truncates the new password.
+    if (strlen($new) > 16) {
+        echo json_encode(['status' => 'error', 'message' => 'New password must be 16 characters or fewer.']);
+        exit();
+    }
+    if (empty($email)) {
+        echo json_encode(['status' => 'error', 'message' => 'Session expired. Please log in again.']);
+        exit();
+    }
 
-    // 2/3. Verify and Update in DB
-    // Special-case the local development shortcut admin stored in `tbl_accounts`.
-    if ($email === 'main@admin.edu') {
-        $stmt_acc = $conn->prepare("SELECT password FROM tbl_accounts WHERE email = ? LIMIT 1");
-        $stmt_acc->bind_param("s", $email);
-        $stmt_acc->execute();
-        $res_acc = $stmt_acc->get_result();
-        $acc_row = $res_acc->fetch_assoc();
-        $stored_acc_pw = $acc_row['password'] ?? null;
+    // 2/3. Verify current password and update it in tbl_accounts — the same
+    // table landing-page.php authenticates admin logins against. Looked up
+    // by the logged-in admin's own session email rather than a hardcoded
+    // dev account, so this works for whatever email is on file.
+    $stmt_acc = $conn->prepare("SELECT password FROM tbl_accounts WHERE email = ? LIMIT 1");
+    $stmt_acc->bind_param("s", $email);
+    $stmt_acc->execute();
+    $res_acc = $stmt_acc->get_result();
+    $acc_row = $res_acc->fetch_assoc();
+    $stmt_acc->close();
 
-        // Accept either the stored tbl_accounts password or the known dev shortcut 'admin123'
-        if ($current === $stored_acc_pw || $current === 'admin123') {
-            // Update the password in tbl_accounts (legacy table stores plain password)
-            $update_acc = $conn->prepare("UPDATE tbl_accounts SET password = ? WHERE email = ?");
-            $update_acc->bind_param("ss", $new, $email);
-            if ($update_acc->execute()) {
-                echo json_encode(['status' => 'success', 'message' => 'Password updated successfully.']);
-            } else {
-                echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
-            }
-        } else {
-            echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
+    if (!$acc_row) {
+        echo json_encode(['status' => 'error', 'message' => 'Account not found. Please log in again.']);
+        exit();
+    }
+
+    if ($current !== $acc_row['password']) {
+        echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
+        exit();
+    }
+
+    // Self-healing schema (same pattern already used for last_login in
+    // landing-page.php): add the tracking column the first time it's needed.
+    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_password_change'");
+    if ($col_check && mysqli_num_rows($col_check) === 0) {
+        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN last_password_change DATETIME NULL");
+    }
+
+    $now_dt     = date('Y-m-d H:i:s');
+    $update_acc = $conn->prepare("UPDATE tbl_accounts SET password = ?, last_password_change = ? WHERE email = ?");
+    $update_acc->bind_param("sss", $new, $now_dt, $email);
+    if ($update_acc->execute()) {
+        $_SESSION['admin_last_pw_change'] = $now_dt;
+        echo json_encode([
+            'status'          => 'success',
+            'message'         => 'Password updated successfully.',
+            'last_pw_change'  => $now_dt,
+        ]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Database error. Please try again.']);
+    }
+    exit();
+}
+
+// ================= AJAX UPDATE PROFILE (Settings → My Account) =================
+if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'update_profile') {
+    header('Content-Type: application/json');
+    csrf_verify();
+
+    $new_name  = trim($_POST['admin_name'] ?? '');
+    $new_email = trim($_POST['admin_email'] ?? '');
+    $old_email = $_SESSION['admin_email'] ?? '';
+
+    if ($new_name === '') {
+        echo json_encode(['status' => 'error', 'message' => 'Display name cannot be empty.']);
+        exit();
+    }
+    if (mb_strlen($new_name) > 100) {
+        echo json_encode(['status' => 'error', 'message' => 'Display name is too long (max 100 characters).']);
+        exit();
+    }
+    // Same allowed-character rule already used for faculty names in update-profile.php.
+    if (!preg_match("/^[a-zA-ZÀ-ÖØ-öø-ÿ\s.\-']+$/u", $new_name)) {
+        echo json_encode(['status' => 'error', 'message' => 'Display name contains invalid characters.']);
+        exit();
+    }
+    if ($new_email === '' || !filter_var($new_email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(['status' => 'error', 'message' => 'Please enter a valid email address.']);
+        exit();
+    }
+    if (empty($old_email)) {
+        echo json_encode(['status' => 'error', 'message' => 'Session expired. Please log in again.']);
+        exit();
+    }
+
+    // tbl_accounts.email carries a UNIQUE key — check for collisions ourselves
+    // first so we can return a friendly message instead of a raw DB error.
+    if (strcasecmp($new_email, $old_email) !== 0) {
+        $stmt_dup = $conn->prepare("SELECT 1 FROM tbl_accounts WHERE email = ? LIMIT 1");
+        $stmt_dup->bind_param("s", $new_email);
+        $stmt_dup->execute();
+        $dup_found = $stmt_dup->get_result()->num_rows > 0;
+        $stmt_dup->close();
+        if ($dup_found) {
+            echo json_encode(['status' => 'error', 'message' => 'That email is already in use.']);
+            exit();
         }
+    }
+
+    $stmt_upd = $conn->prepare("UPDATE tbl_accounts SET fullName = ?, email = ? WHERE email = ?");
+    $stmt_upd->bind_param("sss", $new_name, $new_email, $old_email);
+
+    if ($stmt_upd->execute()) {
+        // Keep the session in sync so every part of the page (header, dropdown,
+        // greeting, and subsequent requests like change-password) sees the
+        // update immediately without requiring a fresh login.
+        $_SESSION['admin_name']  = $new_name;
+        $_SESSION['admin_email'] = $new_email;
+        echo json_encode([
+            'status'      => 'success',
+            'message'     => 'Profile updated successfully.',
+            'admin_name'  => $new_name,
+            'admin_email' => $new_email,
+        ]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Could not save changes. Please try again.']);
     }
     exit();
 }
@@ -111,26 +204,33 @@ mysqli_query($conn, "
 
 if (isset($_POST['add_item'])) {
     csrf_verify();
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+
     // Sanitize and format basic inputs
     $name = trim($_POST['item_name']);
     $category = $_POST['category'];
     $qty = (int) $_POST['quantity'];
+    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $description = trim($_POST['description'] ?? '');
+    if ($description === '') $description = null;
 
     // Default image path
     $image_path = "uploads/default.png";
 
     // Handle image upload
     if (!empty($_FILES['item_image']['name'])) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $allowed_types = ['image/jpeg', 'image/png'];
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
-            die("Only JPG, PNG, and WEBP images are allowed.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
-            die("Image too large. Maximum size is 2MB.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
+            exit();
         }
 
         $image_name = time() . "_" . preg_replace("/[^a-zA-Z0-9.]/", "_", $_FILES['item_image']['name']);
@@ -141,17 +241,17 @@ if (isset($_POST['add_item'])) {
         }
     }
 
-    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssis", $name, $category, $qty, $image_path);
+    $stmt = $conn->prepare("INSERT INTO tbl_inventory (item_name, category, quantity, image_path, `condition`, description) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssisss", $name, $category, $qty, $image_path, $condition, $description);
 
     if ($stmt->execute()) {
         $stmt->close();
-        $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
         error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
-        die("Error saving to database. Please try again later.");
+        header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
+        exit();
     }
 }
 
@@ -160,27 +260,32 @@ if (isset($_POST['add_item'])) {
 
 if (isset($_POST['update_item'])) {
     csrf_verify();
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 
     $item_id = intval($_POST['item_id']);
     $name = $_POST['item_name'];
     $category = $_POST['category'];
     $qty = intval($_POST['quantity']);
+    $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
+    $description = trim($_POST['description'] ?? '');
 
     $image_path = $_POST['old_image'];
 
     // Upload new image if provided
     if (!empty($_FILES['item_image']['name'])) {
 
-        $allowed_types = ['image/jpeg', 'image/png', 'image/webp'];
+        $allowed_types = ['image/jpeg', 'image/png'];
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
-            die("Only JPG, PNG, and WEBP images are allowed.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
+            exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
-            die("Image too large. Maximum size is 2MB.");
+            header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
+            exit();
         }
 
         $image_name = time() . "_" . $_FILES['item_image']['name'];
@@ -188,18 +293,32 @@ if (isset($_POST['update_item'])) {
 
         move_uploaded_file($_FILES['item_image']['tmp_name'], $target);
         $image_path = "uploads/" . $image_name;
+    } elseif (($_POST['remove_image'] ?? '0') === '1') {
+        // Explicit "Remove image" click — revert to the default placeholder.
+        // Unlike archiving (which must never touch the file), this really is
+        // a deliberate request to get rid of this specific image, so it's
+        // safe — and expected — to also delete the old upload from disk.
+        if ($image_path !== 'uploads/default.png') {
+            $old_file = __DIR__ . '/../../' . $image_path;
+            if (is_file($old_file)) {
+                @unlink($old_file);
+            }
+        }
+        $image_path = 'uploads/default.png';
     }
 
+    $description_escaped = mysqli_real_escape_string($conn, $description);
     $sql = "UPDATE tbl_inventory
             SET item_name='$name',
                 category='$category',
                 quantity=$qty,
-                image_path='$image_path'
+                image_path='$image_path',
+                `condition`='$condition',
+                description=" . ($description_escaped === '' ? 'NULL' : "'$description_escaped'") . "
             WHERE item_id=$item_id";
 
     mysqli_query($conn, $sql);
 
-    $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();
 }
@@ -210,13 +329,9 @@ if (isset($_POST['update_item'])) {
 if (isset($_GET['delete_item'])) {
     $id = intval($_GET['delete_item']);
 
-    $res = mysqli_query($conn, "SELECT image_path FROM tbl_inventory WHERE item_id=$id");
-    $row = mysqli_fetch_assoc($res);
-
-    if ($row && $row['image_path'] !== 'uploads/default.png') {
-        unlink($row['image_path']);
-    }
-
+    // NOTE: this only archives the item (is_archived = 1) — it does NOT
+    // delete the underlying image file. Archiving is reversible via
+    // "Restore", so the uploaded photo must stay intact for that to work.
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);
@@ -258,7 +373,10 @@ if (isset($_GET['force_delete'])) {
 
 // ================= FETCH ALL REQUESTS =================
 
-$waiting_sql = "SELECT * FROM tbl_requests WHERE status='Waiting'";
+$waiting_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
+                FROM tbl_requests
+                LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
+                WHERE tbl_requests.status='Waiting'";
 
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";
@@ -278,7 +396,10 @@ if (!empty($_GET['waiting_search'])) {
 }
 
 
-$approved_sql = "SELECT * FROM tbl_requests WHERE status IN ('Approved','Overdue')";
+$approved_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
+                  FROM tbl_requests
+                  LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
+                  WHERE tbl_requests.status IN ('Approved','Overdue')";
 if (!empty($_GET['approved_search'])) {
     $search = "%" . $_GET['approved_search'] . "%";
     $approved_sql .= " AND (
@@ -391,18 +512,37 @@ if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 
 
 $admin_email = $_SESSION['admin_email'] ?? '';
 
-// Ensure we have the admin's previous last_login available in session.
-// If not present (e.g., first login after this feature was added), try to read it from tbl_accounts.
-if (empty($_SESSION['admin_last_login']) && $admin_email === 'main@admin.edu') {
-    $col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
-    if ($col_check && mysqli_num_rows($col_check) > 0) {
-        $stmt = $conn->prepare("SELECT last_login FROM tbl_accounts WHERE email = ? LIMIT 1");
+// Ensure we have the admin's previous last_login, and their last
+// password-change date, available for display. If not already cached in
+// session (e.g., first load after this feature was added, or right after
+// a fresh login), read them from tbl_accounts. Generalized to work for
+// whichever email is on file rather than a single hardcoded account.
+$admin_last_pw_change = $_SESSION['admin_last_pw_change'] ?? null;
+if (!empty($admin_email) && (empty($_SESSION['admin_last_login']) || $admin_last_pw_change === null)) {
+    $col_login = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_login'");
+    $has_login_col = $col_login && mysqli_num_rows($col_login) > 0;
+
+    $col_pw = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'last_password_change'");
+    $has_pw_col = $col_pw && mysqli_num_rows($col_pw) > 0;
+
+    $select_cols = [];
+    if ($has_login_col) $select_cols[] = 'last_login';
+    if ($has_pw_col) $select_cols[] = 'last_password_change';
+
+    if (!empty($select_cols)) {
+        $stmt = $conn->prepare("SELECT " . implode(', ', $select_cols) . " FROM tbl_accounts WHERE email = ? LIMIT 1");
         if ($stmt) {
             $stmt->bind_param("s", $admin_email);
             $stmt->execute();
             $res = $stmt->get_result();
             if ($res && $row = $res->fetch_assoc()) {
-                $_SESSION['admin_last_login'] = $row['last_login'] ?? null;
+                if ($has_login_col && empty($_SESSION['admin_last_login'])) {
+                    $_SESSION['admin_last_login'] = $row['last_login'] ?? null;
+                }
+                if ($has_pw_col && $admin_last_pw_change === null) {
+                    $admin_last_pw_change = $row['last_password_change'] ?? null;
+                    $_SESSION['admin_last_pw_change'] = $admin_last_pw_change;
+                }
             }
             $stmt->close();
         }
