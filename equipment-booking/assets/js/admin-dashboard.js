@@ -104,24 +104,11 @@
         const verr = document.getElementById('verboseErrorsToggle');
         if (verr) { const v = LS.get('verboseErrors'); if (v !== null) verr.checked = (v === 'true'); }
 
-        // Notification read state
-        const readArr = LS.getJ('notifRead');
-        if (readArr && readArr.length) {
-            let unread = 0;
-            document.querySelectorAll('.notif-item').forEach((item, i) => {
-                if (readArr.includes(i)) {
-                    item.classList.remove('unread');
-                    const dot = item.querySelector('.unread-dot');
-                    if (dot) dot.style.display = 'none';
-                } else if (item.classList.contains('unread')) unread++;
-            });
-            const uc = document.getElementById('unreadCount');
-            if (uc) uc.textContent = unread + ' unread';
-            document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
-                if (unread === 0) b.style.display = 'none';
-                else { b.style.display = ''; b.textContent = unread; }
-            });
-        }
+        // Notification read/unread state is no longer a client-side guess —
+        // it's rendered straight from tbl_notif_state on page load (see
+        // notif-functions.php) and kept in sync via the notif-*.php AJAX
+        // endpoints from here on. See the "Notifications (server-backed)"
+        // section further down for markRead/delete/poll wiring.
     }
 
     /* ── Tab switcher ────────────────────────────────────────── */
@@ -243,17 +230,74 @@
         if (activeBtn) activeBtn.classList.add('active');
     }
 
+    /* switchSettTab (legacy Settings-overlay tab helper) removed —
+       the overlay it served no longer exists; Settings navigation
+       now goes through switchSettMainTab(). */
+
+    /* ════════════════════════════════════════════════════════════
+       NOTIFICATIONS (server-backed)
+       The feed itself (which notifications exist) is computed live
+       server-side from tbl_requests / tbl_room_issues / tbl_inventory
+       — see notif-functions.php. This section only handles: marking
+       read/deleted (persisted via equipment-booking/api/notif-*.php),
+       filtering the visible list, navigating to the right screen when
+       a notification is opened, and short-polling for new ones.
+    ════════════════════════════════════════════════════════════════ */
     function _getUnreadCount() {
-        return document.querySelectorAll('.notif-item.unread').length;
+        return document.querySelectorAll('#notifList .notif-item.unread').length;
     }
 
     function _updateBadges(count) {
         const uc = document.getElementById('unreadCount');
         if (uc) uc.textContent = count + ' unread';
+        const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
+        if (markAllBtn) markAllBtn.disabled = (count === 0);
         document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
-            if (count === 0) b.style.display = 'none';
-            else { b.style.display = ''; b.textContent = count; }
+            const prev = parseInt(b.textContent, 10) || 0;
+            if (count === 0) {
+                b.style.display = 'none';
+            } else {
+                b.style.display = '';
+                b.textContent = count;
+                if (count > prev) {
+                    b.classList.remove('notif-badge-pulse');
+                    void b.offsetWidth; // restart animation
+                    b.classList.add('notif-badge-pulse');
+                }
+            }
         });
+    }
+
+    function _notifPost(url, key) {
+        const body = new URLSearchParams();
+        if (key) body.set('key', key);
+        body.set('csrf_token', getCsrfToken());
+        return fetch(url, { method: 'POST', body })
+            .then(r => r.json())
+            .catch(() => null);
+    }
+
+    /* Cheap, local recount of the chip badges (no network round-trip) —
+       called after any instant local action (read/delete/mark-all-read)
+       so the numbers never lag behind what's actually in the list. Chip
+       add/remove (a category appearing/disappearing entirely) is handled
+       by the next poll via _syncFilterChips. */
+    function _updateChipCounts() {
+        const bar = document.getElementById('notifFilterChips');
+        if (!bar) return;
+        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
+        let unread = 0;
+        document.querySelectorAll('#notifList .notif-item[data-notif-key]').forEach(item => {
+            if (counts.hasOwnProperty(item.dataset.cat)) counts[item.dataset.cat]++;
+            if (item.classList.contains('unread')) unread++;
+        });
+        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(counts).forEach(cat => {
+            const chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
+            if (chip) chip.innerHTML = _esc(labels[cat]) + (counts[cat] > 0 ? ' <span class="notif-chip-count">' + counts[cat] + '</span>' : '');
+        });
+        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
+        if (unreadChip) unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
     }
 
     function _markCardRead(card) {
@@ -262,16 +306,116 @@
         const dot = card.querySelector('.unread-dot');
         if (dot) dot.style.display = 'none';
         _updateBadges(_getUnreadCount());
+        _updateChipCounts();
+        const key = card.dataset.notifKey;
+        if (key) _notifPost('equipment-booking/api/notif-mark-read.php', key);
+    }
+
+    function _deleteCard(card) {
+        const key = card.dataset.notifKey;
+        const wasUnread = card.classList.contains('unread');
+        card.classList.add('notif-removing');
+        setTimeout(() => {
+            const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
+                ? card.previousElementSibling : null;
+            card.remove();
+            // If that was the last card in its group, drop the now-empty group label too.
+            if (group) {
+                const next = group.nextElementSibling;
+                if (!next || !next.classList.contains('notif-item')) group.remove();
+            }
+            if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+            _updateChipCounts();
+        }, 220);
+        if (wasUnread) _updateBadges(Math.max(0, _getUnreadCount() - 1));
+        if (key) _notifPost('equipment-booking/api/notif-delete.php', key);
+        showToast('Notification deleted.');
+    }
+
+    function _showEmptyState() {
+        const list = document.getElementById('notifList');
+        if (!list || document.getElementById('notifEmptyState')) return;
+        const div = document.createElement('div');
+        div.className = 'ps-empty-state notif-empty-state';
+        div.id = 'notifEmptyState';
+        div.innerHTML = '<span class="material-symbols-outlined">notifications_off</span><p>You\'re all caught up. No notifications right now.</p>';
+        list.appendChild(div);
+    }
+
+    /* ── Navigate to the screen a notification is about ─────────
+       Different categories go different places on purpose:
+         overdue  → Requests tab, Overdue filter, flash the row
+         request  → Requests tab, Waiting filter, opens the exact
+                     request's detail modal (same one the table uses)
+         room     → Rooms tab, Issues sub-tab, opens the exact
+                     issue's review modal
+         system   → Inventory tab, scrolls to + flashes that item  */
+    function _notifGoto(card) {
+        const tab = card.dataset.linkTab;
+        if (!tab) return;
+        _markCardRead(card);
+        psCloseModal('notifOverlay');
+
+        if (tab === 'requests') {
+            _switchTabDOM('requests');
+            const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + card.dataset.linkChip + '"]');
+            if (chip) chip.click();
+
+            const reqId = card.dataset.linkRequestId;
+            if (!reqId) return;
+            setTimeout(() => {
+                const row = document.querySelector('.ps-req-row[data-id="' + reqId + '"]');
+                if (!row) return;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('notif-target-flash');
+                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                // Waiting-table rows can open the real detail modal directly —
+                // reuse the exact trigger the table itself uses.
+                const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
+                if (trigger) setTimeout(() => trigger.click(), 280);
+            }, 120);
+        } else if (tab === 'rooms') {
+            _switchTabDOM('rooms');
+            if (card.dataset.linkSub) switchRoomsTab(card.dataset.linkSub);
+
+            const issueId = card.dataset.linkIssueId;
+            if (!issueId) return;
+            setTimeout(() => {
+                const reviewBtn = document.querySelector('[data-action="open-issue-review"][data-issue-id="' + issueId + '"]');
+                if (reviewBtn) {
+                    reviewBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const row = reviewBtn.closest('tr');
+                    if (row) {
+                        row.classList.add('notif-target-flash');
+                        setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                    }
+                    setTimeout(() => reviewBtn.click(), 280);
+                }
+            }, 120);
+        } else if (tab === 'inventory') {
+            _switchTabDOM('inventory');
+            const itemId = card.dataset.linkItemId;
+            if (!itemId) return;
+            setTimeout(() => {
+                const row = document.querySelector('.inv-row-item[data-item-id="' + itemId + '"]');
+                if (!row) return;
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.classList.add('notif-target-flash');
+                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+            }, 120);
+        }
     }
 
     function initNotifCards() {
         document.querySelectorAll('.notif-card').forEach(card => {
+            if (card.dataset.notifWired) return;
+            card.dataset.notifWired = '1';
+
             const mainRow = card.querySelector('.notif-card-main');
             if (mainRow) {
                 mainRow.addEventListener('click', () => {
                     const isExpanded = card.classList.contains('expanded');
-                    // Collapse all others
-                    document.querySelectorAll('.notif-card.expanded').forEach(c => c.classList.remove('expanded'));
+                    document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
                     if (!isExpanded) {
                         card.classList.add('expanded');
                         _markCardRead(card);
@@ -281,47 +425,212 @@
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); mainRow.click(); }
                 });
             }
-            const dismissBtn = card.querySelector('[data-notif-dismiss]');
-            if (dismissBtn) {
-                dismissBtn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    _markCardRead(card);
-                    card.classList.remove('expanded');
-                    showToast('Notification dismissed.');
-                });
+            const gotoBtn = card.querySelector('[data-notif-goto]');
+            if (gotoBtn) {
+                gotoBtn.addEventListener('click', e => { e.stopPropagation(); _notifGoto(card); });
+            }
+            const deleteBtn = card.querySelector('[data-notif-delete]');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', e => { e.stopPropagation(); _deleteCard(card); });
             }
         });
     }
 
-    /* switchSettTab (legacy Settings-overlay tab helper) removed —
-       the overlay it served no longer exists; Settings navigation
-       now goes through switchSettMainTab(). */
-
-    /* ── Notifications ───────────────────────────────────────── */
     function filterNotifs(cat) {
         document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(t => t.classList.remove('active'));
         const btn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="' + cat + '"]');
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('.notif-item').forEach(item => {
-            if (cat === 'all') item.style.display = '';
-            else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
-            else item.style.display = item.dataset.cat === cat ? '' : 'none';
+        else {
+            // The active filter's chip vanished (its category emptied out
+            // since it was picked) — fall back to "All" rather than showing
+            // a stuck, unlabeled filter.
+            cat = 'all';
+            const allBtn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="all"]');
+            if (allBtn) allBtn.classList.add('active');
+        }
+
+        let anyCardVisible = false;
+        document.querySelectorAll('#notifList .notif-item').forEach(item => {
+            let show;
+            if (cat === 'all') show = true;
+            else if (cat === 'unread') show = item.classList.contains('unread');
+            else show = item.dataset.cat === cat;
+            item.style.display = show ? '' : 'none';
+            if (show) anyCardVisible = true;
         });
+        document.querySelectorAll('#notifList .notif-group-label').forEach(label => {
+            let anyVisible = false;
+            let sib = label.nextElementSibling;
+            while (sib && sib.classList.contains('notif-item')) {
+                if (sib.style.display !== 'none') anyVisible = true;
+                sib = sib.nextElementSibling;
+            }
+            label.style.display = anyVisible ? '' : 'none';
+        });
+
+        const filterEmpty = document.getElementById('notifFilterEmptyState');
+        const hasAnyCardAtAll = !!document.querySelector('#notifList .notif-item');
+        if (filterEmpty) filterEmpty.style.display = (hasAnyCardAtAll && !anyCardVisible) ? '' : 'none';
+    }
+
+    /* Keep the filter chip row honest against live data: add a chip for
+       a category that just got its first notification, refresh the
+       counts on every chip, and drop a chip whose category emptied out
+       (unless it's the one currently active — filterNotifs() handles
+       falling back to "All" for that case). */
+    function _syncFilterChips(notifications) {
+        const bar = document.getElementById('notifFilterChips');
+        if (!bar) return;
+        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
+        let unread = 0;
+        notifications.forEach(n => {
+            if (counts.hasOwnProperty(n.cat)) counts[n.cat]++;
+            if (!n.is_read) unread++;
+        });
+
+        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(counts).forEach(cat => {
+            let chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
+            if (counts[cat] > 0) {
+                if (!chip) {
+                    chip = document.createElement('button');
+                    chip.className = 'rq-filter-chip';
+                    chip.dataset.notifFilter = cat;
+                    chip.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
+                    bar.appendChild(chip);
+                }
+                chip.innerHTML = _esc(labels[cat]) + ' <span class="notif-chip-count">' + counts[cat] + '</span>';
+            } else if (chip && !chip.classList.contains('active')) {
+                chip.remove();
+            }
+        });
+
+        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
+        if (unreadChip) {
+            unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
+        }
     }
 
     function markAllRead() {
-        const readArr = [];
-        document.querySelectorAll('.notif-item').forEach((item, i) => {
+        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
             item.classList.remove('unread');
             const dot = item.querySelector('.unread-dot');
             if (dot) dot.style.display = 'none';
-            readArr.push(i);
         });
-        const uc = document.getElementById('unreadCount');
-        if (uc) uc.textContent = '0 unread';
-        document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => b.style.display = 'none');
-        LS.setJ('notifRead', readArr);
+        _updateBadges(0);
+        _updateChipCounts();
+        _notifPost('equipment-booking/api/notif-mark-all-read.php');
         showToast('All notifications marked as read.');
+    }
+
+    /* ── Poll for genuinely new notifications (new request submitted,
+       item went overdue, room issue reported, stock dropped, etc.)
+       without a full page reload. Only adds/removes cards + updates
+       badges; never disturbs a card the admin has expanded. ── */
+    function _buildNotifCardEl(n) {
+        const wrap = document.createElement('div');
+        wrap.className = 'notif-item notif-card notif-fresh' + (n.urgent ? ' notif-urgent' : '') + (n.is_read ? '' : ' unread');
+        wrap.dataset.cat = n.cat;
+        wrap.dataset.notifKey = n.key;
+        wrap.dataset.linkTab = (n.link && n.link.tab) || '';
+        wrap.dataset.linkChip = (n.link && n.link.chip) || '';
+        wrap.dataset.linkSub = (n.link && n.link.sub) || '';
+        wrap.dataset.linkRequestId = (n.link && n.link.request_id) || '';
+        wrap.dataset.linkIssueId = (n.link && n.link.issue_id) || '';
+        wrap.dataset.linkItemId = (n.link && n.link.item_id) || '';
+
+        const detailRows = (n.detail || []).map(d =>
+            '<div class="ps-detail-item"><div class="ps-detail-label">' + _esc(d.label) +
+            '</div><div class="ps-detail-value"' + (d.danger ? ' style="color:var(--danger);font-weight:700;"' : '') +
+            '>' + _esc(String(d.value)) + '</div></div>'
+        ).join('');
+
+        wrap.innerHTML =
+            '<div class="notif-card-main" role="button" tabindex="0">' +
+            '<div class="notif-icon ' + _esc(n.icon_class) + '"><span class="material-symbols-outlined">' + _esc(n.icon) + '</span></div>' +
+            '<div class="notif-body-wrap"><h4>' + _esc(n.title) + '</h4><p>' + n.body + '</p></div>' +
+            '<div class="notif-meta"><span class="notif-time">' + _esc(n.time_label) + '</span><div class="unread-dot"></div>' +
+            '<span class="material-symbols-outlined notif-chevron">expand_more</span></div>' +
+            '</div>' +
+            '<div class="notif-card-detail"><div class="ps-detail-grid">' + detailRows + '</div>' +
+            '<div class="notif-card-actions">' +
+            '<button type="button" class="ps-btn ps-btn--primary ps-btn--sm" data-notif-goto><span class="material-symbols-outlined">visibility</span>' + _esc(n.view_label) + '</button>' +
+            '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification"><span class="material-symbols-outlined">delete</span>Delete</button>' +
+            '</div></div>';
+        return wrap;
+    }
+
+    function _esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s == null ? '' : s;
+        return d.innerHTML;
+    }
+
+    function _notifPoll() {
+        fetch('equipment-booking/api/notif-list.php')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || data.status !== 'success') return;
+                const list = document.getElementById('notifList');
+                if (!list) return;
+
+                const serverKeys = new Set(data.notifications.map(n => n.key));
+                const domCards = list.querySelectorAll('.notif-item[data-notif-key]');
+
+                // Remove cards for notifications that no longer exist server-side
+                // (e.g. the request was approved/declined by another admin tab,
+                // or the item's stock was replenished) — but never touch one the
+                // admin currently has expanded, mid-review.
+                domCards.forEach(card => {
+                    if (!serverKeys.has(card.dataset.notifKey) && !card.classList.contains('expanded')) {
+                        _deleteCardSilent(card);
+                    }
+                });
+
+                // Add cards for genuinely new notifications, newest group-appropriate spot.
+                const existingKeys = new Set(Array.from(list.querySelectorAll('.notif-item[data-notif-key]')).map(c => c.dataset.notifKey));
+                let addedAny = false;
+                data.notifications.forEach(n => {
+                    if (existingKeys.has(n.key)) return;
+                    addedAny = true;
+                    const el = _buildNotifCardEl(n);
+                    const groupLabel = Array.from(list.querySelectorAll('.notif-group-label')).find(g => g.textContent.trim().indexOf(n.group_label) === 0);
+                    if (groupLabel) {
+                        groupLabel.insertAdjacentElement('afterend', el);
+                    } else {
+                        const div = document.createElement('div');
+                        div.className = 'notif-group-label' + (n.group_danger ? ' notif-group-label--danger' : '');
+                        div.innerHTML = '<span class="material-symbols-outlined">' + _esc(n.group_icon) + '</span>' + _esc(n.group_label);
+                        list.insertBefore(div, list.firstChild);
+                        div.insertAdjacentElement('afterend', el);
+                    }
+                });
+                _syncFilterChips(data.notifications);
+                if (addedAny) {
+                    const empty = document.getElementById('notifEmptyState');
+                    if (empty) empty.remove();
+                    initNotifCards();
+                }
+                const activeFilter = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
+                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all');
+
+                _updateBadges(data.unread_count);
+            })
+            .catch(() => { /* silent — polling shouldn't be noisy on network hiccups */ });
+    }
+
+    function _deleteCardSilent(card) {
+        card.classList.add('notif-removing');
+        setTimeout(() => {
+            const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
+                ? card.previousElementSibling : null;
+            card.remove();
+            if (group) {
+                const next = group.nextElementSibling;
+                if (!next || !next.classList.contains('notif-item')) group.remove();
+            }
+            if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+        }, 220);
     }
 
     /* ── Settings ────────────────────────────────────────────── */
@@ -1495,6 +1804,9 @@
             removeFlag: 'eqm-remove-image-flag'
         });
         initNotifCards();
+        // Poll for new notifications (new requests, overdue items, room
+        // issues, stock drops) every 25s without a full page reload.
+        setInterval(_notifPoll, 25000);
 
         // Live search
         setupLiveSearch('waitingSearch', 'waiting-body', 'waiting');

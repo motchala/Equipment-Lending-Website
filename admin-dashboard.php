@@ -1,5 +1,22 @@
 <?php require_once __DIR__ . '/equipment-booking/core/admin-functions.php'; ?>
 <?php require_once __DIR__ . '/room-reservation/core/admin-rooms-functions.php'; ?>
+<?php require_once __DIR__ . '/equipment-booking/core/notif-functions.php'; ?>
+<?php
+// ================= NOTIFICATIONS (live feed) =================
+// Computed fresh on every load from tbl_requests / tbl_room_issues /
+// tbl_inventory — see notif-functions.php. $notif_unread drives every
+// badge on the page (bell, dropdown item, sidebar) so they always agree
+// with what's inside the modal.
+$notifications = notif_build_list($conn);
+$notif_unread  = notif_count_unread($notifications);
+
+// Live count per category — drives which filter chips are worth
+// showing at all (no point offering a "Rooms" filter with 0 items).
+$notif_cat_counts = ['request' => 0, 'overdue' => 0, 'room' => 0, 'system' => 0];
+foreach ($notifications as $n) {
+    if (isset($notif_cat_counts[$n['cat']])) $notif_cat_counts[$n['cat']]++;
+}
+?>
 <?php
 // ── CONFIRM RETURN ─────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
@@ -76,11 +93,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                <?php if ($stat_waiting > 0 || $stat_overdue > 0): ?>
-                    <span class="notif-btn-badge">
-                        <?php echo $stat_waiting + $stat_overdue; ?>
-                    </span>
-                <?php endif; ?>
+                <span class="notif-btn-badge" id="notifBtnBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>">
+                    <?php echo $notif_unread; ?>
+                </span>
             </button>
 
             <div class="header-user-info">
@@ -123,9 +138,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                             </svg>
                         </div>Notifications
-                        <?php if ($stat_waiting + $stat_overdue > 0): ?>
-                            <span class="notif-badge"><?php echo $stat_waiting + $stat_overdue; ?></span>
-                        <?php endif; ?>
+                        <span class="notif-badge" id="notifDdBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo $notif_unread; ?></span>
                     </button>
                     <button class="dd-item" id="dd-settings-btn">
                         <div class="dd-icon">
@@ -731,7 +744,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         while ($r = mysqli_fetch_assoc($overdue_q)):
                                             $days_od = max(0, (int)floor((strtotime($today) - strtotime($r['return_date'])) / 86400));
                                     ?>
-                                            <tr>
+                                            <tr data-id="<?php echo (int)$r['id']; ?>">
                                                 <td>
                                                     <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
                                                     <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($r['faculty_id']); ?></div>
@@ -3510,9 +3523,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
     <!-- ============================================================
-         MODAL: NOTIFICATIONS  (redesigned to match the rest of the
-         admin — ps-modal shell, rq-filter-chip pills, ps-detail-grid
-         detail rows, instead of the old standalone overlay-page.)
+         MODAL: NOTIFICATIONS
+         Fully dynamic — every card below is rendered from $notifications
+         (equipment-booking/core/notif-functions.php), which is built
+         live from tbl_requests / tbl_room_issues / tbl_inventory. Read
+         and deleted state persist server-side in tbl_notif_state via
+         equipment-booking/api/notif-*.php. See admin-dashboard.js for
+         the click handling (mark-read, delete, navigate, poll).
     ============================================================ -->
     <div class="ps-modal-backdrop" id="notifOverlay">
         <div class="ps-modal ps-modal--lg notif-modal">
@@ -3528,229 +3545,99 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             <div class="notif-toolbar">
                 <p class="notif-unread-line">You have
-                    <strong id="unreadCount"><?php echo $stat_waiting + $stat_overdue + 2; ?> unread</strong>
-                    notifications.
+                    <strong id="unreadCount"><?php echo $notif_unread; ?> unread</strong>
+                    notification<?php echo $notif_unread !== 1 ? 's' : ''; ?>.
                 </p>
-                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="mark-all-read">Mark all as read</button>
+                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="mark-all-read" <?php echo $notif_unread === 0 ? ' disabled' : ''; ?>>Mark all as read</button>
             </div>
 
-            <div class="rq-filter-chips notif-filter-chips">
+            <div class="rq-filter-chips notif-filter-chips" id="notifFilterChips">
                 <button class="rq-filter-chip active" data-notif-filter="all">All</button>
-                <button class="rq-filter-chip" data-notif-filter="unread">Unread</button>
-                <button class="rq-filter-chip" data-notif-filter="request">Requests</button>
-                <button class="rq-filter-chip" data-notif-filter="overdue">Overdue</button>
-                <button class="rq-filter-chip" data-notif-filter="system">System</button>
+                <button class="rq-filter-chip" data-notif-filter="unread">Unread<?php echo $notif_unread > 0 ? ' <span class="notif-chip-count">' . $notif_unread . '</span>' : ''; ?></button>
+                <?php if ($notif_cat_counts['request'] > 0): ?>
+                    <button class="rq-filter-chip" data-notif-filter="request">Requests <span class="notif-chip-count"><?php echo $notif_cat_counts['request']; ?></span></button>
+                <?php endif; ?>
+                <?php if ($notif_cat_counts['overdue'] > 0): ?>
+                    <button class="rq-filter-chip" data-notif-filter="overdue">Overdue <span class="notif-chip-count"><?php echo $notif_cat_counts['overdue']; ?></span></button>
+                <?php endif; ?>
+                <?php if ($notif_cat_counts['room'] > 0): ?>
+                    <button class="rq-filter-chip" data-notif-filter="room">Rooms <span class="notif-chip-count"><?php echo $notif_cat_counts['room']; ?></span></button>
+                <?php endif; ?>
+                <?php if ($notif_cat_counts['system'] > 0): ?>
+                    <button class="rq-filter-chip" data-notif-filter="system">System <span class="notif-chip-count"><?php echo $notif_cat_counts['system']; ?></span></button>
+                <?php endif; ?>
             </div>
 
-            <div class="ps-modal-body notif-modal-body">
+            <div class="ps-modal-body notif-modal-body" id="notifList">
 
-                <?php if ($stat_overdue > 0): ?>
-                    <div class="notif-group-label notif-group-label--danger">
-                        <span class="material-symbols-outlined">warning</span>
-                        Overdue &mdash; Immediate Action Needed
+                <div class="ps-empty-state notif-empty-state" id="notifFilterEmptyState" style="display:none;">
+                    <span class="material-symbols-outlined">filter_alt_off</span>
+                    <p>Nothing in this filter right now.</p>
+                </div>
+
+                <?php if (empty($notifications)): ?>
+                    <div class="ps-empty-state notif-empty-state" id="notifEmptyState">
+                        <span class="material-symbols-outlined">notifications_off</span>
+                        <p>You're all caught up. No notifications right now.</p>
                     </div>
-                    <?php
-                    $ov_notif = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Overdue' ORDER BY return_date ASC LIMIT 5");
-                    while ($on = mysqli_fetch_assoc($ov_notif)):
-                        $days_late = floor((time() - strtotime($on['return_date'])) / 86400);
+                    <?php else:
+                    $notif_last_group = null;
+                    foreach ($notifications as $n):
+                        if ($n['group_label'] !== $notif_last_group):
+                            $notif_last_group = $n['group_label'];
                     ?>
-                        <div class="notif-item notif-card unread notif-urgent" data-cat="overdue">
+                            <div class="notif-group-label<?php echo $n['group_danger'] ? ' notif-group-label--danger' : ''; ?>">
+                                <span class="material-symbols-outlined"><?php echo $n['group_icon']; ?></span>
+                                <?php echo htmlspecialchars($n['group_label']); ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="notif-item notif-card<?php echo $n['is_read'] ? '' : ' unread'; ?><?php echo $n['urgent'] ? ' notif-urgent' : ''; ?>"
+                            data-cat="<?php echo htmlspecialchars($n['cat']); ?>"
+                            data-notif-key="<?php echo htmlspecialchars($n['key']); ?>"
+                            data-link-tab="<?php echo htmlspecialchars($n['link']['tab'] ?? ''); ?>"
+                            data-link-chip="<?php echo htmlspecialchars($n['link']['chip'] ?? ''); ?>"
+                            data-link-sub="<?php echo htmlspecialchars($n['link']['sub'] ?? ''); ?>"
+                            data-link-request-id="<?php echo htmlspecialchars((string)($n['link']['request_id'] ?? '')); ?>"
+                            data-link-issue-id="<?php echo htmlspecialchars((string)($n['link']['issue_id'] ?? '')); ?>"
+                            data-link-item-id="<?php echo htmlspecialchars((string)($n['link']['item_id'] ?? '')); ?>">
                             <div class="notif-card-main" role="button" tabindex="0">
-                                <div class="notif-icon notif-icon--danger">
-                                    <span class="material-symbols-outlined">schedule</span>
+                                <div class="notif-icon <?php echo htmlspecialchars($n['icon_class']); ?>">
+                                    <span class="material-symbols-outlined"><?php echo htmlspecialchars($n['icon']); ?></span>
                                 </div>
                                 <div class="notif-body-wrap">
-                                    <h4>Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></h4>
-                                    <p><strong><?php echo htmlspecialchars($on['faculty_name']); ?></strong> has not returned this item.
-                                        <?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?> overdue.</p>
+                                    <h4><?php echo htmlspecialchars($n['title']); ?></h4>
+                                    <p><?php echo $n['body']; /* pre-escaped in notif-functions.php */ ?></p>
                                 </div>
                                 <div class="notif-meta">
-                                    <span class="notif-time">Due <?php echo date('M d', strtotime($on['return_date'])); ?></span>
+                                    <span class="notif-time"><?php echo htmlspecialchars($n['time_label']); ?></span>
                                     <div class="unread-dot"></div>
                                     <span class="material-symbols-outlined notif-chevron">expand_more</span>
                                 </div>
                             </div>
                             <div class="notif-card-detail">
                                 <div class="ps-detail-grid">
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Borrower</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($on['faculty_name']); ?> (<?php echo htmlspecialchars($on['faculty_id']); ?>)</div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Equipment</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Due Date</div>
-                                        <div class="ps-detail-value" style="color:var(--danger);font-weight:600;"><?php echo date('M d, Y', strtotime($on['return_date'])); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Days Overdue</div>
-                                        <div class="ps-detail-value" style="color:var(--danger);font-weight:700;"><?php echo $days_late; ?> day<?php echo $days_late != 1 ? 's' : ''; ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Borrow Date</div>
-                                        <div class="ps-detail-value"><?php echo date('M d, Y', strtotime($on['borrow_date'])); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Room / Instructor</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($on['room'] ?? 'â'); ?> / <?php echo htmlspecialchars($on['instructor'] ?? 'â'); ?></div>
-                                    </div>
+                                    <?php foreach ($n['detail'] as $d): ?>
+                                        <div class="ps-detail-item">
+                                            <div class="ps-detail-label"><?php echo htmlspecialchars($d['label']); ?></div>
+                                            <div class="ps-detail-value" <?php echo !empty($d['danger']) ? ' style="color:var(--danger);font-weight:700;"' : ''; ?>><?php echo htmlspecialchars((string)$d['value']); ?></div>
+                                        </div>
+                                    <?php endforeach; ?>
                                 </div>
                                 <div class="notif-card-actions">
-                                    <a href="admin-dashboard.php?view=overdue" class="ps-btn ps-btn--primary ps-btn--sm"
-                                        data-action="ps-close-modal" data-modal="notifOverlay">
+                                    <button type="button" class="ps-btn ps-btn--primary ps-btn--sm" data-notif-goto>
                                         <span class="material-symbols-outlined">visibility</span>
-                                        View in Overdue
-                                    </a>
-                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" data-notif-dismiss>Got it</button>
+                                        <?php echo htmlspecialchars($n['view_label']); ?>
+                                    </button>
+                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification">
+                                        <span class="material-symbols-outlined">delete</span>
+                                        Delete
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                <?php endwhile;
+                <?php endforeach;
                 endif; ?>
-
-                <?php if ($stat_waiting > 0): ?>
-                    <div class="notif-group-label">
-                        <span class="material-symbols-outlined">assignment</span>
-                        Pending Requests
-                    </div>
-                    <?php
-                    $wt_notif = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE status='Waiting' ORDER BY request_date DESC LIMIT 5");
-                    while ($wn = mysqli_fetch_assoc($wt_notif)):
-                    ?>
-                        <div class="notif-item notif-card unread" data-cat="request">
-                            <div class="notif-card-main" role="button" tabindex="0">
-                                <div class="notif-icon notif-icon--maroon">
-                                    <span class="material-symbols-outlined">pending_actions</span>
-                                </div>
-                                <div class="notif-body-wrap">
-                                    <h4>New Borrow Request</h4>
-                                    <p><strong><?php echo htmlspecialchars($wn['faculty_name']); ?></strong> requested
-                                        <strong><?php echo htmlspecialchars($wn['equipment_name']); ?></strong> &mdash; awaiting approval.
-                                    </p>
-                                </div>
-                                <div class="notif-meta">
-                                    <span class="notif-time"><?php echo date('M d', strtotime($wn['request_date'])); ?></span>
-                                    <div class="unread-dot"></div>
-                                    <span class="material-symbols-outlined notif-chevron">expand_more</span>
-                                </div>
-                            </div>
-                            <div class="notif-card-detail">
-                                <div class="ps-detail-grid">
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Borrower</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($wn['faculty_name']); ?> (<?php echo htmlspecialchars($wn['faculty_id']); ?>)</div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Equipment</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($wn['equipment_name']); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Borrow Date</div>
-                                        <div class="ps-detail-value"><?php echo date('M d, Y', strtotime($wn['borrow_date'])); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Return Date</div>
-                                        <div class="ps-detail-value"><?php echo date('M d, Y', strtotime($wn['return_date'])); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Requested On</div>
-                                        <div class="ps-detail-value"><?php echo date('M d, Y g:i A', strtotime($wn['request_date'])); ?></div>
-                                    </div>
-                                    <div class="ps-detail-item">
-                                        <div class="ps-detail-label">Room / Instructor</div>
-                                        <div class="ps-detail-value"><?php echo htmlspecialchars($wn['room'] ?? 'â'); ?> / <?php echo htmlspecialchars($wn['instructor'] ?? 'â'); ?></div>
-                                    </div>
-                                </div>
-                                <div class="notif-card-actions">
-                                    <a href="admin-dashboard.php?view=requests" class="ps-btn ps-btn--primary ps-btn--sm"
-                                        data-action="ps-close-modal" data-modal="notifOverlay">
-                                        <span class="material-symbols-outlined">visibility</span>
-                                        View in Requests
-                                    </a>
-                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" data-notif-dismiss>Got it</button>
-                                </div>
-                            </div>
-                        </div>
-                <?php endwhile;
-                endif; ?>
-
-                <div class="notif-group-label">
-                    <span class="material-symbols-outlined">info</span>
-                    System
-                </div>
-
-                <div class="notif-item notif-card unread" data-cat="system">
-                    <div class="notif-card-main" role="button" tabindex="0">
-                        <div class="notif-icon notif-icon--info">
-                            <span class="material-symbols-outlined">info</span>
-                        </div>
-                        <div class="notif-body-wrap">
-                            <h4>Scheduled Maintenance Tonight</h4>
-                            <p>PUPSync will undergo maintenance from 11:00 PM to 1:00 AM. Please inform users.</p>
-                        </div>
-                        <div class="notif-meta">
-                            <span class="notif-time">8:00 AM</span>
-                            <div class="unread-dot"></div>
-                            <span class="material-symbols-outlined notif-chevron">expand_more</span>
-                        </div>
-                    </div>
-                    <div class="notif-card-detail">
-                        <div class="ps-detail-grid">
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Window</div>
-                                <div class="ps-detail-value">11:00 PM &ndash; 1:00 AM tonight</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Affected</div>
-                                <div class="ps-detail-value">All PUPSync services (lending, inventory, login)</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Action Required</div>
-                                <div class="ps-detail-value">Notify active users before 10:30 PM</div>
-                            </div>
-                        </div>
-                        <div class="notif-card-actions">
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-notif-dismiss>Got it</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="notif-item notif-card" data-cat="system">
-                    <div class="notif-card-main" role="button" tabindex="0">
-                        <div class="notif-icon notif-icon--success">
-                            <span class="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <div class="notif-body-wrap">
-                            <h4>Database Backup Completed</h4>
-                            <p>Automatic daily backup of <code>lending_db</code> completed successfully.</p>
-                        </div>
-                        <div class="notif-meta">
-                            <span class="notif-time">Yesterday, 2:00 AM</span>
-                            <span class="material-symbols-outlined notif-chevron">expand_more</span>
-                        </div>
-                    </div>
-                    <div class="notif-card-detail">
-                        <div class="ps-detail-grid">
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Database</div>
-                                <div class="ps-detail-value">lending_db</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Completed At</div>
-                                <div class="ps-detail-value">Yesterday at 2:00 AM</div>
-                            </div>
-                            <div class="ps-detail-item">
-                                <div class="ps-detail-label">Status</div>
-                                <div class="ps-detail-value"><span class="ps-badge ps-badge--dot ps-badge--active">Success</span></div>
-                            </div>
-                        </div>
-                        <div class="notif-card-actions">
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-notif-dismiss>Got it</button>
-                        </div>
-                    </div>
-                </div>
 
             </div><!-- /notif-modal-body -->
         </div>

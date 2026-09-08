@@ -917,3 +917,21 @@ CREATE TABLE IF NOT EXISTS `tbl_room_issues` (
   CONSTRAINT `fk_issue_room`
     FOREIGN KEY (`room_id`) REFERENCES `tbl_rooms` (`room_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- NOTIFICATION SYSTEM (Admin bell/modal)
+-- Notifications themselves are computed live from tbl_requests,
+-- tbl_room_issues and tbl_inventory (see equipment-booking/core/notif-functions.php)
+-- rather than stored — this table only tracks per-notification read/deleted
+-- state, keyed by a stable synthetic id (e.g. "overdue-12", "roomissue-3").
+-- Fully idempotent — safe to run on an existing lending_db.
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS `tbl_notif_state` (
+  `id`         int(11)      NOT NULL AUTO_INCREMENT,
+  `notif_key`  varchar(64)  NOT NULL,
+  `is_read`    tinyint(1)   NOT NULL DEFAULT 0,
+  `is_deleted` tinyint(1)   NOT NULL DEFAULT 0,
+  `updated_at` datetime     DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_notif_key` (`notif_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

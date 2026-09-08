@@ -1099,6 +1099,12 @@ main#app-main {
     font-size: 16px;
 }
 
+.ps-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .ps-btn--primary {
     background: var(--accent-maroon);
     color: white;
@@ -3595,6 +3601,39 @@ input[type="range"] {
     padding: 0.85rem 1.25rem 0;
     margin-bottom: 0 !important;
     flex-shrink: 0;
+    /* Streamlined single-row filter bar — scrolls horizontally instead
+       of wrapping to a second line when several categories are active. */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.notif-filter-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.notif-filter-chips .rq-filter-chip {
+    flex-shrink: 0;
+}
+
+.notif-chip-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.08);
+    color: inherit;
+}
+
+.rq-filter-chip.active .notif-chip-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
 }
 
 .notif-modal-body {
@@ -3670,6 +3709,11 @@ input[type="range"] {
 .notif-icon--success {
     background: #eafaf2;
     color: var(--success);
+}
+
+.notif-icon--warning {
+    background: #fef4e6;
+    color: var(--warning);
 }
 
 .notif-body-wrap {
@@ -3884,6 +3928,88 @@ input[type="range"] {
 
 .notif-card-actions .ps-btn--ghost {
     margin-left: auto;
+}
+
+.notif-delete-btn {
+    color: var(--danger) !important;
+}
+
+.notif-delete-btn:hover {
+    background: #fdecea !important;
+}
+
+/* Card removal (delete) — brief collapse instead of an abrupt disappear */
+.notif-item.notif-removing {
+    animation: notifRemove 0.22s ease forwards;
+}
+
+@keyframes notifRemove {
+    to {
+        opacity: 0;
+        transform: scale(0.97);
+        max-height: 0;
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        border-width: 0;
+    }
+}
+
+/* Newly-arrived card from polling — quick highlight so it doesn't just pop in unnoticed */
+.notif-item.notif-fresh {
+    animation: notifFresh 1.6s ease;
+}
+
+@keyframes notifFresh {
+    0% {
+        background: var(--accent-light);
+    }
+
+    100% {
+        background: var(--primary-white);
+    }
+}
+
+.notif-empty-state {
+    padding: 2.5rem 1rem;
+}
+
+/* Bell badge — small pulse whenever the unread count changes upward */
+.notif-btn-badge.notif-badge-pulse,
+.notif-badge.notif-badge-pulse {
+    animation: notifBadgePulse 0.5s ease;
+}
+
+@keyframes notifBadgePulse {
+    0% {
+        transform: scale(1);
+    }
+
+    40% {
+        transform: scale(1.35);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Brief highlight flash for a row/card the user was just deep-linked to
+   from a notification (Requests table row, Inventory item, etc.) */
+.notif-target-flash {
+    animation: notifTargetFlash 1.8s ease;
+}
+
+@keyframes notifTargetFlash {
+    0% {
+        background: var(--accent-light);
+        box-shadow: 0 0 0 2px var(--accent-maroon) inset;
+    }
+
+    100% {
+        background: transparent;
+        box-shadow: none;
+    }
 }
 
 /* ── RESPONSIVE ───────────────────────────────────────────────── */
