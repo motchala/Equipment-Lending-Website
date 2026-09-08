@@ -3576,6 +3576,13 @@ input[type="range"] {
 /* ── NOTIFICATIONS MODAL ──────────────────────────────────────── */
 .notif-modal {
     max-width: 620px;
+    /* Fixed height regardless of how many notifications are currently
+       showing — otherwise the modal grows/shrinks every time the filter
+       changes or the feed updates, which feels unstable. The body below
+       (flex:1 from .ps-modal-body) fills whatever's left and scrolls;
+       the max-height keeps this sane on short/mobile viewports. */
+    height: 640px;
+    max-height: 85vh;
 }
 
 .notif-toolbar {
@@ -3972,6 +3979,14 @@ input[type="range"] {
 
 .notif-empty-state {
     padding: 2.5rem 1rem;
+    /* With the modal now a fixed height, center the empty message in
+       whatever space is available instead of leaving it pinned to the
+       top with a block of dead space underneath it. */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Bell badge — small pulse whenever the unread count changes upward */
