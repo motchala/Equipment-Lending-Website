@@ -2196,8 +2196,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
                                     $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
                                     $fac_res = $conn->query(
-                                        "SELECT u.fullname, u.email, u.role,"
-                                            . " u.faculty_id,"
+                                        "SELECT u.fullname, u.email, u.backup_email, u.role,"
+                                            . " u.faculty_id, u.organization_id,"
                                             . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
                                             . "     o.name AS org_name"
                                             . " FROM tbl_users u"
@@ -2215,9 +2215,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <tr
                                                 data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
                                                 data-email="<?= htmlspecialchars($frow['email']) ?>"
+                                                data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
                                                 data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
                                                 data-role="<?= htmlspecialchars($frow['role']) ?>"
                                                 data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
+                                                data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
                                                 data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
                                                 data-init="<?= $initFac ?>">
                                                 <td>
@@ -4316,9 +4318,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <span class="faculty-toggle-track"></span>
                         Organization Adviser
                     </label>
-                    <div class="form-group" style="margin-bottom:0;margin-top:0.65rem">
-                        <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Organization Name</label>
-                        <input type="text" id="fac-edit-org" class="form-control-custom" placeholder="e.g. JPIA">
+                    <div class="form-group" id="fac-edit-org-group" style="margin-bottom:0;margin-top:0.65rem;display:none;">
+                        <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Organization</label>
+                        <?php
+                        $edit_org_opts_res = $conn->query(
+                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                        );
+                        if ($edit_org_opts_res && $edit_org_opts_res->num_rows > 0): ?>
+                            <select id="fac-edit-org" class="form-control-custom">
+                                <option value="">&#8212; Select Organization &#8212;</option>
+                                <?php while ($edit_org_row = $edit_org_opts_res->fetch_assoc()): ?>
+                                    <option value="<?= (int)$edit_org_row['id'] ?>">
+                                        <?= htmlspecialchars($edit_org_row['name']) ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
+                        <?php else: ?>
+                            <select id="fac-edit-org" class="form-control-custom" disabled>
+                                <option value="">&#8212; Organizations unavailable &#8212;</option>
+                            </select>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -4327,6 +4346,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <span class="faculty-toggle-track"></span>
                     Org Borrowing Enabled
                 </label>
+
+                <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-top:1rem"></div>
 
                 <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
                     <button class="ps-btn ps-btn--danger" id="fac-edit-delete-btn" type="button" disabled>
@@ -4456,6 +4477,39 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             }
 
+            /* Edit modal: keep a reference to the row currently being edited,
+               so Save Changes can identify + update it after a successful save. */
+            var _facEditRow = null;
+
+            function _syncFacEditOrgVisibility() {
+                var chk = document.getElementById('fac-edit-adviser');
+                var grp = document.getElementById('fac-edit-org-group');
+                var sel = document.getElementById('fac-edit-org');
+                if (!chk || !grp) return;
+                grp.style.display = chk.checked ? '' : 'none';
+                if (sel && !chk.checked) sel.value = '';
+            }
+
+            var _facEditAdviserChk = document.getElementById('fac-edit-adviser');
+            if (_facEditAdviserChk) {
+                _facEditAdviserChk.addEventListener('change', _syncFacEditOrgVisibility);
+            }
+
+            function _showFacEditAlert(msg, isError) {
+                var box = document.getElementById('fac-edit-alert');
+                if (!box) return;
+                box.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
+                box.textContent = msg;
+                box.classList.remove('hidden');
+            }
+
+            function _clearFacEditAlert() {
+                var box = document.getElementById('fac-edit-alert');
+                if (!box) return;
+                box.classList.add('hidden');
+                box.textContent = '';
+            }
+
             /* Edit modal: open on row edit-button click */
             document.addEventListener('click', function(e) {
                 var btn = e.target.closest('.fac-edit-btn');
@@ -4463,11 +4517,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 var row = btn.closest('tr');
                 if (!row) return;
 
+                _facEditRow = row;
+                _clearFacEditAlert();
+
                 var fullname = row.dataset.fullname || '';
                 var email = row.dataset.email || '';
+                var backupEmail = row.dataset.backupEmail || '';
                 var facId = row.dataset.facultyId || '';
                 var role = row.dataset.role || '';
                 var org = row.dataset.org || '';
+                var orgId = row.dataset.orgId || '';
                 var aob = row.dataset.aob === '1';
                 var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
                 var isAdviser = role === 'Organization Adviser';
@@ -4483,12 +4542,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 document.getElementById('fac-edit-first').value = firstName;
                 document.getElementById('fac-edit-last').value = lastName;
                 document.getElementById('fac-edit-email').value = email;
-                document.getElementById('fac-edit-backup').value = '';
+                document.getElementById('fac-edit-backup').value = backupEmail;
                 document.getElementById('fac-edit-adviser').checked = isAdviser;
-                document.getElementById('fac-edit-org').value = org;
+                var orgSel = document.getElementById('fac-edit-org');
+                if (orgSel) orgSel.value = (isAdviser && orgId) ? orgId : '';
                 document.getElementById('fac-edit-aob').checked = aob;
                 document.getElementById('fac-delete-name').textContent = fullname;
 
+                _syncFacEditOrgVisibility();
                 openFacModal('fac-edit-modal');
             });
 
@@ -4502,7 +4563,103 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             /* Delete Account: non-functional until later dev stage */
 
-            /* Save Changes: non-functional until later dev stage */
+            /* Save Changes */
+            var facEditSaveBtn = document.getElementById('fac-edit-save');
+            if (facEditSaveBtn) {
+                facEditSaveBtn.addEventListener('click', function() {
+                    _clearFacEditAlert();
+                    if (!_facEditRow) return;
+
+                    var facultyId = _facEditRow.dataset.facultyId || '';
+                    var firstName = (document.getElementById('fac-edit-first').value || '').trim();
+                    var lastName = (document.getElementById('fac-edit-last').value || '').trim();
+                    var email = (document.getElementById('fac-edit-email').value || '').trim();
+                    var backup = (document.getElementById('fac-edit-backup').value || '').trim();
+                    var isAdviser = document.getElementById('fac-edit-adviser').checked ? '1' : '0';
+                    var orgId = document.getElementById('fac-edit-org') ? document.getElementById('fac-edit-org').value : '';
+                    var aob = document.getElementById('fac-edit-aob').checked ? '1' : '0';
+
+                    if (!firstName) { _showFacEditAlert('First name is required.', true); return; }
+                    if (!lastName) { _showFacEditAlert('Last name is required.', true); return; }
+                    if (!email) { _showFacEditAlert('PUPSync email is required.', true); return; }
+                    if (isAdviser === '1' && !orgId) {
+                        _showFacEditAlert('An organization must be selected for an adviser.', true);
+                        return;
+                    }
+
+                    var savedLabel = facEditSaveBtn.innerHTML;
+                    facEditSaveBtn.disabled = true;
+                    facEditSaveBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Saving...';
+
+                    var csrfEl = document.querySelector('input[name="csrf_token"]');
+                    var body = new URLSearchParams({
+                        csrf_token: csrfEl ? csrfEl.value : '',
+                        faculty_id: facultyId,
+                        pupsync_email: email,
+                        backup_email: backup,
+                        first_name: firstName,
+                        last_name: lastName,
+                        is_org_adviser: isAdviser,
+                        organization_id: orgId,
+                        allow_org_borrowing: aob
+                    });
+
+                    fetch('equipment-booking/api/update-faculty-account.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString()
+                    })
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            if (data.status === 'success') {
+                                var fullname = [firstName, lastName].join(' ').trim();
+                                var role = isAdviser === '1' ? 'Organization Adviser' : 'Regular Faculty';
+                                var orgSelEl = document.getElementById('fac-edit-org');
+                                var orgName = (isAdviser === '1' && orgSelEl)
+                                    ? ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '')
+                                    : '';
+                                var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
+
+                                // Update the row's dataset so re-opening Edit shows the saved values
+                                _facEditRow.dataset.fullname = fullname;
+                                _facEditRow.dataset.email = email;
+                                _facEditRow.dataset.backupEmail = backup;
+                                _facEditRow.dataset.role = role;
+                                _facEditRow.dataset.org = orgNameSafe;
+                                _facEditRow.dataset.orgId = isAdviser === '1' ? orgId : '0';
+                                _facEditRow.dataset.aob = aob;
+                                _facEditRow.dataset.init = fullname.charAt(0).toUpperCase() || 'F';
+
+                                // Reflect the changes in the visible table cells
+                                var subLabel = (isAdviser === '1' && orgNameSafe)
+                                    ? 'Org Adviser \u00B7 ' + orgNameSafe
+                                    : 'Active Faculty';
+                                var cells = _facEditRow.querySelectorAll('td');
+                                if (cells[0]) {
+                                    var nameDiv = cells[0].querySelector('div:first-child');
+                                    var subDiv = cells[0].querySelector('div:last-child');
+                                    if (nameDiv) nameDiv.textContent = fullname;
+                                    if (subDiv) subDiv.textContent = subLabel;
+                                }
+                                if (cells[2]) cells[2].textContent = email;
+                                var aobToggle = _facEditRow.querySelector('.org-borrowing-toggle');
+                                if (aobToggle) aobToggle.checked = aob === '1';
+
+                                closeFacModal('fac-edit-modal');
+                                if (typeof showToast === 'function') showToast('Faculty account updated successfully.');
+                            } else {
+                                _showFacEditAlert(data.message || 'Could not save changes.', true);
+                            }
+                        })
+                        .catch(function() {
+                            _showFacEditAlert('Network error. Please try again.', true);
+                        })
+                        .finally(function() {
+                            facEditSaveBtn.disabled = false;
+                            facEditSaveBtn.innerHTML = savedLabel;
+                        });
+                });
+            }
 
             /* Delete modal: close */
             ['fac-delete-close', 'fac-delete-cancel'].forEach(function(id) {
