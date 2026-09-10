@@ -1129,7 +1129,7 @@
     }
 
     function _buildFacultyRow(data) {
-        // data = { fullname, email, role, org_name, faculty_id, allow_org_borrowing }
+        // data = { fullname, email, backup_email, role, org_name, org_id, faculty_id, allow_org_borrowing }
         const tr = document.createElement('tr');
         const isAdviser = data.role === 'Organization Adviser';
         const subLabel = isAdviser && data.org_name
@@ -1139,9 +1139,11 @@
 
         tr.dataset.fullname = data.fullname || '';
         tr.dataset.email = data.email || '';
+        tr.dataset.backupEmail = data.backup_email || '';
         tr.dataset.facultyId = data.faculty_id || '';
         tr.dataset.role = data.role || '';
         tr.dataset.org = data.org_name || '';
+        tr.dataset.orgId = data.org_id || '0';
         tr.dataset.aob = data.allow_org_borrowing === 1 ? '1' : '0';
         tr.dataset.init = init;
 
@@ -1256,6 +1258,7 @@
                         const orgName = isAdviser === '1'
                             ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
                             : '';
+                        const orgIdVal = isAdviser === '1' ? orgId : '0';
 
                         // DOM prepend: remove empty-state row if present, then prepend new row
                         const emptyRow = document.getElementById('fac-empty-row');
@@ -1264,8 +1267,11 @@
                         const tbody = document.getElementById('faculty-list-tbody');
                         if (tbody) {
                             const newRow = _buildFacultyRow({
-                                fullname, email, role,
+                                fullname, email,
+                                backup_email: backup,
+                                role,
                                 org_name: orgName,
+                                org_id: orgIdVal,
                                 faculty_id: data.faculty_id || '',
                                 allow_org_borrowing: 0
                             });
