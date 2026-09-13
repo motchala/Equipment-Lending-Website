@@ -1121,7 +1121,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
 
                     <div class="pr-card">
-                        <div class="pr-card-header pr-card-header-maroon">
+                        <div class="pr-card-header">
                             <h3>
                                 <span class="material-symbols-outlined">calendar_month</span>
                                 Reservations
@@ -1212,7 +1212,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <?php if (empty($rooms_buildings)): ?>
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header pr-card-header-maroon">
+                            <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -1225,7 +1225,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <?php else: ?>
 
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header pr-card-header-maroon">
+                            <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -1582,7 +1582,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel" id="rooms-issues-panel">
                     <div class="pr-card">
-                        <div class="pr-card-header pr-card-header-maroon">
+                        <div class="pr-card-header">
                             <h3>
                                 <span class="material-symbols-outlined">report_problem</span>
                                 Room Issues
@@ -4579,9 +4579,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     var orgId = document.getElementById('fac-edit-org') ? document.getElementById('fac-edit-org').value : '';
                     var aob = document.getElementById('fac-edit-aob').checked ? '1' : '0';
 
-                    if (!firstName) { _showFacEditAlert('First name is required.', true); return; }
-                    if (!lastName) { _showFacEditAlert('Last name is required.', true); return; }
-                    if (!email) { _showFacEditAlert('PUPSync email is required.', true); return; }
+                    if (!firstName) {
+                        _showFacEditAlert('First name is required.', true);
+                        return;
+                    }
+                    if (!lastName) {
+                        _showFacEditAlert('Last name is required.', true);
+                        return;
+                    }
+                    if (!email) {
+                        _showFacEditAlert('PUPSync email is required.', true);
+                        return;
+                    }
                     if (isAdviser === '1' && !orgId) {
                         _showFacEditAlert('An organization must be selected for an adviser.', true);
                         return;
@@ -4605,19 +4614,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     });
 
                     fetch('equipment-booking/api/update-faculty-account.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    })
-                        .then(function(res) { return res.json(); })
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: body.toString()
+                        })
+                        .then(function(res) {
+                            return res.json();
+                        })
                         .then(function(data) {
                             if (data.status === 'success') {
                                 var fullname = [firstName, lastName].join(' ').trim();
                                 var role = isAdviser === '1' ? 'Organization Adviser' : 'Regular Faculty';
                                 var orgSelEl = document.getElementById('fac-edit-org');
-                                var orgName = (isAdviser === '1' && orgSelEl)
-                                    ? ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '')
-                                    : '';
+                                var orgName = (isAdviser === '1' && orgSelEl) ?
+                                    ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '') :
+                                    '';
                                 var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
 
                                 // Update the row's dataset so re-opening Edit shows the saved values
@@ -4631,9 +4644,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 _facEditRow.dataset.init = fullname.charAt(0).toUpperCase() || 'F';
 
                                 // Reflect the changes in the visible table cells
-                                var subLabel = (isAdviser === '1' && orgNameSafe)
-                                    ? 'Org Adviser \u00B7 ' + orgNameSafe
-                                    : 'Active Faculty';
+                                var subLabel = (isAdviser === '1' && orgNameSafe) ?
+                                    'Org Adviser \u00B7 ' + orgNameSafe :
+                                    'Active Faculty';
                                 var cells = _facEditRow.querySelectorAll('td');
                                 if (cells[0]) {
                                     var nameDiv = cells[0].querySelector('div:first-child');

@@ -2104,7 +2104,6 @@ select.ps-form-control {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
 }
 
 .eq-card-header h2 {
@@ -3210,7 +3209,6 @@ textarea.form-control-custom {
 .info-card-head {
     padding: 0.9rem 1.2rem;
     border-bottom: 1px solid var(--khaki-border);
-    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
 }
 
 .info-card-head h3 {
@@ -5956,21 +5954,9 @@ input[type="range"] {
     flex-shrink: 0;
 }
 
-/* ── Gradient maroon header — Reservations / All Rooms / Room
-   Issues, so each section's title reads as a clear, emphasized
-   banner rather than blending in with the card body. ────────── */
-#panel-rooms .pr-card-header.pr-card-header-maroon {
-    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
-    border-bottom: none;
-}
-
-#panel-rooms .pr-card-header.pr-card-header-maroon h3 {
-    color: #fff;
-}
-
-#panel-rooms .pr-card-header.pr-card-header-maroon h3 .material-symbols-outlined {
-    color: rgba(255, 255, 255, 0.85);
-}
+/* pr-card-header-maroon (the dark gradient "emphasized banner" treatment
+   for Reservations / All Rooms / Room Issues) has been retired — these
+   now use the same plain header as every other container in the app. */
 
 #panel-rooms .pr-card-note {
     padding: 0.6rem 1.25rem;
@@ -6844,21 +6830,13 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-bottom: 1px solid var(--khaki-border);
 }
 
-/* Appearance / Notification Preferences / Accessibility — matches the same
-   reddish gradient header hue/weight already used on the My Account and
-   Help & FAQ info-cards (e.g. Common Questions, Contact Support). Deliberately
-   excludes the Advanced card (.sett-danger-bdr), which keeps its plain
-   danger-tinted header. */
-#sett-prefs .sett-card:not(.sett-danger-bdr)>.sett-card-head {
-    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
-}
-
-/* Auto-Approval Rules / Thresholds & Limits / Decision Log — same treatment,
-   scoped to the Borrowing Rules sub-tab only so it never touches the many
-   other .ps-card-header instances elsewhere in the app (Requests tab, etc). */
-#sett-rules .ps-card-header {
-    background: linear-gradient(135deg, var(--section-tint-start), var(--section-tint-end));
-}
+/* Appearance / Notification Preferences / Accessibility / Auto-Approval
+   Rules / Thresholds & Limits / Decision Log now use the same plain
+   header as every other container in the app (Requests, Equipment,
+   Faculty, Rooms) — the reddish gradient tint that used to set these
+   apart from everywhere else has been removed for consistency. The
+   Advanced/Danger Zone card (.sett-danger-bdr) is the one deliberate
+   exception and keeps its distinct danger-tinted header. */
 
 .sett-card-head .material-symbols-outlined {
     font-size: 18px;

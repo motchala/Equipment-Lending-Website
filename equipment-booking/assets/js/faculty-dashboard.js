@@ -1286,6 +1286,19 @@
                     switchTab(el.dataset.tab, el.dataset.lending || null);
                     if (el.dataset.lending) switchLendingSub(el.dataset.lending);
                     break;
+                case 'myact-report-issue': {
+                    var actChat = document.getElementById('actAiChat');
+                    var actInput = document.getElementById('actAiInput');
+                    if (actChat) actChat.classList.add('open');
+                    if (actInput) {
+                        var equipName = el.dataset.equipment || 'this item';
+                        var reqId = el.dataset.requestId || '';
+                        actInput.value = 'I need to report an issue with my "' + equipName + '"'
+                            + (reqId ? ' (Request #' + reqId + ')' : '') + '.';
+                        actInput.focus();
+                    }
+                    break;
+                }
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;

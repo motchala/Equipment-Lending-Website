@@ -30,7 +30,8 @@ table,
 .eq-grid,
 .bento-grid,
 .active-cards-grid,
-.act-board {
+.myact-stats-grid,
+.myact-timeline {
     max-width: 100%;
 }
 
@@ -716,93 +717,50 @@ table,
 
 
 /* ================================================================
-   § 15  MY ACTIVITY — kanban board
-   NOTE: Base styles (.act-stats-bar, .act-stat, .act-board, .act-col,
-   .act-card, etc.) are defined in faculty-dashboard.css.
-   Only responsive layout overrides live here.
+   § 15  MY ACTIVITY — stat grid, current-loan cards & timeline
+   NOTE: the redesigned My Activity tab reuses .stat-card (§8/§30),
+   .active-cards-grid/.active-card (§12) and .table-surface (§14),
+   so their responsive behaviour already applies here. This section
+   only covers what's unique to My Activity: the 4-up stat grid and
+   the "Upcoming" timeline.
 ================================================================ */
-
-/* Tablet: 2-col kanban */
 @media (min-width: 769px) and (max-width: 1100px) {
-    .act-board {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .act-board .act-col:nth-child(3) {
-        grid-column: 1 / -1;
+    .myact-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
-/* Mobile: 1-col scrollable kanban */
 @media (max-width: 768px) {
-    .act-stats-bar {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-    }
-
-    .act-stat {
-        flex-direction: column;
-        align-items: flex-start;
-        padding: 10px 12px;
-        gap: 6px;
-    }
-
-    .act-stat-icon {
-        width: 28px;
-        height: 28px;
-    }
-
-    .act-stat-value {
-        font-size: 1.3rem;
-    }
-
-    .act-stats-bar .act-stat-label {
-        font-size: 0.62rem;
-        white-space: nowrap;
-    }
-
-    /* Horizontal scroll kanban on mobile */
-    .act-board {
-        display: flex;
-        flex-direction: row;
+    .myact-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
         gap: 10px;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding-bottom: 8px;
-        /* Snap columns */
-        scroll-snap-type: x mandatory;
     }
 
-    .act-board::-webkit-scrollbar {
-        display: none;
+    .myact-timeline-time {
+        width: 56px;
+        font-size: 0.72rem;
     }
 
-    .act-col {
-        flex: 0 0 280px;
-        scroll-snap-align: start;
+    .myact-timeline-item {
+        gap: 10px;
     }
 }
 
 @media (max-width: 480px) {
-    .act-stats-bar {
-        gap: 6px;
+    .myact-stats-grid {
+        grid-template-columns: 1fr;
     }
 
-    .act-stat {
-        padding: 8px 10px;
+    .myact-timeline {
+        padding: 4px 14px;
     }
 
-    .act-stat-label {
-        font-size: 0.58rem !important;
+    .myact-timeline-item {
+        flex-wrap: wrap;
     }
 
-    .act-stat-value {
-        font-size: 1.15rem !important;
-    }
-
-    .act-col {
-        flex: 0 0 260px;
+    .myact-timeline-time {
+        width: auto;
     }
 
     /* Download report button — full width on tiny screens */
@@ -1462,7 +1420,10 @@ table,
     .modal-backdrop,
     .overlay-page,
     .btn-download-report,
-    .act-col-menu,
+    .myact-card-actions,
+    .act-ai-fab,
+    .act-ai-chat,
+    .req-sort-btn,
     .alert-close {
         display: none !important;
     }
@@ -1480,14 +1441,21 @@ table,
         overflow: visible;
     }
 
-    .act-board {
+    .myact-stats-grid {
         display: grid !important;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 10px;
     }
 
-    .act-col {
-        flex: none !important;
+    .myact-current-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px;
+    }
+
+    .active-card,
+    .myact-timeline-item,
+    .requests-table tr {
         page-break-inside: avoid;
     }
 
