@@ -647,6 +647,10 @@ main#app-main {
     color: var(--accent-maroon);
 }
 
+.dd-icon .material-symbols-outlined {
+    font-size: 18px;
+}
+
 .dd-divider {
     height: 1px;
     background: var(--khaki-border);

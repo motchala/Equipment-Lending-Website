@@ -275,7 +275,12 @@ if (isset($_POST['login'])) {
 
             <div class="panel-logo">
                 <div class="panel-logo-icon">
-                    <i class="fa-solid fa-graduation-cap"></i>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                    </svg>
                 </div>
                 <div class="panel-logo-text">
                     <span class="panel-logo-name">

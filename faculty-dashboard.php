@@ -1546,7 +1546,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <span>Equipment</span>
             </a>
             <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
-                <span class="material-symbols-outlined">apartment</span>
+                <span class="material-symbols-outlined">meeting_room</span>
                 <span>Facilities</span>
             </a>
             <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
@@ -2188,7 +2188,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <!-- Rooms Sub-Nav — Browse | My Reservations -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-rooms-nav="browse">
-                        <span class="material-symbols-outlined">apartment</span> Browse Facilities
+                        <span class="material-symbols-outlined">meeting_room</span> Browse Facilities
                     </button>
                     <button class="lending-nav-btn" data-rooms-nav="history">
                         <span class="material-symbols-outlined">event_note</span> My Reservations

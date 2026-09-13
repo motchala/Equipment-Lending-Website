@@ -204,16 +204,20 @@ body {
 .panel-logo-icon {
     position: relative;
     flex-shrink: 0;
-    width: 54px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(150deg, var(--maroon) 0%, var(--maroon-deep) 100%);
-    clip-path: polygon(50% 0%, 100% 16%, 100% 58%, 50% 100%, 0% 58%, 0% 16%);
+    border-radius: var(--r-md);
     color: var(--cream);
-    font-size: 1.2rem;
     box-shadow: 0 8px 18px rgba(96, 3, 2, 0.28);
+}
+
+.panel-logo-icon svg {
+    width: 24px;
+    height: 24px;
 }
 
 .panel-logo-text {
@@ -228,6 +232,15 @@ body {
     color: var(--text-hi);
     letter-spacing: 0.2px;
     line-height: 1.15;
+}
+
+.brand-pup {
+    font-weight: 700;
+    color: var(--maroon);
+}
+
+.brand-sync {
+    font-weight: 500;
 }
 
 .panel-logo-sub {
@@ -508,6 +521,8 @@ body {
 ================================================================ */
 .panel-stage {
     position: relative;
+    border-top: 1px solid rgba(96, 3, 2, 0.1);
+    padding-top: clamp(1.5rem, 3.5vh, 2.1rem);
 }
 
 .panel-view {
@@ -539,7 +554,7 @@ body {
    no shadow — same elements as the role picker, just swapped in place. */
 
 .auth-head {
-    margin-bottom: 1.9rem;
+    margin-bottom: 1.75rem;
 }
 
 .auth-head .pane-title {
@@ -552,7 +567,7 @@ body {
 
 .pane-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 1.95rem;
+    font-size: 1.55rem;
     font-weight: 600;
     color: var(--text-hi);
     margin-bottom: 3px;
@@ -560,7 +575,7 @@ body {
 }
 
 .pane-subtitle {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--text-mid);
     margin-bottom: 1.4rem;
 }
