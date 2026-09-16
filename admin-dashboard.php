@@ -53,22 +53,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 ================================================================ -->
     <header class="app-header">
 
-        <!-- Logo block — sits flush above the sidebar -->
-        <div class="header-logo">
-            <div class="logo-icon-box">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-            </div>
-            <div class="logo-text">
-                <span style="white-space:nowrap;line-height:1.2;">
-                    <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
-                    <span class="logo-badge">Admin</span>
-                </span>
-                <span class="logo-subtitle">Admin Portal</span>
+        <div class="header-left">
+            <!-- Sidebar toggle — visible on mobile only (see responsive CSS) -->
+            <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Open menu"
+                aria-expanded="false" aria-controls="adminSidebar">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+
+            <!-- Logo block — sits flush above the sidebar -->
+            <div class="header-logo">
+                <div class="logo-icon-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span style="white-space:nowrap;line-height:1.2;">
+                        <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
+                        <span class="logo-badge">Admin</span>
+                    </span>
+                    <span class="logo-subtitle">Admin Portal</span>
+                </div>
             </div>
         </div>
 
@@ -146,6 +154,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
      APP BODY
 ================================================================ -->
     <div class="app-body">
+
+        <!-- Backdrop behind the off-canvas sidebar on mobile — tapping it closes the menu -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
         <!-- ================================================================
      SIDEBAR
@@ -360,6 +371,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-lending" data-lending="waiting">View All</button>
                         </div>
                         <div class="ps-card-body" style="padding:0">
+                            <div class="ps-table-wrap">
                             <table class="ps-table">
                                 <thead>
                                     <tr>
@@ -397,6 +409,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <?php endif; ?>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
 

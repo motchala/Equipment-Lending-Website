@@ -151,6 +151,54 @@ header.app-header {
     flex-shrink: 0;
 }
 
+/* Wraps the sidebar-toggle button + logo so both sit flush against the
+   sidebar's left edge, matching the sidebar's own width on desktop. */
+.header-left {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+/* Hamburger button — opens/closes the off-canvas sidebar on mobile.
+   Hidden on desktop, where the sidebar is always visible. */
+.sidebar-toggle-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-left: 0.75rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-dark);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.sidebar-toggle-btn:hover {
+    background: var(--hover-bg);
+}
+
+.sidebar-toggle-btn .material-symbols-outlined {
+    font-size: 22px;
+}
+
+/* Backdrop behind the off-canvas sidebar on mobile — tapping it closes
+   the menu. Hidden on desktop and hidden by default on mobile too;
+   JS/CSS only shows it while the sidebar is open. */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 390;
+}
+
 /* Logo block — same width as sidebar, right border acts as divider */
 .header-logo {
     width: var(--sidebar-w);
@@ -4079,6 +4127,36 @@ input[type="range"] {
         align-items: center;
     }
 
+    /* Show the hamburger; the sidebar itself becomes an off-canvas drawer
+       below (see the "Sidebar — off-canvas drawer" rules further down). */
+    .sidebar-toggle-btn {
+        display: flex;
+        margin-left: 0;
+        margin-right: 0.5rem;
+    }
+
+    /* No longer needs to match the (now hidden) sidebar's width — let it
+       size to its content so there's room for the hamburger + search. */
+    .header-logo {
+        width: auto;
+        padding: 0 0.75rem 0 0;
+        border-right: none;
+    }
+
+    .logo-text {
+        display: none;
+    }
+
+    /* Search drops to its own full-width row beneath the top row
+       (logo+hamburger left, notif/QR/avatar right), using the header's
+       existing flex-wrap rather than a new interaction pattern. */
+    .header-search {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: 100%;
+        margin: 0.5rem 0 0.25rem;
+    }
+
     .header-right {
         min-height: 56px;
         display: flex;
@@ -4369,6 +4447,66 @@ input[type="range"] {
     /* Reduce top padding in tab panels */
     .tab-panel {
         padding-top: 1.4rem;
+    }
+
+    /* Sub-tab pills (Requests / Settings / Borrowing Rules) — horizontal
+       scroll instead of overflowing past the viewport edge, same pattern
+       already used for .lending-nav above. */
+    .rq-sub-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .rq-sub-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .rq-sub-tab {
+        flex-shrink: 0;
+    }
+
+    /* ── Sidebar — off-canvas drawer ─────────────────────────────
+       Slides in from the left over the content instead of squeezing
+       #app-main into a sliver of the screen. Toggled via the hamburger
+       button (admin-dashboard.js adds/removes .sidebar-open on body). */
+    nav.sidebar {
+        position: fixed;
+        top: var(--header-h);
+        left: 0;
+        bottom: 0;
+        z-index: 400;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+    }
+
+    body.sidebar-open nav.sidebar {
+        transform: translateX(0);
+    }
+
+    body.sidebar-open .sidebar-backdrop {
+        display: block;
+    }
+
+    /* The sidebar no longer takes up flex space now that it's fixed —
+       let main content use the full width. */
+    main#app-main {
+        width: 100%;
+    }
+
+    /* A handful of 2/3-column grids used across Dashboard, Requests
+       review modals, and Help & FAQ — stack to one column so content
+       and touch targets stay readable instead of being squeezed. */
+    .ps-quick-actions,
+    .ps-two-col,
+    .ps-mini-stats,
+    .ps-detail-grid,
+    .hc-steps-grid {
+        grid-template-columns: 1fr;
     }
 }
 
