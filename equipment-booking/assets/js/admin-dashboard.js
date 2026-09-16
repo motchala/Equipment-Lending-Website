@@ -111,6 +111,13 @@
         // section further down for markRead/delete/poll wiring.
     }
 
+    /* ── Mobile sidebar drawer ───────────────────────────────── */
+    function _closeMobileSidebar() {
+        document.body.classList.remove('sidebar-open');
+        const toggleBtn = document.getElementById('sidebarToggleBtn');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -120,6 +127,7 @@
         // Highlight the specific element that was clicked, or fall back to first match
         const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
+        _closeMobileSidebar();
     }
 
     /* ── Lending sub-nav ─────────────────────────────────────── */
@@ -1344,6 +1352,23 @@
             e.preventDefault();
             _switchTabDOM(this.dataset.tab, this);
         });
+    });
+
+    /* ── Mobile sidebar drawer: hamburger toggle + backdrop + Esc ── */
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    if (sidebarToggleBtn) {
+        sidebarToggleBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            const isOpen = document.body.classList.toggle('sidebar-open');
+            sidebarToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+    }
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', _closeMobileSidebar);
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') _closeMobileSidebar();
     });
 
     /* ── Lending sub-nav ─────────────────────────────────────── */

@@ -8345,3 +8345,576 @@ body {
         display: none;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FACULTY UI ADDITIONS
+   1. Brand logo (matched to admin / landing page)
+   2. Sidebar Sign Out
+   3. Avatar notification badge + dropdown count
+   4. Notifications modal (admin-style layout)
+   5. Simplified Settings layout
+   6. Equipment pagination
+   All colours come from existing design tokens, so dark / high-contrast
+   themes are inherited automatically.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Brand logo — matches the admin portal / landing page ──────────
+   The earlier "redesign" layer replaced the logo with a ★ glyph and hid
+   the SVG + subtitle. These rules restore the shared PUPSYNC mark:
+   a maroon rounded square holding the layered-cube icon.
+─────────────────────────────────────────────────────────────────────── */
+.side-nav-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.side-nav-logo {
+    width: 32px !important;
+    height: 32px !important;
+    background: #800000 !important;
+    border-radius: 8px !important;
+    display: grid !important;
+    place-items: center !important;
+    color: #ffffff !important;
+    flex-shrink: 0;
+}
+
+/* Undo the ★ substitution from the redesign layer */
+.side-nav-logo::after {
+    content: none !important;
+}
+
+.side-nav-logo svg {
+    display: block !important;
+    width: 16px;
+    height: 16px;
+    stroke: #ffffff;
+}
+
+.side-nav-brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+.side-nav-title {
+    font-family: var(--font-sans) !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    color: #800000 !important;
+    white-space: nowrap;
+    line-height: 1.2 !important;
+}
+
+.side-nav-title strong {
+    font-weight: 700 !important;
+    color: #800000 !important;
+}
+
+.side-nav-title .snt-light {
+    font-weight: 500;
+    color: #800000;
+}
+
+/* Subtitle was display:none in the redesign layer — bring it back */
+.side-nav-sub {
+    display: block !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    color: var(--color-secondary) !important;
+    line-height: 1 !important;
+    margin-top: 2px !important;
+}
+
+[data-theme="dark"] .side-nav-title,
+[data-theme="dark"] .side-nav-title strong,
+[data-theme="dark"] .side-nav-title .snt-light {
+    color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] .side-nav-logo {
+    background: var(--color-primary-container) !important;
+}
+
+/* ── 2. Sidebar: Sign Out (last item in .side-nav-footer) ─────────────── */
+.side-nav-item.side-nav-signout {
+    margin-top: 4px;
+    color: var(--color-error) !important;
+}
+
+.side-nav-item.side-nav-signout .material-symbols-outlined {
+    color: var(--color-error) !important;
+}
+
+.side-nav-item.side-nav-signout:hover {
+    background: var(--color-error-container) !important;
+    color: var(--color-error) !important;
+}
+
+[data-theme="dark"] .side-nav-item.side-nav-signout:hover {
+    background: rgba(248, 113, 113, 0.14) !important;
+}
+
+/* ── 3. Avatar notification badge + dropdown count ────────────────────── */
+.top-bar-profile-wrap {
+    position: relative;
+}
+
+/* The avatar is overflow:hidden for the photo crop, so the badge is
+   positioned against the wrapper instead of the button. */
+.avatar-notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-surface);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.dd-item-count {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+/* ── 4. Notifications modal ───────────────────────────────────────────── */
+.fnotif-backdrop {
+    align-items: flex-start;
+    padding-top: 6vh;
+}
+
+.fnotif-box {
+    background: var(--color-surface-lowest);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    max-height: min(84vh, 780px);
+    overflow: hidden;
+    animation: modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fnotif-head {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 22px 16px;
+}
+
+.fnotif-head-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--color-error-container);
+    color: var(--color-primary);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.fnotif-head-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.fnotif-head-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin: 0;
+    flex: 1;
+}
+
+.fnotif-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--color-surface-container);
+    color: var(--color-on-surface-variant);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--transition), color var(--transition);
+}
+
+.fnotif-close:hover {
+    background: var(--color-surface-high);
+    color: var(--color-on-surface);
+}
+
+.fnotif-close .material-symbols-outlined {
+    font-size: 19px;
+}
+
+.fnotif-subhead {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 0 22px 2px;
+}
+
+.fnotif-count-text {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-on-surface-variant);
+}
+
+.fnotif-count-text strong {
+    color: var(--color-on-surface);
+    font-weight: 700;
+}
+
+.fnotif-markall-btn {
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.fnotif-markall-btn:hover {
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+
+.fnotif-tabs {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px 22px 14px;
+}
+
+.fnotif-tabs .notif-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    font-weight: 500;
+}
+
+.fnotif-pill-count {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-high);
+    color: var(--color-on-surface-variant);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.fnotif-tabs .notif-tab.active .fnotif-pill-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+/* Scrollable list — head, sub-head and tabs stay pinned */
+.fnotif-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 22px 22px;
+    border-top: 1px solid var(--color-outline-variant);
+    padding-top: 16px;
+}
+
+.fnotif-body .notif-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fnotif-body .notif-section-label {
+    margin-top: 6px;
+}
+
+.fnotif-body .notif-section-overdue {
+    color: var(--color-error);
+}
+
+.fnotif-body .notif-card-overdue {
+    border-color: var(--color-error);
+}
+
+.fnotif-body .notif-card-meta .notif-time {
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+    white-space: nowrap;
+}
+
+.fnotif-body .unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-error);
+}
+
+.fnotif-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--color-secondary);
+}
+
+.fnotif-empty .material-symbols-outlined {
+    font-size: 44px;
+    display: block;
+    margin-bottom: 10px;
+    opacity: 0.35;
+    color: var(--color-primary);
+}
+
+.fnotif-empty p {
+    margin: 0;
+    font-size: 0.86rem;
+}
+
+@media (max-width: 600px) {
+    .fnotif-backdrop {
+        padding: 12px;
+        align-items: center;
+    }
+
+    .fnotif-box {
+        max-height: 92vh;
+    }
+
+    .fnotif-head,
+    .fnotif-subhead,
+    .fnotif-tabs,
+    .fnotif-body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .fnotif-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+
+    .fnotif-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .fnotif-tabs .notif-tab {
+        flex-shrink: 0;
+    }
+}
+
+/* ── 5. Simplified Settings layout ────────────────────────────────────── */
+.sov-pagehead {
+    padding: 28px 32px 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.sov-pagehead-title {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+    margin: 0 0 4px;
+    letter-spacing: -0.4px;
+}
+
+.sov-pagehead-sub {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--color-secondary);
+}
+
+/* Calmer body: more breathing room, lighter cards, no heavy borders */
+.sov-body {
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 32px 40px;
+    gap: 28px;
+}
+
+.sov-sidenav {
+    gap: 2px;
+}
+
+.sov-nav-item {
+    border-radius: var(--radius-sm);
+    padding: 9px 14px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.sov-form-card {
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    padding: 24px 26px;
+}
+
+.sov-form-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+}
+
+.sov-section-block+.sov-section-block {
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+.sov-section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--color-secondary);
+    margin-bottom: 12px;
+}
+
+@media (max-width: 900px) {
+
+    .sov-pagehead,
+    .sov-body {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+}
+
+/* ── 6. Equipment pagination ──────────────────────────────────────────── */
+.eq-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+.eq-pg-info {
+    font-size: 0.8rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 500;
+}
+
+.eq-pg-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.eq-pg-numbers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.eq-pg-btn,
+.eq-pg-num {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.eq-pg-btn .material-symbols-outlined {
+    font-size: 19px;
+}
+
+.eq-pg-btn:hover:not(:disabled),
+.eq-pg-num:hover:not(.active) {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+    color: var(--color-primary);
+}
+
+.eq-pg-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.eq-pg-num.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+    cursor: default;
+}
+
+.eq-pg-ellipsis {
+    padding: 0 4px;
+    color: var(--color-secondary);
+    font-size: 0.82rem;
+    user-select: none;
+}
+
+@media (max-width: 600px) {
+    .eq-pagination {
+        justify-content: center;
+    }
+
+    .eq-pg-info {
+        width: 100%;
+        text-align: center;
+    }
+
+    .eq-pg-controls {
+        margin-left: 0;
+    }
+}

@@ -1,49 +1,4 @@
 /* ================================================================
-   PANEL VIEWS — the right-hand gateway panel swaps its own content
-   in place (role picker <-> login form). There is no popup/modal;
-   everything below just toggles which .panel-view is active inside
-   the same panel container.
-================================================================ */
-
-/**
- * Shows one panel view and hides the others, with a scroll reset so
- * the newly-shown view always starts at the top of the panel.
- * @param {string} viewId  'accessView' | 'facultyView' | 'adminView'
- */
-function showPanelView(viewId) {
-    document.querySelectorAll('.panel-view').forEach(view => {
-        view.classList.toggle('active', view.id === viewId);
-    });
-    resetPanelScroll();
-}
-
-function showAccessView() {
-    showPanelView('accessView');
-}
-
-function showFacultyView() {
-    showPanelView('facultyView');
-}
-
-function showAdminView() {
-    showPanelView('adminView');
-}
-
-function resetPanelScroll() {
-    const panel = document.querySelector('.gateway-panel');
-    if (panel) panel.scrollTop = 0;
-}
-
-// Esc backs out of whichever login form is open, back to the role picker.
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-        const openAuthView = document.querySelector('.panel-view-auth.active');
-        if (openAuthView) showAccessView();
-    }
-});
-
-
-/* ================================================================
    AUTO-DISMISS ALERTS
 ================================================================ */
 setTimeout(() => {
@@ -86,19 +41,7 @@ function toggleEye(inputId, btn) {
    with Content-Security-Policy (no unsafe-inline).
 ================================================================ */
 document.addEventListener('DOMContentLoaded', function () {
-
-    // Gateway — role access cards swap the panel's own content in place
-    document.getElementById('gwStudentBtn')?.addEventListener('click', () => {
-        window.location.href = 'student-dashboard.php';
-    });
-    document.getElementById('gwFacultyBtn')?.addEventListener('click', () => showFacultyView());
-    document.getElementById('gwAdminBtn')?.addEventListener('click', () => showAdminView());
-
-    // Back buttons — return to the role picker within the same panel
-    document.getElementById('facultyBackBtn')?.addEventListener('click', () => showAccessView());
-    document.getElementById('adminBackBtn')?.addEventListener('click', () => showAccessView());
-
-    // Password eye-toggles — wired via data-target attribute
+    // Password eye-toggle — wired via data-target attribute
     document.querySelectorAll('.eye-toggle[data-target]').forEach(btn => {
         btn.addEventListener('click', function () {
             toggleEye(this.dataset.target, this);
@@ -108,15 +51,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
 /* ================================================================
    LOGIN RATE LIMITING — lockout countdown timer
-   Runs when the page loads with an active lockout on either the
-   Faculty or Admin login form. Counts down from the server-supplied
-   seconds value (data-lockout-seconds on the disabled submit button),
-   updates the <span> in the banner every second, and reloads when
-   the lockout expires so the form is re-enabled without a manual
-   refresh.
+   Runs when the page loads with an active lockout on the login
+   form. Counts down from the server-supplied seconds value
+   (data-lockout-seconds on the disabled submit button), updates the
+   <span> in the banner every second, and reloads when the lockout
+   expires so the form is re-enabled without a manual refresh.
 
-   Also suppresses the generic 5-second auto-dismiss on whichever
-   banner is showing a lockout — that banner must stay visible for
+   Also suppresses the generic 5-second auto-dismiss on the banner
+   while it's showing a lockout — that banner must stay visible for
    the full lockout duration.
 ================================================================ */
 (function () {
@@ -156,8 +98,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        initLockoutCountdown('facultySubmitBtn', 'lockout-countdown-faculty');
-        initLockoutCountdown('adminSubmitBtn', 'lockout-countdown-admin');
+        initLockoutCountdown('loginSubmitBtn', 'lockout-countdown');
     });
 
 }());

@@ -53,22 +53,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 ================================================================ -->
     <header class="app-header">
 
-        <!-- Logo block — sits flush above the sidebar -->
-        <div class="header-logo">
-            <div class="logo-icon-box">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                    <polyline points="2 17 12 22 22 17" />
-                    <polyline points="2 12 12 17 22 12" />
-                </svg>
-            </div>
-            <div class="logo-text">
-                <span style="white-space:nowrap;line-height:1.2;">
-                    <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
-                    <span class="logo-badge">Admin</span>
-                </span>
-                <span class="logo-subtitle">Admin Portal</span>
+        <div class="header-left">
+            <!-- Sidebar toggle — visible on mobile only (see responsive CSS) -->
+            <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Open menu"
+                aria-expanded="false" aria-controls="adminSidebar">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+
+            <!-- Logo block — sits flush above the sidebar -->
+            <div class="header-logo">
+                <div class="logo-icon-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span style="white-space:nowrap;line-height:1.2;">
+                        <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
+                        <span class="logo-badge">Admin</span>
+                    </span>
+                    <span class="logo-subtitle">Admin Portal</span>
+                </div>
             </div>
         </div>
 
@@ -88,11 +96,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             <!-- Notification Bell -->
             <button class="notif-btn" data-action="open-notif-modal" title="Notifications">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                </svg>
+                <span class="material-symbols-outlined" style="font-size:20px;">notifications</span>
                 <span class="notif-btn-badge" id="notifBtnBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>">
                     <?php echo $notif_unread; ?>
                 </span>
@@ -121,45 +125,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="dd-menu">
                     <button class="dd-item" id="dd-account-btn">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                width="16" height="16">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                <circle cx="12" cy="7" r="4" />
-                            </svg>
+                            <span class="material-symbols-outlined">person</span>
                         </div>My Account
                     </button>
                     <button class="dd-item" data-action="open-notif-modal">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                width="16" height="16">
-                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                            </svg>
+                            <span class="material-symbols-outlined">notifications</span>
                         </div>Notifications
                         <span class="notif-badge" id="notifDdBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo $notif_unread; ?></span>
                     </button>
                     <button class="dd-item" id="dd-settings-btn">
                         <div class="dd-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                width="16" height="16">
-                                <circle cx="12" cy="12" r="3" />
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                            </svg>
+                            <span class="material-symbols-outlined">settings</span>
                         </div>Settings
                     </button>
                     <div class="dd-divider"></div>
                     <button class="dd-item dd-logout" data-action="logout">
                         <div class="dd-icon" style="background:#ffeaea;">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                width="16" height="16" style="color:var(--danger)">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                                <polyline points="16 17 21 12 16 7" />
-                                <line x1="21" y1="12" x2="9" y2="12" />
-                            </svg>
+                            <span class="material-symbols-outlined" style="color:var(--danger)">logout</span>
                         </div>Logout
                     </button>
                 </div>
@@ -171,6 +154,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
      APP BODY
 ================================================================ -->
     <div class="app-body">
+
+        <!-- Backdrop behind the off-canvas sidebar on mobile — tapping it closes the menu -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
         <!-- ================================================================
      SIDEBAR
@@ -385,6 +371,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-lending" data-lending="waiting">View All</button>
                         </div>
                         <div class="ps-card-body" style="padding:0">
+                            <div class="ps-table-wrap">
                             <table class="ps-table">
                                 <thead>
                                     <tr>
@@ -422,6 +409,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <?php endif; ?>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
 
@@ -1121,7 +1109,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
 
                     <div class="pr-card">
-                        <div class="pr-card-header pr-card-header-maroon">
+                        <div class="pr-card-header">
                             <h3>
                                 <span class="material-symbols-outlined">calendar_month</span>
                                 Reservations
@@ -1212,7 +1200,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <?php if (empty($rooms_buildings)): ?>
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header pr-card-header-maroon">
+                            <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -1225,7 +1213,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <?php else: ?>
 
                         <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header pr-card-header-maroon">
+                            <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
@@ -1582,7 +1570,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel" id="rooms-issues-panel">
                     <div class="pr-card">
-                        <div class="pr-card-header pr-card-header-maroon">
+                        <div class="pr-card-header">
                             <h3>
                                 <span class="material-symbols-outlined">report_problem</span>
                                 Room Issues
@@ -4579,9 +4567,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     var orgId = document.getElementById('fac-edit-org') ? document.getElementById('fac-edit-org').value : '';
                     var aob = document.getElementById('fac-edit-aob').checked ? '1' : '0';
 
-                    if (!firstName) { _showFacEditAlert('First name is required.', true); return; }
-                    if (!lastName) { _showFacEditAlert('Last name is required.', true); return; }
-                    if (!email) { _showFacEditAlert('PUPSync email is required.', true); return; }
+                    if (!firstName) {
+                        _showFacEditAlert('First name is required.', true);
+                        return;
+                    }
+                    if (!lastName) {
+                        _showFacEditAlert('Last name is required.', true);
+                        return;
+                    }
+                    if (!email) {
+                        _showFacEditAlert('PUPSync email is required.', true);
+                        return;
+                    }
                     if (isAdviser === '1' && !orgId) {
                         _showFacEditAlert('An organization must be selected for an adviser.', true);
                         return;
@@ -4605,19 +4602,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     });
 
                     fetch('equipment-booking/api/update-faculty-account.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    })
-                        .then(function(res) { return res.json(); })
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: body.toString()
+                        })
+                        .then(function(res) {
+                            return res.json();
+                        })
                         .then(function(data) {
                             if (data.status === 'success') {
                                 var fullname = [firstName, lastName].join(' ').trim();
                                 var role = isAdviser === '1' ? 'Organization Adviser' : 'Regular Faculty';
                                 var orgSelEl = document.getElementById('fac-edit-org');
-                                var orgName = (isAdviser === '1' && orgSelEl)
-                                    ? ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '')
-                                    : '';
+                                var orgName = (isAdviser === '1' && orgSelEl) ?
+                                    ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '') :
+                                    '';
                                 var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
 
                                 // Update the row's dataset so re-opening Edit shows the saved values
@@ -4631,9 +4632,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 _facEditRow.dataset.init = fullname.charAt(0).toUpperCase() || 'F';
 
                                 // Reflect the changes in the visible table cells
-                                var subLabel = (isAdviser === '1' && orgNameSafe)
-                                    ? 'Org Adviser \u00B7 ' + orgNameSafe
-                                    : 'Active Faculty';
+                                var subLabel = (isAdviser === '1' && orgNameSafe) ?
+                                    'Org Adviser \u00B7 ' + orgNameSafe :
+                                    'Active Faculty';
                                 var cells = _facEditRow.querySelectorAll('td');
                                 if (cells[0]) {
                                     var nameDiv = cells[0].querySelector('div:first-child');

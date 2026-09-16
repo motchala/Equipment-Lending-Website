@@ -286,11 +286,6 @@
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
         }
-        // Highlight Help Center sidebar item when help overlay is open
-        if (id === 'helpOverlay') {
-            const helpNavItem = document.querySelector('.side-nav-item[data-target="helpOverlay"]');
-            if (helpNavItem) helpNavItem.classList.add('active');
-        }
     }
 
     function openOverlay(id) {
@@ -401,15 +396,106 @@
     //     });
     // }
 
-    /* ── Equipment Search/Filter ───────────────────────────────────────── */
-    function filterEquipment() {
-        const search = (document.getElementById('equipmentSearch').value || '').toLowerCase();
-        const category = (document.getElementById('categoryFilter').value || '').toLowerCase();
-        document.querySelectorAll('.item-node').forEach(item => {
-            const nameMatch = item.dataset.name.includes(search);
+    /* ── Equipment Search/Filter + Pagination ──────────────────────────
+       12 items per page. The 2 featured cards above the catalog are
+       separate markup and are never counted here.
+       Filtering always resets you to page 1 so you don't land on an
+       empty page after narrowing the results.
+    ─────────────────────────────────────────────────────────────────── */
+    const EQ_PER_PAGE = 12;
+    let eqCurrentPage = 1;
+
+    function getMatchingEquipment() {
+        const searchEl = document.getElementById('equipmentSearch');
+        const catEl = document.getElementById('categoryFilter');
+        const search = (searchEl ? searchEl.value : '').toLowerCase();
+        const category = (catEl ? catEl.value : '').toLowerCase();
+        return Array.from(document.querySelectorAll('.item-node')).filter(item => {
+            const nameMatch = (item.dataset.name || '').includes(search);
             const catMatch = !category || item.dataset.category === category;
-            item.style.display = (nameMatch && catMatch) ? '' : 'none';
+            return nameMatch && catMatch;
         });
+    }
+
+    function renderEquipmentPage() {
+        const matches = getMatchingEquipment();
+        const total = matches.length;
+        const totalPages = Math.max(1, Math.ceil(total / EQ_PER_PAGE));
+        if (eqCurrentPage > totalPages) eqCurrentPage = totalPages;
+        if (eqCurrentPage < 1) eqCurrentPage = 1;
+
+        // Hide everything, then reveal only this page's slice
+        document.querySelectorAll('.item-node').forEach(el => { el.style.display = 'none'; });
+        const start = (eqCurrentPage - 1) * EQ_PER_PAGE;
+        matches.slice(start, start + EQ_PER_PAGE).forEach(el => { el.style.display = ''; });
+
+        // Count chip reflects the filtered total, not the page size
+        const chip = document.getElementById('equipCountChip');
+        if (chip) chip.textContent = total + (total === 1 ? ' item' : ' items');
+
+        // Empty state
+        const noRes = document.getElementById('equipNoResults');
+        if (noRes) noRes.style.display = total === 0 ? '' : 'none';
+
+        // Pagination bar — hidden when everything fits on one page
+        const pager = document.getElementById('equipPagination');
+        if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages <= 1) return;
+
+        const info = document.getElementById('equipPageInfo');
+        if (info) {
+            info.textContent = 'Showing ' + (start + 1) + '–' +
+                Math.min(start + EQ_PER_PAGE, total) + ' of ' + total;
+        }
+
+        const prev = document.getElementById('equipPrevBtn');
+        const next = document.getElementById('equipNextBtn');
+        if (prev) prev.disabled = eqCurrentPage === 1;
+        if (next) next.disabled = eqCurrentPage === totalPages;
+
+        // Numbered buttons, windowed so long catalogs don't overflow
+        const nums = document.getElementById('equipPageNumbers');
+        if (nums) {
+            nums.innerHTML = '';
+            const pages = [];
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                let lo = Math.max(2, eqCurrentPage - 1);
+                let hi = Math.min(totalPages - 1, eqCurrentPage + 1);
+                if (lo > 2) pages.push('…');
+                for (let i = lo; i <= hi; i++) pages.push(i);
+                if (hi < totalPages - 1) pages.push('…');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '…') {
+                    const s = document.createElement('span');
+                    s.className = 'eq-pg-ellipsis';
+                    s.textContent = '…';
+                    nums.appendChild(s);
+                    return;
+                }
+                const b = document.createElement('button');
+                b.className = 'eq-pg-num' + (p === eqCurrentPage ? ' active' : '');
+                b.textContent = p;
+                b.addEventListener('click', () => goToEquipmentPage(p));
+                nums.appendChild(b);
+            });
+        }
+    }
+
+    function goToEquipmentPage(page) {
+        eqCurrentPage = page;
+        renderEquipmentPage();
+        const card = document.querySelector('#lending-browse .catalog-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function filterEquipment() {
+        eqCurrentPage = 1;   // new filter => back to page 1
+        renderEquipmentPage();
     }
 
     /* ── Borrow Form ───────────────────────────────────────────────────── */
@@ -471,11 +557,17 @@
             let next = label.nextElementSibling;
             let hasVisible = false;
             while (next && !next.classList.contains('notif-section-label')) {
-                if (next.style.display !== 'none') hasVisible = true;
+                if (!next.classList.contains('fnotif-empty') && next.style.display !== 'none') hasVisible = true;
                 next = next.nextElementSibling;
             }
             label.style.display = hasVisible ? '' : 'none';
         });
+
+        // "Nothing here" state when a filter matches no cards
+        const anyVisible = Array.from(document.querySelectorAll('.notif-card'))
+            .some(c => c.style.display !== 'none');
+        const empty = document.getElementById('notifEmptyState');
+        if (empty) empty.style.display = anyVisible ? 'none' : '';
     }
 
     function markAllRead() {
@@ -488,8 +580,23 @@
         });
         const uc = document.getElementById('unreadCount');
         if (uc) uc.textContent = '0 unread';
+
+        // Clear every unread indicator: legacy badges, the avatar badge,
+        // and the count pill in the avatar dropdown.
         document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
+        const avBadge = document.getElementById('notifBadge');
+        if (avBadge) { avBadge.textContent = '0'; avBadge.style.display = 'none'; }
+        const ddCount = document.getElementById('notifDdCount');
+        if (ddCount) { ddCount.textContent = '0'; ddCount.style.display = 'none'; }
+        const avBtn = document.getElementById('avatarBtn');
+        if (avBtn) avBtn.setAttribute('aria-label', 'Account menu');
+
         LS.setJ('notifRead', readArr);
+
+        // If the Unread tab is active, re-run it so the list reflects the change
+        const activeTab = document.querySelector('.notif-tab.active');
+        if (activeTab) filterNotifs(activeTab.dataset.notifFilter || 'all');
+
         showToast('All notifications marked as read.');
     }
 
@@ -1286,6 +1393,19 @@
                     switchTab(el.dataset.tab, el.dataset.lending || null);
                     if (el.dataset.lending) switchLendingSub(el.dataset.lending);
                     break;
+                case 'myact-report-issue': {
+                    var actChat = document.getElementById('actAiChat');
+                    var actInput = document.getElementById('actAiInput');
+                    if (actChat) actChat.classList.add('open');
+                    if (actInput) {
+                        var equipName = el.dataset.equipment || 'this item';
+                        var reqId = el.dataset.requestId || '';
+                        actInput.value = 'I need to report an issue with my "' + equipName + '"'
+                            + (reqId ? ' (Request #' + reqId + ')' : '') + '.';
+                        actInput.focus();
+                    }
+                    break;
+                }
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
@@ -1379,6 +1499,12 @@
                 case 'mark-all-read':
                     markAllRead();
                     break;
+                case 'open-notif-modal':
+                    openNotifModal();
+                    break;
+                case 'close-notif-modal':
+                    closeNotifModal();
+                    break;
                 case 'toast':
                     showToast(el.dataset.msg || '');
                     break;
@@ -1408,7 +1534,6 @@
     if (avatarBtn) {
         avatarBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            closeNotifPopover();
             toggleDropdown();
         });
     }
@@ -1416,32 +1541,57 @@
     /* ── Close dropdown on outside click ─────────────────────────────── */
     document.addEventListener('click', function (e) {
         if (!e.target.closest('#avatarWrap')) closeDropdown();
-        if (!e.target.closest('#notifWrap')) closeNotifPopover();
     });
 
-    /* ── Notification bell popover ────────────────────────────────────── */
-    function openNotifPopover() {
-        const pop = document.getElementById('notifPopover');
-        const btn = document.getElementById('notifBtn');
-        if (pop) pop.classList.add('open');
-        if (btn) btn.setAttribute('aria-expanded', 'true');
+    /* ── Notifications modal ──────────────────────────────────────────
+       The bell now lives on the avatar: the dropdown's "Notifications"
+       item opens this modal.
+    ─────────────────────────────────────────────────────────────────── */
+    function openNotifModal() {
+        const modal = document.getElementById('notifModal');
+        if (!modal) return;
+        closeDropdown();
+        filterNotifs('all');          // always open on the All tab
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
     }
-    function closeNotifPopover() {
-        const pop = document.getElementById('notifPopover');
-        const btn = document.getElementById('notifBtn');
-        if (pop) pop.classList.remove('open');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
+
+    function closeNotifModal() {
+        const modal = document.getElementById('notifModal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
     }
-    const notifBtn = document.getElementById('notifBtn');
-    if (notifBtn) {
-        notifBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            closeDropdown();
-            const pop = document.getElementById('notifPopover');
-            if (pop && pop.classList.contains('open')) closeNotifPopover();
-            else openNotifPopover();
+
+    // Backdrop click + Esc to dismiss
+    const notifModalEl = document.getElementById('notifModal');
+    if (notifModalEl) {
+        notifModalEl.addEventListener('click', function (e) {
+            if (e.target === notifModalEl) closeNotifModal();
         });
     }
+
+    /* Direct bindings as a safety net: if anything ever stops the click
+       from bubbling up to the delegated [data-action] handler, these
+       still fire. Guarded so the modal can't open twice. */
+    document.querySelectorAll('[data-action="open-notif-modal"]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openNotifModal();
+        });
+    });
+    document.querySelectorAll('[data-action="close-notif-modal"]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeNotifModal();
+        });
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        const m = document.getElementById('notifModal');
+        if (m && m.style.display === 'flex') closeNotifModal();
+    });
 
     /* ── Mobile menu toggle ──────────────────────────────────────────── */
     function openMobileNav() {
@@ -1591,6 +1741,13 @@
     const eqCat = document.getElementById('categoryFilter');
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
+
+    /* Pagination: prev/next + first paint */
+    const eqPrev = document.getElementById('equipPrevBtn');
+    const eqNext = document.getElementById('equipNextBtn');
+    if (eqPrev) eqPrev.addEventListener('click', () => goToEquipmentPage(eqCurrentPage - 1));
+    if (eqNext) eqNext.addEventListener('click', () => goToEquipmentPage(eqCurrentPage + 1));
+    if (document.getElementById('equipmentList')) renderEquipmentPage();
 
     /* ── Global Live Search ───────────────────────────────────────────── */
     (function initLiveSearch() {
