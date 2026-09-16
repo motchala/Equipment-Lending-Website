@@ -8345,3 +8345,293 @@ body {
         display: none;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FACULTY UI ADDITIONS
+   1. Sidebar Sign Out       2. Avatar notification badge + dropdown count
+   3. Notifications modal    4. Equipment pagination
+   All colours come from the existing design tokens, so dark / high-contrast
+   themes are inherited automatically — no per-theme overrides needed.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Sidebar: Sign Out (sits last in .side-nav-footer) ─────────────── */
+.side-nav-item.side-nav-signout {
+    margin-top: 4px;
+    color: var(--color-error) !important;
+}
+
+.side-nav-item.side-nav-signout .material-symbols-outlined {
+    color: var(--color-error) !important;
+}
+
+.side-nav-item.side-nav-signout:hover {
+    background: var(--color-error-container) !important;
+    color: var(--color-error) !important;
+}
+
+[data-theme="dark"] .side-nav-item.side-nav-signout:hover {
+    background: rgba(248, 113, 113, 0.14) !important;
+}
+
+/* ── 2. Avatar notification badge ─────────────────────────────────────── */
+.top-bar-profile-wrap {
+    position: relative;
+}
+
+/* The avatar is `overflow:hidden` for the photo crop, so the badge has to
+   live outside it — it is positioned against the wrapper instead. */
+.avatar-notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-surface);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Count pill inside the avatar dropdown's Notifications row */
+.dd-item-count {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    color: #ffffff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+/* ── 3. Notifications modal ───────────────────────────────────────────── */
+.fnotif-box {
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    max-height: min(82vh, 760px);
+}
+
+.fnotif-header {
+    flex-shrink: 0;
+}
+
+.fnotif-subhead {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 22px 0;
+}
+
+.fnotif-count-text {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--color-on-surface-variant);
+}
+
+.fnotif-count-text strong {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+.fnotif-markall-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-container);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.fnotif-markall-btn:hover {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.fnotif-tabs {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px 22px 4px;
+}
+
+/* Scrollable region — the header, sub-header and tabs stay put */
+.fnotif-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 22px 22px;
+}
+
+.fnotif-body .notif-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.fnotif-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--color-secondary);
+}
+
+.fnotif-empty .material-symbols-outlined {
+    font-size: 44px;
+    display: block;
+    margin-bottom: 10px;
+    opacity: 0.35;
+    color: var(--color-primary);
+}
+
+.fnotif-empty p {
+    margin: 0;
+    font-size: 0.86rem;
+}
+
+@media (max-width: 600px) {
+    .fnotif-box {
+        max-height: 92vh;
+    }
+
+    .fnotif-subhead,
+    .fnotif-tabs {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .fnotif-body {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .fnotif-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+    }
+
+    .fnotif-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .fnotif-tabs .notif-tab {
+        flex-shrink: 0;
+    }
+}
+
+/* ── 4. Equipment pagination ──────────────────────────────────────────── */
+.eq-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+.eq-pg-info {
+    font-size: 0.8rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 500;
+}
+
+.eq-pg-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.eq-pg-numbers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.eq-pg-btn,
+.eq-pg-num {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.eq-pg-btn .material-symbols-outlined {
+    font-size: 19px;
+}
+
+.eq-pg-btn:hover:not(:disabled),
+.eq-pg-num:hover:not(.active) {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+    color: var(--color-primary);
+}
+
+.eq-pg-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.eq-pg-num.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+    cursor: default;
+}
+
+.eq-pg-ellipsis {
+    padding: 0 4px;
+    color: var(--color-secondary);
+    font-size: 0.82rem;
+    user-select: none;
+}
+
+@media (max-width: 600px) {
+    .eq-pagination {
+        justify-content: center;
+    }
+
+    .eq-pg-info {
+        width: 100%;
+        text-align: center;
+    }
+
+    .eq-pg-controls {
+        margin-left: 0;
+    }
+}

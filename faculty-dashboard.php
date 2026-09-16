@@ -1561,9 +1561,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <span class="material-symbols-outlined">settings</span>
                 <span>Settings</span>
             </a>
-            <a class="side-nav-item" href="#" data-action="open-overlay" data-target="helpOverlay">
-                <span class="material-symbols-outlined">help</span>
-                <span>Help Center</span>
+            <!-- Sign Out — pinned to the very bottom of the sidebar -->
+            <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
+                <span class="material-symbols-outlined">logout</span>
+                <span>Sign Out</span>
             </a>
         </div>
     </nav>
@@ -1587,57 +1588,17 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <div class="live-search-dropdown" id="liveSearchDropdown" style="display:none;"></div>
             </div>
             <div class="top-bar-actions">
-                <!-- Notification Bell -->
-                <div class="top-bar-notif-wrap" id="notifWrap">
-                    <button class="top-bar-icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
-                        <span class="material-symbols-outlined">notifications</span>
-                        <?php if ($notif_count > 0): ?>
-                            <span class="top-bar-badge" id="notifBadge"><?php echo $notif_count; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <!-- Notification Popover -->
-                    <div class="notif-popover" id="notifPopover" role="menu">
-                        <div class="notif-popover-head">
-                            <span>Notifications</span>
-                            <button class="notif-mark-read-btn" data-action="mark-all-read">Mark all read</button>
-                        </div>
-                        <div class="notif-popover-list">
-                            <?php if (!empty($overdue_notifs)): foreach ($overdue_notifs as $on): ?>
-                                    <div class="notif-pop-item unread" data-cat="overdue">
-                                        <div class="notif-pop-dot notif-dot-error"></div>
-                                        <div class="notif-pop-body">
-                                            <div class="notif-pop-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                            <div class="notif-pop-sub">Due <?php echo htmlspecialchars($on['return_date']); ?> — return immediately</div>
-                                        </div>
-                                    </div>
-                            <?php endforeach;
-                            endif; ?>
-                            <div class="notif-pop-item unread" data-cat="borrow">
-                                <div class="notif-pop-dot notif-dot-primary"></div>
-                                <div class="notif-pop-body">
-                                    <div class="notif-pop-title">Borrow Request Approved</div>
-                                    <div class="notif-pop-sub">Pick up at Admin Office before 5:00 PM</div>
-                                </div>
-                            </div>
-                            <div class="notif-pop-item unread" data-cat="system">
-                                <div class="notif-pop-dot notif-dot-secondary"></div>
-                                <div class="notif-pop-body">
-                                    <div class="notif-pop-title">System Maintenance Tonight</div>
-                                    <div class="notif-pop-sub">PUPSYNC offline 11 PM – 1 AM</div>
-                                </div>
-                            </div>
-                        </div>
-                        <button class="notif-popover-footer" data-action="open-overlay" data-target="notifOverlay">View all notifications</button>
-                    </div>
-                </div>
-                <!-- Avatar -->
+                <!-- Avatar (now also carries the notification indicator) -->
                 <div class="top-bar-profile-wrap" id="avatarWrap" data-name="<?php echo htmlspecialchars($fullname); ?>">
-                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false"
+                        aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread notifications' : ''; ?>">
                         <?php if ($profile_pic_url): ?>
                             <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img">
                         <?php else: ?>
                             <?php echo htmlspecialchars($initials); ?>
                         <?php endif; ?>
+                        <span class="avatar-notif-badge" id="notifBadge"
+                            <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
                     </button>
                     <!-- Simple Avatar Dropdown -->
                     <div class="profile-dropdown" id="profileDropdown" role="menu">
@@ -1655,6 +1616,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             </div>
                         </div>
                         <div class="dd-menu">
+                            <button class="dd-item" data-action="open-notif-modal">
+                                <span class="material-symbols-outlined dd-item-icon">notifications</span>
+                                <span>Notifications</span>
+                                <span class="dd-item-count" id="notifDdCount"
+                                    <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
+                            </button>
                             <button class="dd-item dd-logout" data-action="logout">
                                 <span class="material-symbols-outlined dd-item-icon">logout</span> Sign Out
                             </button>
@@ -2121,6 +2088,28 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                     </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
+                        </div>
+
+                        <!-- No results (search/filter matched nothing) -->
+                        <div class="eq-empty" id="equipNoResults" style="display:none;">
+                            <span class="material-symbols-outlined">search_off</span>
+                            <p>No equipment matches your search.</p>
+                        </div>
+
+                        <!-- ── Pagination (12 items per page; featured cards above are not counted) ── -->
+                        <div class="eq-pagination" id="equipPagination" style="display:none;">
+                            <div class="eq-pg-info" id="equipPageInfo"></div>
+                            <div class="eq-pg-controls">
+                                <button class="eq-pg-btn" id="equipPrevBtn" data-action="equip-page-prev"
+                                    aria-label="Previous page">
+                                    <span class="material-symbols-outlined">chevron_left</span>
+                                </button>
+                                <div class="eq-pg-numbers" id="equipPageNumbers"></div>
+                                <button class="eq-pg-btn" id="equipNextBtn" data-action="equip-page-next"
+                                    aria-label="Next page">
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div><!-- /lending-browse -->
@@ -3106,6 +3095,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <a class="sov-nav-item" data-sov-tab="sov-tab-privacy" href="#">
                         Privacy
                     </a>
+                    <a class="sov-nav-item" data-sov-tab="sov-tab-help" href="#">
+                        Help &amp; Support
+                    </a>
                 </nav>
 
                 <!-- Right content area -->
@@ -3410,35 +3402,136 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                         </div>
                     </div><!-- /sov-tab-privacy -->
 
+                    <!-- ══ TAB: Help & Support ═══════════════════════════ -->
+                    <div class="sov-tab-panel" id="sov-tab-help">
+                        <div class="sov-form-card">
+                            <h3 class="sov-form-title">Help &amp; Support</h3>
+                            <p class="sov-form-hint" style="margin:-4px 0 18px;">Browse common topics or contact the system administrator for further assistance.</p>
+
+                            <div style="display:flex;flex-direction:column;gap:12px;">
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I borrow equipment?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Go to the <strong>Equipment</strong> tab on the sidebar, browse the catalog, and click
+                                        <em>Borrow</em> on any available item. Fill in the borrow date, return date, room, and
+                                        instructor, then submit. Your request will be reviewed by the admin.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I return a borrowed item?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Physically return the borrowed item to the Admin Office. The administrator will then confirm and
+                                        mark your item as returned in the system. You can track the status update in <strong>Equipment
+                                            &mdash; My Requests</strong> or the <strong>My Activity</strong> tab.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        Why is my request showing as Overdue?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Your item's return date has passed without it being marked as returned. Please return the item
+                                        to the Admin Office immediately. Contact the system administrator if you believe this is an
+                                        error.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I reserve a facility or room?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Go to the <strong>Facilities</strong> tab on the sidebar. Browse available rooms, check their
+                                        availability, and submit a reservation request. Approvals are handled by the facilities
+                                        coordinator.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I update my profile or change my password?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Open <strong>Settings</strong> from the sidebar. From there you can update your profile
+                                        picture, name, department, and change your password securely.
+                                    </div>
+                                </details>
+
+                            </div>
+
+                            <div class="help-contact-card" style="margin-top:28px;">
+                                <span class="material-symbols-outlined"
+                                    style="font-size:32px;color:var(--color-primary);margin-bottom:8px;">support_agent</span>
+                                <h4>Still need help?</h4>
+                                <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
+                                <a href="mailto:admin@pupsync.edu.ph" class="btn-urgent-primary"
+                                    style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:12px;">
+                                    <span class="material-symbols-outlined" style="font-size:16px">mail</span>
+                                    Email Administrator
+                                </a>
+                            </div>
+                        </div>
+                    </div><!-- /sov-tab-help -->
+
                 </div><!-- /sov-content -->
             </div><!-- /sov-body -->
         </div><!-- /sov-shell -->
     </div><!-- /settingsOverlay -->
 
     <!-- ================================================================
-     OVERLAY: NOTIFICATIONS
+     MODAL: NOTIFICATIONS  (faculty)
+     Same structural pattern as the admin notification modal — opened
+     from the avatar dropdown instead of living on its own page.
+     Content is scoped to what a faculty member actually gets:
+     overdue items, borrow-request updates, and system notices.
 ================================================================ -->
-    <div class="overlay-page" id="notifOverlay">
-        <div class="overlay-topbar">
-            <button class="overlay-back-btn" data-action="close-overlay" data-target="notifOverlay">
-                <span class="material-symbols-outlined">arrow_back</span> Back
-            </button>
-            <span class="overlay-topbar-title">Notifications</span>
-            <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
-        </div>
-        <div class="notif-overlay-wrap">
+    <div class="modal-backdrop fnotif-backdrop" id="notifModal" style="display:none;" role="dialog" aria-modal="true"
+        aria-labelledby="notifModalTitle">
+        <div class="modal-box fnotif-box">
 
-            <!-- Header row -->
-            <div class="notif-overlay-header">
-                <div>
-                    <h1 class="page-title">Notifications</h1>
-                    <p class="page-subtitle">You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong> notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.</p>
-                </div>
-                <button class="mark-read-btn" data-action="mark-all-read">Mark all as read</button>
+            <!-- Header -->
+            <div class="modal-header fnotif-header">
+                <h3 id="notifModalTitle">
+                    <span class="material-symbols-outlined"
+                        style="font-size:18px;vertical-align:middle;margin-right:8px;">notifications</span>
+                    Notifications
+                </h3>
+                <button class="modal-close-btn" data-action="close-notif-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <!-- Sub-header: unread count + mark all read -->
+            <div class="fnotif-subhead">
+                <p class="fnotif-count-text">
+                    You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong>
+                    notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.
+                </p>
+                <button class="fnotif-markall-btn" data-action="mark-all-read">
+                    <span class="material-symbols-outlined" style="font-size:15px">done_all</span>
+                    Mark all as read
+                </button>
             </div>
 
             <!-- Filter tabs -->
-            <div class="notif-filter-tabs">
+            <div class="fnotif-tabs">
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
                 <button class="notif-tab" data-notif-filter="overdue">Overdue</button>
@@ -3446,185 +3539,105 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <button class="notif-tab" data-notif-filter="system">System</button>
             </div>
 
-            <!-- Notification cards -->
-            <div class="notif-card-list">
+            <!-- Scrollable list -->
+            <div class="modal-body fnotif-body">
+                <div class="notif-card-list">
 
-                <?php if (!empty($overdue_notifs)): ?>
-                    <div class="notif-section-label notif-section-overdue">
-                        <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
-                        Overdue — Action Required
-                    </div>
-                    <?php foreach ($overdue_notifs as $on): ?>
-                        <div class="notif-card unread notif-card-overdue" data-cat="overdue">
-                            <div class="notif-card-icon ni-overdue">
-                                <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
-                            </div>
-                            <div class="notif-card-body">
-                                <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                <div class="notif-card-sub">Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong> — return immediately to avoid penalties.</div>
-                            </div>
-                            <div class="notif-card-meta">
-                                <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
-                                <div class="unread-dot"></div>
-                            </div>
+                    <?php if (!empty($overdue_notifs)): ?>
+                        <div class="notif-section-label notif-section-overdue">
+                            <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
+                            Overdue — Action Required
                         </div>
-                <?php endforeach;
-                endif; ?>
+                        <?php foreach ($overdue_notifs as $on): ?>
+                            <div class="notif-card unread notif-card-overdue" data-cat="overdue">
+                                <div class="notif-card-icon ni-overdue">
+                                    <span class="material-symbols-outlined"
+                                        style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
+                                </div>
+                                <div class="notif-card-body">
+                                    <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
+                                    <div class="notif-card-sub">Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong> — return immediately to avoid penalties.</div>
+                                </div>
+                                <div class="notif-card-meta">
+                                    <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
+                                    <div class="unread-dot"></div>
+                                </div>
+                            </div>
+                    <?php endforeach;
+                    endif; ?>
 
-                <div class="notif-section-label">Today</div>
+                    <div class="notif-section-label">Today</div>
 
-                <div class="notif-card unread" data-cat="borrow">
-                    <div class="notif-card-icon ni-success">
-                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
+                    <div class="notif-card unread" data-cat="borrow">
+                        <div class="notif-card-icon ni-success">
+                            <span class="material-symbols-outlined"
+                                style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
+                        </div>
+                        <div class="notif-card-body">
+                            <div class="notif-card-title">Borrow Request Approved</div>
+                            <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</div>
+                        </div>
+                        <div class="notif-card-meta">
+                            <span class="notif-time">9:42 AM</span>
+                            <div class="unread-dot"></div>
+                        </div>
                     </div>
-                    <div class="notif-card-body">
-                        <div class="notif-card-title">Borrow Request Approved</div>
-                        <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</div>
-                    </div>
-                    <div class="notif-card-meta">
-                        <span class="notif-time">9:42 AM</span>
-                        <div class="unread-dot"></div>
-                    </div>
-                </div>
 
-                <div class="notif-card unread" data-cat="system">
-                    <div class="notif-card-icon ni-alert">
-                        <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
+                    <div class="notif-card unread" data-cat="system">
+                        <div class="notif-card-icon ni-alert">
+                            <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
+                        </div>
+                        <div class="notif-card-body">
+                            <div class="notif-card-title">System Maintenance Tonight</div>
+                            <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</div>
+                        </div>
+                        <div class="notif-card-meta">
+                            <span class="notif-time">8:00 AM</span>
+                            <div class="unread-dot"></div>
+                        </div>
                     </div>
-                    <div class="notif-card-body">
-                        <div class="notif-card-title">System Maintenance Tonight</div>
-                        <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</div>
-                    </div>
-                    <div class="notif-card-meta">
-                        <span class="notif-time">8:00 AM</span>
-                        <div class="unread-dot"></div>
-                    </div>
-                </div>
 
-                <div class="notif-section-label">Yesterday</div>
+                    <div class="notif-section-label">Yesterday</div>
 
-                <div class="notif-card unread" data-cat="borrow">
-                    <div class="notif-card-icon ni-warn">
-                        <span class="material-symbols-outlined" style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
+                    <div class="notif-card unread" data-cat="borrow">
+                        <div class="notif-card-icon ni-warn">
+                            <span class="material-symbols-outlined"
+                                style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
+                        </div>
+                        <div class="notif-card-body">
+                            <div class="notif-card-title">Return Reminder</div>
+                            <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</div>
+                        </div>
+                        <div class="notif-card-meta">
+                            <span class="notif-time">4:15 PM</span>
+                            <div class="unread-dot"></div>
+                        </div>
                     </div>
-                    <div class="notif-card-body">
-                        <div class="notif-card-title">Return Reminder</div>
-                        <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</div>
+
+                    <div class="notif-card" data-cat="borrow">
+                        <div class="notif-card-icon ni-success">
+                            <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span>
+                        </div>
+                        <div class="notif-card-body">
+                            <div class="notif-card-title">Request Submitted</div>
+                            <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.</div>
+                        </div>
+                        <div class="notif-card-meta">
+                            <span class="notif-time">2:00 PM</span>
+                        </div>
                     </div>
-                    <div class="notif-card-meta">
-                        <span class="notif-time">4:15 PM</span>
-                        <div class="unread-dot"></div>
+
+                    <!-- Shown by JS when a filter matches nothing -->
+                    <div class="fnotif-empty" id="notifEmptyState" style="display:none;">
+                        <span class="material-symbols-outlined">notifications_off</span>
+                        <p>Nothing here right now.</p>
                     </div>
-                </div>
 
-                <div class="notif-card" data-cat="borrow">
-                    <div class="notif-card-icon ni-success">
-                        <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span>
-                    </div>
-                    <div class="notif-card-body">
-                        <div class="notif-card-title">Request Submitted</div>
-                        <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.</div>
-                    </div>
-                    <div class="notif-card-meta">
-                        <span class="notif-time">2:00 PM</span>
-                    </div>
-                </div>
+                </div><!-- /notif-card-list -->
+            </div><!-- /fnotif-body -->
+        </div><!-- /fnotif-box -->
+    </div><!-- /notifModal -->
 
-            </div><!-- /notif-card-list -->
-        </div><!-- /notif-overlay-wrap -->
-    </div><!-- /notifOverlay -->
-
-    <!-- ================================================================
-     OVERLAY: HELP CENTER
-================================================================ -->
-    <div class="overlay-page" id="helpOverlay">
-        <div class="unified-settings-wrap">
-            <div class="unified-settings-header">
-                <h1>Help Center</h1>
-                <p>Browse common topics or contact the system administrator for further assistance.</p>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:12px;">
-
-                <details class="help-item">
-                    <summary class="help-item-q">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        How do I borrow equipment?
-                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
-                    </summary>
-                    <div class="help-item-a">
-                        Go to the <strong>Equipment</strong> tab on the sidebar, browse the catalog, and click
-                        <em>Borrow</em> on any available item. Fill in the borrow date, return date, room, and
-                        instructor, then submit. Your request will be reviewed by the admin.
-                    </div>
-                </details>
-
-                <details class="help-item">
-                    <summary class="help-item-q">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        How do I return a borrowed item?
-                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
-                    </summary>
-                    <div class="help-item-a">
-                        Physically return the borrowed item to the Admin Office. The administrator will then confirm and
-                        mark your item as returned in the system. You can track the status update in <strong>Equipment
-                            &mdash; My Requests</strong> or the <strong>My Activity</strong> tab.
-                    </div>
-                </details>
-
-                <details class="help-item">
-                    <summary class="help-item-q">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        Why is my request showing as Overdue?
-                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
-                    </summary>
-                    <div class="help-item-a">
-                        Your item's return date has passed without it being marked as returned. Please return the item
-                        to the Admin Office immediately. Contact the system administrator if you believe this is an
-                        error.
-                    </div>
-                </details>
-
-                <details class="help-item">
-                    <summary class="help-item-q">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        How do I reserve a facility or room?
-                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
-                    </summary>
-                    <div class="help-item-a">
-                        Go to the <strong>Facilities</strong> tab on the sidebar. Browse available rooms, check their
-                        availability, and submit a reservation request. Approvals are handled by the facilities
-                        coordinator.
-                    </div>
-                </details>
-
-                <details class="help-item">
-                    <summary class="help-item-q">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        How do I update my profile or change my password?
-                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
-                    </summary>
-                    <div class="help-item-a">
-                        Open <strong>Settings</strong> from the sidebar. From there you can update your profile
-                        picture, name, department, and change your password securely.
-                    </div>
-                </details>
-
-            </div>
-
-            <div class="help-contact-card" style="margin-top:28px;">
-                <span class="material-symbols-outlined"
-                    style="font-size:32px;color:var(--color-primary);margin-bottom:8px;">support_agent</span>
-                <h4>Still need help?</h4>
-                <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
-                <a href="mailto:admin@pupsync.edu.ph" class="btn-urgent-primary"
-                    style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:12px;">
-                    <span class="material-symbols-outlined" style="font-size:16px">mail</span>
-                    Email Administrator
-                </a>
-            </div>
-        </div>
-    </div><!-- /helpOverlay -->
 
 
     <!-- ================================================================
