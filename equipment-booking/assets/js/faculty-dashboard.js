@@ -1569,6 +1569,24 @@
             if (e.target === notifModalEl) closeNotifModal();
         });
     }
+
+    /* Direct bindings as a safety net: if anything ever stops the click
+       from bubbling up to the delegated [data-action] handler, these
+       still fire. Guarded so the modal can't open twice. */
+    document.querySelectorAll('[data-action="open-notif-modal"]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openNotifModal();
+        });
+    });
+    document.querySelectorAll('[data-action="close-notif-modal"]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeNotifModal();
+        });
+    });
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         const m = document.getElementById('notifModal');

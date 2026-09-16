@@ -1523,16 +1523,17 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
     <nav class="side-nav" id="sideNav">
         <div class="side-nav-brand">
             <div class="side-nav-logo">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
+                    aria-hidden="true">
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
             </div>
-            <div>
-                <div class="side-nav-title"><strong>PUP</strong>SYNC</div>
-                <div class="side-nav-sub">Faculty Platform</div>
+            <div class="side-nav-brand-text">
+                <span class="side-nav-title"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
+                <span class="side-nav-sub">Faculty Portal</span>
             </div>
         </div>
 
@@ -3038,45 +3039,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
         <!-- Two-column shell -->
         <div class="sov-shell">
 
-            <!-- ── Profile Banner ───────────────────────────── -->
-            <section class="sov-banner">
-                <div class="sov-banner-inner">
-                    <h1 class="sov-banner-title">Profile Summary</h1>
-                    <div class="sov-profile-card">
-                        <!-- Join date -->
-                        <div class="sov-pc-col sov-pc-meta">
-                            <span class="material-symbols-outlined sov-meta-icon">calendar_today</span>
-                            <span class="sov-meta-lbl">Joined: Oct 2023</span>
-                        </div>
-                        <!-- Avatar + name -->
-                        <div class="sov-pc-col sov-pc-main">
-                            <div class="sov-pc-avatar-wrap">
-                                <div class="sov-pc-avatar">
-                                    <?php if ($profile_pic_url): ?>
-                                        <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="sov-avatar-img">
-                                    <?php else: ?>
-                                        <?php echo htmlspecialchars($initials); ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            <h2 class="sov-pc-name"><?php echo htmlspecialchars($fullname); ?></h2>
-                            <p class="sov-pc-id"><?php echo htmlspecialchars($_SESSION['faculty_id']); ?></p>
-                            <span class="sov-pc-badge">Active Faculty</span>
-                            <p class="sov-pc-verified">Last Verified: Oct 25, 2023</p>
-                        </div>
-                        <!-- Clearance + actions -->
-                        <div class="sov-pc-col sov-pc-actions">
-                            <div class="sov-clearance-pill">
-                                <span>Clearance Status:</span>
-                                <span class="sov-clearance-ok">Cleared</span>
-                                <span class="material-symbols-outlined sov-clearance-chk">check_circle</span>
-                            </div>
-                            <button class="sov-action-btn" data-action="open-overlay" data-target="accountOverlay">View My Permissions</button>
-                            <button class="sov-action-btn" data-action="open-email-verify-modal">Generate Pickup QR</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <!-- ── Simple page heading ──────────────────────────── -->
+            <div class="sov-pagehead">
+                <h1 class="sov-pagehead-title">Settings</h1>
+                <p class="sov-pagehead-sub">Manage your profile, appearance, and account preferences.</p>
+            </div>
 
             <!-- ── Settings Body (sidebar + content) ────────── -->
             <div class="sov-body">
@@ -3289,21 +3256,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 </div>
                             </div>
 
-                            <!-- 2FA -->
-                            <div class="sov-section-block">
-                                <p class="sov-section-label">Two-Factor Authentication</p>
-                                <div class="sov-security-row">
-                                    <div class="sov-security-info">
-                                        <span class="material-symbols-outlined sov-sec-icon">verified_user</span>
-                                        <div>
-                                            <p class="sov-sec-title">Authenticator App</p>
-                                            <p class="sov-sec-sub">Add an extra layer of protection to your account.</p>
-                                        </div>
-                                    </div>
-                                    <button class="sov-outline-btn" data-action="open-email-verify-modal">Manage</button>
-                                </div>
-                            </div>
-
                             <!-- Active Sessions -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Active Sessions</p>
@@ -3354,27 +3306,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 </div>
                             </div>
 
-                            <!-- Visibility -->
-                            <div class="sov-section-block">
-                                <p class="sov-section-label">Profile Visibility</p>
-                                <div class="sov-toggle-list">
-                                    <div class="sov-toggle-row">
-                                        <div class="sov-toggle-info">
-                                            <p class="sov-toggle-title">Show Profile to Other Faculty</p>
-                                            <p class="sov-toggle-sub">Allow other faculty members to view your basic profile</p>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                    </div>
-                                    <div class="sov-toggle-row">
-                                        <div class="sov-toggle-info">
-                                            <p class="sov-toggle-title">Show Activity Status</p>
-                                            <p class="sov-toggle-sub">Let others see when you were last active</p>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Data management -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Data Management</p>
@@ -3387,16 +3318,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                         </div>
                                     </div>
                                     <button class="sov-outline-btn" data-action="toast" data-msg="Data export coming soon!">Export</button>
-                                </div>
-                                <div class="sov-privacy-action-row sov-danger-row">
-                                    <div class="sov-security-info">
-                                        <span class="material-symbols-outlined sov-sec-icon sov-icon-danger">delete_forever</span>
-                                        <div>
-                                            <p class="sov-sec-title sov-text-danger">Delete Account</p>
-                                            <p class="sov-sec-sub">Permanently remove your account and all associated data.</p>
-                                        </div>
-                                    </div>
-                                    <button class="sov-danger-btn" data-action="toast" data-msg="Please contact your administrator to delete your account.">Delete</button>
                                 </div>
                             </div>
                         </div>
@@ -3504,74 +3425,84 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 ================================================================ -->
     <div class="modal-backdrop fnotif-backdrop" id="notifModal" style="display:none;" role="dialog" aria-modal="true"
         aria-labelledby="notifModalTitle">
-        <div class="modal-box fnotif-box">
+        <div class="fnotif-box">
 
-            <!-- Header -->
-            <div class="modal-header fnotif-header">
-                <h3 id="notifModalTitle">
-                    <span class="material-symbols-outlined"
-                        style="font-size:18px;vertical-align:middle;margin-right:8px;">notifications</span>
-                    Notifications
-                </h3>
-                <button class="modal-close-btn" data-action="close-notif-modal" aria-label="Close">
+            <!-- Head: icon + title + close -->
+            <div class="fnotif-head">
+                <div class="fnotif-head-icon">
+                    <span class="material-symbols-outlined">notifications</span>
+                </div>
+                <h3 class="fnotif-head-title" id="notifModalTitle">Notifications</h3>
+                <button class="fnotif-close" data-action="close-notif-modal" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
 
-            <!-- Sub-header: unread count + mark all read -->
+            <!-- Unread count + mark all read -->
             <div class="fnotif-subhead">
                 <p class="fnotif-count-text">
                     You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong>
                     notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.
                 </p>
-                <button class="fnotif-markall-btn" data-action="mark-all-read">
-                    <span class="material-symbols-outlined" style="font-size:15px">done_all</span>
-                    Mark all as read
-                </button>
+                <button class="fnotif-markall-btn" data-action="mark-all-read">Mark all as read</button>
             </div>
 
-            <!-- Filter tabs -->
+            <!-- Filter pills (counts are front-end only for now) -->
             <div class="fnotif-tabs">
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
-                <button class="notif-tab" data-notif-filter="overdue">Overdue</button>
-                <button class="notif-tab" data-notif-filter="borrow">Borrow</button>
-                <button class="notif-tab" data-notif-filter="system">System</button>
+                <button class="notif-tab" data-notif-filter="overdue">
+                    Overdue
+                    <?php if (!empty($overdue_notifs)): ?>
+                        <span class="fnotif-pill-count"><?php echo count($overdue_notifs); ?></span>
+                    <?php endif; ?>
+                </button>
+                <button class="notif-tab" data-notif-filter="borrow">
+                    Borrow <span class="fnotif-pill-count">3</span>
+                </button>
+                <button class="notif-tab" data-notif-filter="system">
+                    System <span class="fnotif-pill-count">1</span>
+                </button>
             </div>
 
             <!-- Scrollable list -->
-            <div class="modal-body fnotif-body">
+            <div class="fnotif-body">
                 <div class="notif-card-list">
 
                     <?php if (!empty($overdue_notifs)): ?>
                         <div class="notif-section-label notif-section-overdue">
-                            <span class="material-symbols-outlined" style="font-size:14px;">alarm</span>
-                            Overdue — Action Required
+                            <span class="material-symbols-outlined">warning</span>
+                            OVERDUE — IMMEDIATE ACTION NEEDED
                         </div>
                         <?php foreach ($overdue_notifs as $on): ?>
+                            <?php
+                            $due_ts   = strtotime($on['return_date']);
+                            $days_late = $due_ts ? max(0, (int)floor((time() - $due_ts) / 86400)) : 0;
+                            ?>
                             <div class="notif-card unread notif-card-overdue" data-cat="overdue">
                                 <div class="notif-card-icon ni-overdue">
-                                    <span class="material-symbols-outlined"
-                                        style="font-size:18px;font-variation-settings:'FILL' 1">alarm</span>
+                                    <span class="material-symbols-outlined">schedule</span>
                                 </div>
                                 <div class="notif-card-body">
                                     <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                    <div class="notif-card-sub">Due on <strong><?php echo htmlspecialchars($on['return_date']); ?></strong> — return immediately to avoid penalties.</div>
+                                    <div class="notif-card-sub">
+                                        You have not returned this item.
+                                        <?php echo $days_late; ?> day<?php echo $days_late === 1 ? '' : 's'; ?> overdue.
+                                    </div>
                                 </div>
                                 <div class="notif-card-meta">
-                                    <span class="status-chip chip-error"><span class="chip-dot"></span>Overdue</span>
+                                    <span class="notif-time">Due <?php echo $due_ts ? date('M j', $due_ts) : '—'; ?></span>
                                     <div class="unread-dot"></div>
                                 </div>
                             </div>
                     <?php endforeach;
                     endif; ?>
 
-                    <div class="notif-section-label">Today</div>
+                    <div class="notif-section-label">TODAY</div>
 
                     <div class="notif-card unread" data-cat="borrow">
                         <div class="notif-card-icon ni-success">
-                            <span class="material-symbols-outlined"
-                                style="font-size:18px;font-variation-settings:'FILL' 1">check_circle</span>
+                            <span class="material-symbols-outlined">check_circle</span>
                         </div>
                         <div class="notif-card-body">
                             <div class="notif-card-title">Borrow Request Approved</div>
@@ -3585,7 +3516,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                     <div class="notif-card unread" data-cat="system">
                         <div class="notif-card-icon ni-alert">
-                            <span class="material-symbols-outlined" style="font-size:18px;">settings</span>
+                            <span class="material-symbols-outlined">settings</span>
                         </div>
                         <div class="notif-card-body">
                             <div class="notif-card-title">System Maintenance Tonight</div>
@@ -3597,12 +3528,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                         </div>
                     </div>
 
-                    <div class="notif-section-label">Yesterday</div>
+                    <div class="notif-section-label">YESTERDAY</div>
 
                     <div class="notif-card unread" data-cat="borrow">
                         <div class="notif-card-icon ni-warn">
-                            <span class="material-symbols-outlined"
-                                style="font-size:18px;font-variation-settings:'FILL' 1">warning</span>
+                            <span class="material-symbols-outlined">warning</span>
                         </div>
                         <div class="notif-card-body">
                             <div class="notif-card-title">Return Reminder</div>
@@ -3616,7 +3546,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                     <div class="notif-card" data-cat="borrow">
                         <div class="notif-card-icon ni-success">
-                            <span class="material-symbols-outlined" style="font-size:18px;">inventory_2</span>
+                            <span class="material-symbols-outlined">inventory_2</span>
                         </div>
                         <div class="notif-card-body">
                             <div class="notif-card-title">Request Submitted</div>
@@ -3627,7 +3557,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                         </div>
                     </div>
 
-                    <!-- Shown by JS when a filter matches nothing -->
                     <div class="fnotif-empty" id="notifEmptyState" style="display:none;">
                         <span class="material-symbols-outlined">notifications_off</span>
                         <p>Nothing here right now.</p>
