@@ -35,7 +35,7 @@ SET time_zone = "+00:00";
 CREATE TABLE `tbl_accounts` (
   `fullName` varchar(255) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
-  `password` varchar(16) DEFAULT NULL,
+  `password` varchar(255) DEFAULT NULL,
   `last_login` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -44,7 +44,7 @@ CREATE TABLE `tbl_accounts` (
 --
 
 INSERT INTO `tbl_accounts` (`fullName`, `email`, `password`, `last_login`) VALUES
-('Redg Admin', 'main@admin.edu', 'admin123', '2026-06-08 10:15:03');
+('Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', '2026-06-08 10:15:03');
 
 -- --------------------------------------------------------
 

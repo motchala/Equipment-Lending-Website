@@ -55,8 +55,8 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
     }
     // tbl_accounts.password is varchar(16) — enforce so the UPDATE below
     // never silently truncates the new password.
-    if (strlen($new) > 16) {
-        echo json_encode(['status' => 'error', 'message' => 'New password must be 16 characters or fewer.']);
+    if (strlen($new) < 6) {
+        echo json_encode(['status' => 'error', 'message' => 'New password must be at least 6 characters.']);
         exit();
     }
     if (empty($email)) {
@@ -80,7 +80,7 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
         exit();
     }
 
-    if ($current !== $acc_row['password']) {
+    if (!password_verify($current, $acc_row['password'])) {
         echo json_encode(['status' => 'error', 'message' => 'Incorrect current password.']);
         exit();
     }
@@ -93,8 +93,9 @@ if (isset($_POST['ajax_action']) && $_POST['ajax_action'] === 'change_password')
     }
 
     $now_dt     = date('Y-m-d H:i:s');
+    $hashed_new = password_hash($new, PASSWORD_BCRYPT);
     $update_acc = $conn->prepare("UPDATE tbl_accounts SET password = ?, last_password_change = ? WHERE email = ?");
-    $update_acc->bind_param("sss", $new, $now_dt, $email);
+    $update_acc->bind_param("sss", $hashed_new, $now_dt, $email);
     if ($update_acc->execute()) {
         $_SESSION['admin_last_pw_change'] = $now_dt;
         echo json_encode([
@@ -307,17 +308,20 @@ if (isset($_POST['update_item'])) {
         $image_path = 'uploads/default.png';
     }
 
-    $description_escaped = mysqli_real_escape_string($conn, $description);
-    $sql = "UPDATE tbl_inventory
-            SET item_name='$name',
-                category='$category',
-                quantity=$qty,
-                image_path='$image_path',
-                `condition`='$condition',
-                description=" . ($description_escaped === '' ? 'NULL' : "'$description_escaped'") . "
-            WHERE item_id=$item_id";
-
-    mysqli_query($conn, $sql);
+        $description_val = ($description === '') ? null : $description;
+    $stmt = $conn->prepare(
+        "UPDATE tbl_inventory
+         SET item_name = ?,
+             category = ?,
+             quantity = ?,
+             image_path = ?,
+             `condition` = ?,
+             description = ?
+         WHERE item_id = ?"
+    );
+    $stmt->bind_param("ssisssi", $name, $category, $qty, $image_path, $condition, $description_val, $item_id);
+    $stmt->execute();
+    $stmt->close();
 
     header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();

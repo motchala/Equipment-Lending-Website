@@ -98,7 +98,7 @@ if (isset($_POST['login'])) {
     }
 
     if ($row_acc) {
-        if ($password === $row_acc['password']) {
+        if (password_verify($password, $row_acc['password'])) {
             // ── Successful admin login ─────────────────────────
             $_SESSION['admin']      = true;
             $_SESSION['login_time'] = time();
