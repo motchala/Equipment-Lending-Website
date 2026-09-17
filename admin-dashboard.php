@@ -80,31 +80,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
 
-        <!-- Center: Search -->
-        <div class="header-search">
-            <span class="material-symbols-outlined search-icon">search</span>
-            <input type="text" class="header-search-input" placeholder="Search requests, equipment, faculty...">
-        </div>
-
-        <!-- Right: Notification + User + Avatar + Dropdown (unchanged) -->
+        <!-- Right: User + Avatar + Dropdown -->
         <div class="header-right">
-            <!-- Scan Return QR — opens #qrScannerModal (admin-dashboard.js) -->
-            <button id="openQrScannerBtn" class="qr-scan-btn" title="Scan a faculty member's return QR code">
-                <span class="material-symbols-outlined">qr_code_scanner</span>
-                <span class="qr-scan-btn-label">Scan Return</span>
-            </button>
-
-            <!-- Notification Bell -->
-            <button class="notif-btn" data-action="open-notif-modal" title="Notifications">
-                <span class="material-symbols-outlined" style="font-size:20px;">notifications</span>
-                <span class="notif-btn-badge" id="notifBtnBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>">
-                    <?php echo $notif_unread; ?>
-                </span>
-            </button>
-
             <div class="header-user-info">
                 <span class="u-name"><?php echo htmlspecialchars($admin_name); ?></span>
-                <span class="u-role">Administrator</span>
             </div>
 
             <div class="avatar-btn" id="avatarBtn" role="button" aria-haspopup="true" aria-expanded="false"
@@ -112,7 +91,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <?php echo htmlspecialchars($initials); ?>
             </div>
 
-            <!-- Profile Dropdown (unchanged) -->
+            <!-- Profile Dropdown — now also hosts Scan Return + Admin
+                 (My Account, renamed) since those moved out of the navbar.
+                 Logout lives in the sidebar instead; see /sidebar below. -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
                     <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
@@ -126,7 +107,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="dd-item" id="dd-account-btn">
                         <div class="dd-icon">
                             <span class="material-symbols-outlined">person</span>
-                        </div>My Account
+                        </div>Admin
+                    </button>
+                    <div class="dd-divider"></div>
+                    <button class="dd-item" id="openQrScannerBtn">
+                        <div class="dd-icon">
+                            <span class="material-symbols-outlined">qr_code_scanner</span>
+                        </div>Scan Return
                     </button>
                     <button class="dd-item" data-action="open-notif-modal">
                         <div class="dd-icon">
@@ -138,12 +125,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="dd-icon">
                             <span class="material-symbols-outlined">settings</span>
                         </div>Settings
-                    </button>
-                    <div class="dd-divider"></div>
-                    <button class="dd-item dd-logout" data-action="logout">
-                        <div class="dd-icon" style="background:#ffeaea;">
-                            <span class="material-symbols-outlined" style="color:var(--danger)">logout</span>
-                        </div>Logout
                     </button>
                 </div>
             </div>
@@ -195,6 +176,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <a class="nav-item" data-tab="settings" id="snav-settings" href="#">
                     <span class="material-symbols-outlined">settings</span>
                     <span>Settings</span>
+                </a>
+                <a class="nav-item" id="snav-logout" data-action="logout" href="#">
+                    <span class="material-symbols-outlined">logout</span>
+                    <span>Logout</span>
                 </a>
             </div>
 
@@ -372,43 +357,43 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="ps-card-body" style="padding:0">
                             <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Requester</th>
-                                        <th>Equipment</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests ORDER BY request_date DESC LIMIT 5");
-                                    if ($recent_req && mysqli_num_rows($recent_req) > 0):
-                                        while ($rr = mysqli_fetch_assoc($recent_req)):
-                                            $badge = match ($rr['status']) {
-                                                'Waiting'  => 'ps-badge--waiting',
-                                                'Approved' => 'ps-badge--active',
-                                                'Overdue'  => 'ps-badge--overdue',
-                                                'Returned' => 'ps-badge--returned',
-                                                default    => 'ps-badge--returned',
-                                            };
-                                    ?>
-                                            <tr>
-                                                <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($rr['faculty_id']); ?></div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
-                                                <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
+                                <table class="ps-table">
+                                    <thead>
                                         <tr>
-                                            <td colspan="3" style="text-align:center;color:var(--text-light);padding:1.5rem">No requests yet.</td>
+                                            <th>Requester</th>
+                                            <th>Equipment</th>
+                                            <th>Status</th>
                                         </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests ORDER BY request_date DESC LIMIT 5");
+                                        if ($recent_req && mysqli_num_rows($recent_req) > 0):
+                                            while ($rr = mysqli_fetch_assoc($recent_req)):
+                                                $badge = match ($rr['status']) {
+                                                    'Waiting'  => 'ps-badge--waiting',
+                                                    'Approved' => 'ps-badge--active',
+                                                    'Overdue'  => 'ps-badge--overdue',
+                                                    'Returned' => 'ps-badge--returned',
+                                                    default    => 'ps-badge--returned',
+                                                };
+                                        ?>
+                                                <tr>
+                                                    <td>
+                                                        <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
+                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($rr['faculty_id']); ?></div>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
+                                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
+                                                </tr>
+                                            <?php endwhile;
+                                        else: ?>
+                                            <tr>
+                                                <td colspan="3" style="text-align:center;color:var(--text-light);padding:1.5rem">No requests yet.</td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>

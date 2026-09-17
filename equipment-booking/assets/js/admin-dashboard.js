@@ -1086,6 +1086,7 @@
                 case 'toast':
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
+                    e.preventDefault();
                     closeDropdown();
                     if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
@@ -2454,7 +2455,10 @@
             }
         }
 
-        openBtn.addEventListener('click', startScanner);
+        openBtn.addEventListener('click', function () {
+            closeDropdown();
+            startScanner();
+        });
         closeBtn.addEventListener('click', stopScanner);
         modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
     })();

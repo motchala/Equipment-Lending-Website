@@ -137,8 +137,8 @@ body {
 /* ── HEADER ───────────────────────────────────────────────────── */
 header.app-header {
     height: var(--header-h);
-    background: var(--primary-white);
-    border-bottom: 1px solid var(--khaki-border);
+    background: linear-gradient(120deg, var(--accent-maroon) 0%, var(--accent-dark) 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.18);
     display: flex;
     align-items: center;
     padding: 0 1.5rem 0 0;
@@ -147,7 +147,7 @@ header.app-header {
     left: 0;
     right: 0;
     z-index: 300;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
     flex-shrink: 0;
 }
 
@@ -171,14 +171,14 @@ header.app-header {
     background: transparent;
     border: none;
     border-radius: 8px;
-    color: var(--text-dark);
+    color: #ffffff;
     cursor: pointer;
     flex-shrink: 0;
     transition: background 0.15s;
 }
 
 .sidebar-toggle-btn:hover {
-    background: var(--hover-bg);
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .sidebar-toggle-btn .material-symbols-outlined {
@@ -207,15 +207,16 @@ header.app-header {
     align-items: center;
     gap: 10px;
     padding: 0 1.25rem;
-    border-right: 1px solid var(--khaki-border);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
     flex-shrink: 0;
 }
 
-/* Maroon icon box */
+/* Icon box — translucent frosted panel so the white-stroke SVG mark
+   still reads clearly against the maroon gradient header. */
 .logo-icon-box {
     width: 32px;
     height: 32px;
-    background: var(--accent-maroon);
+    background: rgba(255, 255, 255, 0.16);
     border-radius: 8px;
     display: grid;
     place-items: center;
@@ -223,27 +224,32 @@ header.app-header {
 }
 
 /* Logo text */
+.logo-text {
+    color: #ffffff;
+}
+
 .logo-text strong {
     font-size: 16px;
     font-weight: 700;
-    color: var(--accent-maroon);
+    color: #ffffff;
 }
 
 /* Only the "Admin Portal" subtitle — not the SYNC span inside the title row */
 .logo-subtitle {
     font-size: 12px;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.72);
     display: block;
     line-height: 1;
     margin-top: 1px;
 }
 
-/* Admin pill badge next to PUPSYNC */
+/* Admin pill badge next to PUPSYNC — inverted (light chip on dark header)
+   so it doesn't disappear against the maroon gradient. */
 .logo-badge {
-    background: var(--accent-maroon);
-    color: white;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--accent-maroon);
     font-size: 9px;
-    font-weight: 600;
+    font-weight: 700;
     padding: 1px 6px;
     border-radius: 4px;
     letter-spacing: 0.5px;
@@ -529,22 +535,24 @@ main#app-main {
     display: block;
     font-weight: 600;
     font-size: 0.85rem;
-    color: var(--text-dark);
+    color: #ffffff;
 }
 
 .header-user-info .u-role {
     font-size: 0.7rem;
-    color: var(--accent-maroon);
+    color: rgba(255, 255, 255, 0.75);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
 }
 
+/* Inverted (light chip on the maroon header) — the gradient it used
+   to share with the header itself would otherwise make it vanish. */
 .avatar-btn {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
-    color: white;
+    background: var(--secondary-cream);
+    color: var(--accent-maroon);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -552,14 +560,14 @@ main#app-main {
     font-weight: 700;
     font-size: 0.85rem;
     cursor: pointer;
-    border: 2px solid transparent;
+    border: 2px solid rgba(255, 255, 255, 0.4);
     flex-shrink: 0;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .avatar-btn:hover {
-    border-color: var(--accent-maroon);
-    box-shadow: 0 0 0 4px var(--accent-light);
+    border-color: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18);
 }
 
 /* Notification bell in header */
