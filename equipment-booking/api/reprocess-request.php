@@ -34,7 +34,7 @@ if (empty($csrf_token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSI
 $logged_in_faculty_id = (string)$_SESSION['faculty_id'];
 
 // ── Require ArbitrationEngine ─────────────────────────────────────────────────
-require_once __DIR__ . '/../../core/arbitration-engine.php';
+require_once __DIR__ . '/../core/arbitration-engine.php';
 
 // ── Database connection ───────────────────────────────────────────────────────
 require_once __DIR__ . '/../../config/db.php';
