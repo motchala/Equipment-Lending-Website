@@ -544,15 +544,38 @@
     }
 
     /* ── Notifications ─────────────────────────────────────────────────── */
-    function filterNotifs(cat) {
-        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('.notif-card').forEach(item => {
-            if (cat === 'all') item.style.display = '';
-            else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
-            else item.style.display = item.dataset.cat === cat ? '' : 'none';
+    /* ── Notifications: filter + pagination ───────────────────────────
+       Front-end only for now (no backend yet) — but built the same way
+       the equipment catalog is: never render more than one page's worth
+       of cards at a time, so this doesn't get slow once real
+       notifications replace the sample ones.
+    ─────────────────────────────────────────────────────────────────── */
+    const NOTIF_PER_PAGE = 5;
+    let notifCurrentPage = 1;
+    let notifActiveCat = 'all';
+
+    function getMatchingNotifs(cat) {
+        return Array.from(document.querySelectorAll('.notif-card')).filter(item => {
+            if (cat === 'all') return true;
+            if (cat === 'unread') return item.classList.contains('unread');
+            return item.dataset.cat === cat;
         });
+    }
+
+    function renderNotifPage() {
+        const matches = getMatchingNotifs(notifActiveCat);
+        const total = matches.length;
+        const totalPages = Math.max(1, Math.ceil(total / NOTIF_PER_PAGE));
+        if (notifCurrentPage > totalPages) notifCurrentPage = totalPages;
+        if (notifCurrentPage < 1) notifCurrentPage = 1;
+
+        // Hide every card, then reveal only this page's slice of the matches
+        document.querySelectorAll('.notif-card').forEach(el => { el.style.display = 'none'; });
+        const start = (notifCurrentPage - 1) * NOTIF_PER_PAGE;
+        matches.slice(start, start + NOTIF_PER_PAGE).forEach(el => { el.style.display = ''; });
+
+        // Section labels ("Overdue", "Today"...) only show if something
+        // under them survived the filter + page slice
         document.querySelectorAll('.notif-section-label').forEach(label => {
             let next = label.nextElementSibling;
             let hasVisible = false;
@@ -563,11 +586,72 @@
             label.style.display = hasVisible ? '' : 'none';
         });
 
-        // "Nothing here" state when a filter matches no cards
-        const anyVisible = Array.from(document.querySelectorAll('.notif-card'))
-            .some(c => c.style.display !== 'none');
+        // "Nothing here" state when a filter matches no cards at all
         const empty = document.getElementById('notifEmptyState');
-        if (empty) empty.style.display = anyVisible ? 'none' : '';
+        if (empty) empty.style.display = total === 0 ? '' : 'none';
+
+        // Pagination bar — hidden entirely when everything fits on one page
+        const pager = document.getElementById('notifPagination');
+        if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages <= 1) return;
+
+        const info = document.getElementById('notifPageInfo');
+        if (info) {
+            info.textContent = 'Showing ' + (start + 1) + '–' +
+                Math.min(start + NOTIF_PER_PAGE, total) + ' of ' + total;
+        }
+
+        const prev = document.getElementById('notifPrevBtn');
+        const next = document.getElementById('notifNextBtn');
+        if (prev) prev.disabled = notifCurrentPage === 1;
+        if (next) next.disabled = notifCurrentPage === totalPages;
+
+        const nums = document.getElementById('notifPageNumbers');
+        if (nums) {
+            nums.innerHTML = '';
+            const pages = [];
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                let lo = Math.max(2, notifCurrentPage - 1);
+                let hi = Math.min(totalPages - 1, notifCurrentPage + 1);
+                if (lo > 2) pages.push('…');
+                for (let i = lo; i <= hi; i++) pages.push(i);
+                if (hi < totalPages - 1) pages.push('…');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '…') {
+                    const s = document.createElement('span');
+                    s.className = 'fnotif-pg-ellipsis';
+                    s.textContent = '…';
+                    nums.appendChild(s);
+                    return;
+                }
+                const b = document.createElement('button');
+                b.className = 'fnotif-pg-num' + (p === notifCurrentPage ? ' active' : '');
+                b.textContent = p;
+                b.addEventListener('click', () => goToNotifPage(p));
+                nums.appendChild(b);
+            });
+        }
+    }
+
+    function goToNotifPage(page) {
+        notifCurrentPage = page;
+        renderNotifPage();
+        const body = document.querySelector('#notifModal .fnotif-body');
+        if (body) body.scrollTop = 0;
+    }
+
+    function filterNotifs(cat) {
+        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
+        if (btn) btn.classList.add('active');
+        notifActiveCat = cat;
+        notifCurrentPage = 1;
+        renderNotifPage();
     }
 
     function markAllRead() {
@@ -593,9 +677,9 @@
 
         LS.setJ('notifRead', readArr);
 
-        // If the Unread tab is active, re-run it so the list reflects the change
-        const activeTab = document.querySelector('.notif-tab.active');
-        if (activeTab) filterNotifs(activeTab.dataset.notifFilter || 'all');
+        // Re-render the current filter/page so it reflects the change
+        // (the Unread tab in particular may now have nothing left to show)
+        renderNotifPage();
 
         showToast('All notifications marked as read.');
     }
@@ -1587,6 +1671,12 @@
             closeNotifModal();
         });
     });
+
+    /* Notification pagination: prev/next */
+    const notifPrev = document.getElementById('notifPrevBtn');
+    const notifNext = document.getElementById('notifNextBtn');
+    if (notifPrev) notifPrev.addEventListener('click', () => goToNotifPage(notifCurrentPage - 1));
+    if (notifNext) notifNext.addEventListener('click', () => goToNotifPage(notifCurrentPage + 1));
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         const m = document.getElementById('notifModal');

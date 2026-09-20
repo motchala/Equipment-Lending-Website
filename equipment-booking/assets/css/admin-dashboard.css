@@ -137,8 +137,8 @@ body {
 /* ── HEADER ───────────────────────────────────────────────────── */
 header.app-header {
     height: var(--header-h);
-    background: linear-gradient(120deg, var(--accent-maroon) 0%, var(--accent-dark) 100%);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+    background: linear-gradient(120deg, #ffffff 0%, var(--secondary-cream) 100%);
+    border-bottom: 1px solid var(--khaki-border);
     display: flex;
     align-items: center;
     padding: 0 1.5rem 0 0;
@@ -147,7 +147,7 @@ header.app-header {
     left: 0;
     right: 0;
     z-index: 300;
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
 }
 
@@ -171,14 +171,14 @@ header.app-header {
     background: transparent;
     border: none;
     border-radius: 8px;
-    color: #ffffff;
+    color: var(--text-dark);
     cursor: pointer;
     flex-shrink: 0;
     transition: background 0.15s;
 }
 
 .sidebar-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--hover-bg);
 }
 
 .sidebar-toggle-btn .material-symbols-outlined {
@@ -207,16 +207,15 @@ header.app-header {
     align-items: center;
     gap: 10px;
     padding: 0 1.25rem;
-    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    border-right: 1px solid var(--khaki-border);
     flex-shrink: 0;
 }
 
-/* Icon box — translucent frosted panel so the white-stroke SVG mark
-   still reads clearly against the maroon gradient header. */
+/* Maroon icon box */
 .logo-icon-box {
     width: 32px;
     height: 32px;
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--accent-maroon);
     border-radius: 8px;
     display: grid;
     place-items: center;
@@ -224,32 +223,27 @@ header.app-header {
 }
 
 /* Logo text */
-.logo-text {
-    color: #ffffff;
-}
-
 .logo-text strong {
     font-size: 16px;
     font-weight: 700;
-    color: #ffffff;
+    color: var(--accent-maroon);
 }
 
 /* Only the "Admin Portal" subtitle — not the SYNC span inside the title row */
 .logo-subtitle {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.72);
+    color: var(--text-light);
     display: block;
     line-height: 1;
     margin-top: 1px;
 }
 
-/* Admin pill badge next to PUPSYNC — inverted (light chip on dark header)
-   so it doesn't disappear against the maroon gradient. */
+/* Admin pill badge next to PUPSYNC */
 .logo-badge {
-    background: rgba(255, 255, 255, 0.92);
-    color: var(--accent-maroon);
+    background: var(--accent-maroon);
+    color: white;
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 600;
     padding: 1px 6px;
     border-radius: 4px;
     letter-spacing: 0.5px;
@@ -439,8 +433,8 @@ header.app-header {
 /* ── SIDEBAR ──────────────────────────────────────────────────── */
 nav.sidebar {
     width: var(--sidebar-w);
-    background: var(--primary-white);
-    border-right: 1px solid var(--khaki-border);
+    background: linear-gradient(180deg, var(--accent-maroon) 0%, var(--accent-dark) 100%);
+    border-right: 1px solid rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     padding: 1rem 0.75rem;
@@ -453,7 +447,7 @@ nav.sidebar {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.2px;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.55);
     padding: 0 0.6rem;
     margin: 1rem 0 0.4rem;
 }
@@ -469,7 +463,7 @@ nav.sidebar {
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
     cursor: pointer;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.8);
     font-weight: 500;
     transition: all 0.15s;
     text-decoration: none;
@@ -479,13 +473,13 @@ nav.sidebar {
 }
 
 .nav-item:hover {
-    background: var(--accent-light);
-    color: var(--accent-maroon);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 .nav-item.active {
-    background: var(--accent-light);
-    color: var(--accent-maroon);
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
     font-weight: 600;
 }
 
@@ -506,11 +500,12 @@ nav.sidebar {
     padding: 1px 7px;
     border-radius: 50px;
     margin-left: auto;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5);
 }
 
 .nav-divider {
     border: none;
-    border-top: 1px solid var(--khaki-border);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
     margin: 0.5rem 0.6rem;
 }
 
@@ -535,24 +530,22 @@ main#app-main {
     display: block;
     font-weight: 600;
     font-size: 0.85rem;
-    color: #ffffff;
+    color: var(--text-dark);
 }
 
 .header-user-info .u-role {
     font-size: 0.7rem;
-    color: rgba(255, 255, 255, 0.75);
+    color: var(--accent-maroon);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
 }
 
-/* Inverted (light chip on the maroon header) — the gradient it used
-   to share with the header itself would otherwise make it vanish. */
 .avatar-btn {
     width: 40px;
     height: 40px;
-    background: var(--secondary-cream);
-    color: var(--accent-maroon);
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
+    color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -560,14 +553,14 @@ main#app-main {
     font-weight: 700;
     font-size: 0.85rem;
     cursor: pointer;
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    border: 2px solid transparent;
     flex-shrink: 0;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .avatar-btn:hover {
-    border-color: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18);
+    border-color: var(--accent-maroon);
+    box-shadow: 0 0 0 4px var(--accent-light);
 }
 
 /* Notification bell in header */
@@ -968,6 +961,45 @@ main#app-main {
     border-radius: var(--radius);
     border: 1px solid var(--khaki-border);
     overflow: hidden;
+}
+
+/* ── Container header accent ──────────────────────────────────────
+   Every "table/list container" header across the app (Requests,
+   Equipment, Rooms, Faculty, Settings info-cards, Settings Preferences
+   and Borrowing Rules cards) shares one small maroon-gradient accent
+   stripe along its top edge. This is deliberately independent of each
+   header's background/text styling — it's the one consistent visual
+   marker that says "a container starts here", so the header reads as
+   clearly separated from the body below it even though the header
+   itself stays light. The outer card's overflow:hidden + border-radius
+   (already shared by every card wrapper) clips this automatically to
+   match each card's rounded top corners, so no per-card radius
+   handling is needed here.
+   NOTE: modal dialog headers (.ps-modal-head, .form-card-header) are a
+   different UI pattern (popups, not page containers) and intentionally
+   excluded, matching the header-consolidation pass earlier. */
+.ps-card-header,
+.inv-list-header,
+#panel-rooms .pr-card-header,
+.eq-card-header,
+.info-card-head,
+.sett-card-head {
+    position: relative;
+}
+
+.ps-card-header::before,
+.inv-list-header::before,
+#panel-rooms .pr-card-header::before,
+.eq-card-header::before,
+.info-card-head::before,
+.sett-card-head::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-maroon), var(--accent-dark));
 }
 
 .ps-card-header {

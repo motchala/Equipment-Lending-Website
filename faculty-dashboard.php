@@ -456,8 +456,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard.css">
 
-    <!-- Faculty Code Card -->
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-code-card.css">
+    <!-- NOTE: faculty-code-card.css intentionally not loaded — it was a stale
+         snapshot of this same stylesheet (predating several redesigns) that
+         was silently overriding current styles because it loaded last. -->
 
     <!-- Responsive System -->
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css">
@@ -1561,7 +1562,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 href="#">
                 <span class="material-symbols-outlined">settings</span>
                 <span>Settings</span>
-            </a>    
+            </a>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
                 <span class="material-symbols-outlined">logout</span>
@@ -3564,6 +3565,23 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                 </div><!-- /notif-card-list -->
             </div><!-- /fnotif-body -->
+
+            <!-- Pagination — client-side only for now; keeps the list from
+                 rendering everything at once as real notifications grow. -->
+            <div class="fnotif-pagination" id="notifPagination" style="display:none;">
+                <div class="fnotif-pg-info" id="notifPageInfo"></div>
+                <div class="fnotif-pg-controls">
+                    <button class="fnotif-pg-btn" id="notifPrevBtn" data-action="notif-page-prev"
+                        aria-label="Previous page">
+                        <span class="material-symbols-outlined">chevron_left</span>
+                    </button>
+                    <div class="fnotif-pg-numbers" id="notifPageNumbers"></div>
+                    <button class="fnotif-pg-btn" id="notifNextBtn" data-action="notif-page-next"
+                        aria-label="Next page">
+                        <span class="material-symbols-outlined">chevron_right</span>
+                    </button>
+                </div>
+            </div>
         </div><!-- /fnotif-box -->
     </div><!-- /notifModal -->
 

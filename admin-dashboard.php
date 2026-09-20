@@ -91,8 +91,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <?php echo htmlspecialchars($initials); ?>
             </div>
 
-            <!-- Profile Dropdown — now also hosts Scan Return + Admin
-                 (My Account, renamed) since those moved out of the navbar.
+            <!-- Profile Dropdown — also hosts Scan Return + Admin (My
+                 Account, renamed) since those moved out of the navbar.
                  Logout lives in the sidebar instead; see /sidebar below. -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
