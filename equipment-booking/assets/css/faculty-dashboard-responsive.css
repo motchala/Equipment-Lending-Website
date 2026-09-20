@@ -30,8 +30,9 @@ table,
 .eq-grid,
 .bento-grid,
 .active-cards-grid,
-.myact-stats-grid,
-.myact-timeline {
+.myact-summary,
+.myact-loan-grid,
+.myact-list {
     max-width: 100%;
 }
 
@@ -717,58 +718,11 @@ table,
 
 
 /* ================================================================
-   § 15  MY ACTIVITY — stat grid, current-loan cards & timeline
-   NOTE: the redesigned My Activity tab reuses .stat-card (§8/§30),
-   .active-cards-grid/.active-card (§12) and .table-surface (§14),
-   so their responsive behaviour already applies here. This section
-   only covers what's unique to My Activity: the 4-up stat grid and
-   the "Upcoming" timeline.
+   § 15  MY ACTIVITY
+   Moved to its own dedicated stylesheet:
+   equipment-booking/assets/css/faculty-my-activity.css
+   (base styles + all responsive rules for #panel-activity live there).
 ================================================================ */
-@media (min-width: 769px) and (max-width: 1100px) {
-    .myact-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .myact-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
-
-    .myact-timeline-time {
-        width: 56px;
-        font-size: 0.72rem;
-    }
-
-    .myact-timeline-item {
-        gap: 10px;
-    }
-}
-
-@media (max-width: 480px) {
-    .myact-stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .myact-timeline {
-        padding: 4px 14px;
-    }
-
-    .myact-timeline-item {
-        flex-wrap: wrap;
-    }
-
-    .myact-timeline-time {
-        width: auto;
-    }
-
-    /* Download report button — full width on tiny screens */
-    .btn-download-report {
-        width: 100%;
-        justify-content: center;
-    }
-}
 
 
 /* ================================================================
@@ -1419,8 +1373,6 @@ table,
     #app-toast,
     .modal-backdrop,
     .overlay-page,
-    .btn-download-report,
-    .myact-card-actions,
     .act-ai-fab,
     .act-ai-chat,
     .req-sort-btn,
@@ -1441,20 +1393,7 @@ table,
         overflow: visible;
     }
 
-    .myact-stats-grid {
-        display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 10px;
-    }
-
-    .myact-current-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 10px;
-    }
-
     .active-card,
-    .myact-timeline-item,
     .requests-table tr {
         page-break-inside: avoid;
     }
