@@ -1561,11 +1561,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 href="#">
                 <span class="material-symbols-outlined">settings</span>
                 <span>Settings</span>
-            </a>
-            <!-- Sign Out — pinned to the very bottom of the sidebar -->
+            </a>    
+            <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
                 <span class="material-symbols-outlined">logout</span>
-                <span>Sign Out</span>
+                <span>Log Out</span>
             </a>
         </div>
     </nav>
@@ -1624,7 +1624,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                     <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
                             </button>
                             <button class="dd-item dd-logout" data-action="logout">
-                                <span class="material-symbols-outlined dd-item-icon">logout</span> Sign Out
+                                <span class="material-symbols-outlined dd-item-icon">logout</span> Log Out
                             </button>
                         </div>
 
