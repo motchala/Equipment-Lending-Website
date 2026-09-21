@@ -82,10 +82,29 @@
     padding: 18px 20px;
     min-width: 0;
     border-right: 1px solid var(--color-outline-variant);
+    /* Button reset — these are clickable <button> elements now */
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--transition);
 }
 
 .myact-summary-item:last-child {
     border-right: none;
+}
+
+.myact-summary-item:hover,
+.myact-summary-item:focus-visible {
+    background: var(--color-surface-container);
+}
+
+.myact-summary-item:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
 }
 
 .myact-summary-icon {
@@ -199,8 +218,14 @@
 /* ── Currently Borrowing: loan cards ──────────────────────────── */
 .myact-loan-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
     gap: 16px;
+}
+
+/* Collapsed state: only the first 6 cards show until "Show all" is clicked.
+   Keeps the page from growing unbounded when someone has many active loans. */
+.myact-loan-grid.myact-collapsible>.myact-loan-card:nth-child(n+7) {
+    display: none;
 }
 
 .myact-loan-card {
@@ -239,6 +264,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.myact-loan-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
 }
 
 .myact-loan-icon .material-symbols-outlined {
@@ -342,6 +376,35 @@
     font-size: 15px;
 }
 
+/* ── "Show all N" — reveals items hidden by .myact-collapsible ──── */
+.myact-show-more-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border: 1px dashed var(--color-outline-variant);
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-primary);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+}
+
+.myact-show-more-btn:hover {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+}
+
+.myact-show-more-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
 /* ── Upcoming: simple row list ─────────────────────────────────── */
 .myact-list {
     background: var(--color-surface-lowest);
@@ -362,6 +425,35 @@
 
 .myact-row:last-child {
     border-bottom: none;
+}
+
+.myact-row-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-container);
+    color: var(--color-outline);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.myact-row-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.myact-row-icon .material-symbols-outlined {
+    font-size: 17px;
+}
+
+/* Collapsed state: only the first 5 rows show until "Show all" is clicked. */
+.myact-list.myact-collapsible>.myact-row:nth-child(n+6) {
+    display: none;
 }
 
 .myact-row-main {
@@ -457,6 +549,14 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    overflow: hidden;
+}
+
+.myact-history-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
 }
 
 .myact-history-icon .material-symbols-outlined {
@@ -612,7 +712,8 @@
 
     .myact-download-btn,
     .myact-loan-actions,
-    .myact-text-link {
+    .myact-text-link,
+    .myact-show-more-btn {
         display: none !important;
     }
 
@@ -622,6 +723,13 @@
 
     .myact-loan-grid {
         grid-template-columns: repeat(3, 1fr) !important;
+    }
+
+    /* A printed report should always include everything, regardless of
+       whether "Show all" was clicked on screen. */
+    .myact-loan-grid.myact-collapsible>.myact-loan-card,
+    .myact-list.myact-collapsible>.myact-row {
+        display: flex !important;
     }
 
     .myact-loan-card,

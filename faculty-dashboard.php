@@ -30,6 +30,50 @@ $root_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
 // so image src values resolve correctly regardless of nesting depth.
 $uploads_url = $root_url . 'uploads/';
 
+/* ── Equipment photo lookup ───────────────────────────────────────────
+   tbl_requests only stores equipment_name as free text (no item_id
+   foreign key), so we match it against tbl_inventory.item_name to find
+   a real photo. Built once here and reused by "Active Now" (Home tab)
+   and every section of My Activity. */
+$equip_image_map = [];
+$equip_img_res = mysqli_query($conn, "SELECT item_name, image_path FROM tbl_inventory");
+if ($equip_img_res) {
+    while ($eir = mysqli_fetch_assoc($equip_img_res)) {
+        if (!empty($eir['image_path']) && $eir['image_path'] !== 'uploads/default.png') {
+            $equip_image_map[strtolower(trim($eir['item_name']))] = $eir['image_path'];
+        }
+    }
+}
+
+/* Returns a full <img> src for the given equipment name, or null when no
+   catalog photo exists (caller should fall back to actEquipIcon()). */
+function actEquipImage(string $equipmentName): ?string
+{
+    global $equip_image_map, $root_url;
+    $key = strtolower(trim($equipmentName));
+    if (isset($equip_image_map[$key])) {
+        return $root_url . htmlspecialchars($equip_image_map[$key]);
+    }
+    return null;
+}
+
+/* ── Equipment icon helper — fallback when no photo is on file ───────── */
+function actEquipIcon(string $name): string
+{
+    $n = strtolower($name);
+    if (str_contains($n, 'projector'))                    return 'videocam';
+    if (str_contains($n, 'remote') || str_contains($n, ' ac ') || $n === 'ac') return 'settings_remote';
+    if (str_contains($n, 'cord') || str_contains($n, 'extension')) return 'power';
+    if (str_contains($n, 'laptop') || str_contains($n, 'computer')) return 'laptop';
+    if (str_contains($n, 'camera'))                       return 'photo_camera';
+    if (str_contains($n, 'speaker') || str_contains($n, 'audio'))   return 'speaker';
+    if (str_contains($n, 'mic'))                          return 'mic';
+    if (str_contains($n, 'monitor') || str_contains($n, 'screen'))  return 'monitor';
+    if (str_contains($n, 'tablet') || str_contains($n, 'ipad'))     return 'tablet';
+    if (str_contains($n, 'printer'))                      return 'print';
+    return 'inventory_2';
+}
+
 require_once __DIR__ . '/equipment-booking/core/arbitration-engine.php';
 
 function maskEmail($email)
@@ -1857,11 +1901,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             $totalDays = max(1, $returnTs - $borrowTs);
                             $usedDays = max(0, min($nowTs - $borrowTs, $totalDays));
                             $progress = round(($usedDays / $totalDays) * 100);
+                            $aiImage = actEquipImage($ai['equipment_name']);
                         ?>
                             <div class="active-card <?php echo $isOverdue ? 'active-card-overdue' : ''; ?>">
                                 <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;">
                                     <div class="active-card-thumb">
-                                        <span class="material-symbols-outlined">inventory_2</span>
+                                        <?php if ($aiImage): ?>
+                                            <img src="<?php echo $aiImage; ?>" alt="<?php echo htmlspecialchars($ai['equipment_name']); ?>">
+                                        <?php else: ?>
+                                            <span class="material-symbols-outlined"><?php echo actEquipIcon($ai['equipment_name']); ?></span>
+                                        <?php endif; ?>
                                     </div>
                                     <span class="status-chip <?php echo $chipClass; ?>" style="font-size:0.65rem;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;">
                                         <span class="chip-dot"></span><?php echo $chipLabel; ?>
@@ -2355,8 +2404,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     "SELECT * FROM tbl_requests
                      WHERE faculty_id='$uid_safe'
                      AND (status='Overdue' OR (status='Approved' AND borrow_date <= '$today'))
-                     ORDER BY (status='Overdue') DESC, return_date ASC
-                     LIMIT 12"
+                     ORDER BY (status='Overdue') DESC, return_date ASC"
                 );
 
                 $act_upcoming = mysqli_query(
@@ -2364,8 +2412,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     "SELECT * FROM tbl_requests
                      WHERE faculty_id='$uid_safe'
                      AND (status='Waiting' OR (status='Approved' AND borrow_date > '$today'))
-                     ORDER BY borrow_date ASC
-                     LIMIT 10"
+                     ORDER BY borrow_date ASC"
                 );
 
                 $act_history = mysqli_query(
@@ -2403,22 +2450,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                      WHERE faculty_id='$uid_safe' AND status='Returned'"
                 ))['c'] ?? 0;
 
-                /* ── Equipment icon helper ─────────────────────────────────── */
-                function actEquipIcon(string $name): string
-                {
-                    $n = strtolower($name);
-                    if (str_contains($n, 'projector'))                    return 'videocam';
-                    if (str_contains($n, 'remote') || str_contains($n, ' ac ') || $n === 'ac') return 'settings_remote';
-                    if (str_contains($n, 'cord') || str_contains($n, 'extension')) return 'power';
-                    if (str_contains($n, 'laptop') || str_contains($n, 'computer')) return 'laptop';
-                    if (str_contains($n, 'camera'))                       return 'photo_camera';
-                    if (str_contains($n, 'speaker') || str_contains($n, 'audio'))   return 'speaker';
-                    if (str_contains($n, 'mic'))                          return 'mic';
-                    if (str_contains($n, 'monitor') || str_contains($n, 'screen'))  return 'monitor';
-                    if (str_contains($n, 'tablet') || str_contains($n, 'ipad'))     return 'tablet';
-                    if (str_contains($n, 'printer'))                      return 'print';
-                    return 'inventory_2';
-                }
+                /* actEquipIcon() moved to the shared helpers near the top of this
+                   file, so both "Active Now" (Home tab) and My Activity can use
+                   it — see actEquipIcon()/actEquipImage() near $equip_image_map. */
 
                 /* ── Loan progress — linear (matches "Active Now" on the
                        Home tab) instead of the old SVG ring ─────────────────── */
@@ -2475,22 +2509,25 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 </div>
 
                 <!-- ── Summary ──────────────────────────────────────────── -->
+                <!-- Each stat jumps to My Requests pre-filtered to that exact status,
+                     reusing the same filter-requests action the Home tab's stat
+                     cards already use — so the data landed on is always correct. -->
                 <div class="myact-summary">
-                    <div class="myact-summary-item">
+                    <button type="button" class="myact-summary-item" data-action="filter-requests" data-status="Approved">
                         <div class="myact-summary-icon"><span class="material-symbols-outlined">devices</span></div>
                         <div>
                             <p class="myact-summary-value"><?php echo (int)$act_stat_current; ?></p>
                             <p class="myact-summary-label">Borrowing</p>
                         </div>
-                    </div>
-                    <div class="myact-summary-item">
+                    </button>
+                    <button type="button" class="myact-summary-item" data-action="filter-requests" data-status="Waiting">
                         <div class="myact-summary-icon"><span class="material-symbols-outlined">pending</span></div>
                         <div>
                             <p class="myact-summary-value"><?php echo (int)$act_stat_waiting; ?></p>
                             <p class="myact-summary-label">Awaiting Approval</p>
                         </div>
-                    </div>
-                    <div class="myact-summary-item<?php echo $act_stat_overdue > 0 ? ' myact-summary-item--warn' : ''; ?>">
+                    </button>
+                    <button type="button" class="myact-summary-item<?php echo $act_stat_overdue > 0 ? ' myact-summary-item--warn' : ''; ?>" data-action="filter-requests" data-status="Overdue">
                         <div class="myact-summary-icon"><span class="material-symbols-outlined">alarm</span></div>
                         <div>
                             <p class="myact-summary-value"><?php echo (int)$act_stat_overdue; ?></p>
@@ -2499,14 +2536,14 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 <p class="myact-summary-flag"><span class="myact-dot"></span>Action needed</p>
                             <?php endif; ?>
                         </div>
-                    </div>
-                    <div class="myact-summary-item">
+                    </button>
+                    <button type="button" class="myact-summary-item" data-action="filter-requests" data-status="Returned">
                         <div class="myact-summary-icon"><span class="material-symbols-outlined">task_alt</span></div>
                         <div>
                             <p class="myact-summary-value"><?php echo (int)$act_stat_completed; ?></p>
                             <p class="myact-summary-label">Completed</p>
                         </div>
-                    </div>
+                    </button>
                 </div>
 
                 <!-- ── Currently Borrowing ──────────────────────────────── -->
@@ -2514,17 +2551,24 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <div class="myact-section-head">
                         <h3 class="myact-section-title">Currently Borrowing</h3>
                     </div>
-                    <?php if ($act_current && mysqli_num_rows($act_current) > 0): ?>
-                        <div class="myact-loan-grid">
+                    <?php if ($act_current && mysqli_num_rows($act_current) > 0):
+                        $act_current_total = mysqli_num_rows($act_current);
+                    ?>
+                        <div class="myact-loan-grid<?php echo $act_current_total > 6 ? ' myact-collapsible' : ''; ?>">
                             <?php while ($r = mysqli_fetch_assoc($act_current)):
                                 $isOverdue = $r['status'] === 'Overdue';
                                 $icon = actEquipIcon($r['equipment_name']);
+                                $image = actEquipImage($r['equipment_name']);
                                 $prog = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
                             ?>
                                 <article class="myact-loan-card<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
                                     <div class="myact-loan-top">
                                         <div class="myact-loan-icon">
-                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                            <?php if ($image): ?>
+                                                <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
+                                            <?php else: ?>
+                                                <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                            <?php endif; ?>
                                         </div>
                                         <?php if ($isOverdue): ?>
                                             <span class="myact-badge myact-badge-error">Overdue</span>
@@ -2557,6 +2601,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 </article>
                             <?php endwhile; ?>
                         </div>
+                        <?php if ($act_current_total > 6): ?>
+                            <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
+                                Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                            </button>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="myact-empty">
                             <span class="material-symbols-outlined">check_circle</span>
@@ -2570,15 +2619,26 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <div class="myact-section-head">
                         <h3 class="myact-section-title">Upcoming</h3>
                     </div>
-                    <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0): ?>
-                        <div class="myact-list">
+                    <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
+                        $act_upcoming_total = mysqli_num_rows($act_upcoming);
+                    ?>
+                        <div class="myact-list<?php echo $act_upcoming_total > 5 ? ' myact-collapsible' : ''; ?>">
                             <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
                                 $bd = strtotime($r['borrow_date']);
                                 $td = strtotime($today);
                                 $daysAway = (int) round(($bd - $td) / 86400);
                                 $awayStr = $daysAway <= 0 ? 'Today' : ($daysAway === 1 ? 'Tomorrow' : "In {$daysAway} days");
+                                $icon = actEquipIcon($r['equipment_name']);
+                                $image = actEquipImage($r['equipment_name']);
                             ?>
                                 <div class="myact-row">
+                                    <div class="myact-row-icon">
+                                        <?php if ($image): ?>
+                                            <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
+                                        <?php else: ?>
+                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                        <?php endif; ?>
+                                    </div>
                                     <div class="myact-row-main">
                                         <span class="myact-row-when"><?php echo $awayStr; ?></span>
                                         <p class="myact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
@@ -2591,6 +2651,11 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 </div>
                             <?php endwhile; ?>
                         </div>
+                        <?php if ($act_upcoming_total > 5): ?>
+                            <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
+                                Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                            </button>
+                        <?php endif; ?>
                     <?php else: ?>
                         <div class="myact-empty">
                             <span class="material-symbols-outlined">event_upcoming</span>
@@ -2612,13 +2677,18 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             <?php while ($r = mysqli_fetch_assoc($act_history)):
                                 $isDeclined = $r['status'] === 'Declined';
                                 $icon = actEquipIcon($r['equipment_name']);
+                                $image = actEquipImage($r['equipment_name']);
                                 $dateLine = $isDeclined
                                     ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
                                     : (date('M j', strtotime($r['borrow_date'])) . '&ndash;' . date('M j, Y', strtotime($r['returned_at'] ?: $r['return_date'])));
                             ?>
                                 <div class="myact-history-row">
                                     <div class="myact-history-icon">
-                                        <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                        <?php if ($image): ?>
+                                            <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
+                                        <?php else: ?>
+                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="myact-history-main">
                                         <p class="myact-history-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
