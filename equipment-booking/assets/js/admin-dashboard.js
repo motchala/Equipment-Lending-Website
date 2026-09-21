@@ -1372,6 +1372,28 @@
         if (e.key === 'Escape') _closeMobileSidebar();
     });
 
+    /* ── Desktop sidebar collapse (icon-rail): logo icon box doubles
+       as the toggle. Independent of the mobile drawer above — this
+       only resizes the always-inline desktop sidebar; #app-main
+       (flex:1) naturally expands into the freed width. Preference
+       persists across reloads via localStorage. ── */
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+    function _setSidebarCollapsed(collapsed) {
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            sidebarCollapseBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        LS.set('sidebarCollapsed', collapsed ? '1' : '0');
+    }
+    if (sidebarCollapseBtn) {
+        sidebarCollapseBtn.addEventListener('click', function () {
+            _setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+        });
+        // Restore the person's last preference on load.
+        if (LS.get('sidebarCollapsed') === '1') _setSidebarCollapsed(true);
+    }
+
     /* ── Lending sub-nav ─────────────────────────────────────── */
     document.querySelectorAll('.lending-nav-btn').forEach(btn => {
         btn.addEventListener('click', function () { switchLendingSub(this.dataset.lendingNav); });

@@ -60,16 +60,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <span class="material-symbols-outlined">menu</span>
             </button>
 
-            <!-- Logo block — sits flush above the sidebar -->
+            <!-- Logo block — sits flush above the sidebar. The icon box
+                 doubles as the desktop sidebar collapse/expand toggle
+                 (see #sidebarCollapseBtn wiring in admin-dashboard.js);
+                 the hamburger above is the separate mobile off-canvas
+                 toggle and is untouched by this. -->
             <div class="header-logo">
-                <div class="logo-icon-box">
+                <button type="button" class="logo-icon-box" id="sidebarCollapseBtn"
+                    title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
+                    aria-controls="adminSidebar">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                         <polygon points="12 2 2 7 12 12 22 7 12 2" />
                         <polyline points="2 17 12 22 22 17" />
                         <polyline points="2 12 12 17 22 12" />
                     </svg>
-                </div>
+                </button>
                 <div class="logo-text">
                     <span style="white-space:nowrap;line-height:1.2;">
                         <strong>PUP</strong><span style="font-weight:500;">SYNC</span>

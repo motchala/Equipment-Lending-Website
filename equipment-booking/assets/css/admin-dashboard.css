@@ -5,6 +5,8 @@
     --accent-maroon: #600302;
     --accent-dark: #4a0f15;
     --accent-light: #f3e5e6;
+    --sidebar-red-1: #c0392b;
+    --sidebar-red-2: #7b241c;
     --text-dark: #2c2c2c;
     --text-light: #666666;
     --khaki-border: #e6e0d4;
@@ -115,6 +117,7 @@ main#app-main,
 /* ── Layout variables ─────────────────────────────────────────── */
 :root {
     --sidebar-w: 240px;
+    --sidebar-w-collapsed: 76px;
     --header-h: 62px;
 }
 
@@ -209,17 +212,32 @@ header.app-header {
     padding: 0 1.25rem;
     border-right: 1px solid var(--khaki-border);
     flex-shrink: 0;
+    transition: width 0.22s ease;
+    overflow: hidden;
 }
 
-/* Maroon icon box */
+/* Maroon icon box — also the desktop sidebar collapse/expand toggle,
+   so it's a <button> under the hood; reset default button chrome. */
 .logo-icon-box {
     width: 32px;
     height: 32px;
     background: var(--accent-maroon);
+    border: none;
     border-radius: 8px;
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+}
+
+.logo-icon-box:hover {
+    background: var(--accent-dark);
+}
+
+.logo-icon-box:active {
+    transform: scale(0.93);
 }
 
 /* Logo text */
@@ -433,13 +451,39 @@ header.app-header {
 /* ── SIDEBAR ──────────────────────────────────────────────────── */
 nav.sidebar {
     width: var(--sidebar-w);
-    background: linear-gradient(180deg, var(--accent-maroon) 0%, var(--accent-dark) 100%);
+    background: linear-gradient(180deg, var(--sidebar-red-1) 0%, var(--sidebar-red-2) 100%);
     border-right: 1px solid rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     padding: 1rem 0.75rem;
     flex-shrink: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    transition: width 0.22s ease;
+}
+
+/* ── Collapsed (icon-rail) sidebar — toggled by clicking the logo
+   icon box (#sidebarCollapseBtn); #app-main naturally fills the
+   freed width since it's flex:1 in .app-body. Desktop-oriented;
+   harmless if ever triggered on the off-canvas mobile layout. ── */
+body.sidebar-collapsed nav.sidebar {
+    width: var(--sidebar-w-collapsed);
+}
+
+body.sidebar-collapsed .header-logo {
+    width: var(--sidebar-w-collapsed);
+}
+
+body.sidebar-collapsed .logo-text,
+body.sidebar-collapsed .nav-group-label,
+body.sidebar-collapsed .nav-item span:not(.material-symbols-outlined),
+body.sidebar-collapsed .nav-badge {
+    display: none;
+}
+
+body.sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding: 0.6rem;
 }
 
 .nav-group-label {
@@ -463,7 +507,7 @@ nav.sidebar {
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.8);
+    color: #ffffff;
     font-weight: 500;
     transition: all 0.15s;
     text-decoration: none;
@@ -490,6 +534,7 @@ nav.sidebar {
 .nav-item .material-symbols-outlined {
     font-size: 20px;
     flex-shrink: 0;
+    color: #ffffff;
 }
 
 .nav-badge {
@@ -4185,6 +4230,14 @@ input[type="range"] {
 
     .logo-text {
         display: none;
+    }
+
+    /* The logo/collapse toggle is a desktop-only affordance — on mobile
+       the hamburger already handles showing/hiding the sidebar via the
+       off-canvas drawer, so disable double-duty here to avoid the two
+       mechanisms fighting over the same nav.sidebar width. */
+    #sidebarCollapseBtn {
+        pointer-events: none;
     }
 
     /* Search drops to its own full-width row beneath the top row
