@@ -756,48 +756,22 @@ table,
    § 17  SETTINGS OVERLAY
 ================================================================ */
 
-/* Tablet: content sizing */
+/* Tablet: tighten card padding */
 @media (min-width: 769px) and (max-width: 1100px) {
-
-    .sov-pagehead,
-    .sov-body {
-        max-width: 100%;
+    .acct-card {
+        padding: 20px 22px;
     }
 
-    .sov-form-card {
-        padding: 22px 24px;
-    }
-
-    .sov-form-grid {
-        gap: 14px 18px;
-    }
-
-    .sov-sidenav {
-        width: 176px;
+    .acct-row-label {
+        width: 112px;
     }
 }
 
-/* Mobile: stacked layout, horizontal tab bar.
-   Base stacking rules live in faculty-dashboard.css — these
-   only supplement spacing for narrow viewports. */
+/* Mobile: supplement spacing only — base stacking rules live in
+   faculty-dashboard.css */
 @media (max-width: 768px) {
-    .sov-topbar {
-        padding: 0 14px;
-        height: 56px;
-        gap: 10px;
-    }
-
-    .sov-back-btn {
-        width: 34px;
-        height: 34px;
-    }
-
-    .sov-topbar-brand {
-        font-size: 0.875rem;
-    }
-
-    .sov-row {
-        gap: 12px;
+    .acct-banner-name {
+        font-size: 1.1rem;
     }
 
     .sov-theme-row {

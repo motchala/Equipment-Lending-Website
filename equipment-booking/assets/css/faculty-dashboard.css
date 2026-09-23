@@ -7442,11 +7442,10 @@ body {
 
 /* ================================================================
    SETTINGS OVERLAY — Faculty
-   One consolidated stylesheet for #settingsOverlay, built entirely
-   on the shared design tokens (--color-*, --radius-*, --shadow-*,
-   --font-*) so it inherits light / dark / high-contrast automatically
-   and matches the spacing rhythm + icon set used across the rest of
-   the faculty UI (sidebar, dashboard cards, modals, help center).
+   Layout: identity banner + horizontal pill tabs + a 2-card grid per
+   tab (mirrors the admin "My Account" pattern), built entirely on
+   the shared design tokens (--color-*, --radius-*, --shadow-*,
+   --font-*) so it inherits light / dark / high-contrast automatically.
 ================================================================ */
 
 #settingsOverlay {
@@ -7456,56 +7455,6 @@ body {
     background: var(--color-background);
 }
 
-/* ── Top bar (back + brand) ───────────────────────────────────── */
-.sov-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    height: var(--topbar-h);
-    background: var(--color-surface-lowest);
-    border-bottom: 1px solid var(--color-outline-variant);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 24px;
-    flex-shrink: 0;
-}
-
-.sov-back-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--color-outline-variant);
-    background: transparent;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-secondary);
-    flex-shrink: 0;
-    transition: background var(--transition), color var(--transition), border-color var(--transition);
-}
-
-.sov-back-btn .material-symbols-outlined {
-    font-size: 20px;
-}
-
-.sov-back-btn:hover {
-    background: var(--color-surface-container);
-    color: var(--color-on-surface);
-    border-color: var(--color-outline);
-}
-
-.sov-topbar-brand {
-    font-size: 1rem;
-    color: var(--color-secondary);
-    font-family: var(--font-display);
-}
-
-.sov-topbar-brand strong {
-    color: var(--color-primary);
-}
-
 /* ── Shell ─────────────────────────────────────────────────────── */
 .sov-shell {
     flex: 1;
@@ -7513,17 +7462,13 @@ body {
     flex-direction: column;
 }
 
-/* ── Page heading + identity chip ─────────────────────────────── */
+/* ── Page heading ──────────────────────────────────────────────── */
+/* Matches .app-main's own padding (32px 40px) so Settings lines up
+   with the rest of the faculty interface instead of floating in a
+   narrower, centered column. */
 .sov-pagehead {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 20px;
-    max-width: 1080px;
-    margin: 0 auto;
     width: 100%;
-    padding: 28px 32px 20px;
+    padding: 32px 40px 20px;
     box-sizing: border-box;
 }
 
@@ -7542,25 +7487,44 @@ body {
     color: var(--color-secondary);
 }
 
-.sov-identity {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: var(--radius-full);
-    padding: 6px 16px 6px 6px;
-    flex-shrink: 0;
+/* ── Body ──────────────────────────────────────────────────────── */
+.sov-body {
+    flex: 1;
+    width: 100%;
+    padding: 0 40px 48px;
+    box-sizing: border-box;
 }
 
-.sov-identity-avatar {
-    width: 38px;
-    height: 38px;
+/* ── Identity banner ───────────────────────────────────────────── */
+.acct-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px;
+    background: linear-gradient(135deg, var(--color-primary-container) 0%, color-mix(in srgb, var(--color-primary-container) 65%, black) 100%);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+}
+
+.acct-banner-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+
+.acct-banner-avatar {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    background: var(--color-primary-container);
+    background: rgba(255, 255, 255, 0.16);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     color: var(--color-on-primary);
+    font-size: 1.2rem;
     font-weight: 700;
-    font-size: 0.8rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -7568,78 +7532,111 @@ body {
     flex-shrink: 0;
 }
 
-.sov-identity-avatar .avatar-img {
+.acct-banner-avatar .avatar-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.sov-identity-text {
-    display: flex;
-    flex-direction: column;
-    line-height: 1.25;
+.acct-banner-text {
+    min-width: 0;
 }
 
-.sov-identity-name {
-    font-size: 0.82rem;
+.acct-banner-name {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
     font-weight: 700;
-    color: var(--color-on-surface);
+    color: var(--color-on-primary);
+    margin: 0 0 3px;
+    letter-spacing: -0.01em;
 }
 
-.sov-identity-id {
-    font-size: 0.72rem;
-    color: var(--color-secondary);
+.acct-banner-meta {
+    font-size: 0.82rem;
+    color: var(--color-on-primary);
+    opacity: 0.82;
+    margin: 0 0 9px;
 }
 
-/* ── Body: sidebar + content ──────────────────────────────────── */
-.sov-body {
-    flex: 1;
-    display: flex;
-    align-items: flex-start;
-    max-width: 1080px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 0 32px 48px;
-    gap: 28px;
-    box-sizing: border-box;
+.acct-banner-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--color-on-primary);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
 }
 
-.sov-sidenav {
-    width: 200px;
+.acct-banner-badge .material-symbols-outlined {
+    font-size: 14px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.sov-nav-item.acct-banner-edit-btn {
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: var(--color-on-primary);
     flex-shrink: 0;
+}
+
+.sov-nav-item.acct-banner-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.26);
+    color: var(--color-on-primary);
+}
+
+.sov-nav-item.acct-banner-edit-btn.active {
+    background: rgba(255, 255, 255, 0.3);
+    color: var(--color-on-primary);
+}
+
+/* ── Horizontal pill tabs ──────────────────────────────────────── */
+.acct-tabs {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    position: sticky;
-    top: 20px;
+    gap: 4px;
+    background: var(--color-surface-container);
+    border: 1px solid var(--color-outline-variant);
+    padding: 5px;
+    border-radius: var(--radius-full);
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+    margin-bottom: 22px;
 }
 
 .sov-nav-item {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: var(--radius-sm);
-    font-size: 0.875rem;
-    font-weight: 500;
+    gap: 7px;
+    padding: 9px 18px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: transparent;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
     color: var(--color-secondary);
-    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: background var(--transition), color var(--transition);
 }
 
 .sov-nav-item .material-symbols-outlined {
     font-size: 18px;
-    flex-shrink: 0;
 }
 
 .sov-nav-item:hover {
-    background: var(--color-surface-container);
+    background: var(--color-surface-high);
     color: var(--color-on-surface);
 }
 
 .sov-nav-item.active {
-    background: color-mix(in srgb, var(--color-primary) 14%, transparent);
-    color: var(--color-primary);
+    background: var(--color-primary-container);
+    color: var(--color-on-primary);
     font-weight: 700;
 }
 
@@ -7670,70 +7667,140 @@ body {
     }
 }
 
-/* ── Card ──────────────────────────────────────────────────────── */
-.sov-form-card {
+/* ── Card grid (2 cards per tab) ──────────────────────────────── */
+.acct-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.acct-card {
     background: var(--color-surface-lowest);
     border: 1px solid var(--color-outline-variant);
     border-radius: var(--radius-lg);
-    padding: 28px 30px;
+    padding: 24px 26px;
     box-shadow: var(--shadow-sm);
 }
 
-.sov-form-head {
-    margin-bottom: 24px;
+.acct-card-full {
+    max-width: none;
 }
 
-.sov-form-title {
+.acct-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 14px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.acct-card-head .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.acct-card-head h3 {
+    margin: 0;
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--color-on-surface);
-    margin: 0 0 4px;
     letter-spacing: -0.01em;
 }
 
-.sov-form-sub {
-    margin: 0;
-    font-size: 0.82rem;
-    color: var(--color-secondary);
+.acct-card-foot {
+    margin-top: 18px;
+    padding-top: 4px;
+    display: flex;
+    justify-content: flex-end;
 }
 
-/* ── Section blocks within a card ─────────────────────────────── */
-.sov-section-block+.sov-section-block {
-    margin-top: 24px;
-    padding-top: 22px;
-    border-top: 1px solid var(--color-outline-variant);
+/* ── Label / value rows ───────────────────────────────────────── */
+.acct-rows {
+    margin-top: 2px;
 }
 
-.sov-section-label {
-    font-size: 0.7rem;
+.acct-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.acct-row:last-child {
+    border-bottom: none;
+    padding-bottom: 2px;
+}
+
+.acct-row-label {
+    width: 132px;
+    flex-shrink: 0;
+    font-size: 0.68rem;
     font-weight: 700;
-    letter-spacing: 0.8px;
+    letter-spacing: 0.6px;
     text-transform: uppercase;
     color: var(--color-secondary);
-    margin: 0 0 14px;
 }
 
-.sov-desc-small {
-    font-size: 0.82rem;
+.acct-row-value {
+    flex: 1;
+    min-width: 0;
+}
+
+.acct-row-static {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+}
+
+.acct-row-static-muted {
+    font-weight: 500;
     color: var(--color-secondary);
-    margin: 10px 0 0;
 }
 
-/* ── Profile form grid ────────────────────────────────────────── */
-.sov-form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px 22px;
-    margin-bottom: 24px;
+.acct-row-input {
+    width: 100%;
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: var(--color-on-surface);
+    padding: 5px 8px;
+    margin: -5px 0 -5px -8px;
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: background var(--transition), box-shadow var(--transition);
 }
 
-.sov-form-grid .form-group {
-    margin-bottom: 0;
+.acct-row-input:hover {
+    background: var(--color-surface-container);
 }
 
-.sov-form-footer {
-    padding-top: 4px;
+.acct-row-input:focus {
+    background: var(--color-surface-container);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
+.acct-row .sov-btn-outline {
+    flex-shrink: 0;
+}
+
+.acct-row-note .acct-row-label,
+.acct-row-note .acct-row-static-muted {
+    font-weight: 500;
+}
+
+.acct-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-success);
+    display: inline-block;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
@@ -7783,7 +7850,7 @@ body {
 /* ── Theme swatches ───────────────────────────────────────────── */
 .sov-theme-row {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: wrap;
 }
 
@@ -7797,8 +7864,8 @@ body {
 }
 
 .sov-theme-swatch {
-    width: 88px;
-    height: 60px;
+    width: 84px;
+    height: 56px;
     border-radius: var(--radius-md);
     border: 2px solid transparent;
     overflow: hidden;
@@ -7815,7 +7882,7 @@ body {
 }
 
 .sov-swatch-topbar {
-    height: 14px;
+    height: 13px;
     flex-shrink: 0;
 }
 
@@ -7825,7 +7892,7 @@ body {
 }
 
 .sov-swatch-sidebar {
-    width: 24px;
+    width: 22px;
     flex-shrink: 0;
 }
 
@@ -7899,9 +7966,15 @@ body {
 }
 
 .sov-theme-name {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     color: var(--color-secondary);
     font-weight: 500;
+}
+
+.sov-desc-small {
+    font-size: 0.82rem;
+    color: var(--color-secondary);
+    margin: 14px 0 0;
 }
 
 /* ── Font size buttons ────────────────────────────────────────── */
@@ -7946,61 +8019,15 @@ body {
     border-color: var(--color-primary-container);
 }
 
-/* ── Row: icon + text + action — Security / Privacy tabs ────────── */
-.sov-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-
-.sov-row+.sov-row {
-    margin-top: 16px;
-}
-
-.sov-row-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: var(--color-surface-container);
-    color: var(--color-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.sov-row-icon .material-symbols-outlined {
-    font-size: 19px;
-}
-
-.sov-row-text {
-    flex: 1;
-    min-width: 0;
-}
-
-.sov-row-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-on-surface);
-    margin: 0 0 2px;
-}
-
-.sov-row-sub {
-    font-size: 0.8rem;
-    color: var(--color-secondary);
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-
+/* ── Badge ─────────────────────────────────────────────────────── */
 .sov-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     padding: 4px 12px;
     border-radius: var(--radius-full);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 700;
-    flex-shrink: 0;
 }
 
 .sov-badge-success {
@@ -8037,83 +8064,86 @@ body {
 /* ── Pointer-events: re-enable clicks inside the overlay's inner
    elements regardless of the base .overlay-page pointer-events
    handling (kept defensive on purpose) ──────────────────────── */
-#settingsOverlay .sov-topbar,
 #settingsOverlay .sov-shell,
 #settingsOverlay .sov-pagehead,
 #settingsOverlay .sov-body,
-#settingsOverlay .sov-sidenav,
+#settingsOverlay .acct-banner,
+#settingsOverlay .acct-tabs,
 #settingsOverlay .sov-content,
 #settingsOverlay .sov-tab-panel {
     pointer-events: auto;
 }
 
-/* ── Responsive ────────────────────────────────────────────────── */
-@media (max-width: 900px) {
+/* ── Responsive (mirrors § 5 MAIN CANVAS PADDING's breakpoints so
+   Settings scales exactly like the rest of the faculty interface) ── */
+@media (min-width: 769px) and (max-width: 1024px) {
 
     .sov-pagehead,
     .sov-body {
-        padding-left: 18px;
-        padding-right: 18px;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .acct-grid {
+        grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 768px) {
     .sov-pagehead {
-        padding: 20px 16px 16px;
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .sov-identity {
-        align-self: flex-start;
+        padding: 16px 14px 16px;
     }
 
     .sov-body {
+        padding: 0 14px 32px;
+    }
+
+    .acct-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .acct-banner {
         flex-direction: column;
-        padding: 0 16px 40px;
-        gap: 18px;
+        align-items: stretch;
+        padding: 20px;
     }
 
-    .sov-sidenav {
-        position: static;
+    .acct-banner-edit-btn {
+        justify-content: center;
+    }
+
+    .acct-tabs {
         width: 100%;
-        flex-direction: row;
         overflow-x: auto;
-        border-bottom: 1px solid var(--color-outline-variant);
-        padding-bottom: 6px;
-        gap: 4px;
     }
 
-    .sov-nav-item {
-        flex-shrink: 0;
-        white-space: nowrap;
-    }
-
-    .sov-form-card {
+    .acct-card {
         padding: 20px 18px;
         border-radius: var(--radius-md);
     }
 
-    .sov-form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .sov-row {
+    .acct-row {
         flex-wrap: wrap;
     }
 
-    .sov-row-text {
-        min-width: 60%;
+    .acct-row-label {
+        width: 100%;
+        margin-bottom: 2px;
     }
 
     .sov-theme-swatch {
         width: 72px;
         height: 50px;
     }
+}
 
-    /* On mobile, sov-topbar replaces the generic overlay-topbar */
-    #settingsOverlay>.overlay-topbar {
-        display: none;
+@media (max-width: 480px) {
+    .sov-pagehead {
+        padding: 12px 10px 12px;
+    }
+
+    .sov-body {
+        padding: 0 10px 28px;
     }
 }
 
