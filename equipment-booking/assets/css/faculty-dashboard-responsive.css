@@ -753,22 +753,15 @@ table,
 
 
 /* ================================================================
-   § 17  SETTINGS / ACCOUNT OVERLAYS
+   § 17  SETTINGS OVERLAY
 ================================================================ */
 
-/* SOV overlay — content sizing on tablet */
+/* Tablet: content sizing */
 @media (min-width: 769px) and (max-width: 1100px) {
-    .sov-shell {
-        max-width: 100%;
-    }
 
-    .sov-banner {
-        padding: 28px 20px 32px;
-    }
-
+    .sov-pagehead,
     .sov-body {
-        gap: 20px;
-        padding: 20px 16px 40px;
+        max-width: 100%;
     }
 
     .sov-form-card {
@@ -776,13 +769,17 @@ table,
     }
 
     .sov-form-grid {
-        grid-template-columns: 1fr 1fr;
         gap: 14px 18px;
+    }
+
+    .sov-sidenav {
+        width: 176px;
     }
 }
 
-/* SOV overlay — mobile already handled in main CSS (§8178+),
-   these supplement missing pieces */
+/* Mobile: stacked layout, horizontal tab bar.
+   Base stacking rules live in faculty-dashboard.css — these
+   only supplement spacing for narrow viewports. */
 @media (max-width: 768px) {
     .sov-topbar {
         padding: 0 14px;
@@ -799,60 +796,12 @@ table,
         font-size: 0.875rem;
     }
 
-    .sov-profile-card {
-        flex-direction: column;
-        gap: 16px;
-        padding: 16px 16px 20px;
-    }
-
-    .sov-pc-main {
-        margin-top: 0;
-        order: 0;
-    }
-
-    .sov-pc-meta {
-        display: none;
-        /* hide join date meta on mobile for cleanliness */
-    }
-
-    .sov-pc-actions {
-        align-items: stretch;
-        width: 100%;
-    }
-
-    .sov-action-btn {
-        width: 100%;
-        text-align: center;
-    }
-
-    .sov-clearance-pill {
-        justify-content: center;
-    }
-
-    .sov-form-grid {
-        grid-template-columns: 1fr;
+    .sov-row {
         gap: 12px;
-    }
-
-    .sov-form-card {
-        padding: 18px 16px;
-        border-radius: 10px;
-    }
-
-    .sov-security-row,
-    .sov-privacy-action-row {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .sov-outline-btn,
-    .sov-danger-btn {
-        flex-shrink: 0;
     }
 
     .sov-theme-row {
         gap: 12px;
-        flex-wrap: wrap;
     }
 }
 
@@ -1419,8 +1368,8 @@ table,
     .qa-btn,
     .btn-borrow,
     .btn-submit-form,
-    .sov-save-btn,
-    .sov-outline-btn,
+    .sov-btn-primary,
+    .sov-btn-outline,
     .fcc-generate-btn,
     .dash-code-generate-btn {
         min-height: 44px;

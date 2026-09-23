@@ -3085,25 +3085,40 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
     </div><!-- /accountOverlay -->
 
     <!-- ================================================================
-     OVERLAY: SETTINGS (Redesigned — Sidebar Tab Layout)
+     OVERLAY: SETTINGS
 ================================================================ -->
     <div class="overlay-page" id="settingsOverlay">
 
         <!-- Sticky top-bar (back + title) -->
         <div class="sov-topbar">
-            <button class="sov-back-btn" data-action="close-overlay" data-target="settingsOverlay">
+            <button class="sov-back-btn" data-action="close-overlay" data-target="settingsOverlay" aria-label="Back to dashboard">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
             <div class="sov-topbar-brand"><strong>PUP</strong>SYNC</div>
         </div>
 
-        <!-- Two-column shell -->
+        <!-- Shell -->
         <div class="sov-shell">
 
-            <!-- ── Simple page heading ──────────────────────────── -->
+            <!-- ── Page heading + identity chip ─────────────────── -->
             <div class="sov-pagehead">
-                <h1 class="sov-pagehead-title">Settings</h1>
-                <p class="sov-pagehead-sub">Manage your profile, appearance, and account preferences.</p>
+                <div class="sov-pagehead-text">
+                    <h1 class="sov-pagehead-title">Settings</h1>
+                    <p class="sov-pagehead-sub">Manage your profile, appearance, and account preferences.</p>
+                </div>
+                <div class="sov-identity">
+                    <div class="sov-identity-avatar">
+                        <?php if ($profile_pic_url): ?>
+                            <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="" class="avatar-img">
+                        <?php else: ?>
+                            <?php echo htmlspecialchars($initials); ?>
+                        <?php endif; ?>
+                    </div>
+                    <div class="sov-identity-text">
+                        <span class="sov-identity-name"><?php echo htmlspecialchars($fullname); ?></span>
+                        <span class="sov-identity-id">ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
+                    </div>
+                </div>
             </div>
 
             <!-- ── Settings Body (sidebar + content) ────────── -->
@@ -3112,19 +3127,24 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <!-- Left sidebar nav -->
                 <nav class="sov-sidenav" id="sovSidenav">
                     <a class="sov-nav-item active" data-sov-tab="sov-tab-profile" href="#">
-                        Profile
+                        <span class="material-symbols-outlined">person</span>
+                        <span>Profile</span>
                     </a>
                     <a class="sov-nav-item" data-sov-tab="sov-tab-appearance" href="#">
-                        Appearance
+                        <span class="material-symbols-outlined">palette</span>
+                        <span>Appearance</span>
                     </a>
                     <a class="sov-nav-item" data-sov-tab="sov-tab-security" href="#">
-                        Security
+                        <span class="material-symbols-outlined">security</span>
+                        <span>Security</span>
                     </a>
                     <a class="sov-nav-item" data-sov-tab="sov-tab-privacy" href="#">
-                        Privacy
+                        <span class="material-symbols-outlined">privacy_tip</span>
+                        <span>Privacy</span>
                     </a>
                     <a class="sov-nav-item" data-sov-tab="sov-tab-help" href="#">
-                        Help &amp; Support
+                        <span class="material-symbols-outlined">help_outline</span>
+                        <span>Help &amp; Support</span>
                     </a>
                 </nav>
 
@@ -3134,33 +3154,36 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <!-- ══ TAB: Profile ══════════════════════════════════ -->
                     <div class="sov-tab-panel active" id="sov-tab-profile">
                         <div class="sov-form-card">
-                            <h3 class="sov-form-title">Profile</h3>
+                            <div class="sov-form-head">
+                                <h3 class="sov-form-title">Personal Information</h3>
+                                <p class="sov-form-sub">Keep your profile up to date so students and staff can reach you.</p>
+                            </div>
                             <div class="sov-form-grid">
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovFullName">Full Name</label>
-                                    <input class="sov-input" id="sovFullName" type="text"
+                                <div class="form-group">
+                                    <label class="form-label" for="sovFullName">Full Name</label>
+                                    <input class="form-input" id="sovFullName" type="text"
                                         value="<?php echo htmlspecialchars($fullname); ?>"
-                                        data-field="fullname">
+                                        data-sov-field="fullname">
                                 </div>
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovFacultyId">Faculty ID</label>
-                                    <input class="sov-input sov-input-readonly" id="sovFacultyId" type="text"
+                                <div class="form-group">
+                                    <label class="form-label" for="sovFacultyId">Faculty ID</label>
+                                    <input class="form-input is-readonly" id="sovFacultyId" type="text"
                                         value="<?php echo htmlspecialchars($_SESSION['faculty_id']); ?>"
                                         readonly>
                                 </div>
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovEmail">Email Address</label>
-                                    <input class="sov-input" id="sovEmail" type="email"
+                                <div class="form-group">
+                                    <label class="form-label" for="sovEmail">Email Address</label>
+                                    <input class="form-input" id="sovEmail" type="email"
                                         value="<?php echo htmlspecialchars($db_email); ?>"
-                                        data-field="email">
+                                        data-sov-field="email">
                                 </div>
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovDepartment">Department</label>
+                                <div class="form-group">
+                                    <label class="form-label" for="sovDepartment">Department</label>
                                     <?php if ($department_locked): ?>
-                                        <input class="sov-input sov-input-readonly" id="sovDepartment" type="text"
+                                        <input class="form-input is-readonly" id="sovDepartment" type="text"
                                             value="<?php echo htmlspecialchars($db_department); ?>" readonly>
                                     <?php else: ?>
-                                        <select class="sov-input" id="sovDepartment" data-field="department">
+                                        <select class="form-input" id="sovDepartment" data-sov-field="department">
                                             <option value="">Select Department…</option>
                                             <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
                                                 <option value="<?php echo $p; ?>" <?php echo $db_department === $p ? 'selected' : ''; ?>>
@@ -3170,9 +3193,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                         </select>
                                     <?php endif; ?>
                                 </div>
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovRank">Position / Rank</label>
-                                    <select class="sov-input" id="sovRank" data-field="faculty_rank">
+                                <div class="form-group">
+                                    <label class="form-label" for="sovRank">Position / Rank</label>
+                                    <select class="form-input" id="sovRank" data-sov-field="faculty_rank">
                                         <option value="">Select Position…</option>
                                         <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
                                             <option value="<?php echo $rank; ?>" <?php echo $db_faculty_rank === $rank ? 'selected' : ''; ?>>
@@ -3181,16 +3204,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                                <div class="sov-form-group">
-                                    <label class="sov-label" for="sovPhone">Mobile Number</label>
-                                    <input class="sov-input" id="sovPhone" type="tel"
+                                <div class="form-group">
+                                    <label class="form-label" for="sovPhone">Mobile Number</label>
+                                    <input class="form-input" id="sovPhone" type="tel"
                                         value="<?php echo htmlspecialchars($db_phone); ?>"
                                         placeholder="+63 912 345 6789"
-                                        data-field="phone">
+                                        data-sov-field="phone">
                                 </div>
                             </div>
                             <div class="sov-form-footer">
-                                <button class="sov-save-btn" data-action="contact-save">Save Changes</button>
+                                <button class="sov-btn-primary" data-action="contact-save">Save Changes</button>
                             </div>
                         </div>
                     </div><!-- /sov-tab-profile -->
@@ -3198,7 +3221,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <!-- ══ TAB: Appearance ═══════════════════════════════ -->
                     <div class="sov-tab-panel" id="sov-tab-appearance">
                         <div class="sov-form-card">
-                            <h3 class="sov-form-title">Appearance</h3>
+                            <div class="sov-form-head">
+                                <h3 class="sov-form-title">Appearance</h3>
+                                <p class="sov-form-sub">Choose how PUPSync looks and reads on your screen.</p>
+                            </div>
 
                             <!-- Theme -->
                             <div class="sov-section-block">
@@ -3281,37 +3307,36 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <!-- ══ TAB: Security ═════════════════════════════════ -->
                     <div class="sov-tab-panel" id="sov-tab-security">
                         <div class="sov-form-card">
-                            <h3 class="sov-form-title">Security</h3>
+                            <div class="sov-form-head">
+                                <h3 class="sov-form-title">Account Security</h3>
+                                <p class="sov-form-sub">Manage your password, recovery email, and active sessions.</p>
+                            </div>
 
                             <!-- Password -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Password</p>
-                                <div class="sov-security-row">
-                                    <div class="sov-security-info">
-                                        <span class="material-symbols-outlined sov-sec-icon">lock</span>
-                                        <div>
-                                            <p class="sov-sec-title">Change Password</p>
-                                            <p class="sov-sec-sub">Update your account password regularly to keep it secure.</p>
-                                        </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">lock</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Change Password</p>
+                                        <p class="sov-row-sub">Update your account password regularly to keep it secure.</p>
                                     </div>
-                                    <button class="sov-outline-btn" data-action="open-pw-modal">Change</button>
+                                    <button class="sov-btn-outline" data-action="open-pw-modal">Change</button>
                                 </div>
                             </div>
 
                             <!-- Backup Email -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Recovery</p>
-                                <div class="sov-security-row">
-                                    <div class="sov-security-info">
-                                        <span class="material-symbols-outlined sov-sec-icon">alternate_email</span>
-                                        <div>
-                                            <p class="sov-sec-title">Backup Email</p>
-                                            <p class="sov-sec-sub">
-                                                <?php echo $masked_backup ? htmlspecialchars($masked_backup) : 'No backup email set.'; ?>
-                                            </p>
-                                        </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">alternate_email</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Backup Email</p>
+                                        <p class="sov-row-sub">
+                                            <?php echo $masked_backup ? htmlspecialchars($masked_backup) : 'No backup email set.'; ?>
+                                        </p>
                                     </div>
-                                    <button class="sov-outline-btn" data-action="open-backup-email-modal">
+                                    <button class="sov-btn-outline" data-action="open-backup-email-modal">
                                         <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
                                     </button>
                                 </div>
@@ -3320,15 +3345,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             <!-- Active Sessions -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Active Sessions</p>
-                                <div class="sov-session-card">
-                                    <div class="sov-session-info">
-                                        <span class="material-symbols-outlined sov-sec-icon">devices</span>
-                                        <div>
-                                            <p class="sov-sec-title">Current Session</p>
-                                            <p class="sov-sec-sub">This device — <?php echo htmlspecialchars($_SERVER['HTTP_USER_AGENT'] ? substr($_SERVER['HTTP_USER_AGENT'], 0, 40) . '…' : 'Unknown'); ?></p>
-                                        </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">devices</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Current Session</p>
+                                        <p class="sov-row-sub">This device — <?php echo htmlspecialchars($_SERVER['HTTP_USER_AGENT'] ? substr($_SERVER['HTTP_USER_AGENT'], 0, 40) . '…' : 'Unknown'); ?></p>
                                     </div>
-                                    <span class="sov-session-badge">Active</span>
+                                    <span class="sov-badge sov-badge-success">Active</span>
                                 </div>
                             </div>
                         </div>
@@ -3337,48 +3360,50 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <!-- ══ TAB: Privacy ══════════════════════════════════ -->
                     <div class="sov-tab-panel" id="sov-tab-privacy">
                         <div class="sov-form-card">
-                            <h3 class="sov-form-title">Privacy</h3>
+                            <div class="sov-form-head">
+                                <h3 class="sov-form-title">Privacy &amp; Notifications</h3>
+                                <p class="sov-form-sub">Choose what PUPSync notifies you about and manage your data.</p>
+                            </div>
 
                             <!-- Notification preferences -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Notification Preferences</p>
-                                <div class="sov-toggle-list">
-                                    <div class="sov-toggle-row">
-                                        <div class="sov-toggle-info">
-                                            <p class="sov-toggle-title">Email Alerts</p>
-                                            <p class="sov-toggle-sub">Receive overdue reminders via email</p>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">mail</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Email Alerts</p>
+                                        <p class="sov-row-sub">Receive overdue reminders via email</p>
                                     </div>
-                                    <div class="sov-toggle-row">
-                                        <div class="sov-toggle-info">
-                                            <p class="sov-toggle-title">Reservation Reminders</p>
-                                            <p class="sov-toggle-sub">Get notified 24 hours before a booking</p>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                    <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">event_upcoming</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Reservation Reminders</p>
+                                        <p class="sov-row-sub">Get notified 24 hours before a booking</p>
                                     </div>
-                                    <div class="sov-toggle-row">
-                                        <div class="sov-toggle-info">
-                                            <p class="sov-toggle-title">Account Activity Alerts</p>
-                                            <p class="sov-toggle-sub">Receive security and login notifications</p>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                    <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">notifications</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Account Activity Alerts</p>
+                                        <p class="sov-row-sub">Receive security and login notifications</p>
                                     </div>
+                                    <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
                                 </div>
                             </div>
 
                             <!-- Data management -->
                             <div class="sov-section-block">
                                 <p class="sov-section-label">Data Management</p>
-                                <div class="sov-privacy-action-row">
-                                    <div class="sov-security-info">
-                                        <span class="material-symbols-outlined sov-sec-icon">download</span>
-                                        <div>
-                                            <p class="sov-sec-title">Export My Data</p>
-                                            <p class="sov-sec-sub">Download a copy of all your activity and profile data.</p>
-                                        </div>
+                                <div class="sov-row">
+                                    <div class="sov-row-icon"><span class="material-symbols-outlined">download</span></div>
+                                    <div class="sov-row-text">
+                                        <p class="sov-row-title">Export My Data</p>
+                                        <p class="sov-row-sub">Download a copy of all your activity and profile data.</p>
                                     </div>
-                                    <button class="sov-outline-btn" data-action="toast" data-msg="Data export coming soon!">Export</button>
+                                    <button class="sov-btn-outline" data-action="toast" data-msg="Data export coming soon!">Export</button>
                                 </div>
                             </div>
                         </div>
@@ -3387,10 +3412,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <!-- ══ TAB: Help & Support ═══════════════════════════ -->
                     <div class="sov-tab-panel" id="sov-tab-help">
                         <div class="sov-form-card">
-                            <h3 class="sov-form-title">Help &amp; Support</h3>
-                            <p class="sov-form-hint" style="margin:-4px 0 18px;">Browse common topics or contact the system administrator for further assistance.</p>
+                            <div class="sov-form-head">
+                                <h3 class="sov-form-title">Help &amp; Support</h3>
+                                <p class="sov-form-sub">Browse common topics or contact the system administrator for further assistance.</p>
+                            </div>
 
-                            <div style="display:flex;flex-direction:column;gap:12px;">
+                            <div class="sov-help-list">
 
                                 <details class="help-item">
                                     <summary class="help-item-q">
@@ -3458,14 +3485,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                             </div>
 
-                            <div class="help-contact-card" style="margin-top:28px;">
-                                <span class="material-symbols-outlined"
-                                    style="font-size:32px;color:var(--color-primary);margin-bottom:8px;">support_agent</span>
+                            <div class="help-contact-card">
+                                <span class="material-symbols-outlined help-contact-icon">support_agent</span>
                                 <h4>Still need help?</h4>
                                 <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
-                                <a href="mailto:admin@pupsync.edu.ph" class="btn-urgent-primary"
-                                    style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;margin-top:12px;">
-                                    <span class="material-symbols-outlined" style="font-size:16px">mail</span>
+                                <a href="mailto:admin@pupsync.edu.ph" class="sov-btn-primary help-contact-btn">
+                                    <span class="material-symbols-outlined">mail</span>
                                     Email Administrator
                                 </a>
                             </div>
