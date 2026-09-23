@@ -2421,7 +2421,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                      WHERE faculty_id='$uid_safe'
                      AND status IN ('Returned','Declined')
                      ORDER BY request_date DESC
-                     LIMIT 6"
+                     LIMIT 200"   /* client-side pagination shows 10 at a time; 200 is a safe ceiling */
                 );
 
                 /* ── Stat counters ─────────────────────────────────────────── */
@@ -2672,9 +2672,13 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             View all <span class="material-symbols-outlined">arrow_forward</span>
                         </button>
                     </div>
-                    <?php if ($act_history && mysqli_num_rows($act_history) > 0): ?>
-                        <div class="myact-list">
-                            <?php while ($r = mysqli_fetch_assoc($act_history)):
+                    <?php if ($act_history && mysqli_num_rows($act_history) > 0):
+                        $hist_rows = [];
+                        while ($r = mysqli_fetch_assoc($act_history)) $hist_rows[] = $r;
+                        $hist_total = count($hist_rows);
+                    ?>
+                        <div class="myact-list" id="myactHistList">
+                            <?php foreach ($hist_rows as $hidx => $r):
                                 $isDeclined = $r['status'] === 'Declined';
                                 $icon = actEquipIcon($r['equipment_name']);
                                 $image = actEquipImage($r['equipment_name']);
@@ -2682,7 +2686,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                     ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
                                     : (date('M j', strtotime($r['borrow_date'])) . '&ndash;' . date('M j, Y', strtotime($r['returned_at'] ?: $r['return_date'])));
                             ?>
-                                <div class="myact-history-row">
+                                <div class="myact-history-row" data-hist-idx="<?php echo $hidx; ?>">
                                     <div class="myact-history-icon">
                                         <?php if ($image): ?>
                                             <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
@@ -2701,8 +2705,25 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                     </div>
                                     <?php echo actStatusPill($r['status']); ?>
                                 </div>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         </div>
+
+                        <!-- Pagination — only rendered when more than 10 rows exist;
+                             JS handles show/hide and page switching. -->
+                        <div class="myact-hist-pg" id="myactHistPg"
+                            <?php echo $hist_total <= 10 ? 'style="display:none;"' : ''; ?>>
+                            <span class="myact-hist-pg-info" id="myactHistPgInfo"></span>
+                            <div class="myact-hist-pg-controls">
+                                <button class="myact-hist-pg-btn" id="myactHistPrev" aria-label="Previous page">
+                                    <span class="material-symbols-outlined">chevron_left</span>
+                                </button>
+                                <div class="myact-hist-pg-nums" id="myactHistNums"></div>
+                                <button class="myact-hist-pg-btn" id="myactHistNext" aria-label="Next page">
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
+                        </div>
+
                     <?php else: ?>
                         <div class="myact-empty">
                             <span class="material-symbols-outlined">history</span>

@@ -738,3 +738,112 @@
         page-break-inside: avoid;
     }
 }
+
+/* ── History pagination footer ────────────────────────────────── */
+.myact-hist-pg {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding: 12px 18px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    border-top: none;
+}
+
+/* Attach visually to the list above it */
+#myactHistList {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+#myactHistList+.myact-hist-pg {
+    display: flex;
+}
+
+.myact-hist-pg-info {
+    font-size: 0.78rem;
+    color: var(--color-on-surface-variant);
+    font-weight: 500;
+}
+
+.myact-hist-pg-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.myact-hist-pg-nums {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.myact-hist-pg-btn,
+.myact-hist-pg-num {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.myact-hist-pg-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+.myact-hist-pg-btn:hover:not(:disabled),
+.myact-hist-pg-num:hover:not(.active) {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+    color: var(--color-primary);
+}
+
+.myact-hist-pg-btn:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.myact-hist-pg-num.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+    cursor: default;
+}
+
+.myact-hist-pg-ellipsis {
+    padding: 0 3px;
+    color: var(--color-secondary);
+    font-size: 0.78rem;
+    user-select: none;
+}
+
+@media (max-width: 480px) {
+    .myact-hist-pg {
+        justify-content: center;
+        padding: 10px 14px;
+    }
+
+    .myact-hist-pg-info {
+        width: 100%;
+        text-align: center;
+    }
+
+    .myact-hist-pg-controls {
+        margin-left: 0;
+    }
+}

@@ -1490,6 +1490,12 @@
                     }
                     break;
                 }
+                case 'hist-page-prev':
+                    goToHistPage(histCurrentPage - 1);
+                    break;
+                case 'hist-page-next':
+                    goToHistPage(histCurrentPage + 1);
+                    break;
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
@@ -3382,4 +3388,102 @@
         doPoll();                        // fire immediately
         setInterval(doPoll, 5000);       // then every 5 seconds
     }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   MY ACTIVITY — History pagination
+   10 rows per page. Rows already in the DOM, each with
+   data-hist-idx="N". JS slices them: anything outside the current
+   page range gets display:none, the rest shows.
+══════════════════════════════════════════════════════════════════ */
+(function () {
+    var HIST_PER_PAGE = 10;
+    var histCurrentPage = 1;
+
+    function allHistRows() {
+        return Array.from(document.querySelectorAll('#myactHistList .myact-history-row'));
+    }
+
+    function renderHistPage() {
+        var rows = allHistRows();
+        var total = rows.length;
+        if (total === 0) return;
+
+        var totalPages = Math.max(1, Math.ceil(total / HIST_PER_PAGE));
+        if (histCurrentPage > totalPages) histCurrentPage = totalPages;
+        if (histCurrentPage < 1) histCurrentPage = 1;
+
+        var start = (histCurrentPage - 1) * HIST_PER_PAGE;
+        rows.forEach(function (row) {
+            var idx = parseInt(row.dataset.histIdx, 10);
+            row.style.display = (idx >= start && idx < start + HIST_PER_PAGE) ? '' : 'none';
+        });
+
+        /* Pagination bar */
+        var pg = document.getElementById('myactHistPg');
+        if (!pg) return;
+        pg.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages <= 1) return;
+
+        var info = document.getElementById('myactHistPgInfo');
+        if (info) {
+            info.textContent = 'Showing ' + (start + 1) + '–' +
+                Math.min(start + HIST_PER_PAGE, total) + ' of ' + total;
+        }
+
+        var prev = document.getElementById('myactHistPrev');
+        var next = document.getElementById('myactHistNext');
+        if (prev) prev.disabled = histCurrentPage === 1;
+        if (next) next.disabled = histCurrentPage === totalPages;
+
+        var nums = document.getElementById('myactHistNums');
+        if (!nums) return;
+        nums.innerHTML = '';
+        var pages = [];
+        if (totalPages <= 7) {
+            for (var i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            var lo = Math.max(2, histCurrentPage - 1);
+            var hi = Math.min(totalPages - 1, histCurrentPage + 1);
+            if (lo > 2) pages.push('…');
+            for (var i = lo; i <= hi; i++) pages.push(i);
+            if (hi < totalPages - 1) pages.push('…');
+            pages.push(totalPages);
+        }
+        pages.forEach(function (p) {
+            if (p === '…') {
+                var s = document.createElement('span');
+                s.className = 'myact-hist-pg-ellipsis';
+                s.textContent = '…';
+                nums.appendChild(s);
+                return;
+            }
+            var b = document.createElement('button');
+            b.className = 'myact-hist-pg-num' + (p === histCurrentPage ? ' active' : '');
+            b.textContent = p;
+            b.addEventListener('click', function () { goToHistPage(p); });
+            nums.appendChild(b);
+        });
+    }
+
+    function goToHistPage(page) {
+        histCurrentPage = page;
+        renderHistPage();
+        var list = document.getElementById('myactHistList');
+        if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* Wire prev/next */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#myactHistPrev, #myactHistNext');
+        if (!btn) return;
+        if (btn.id === 'myactHistPrev') goToHistPage(histCurrentPage - 1);
+        if (btn.id === 'myactHistNext') goToHistPage(histCurrentPage + 1);
+    });
+
+    /* Init on DOMContentLoaded */
+    function init() { if (document.getElementById('myactHistList')) renderHistPage(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
