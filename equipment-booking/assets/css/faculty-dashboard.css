@@ -7191,22 +7191,72 @@ body {
     color: rgba(255, 255, 255, .7);
 }
 
-.act-ai-chat-close {
+.act-ai-chat-head-btns {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.act-ai-chat-head-btn {
     background: none;
     border: none;
     cursor: pointer;
-    color: rgba(255, 255, 255, .75);
+    color: rgba(255, 255, 255, .7);
     display: flex;
     align-items: center;
-    transition: color var(--transition);
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    transition: background var(--transition), color var(--transition);
 }
 
-.act-ai-chat-close:hover {
+.act-ai-chat-head-btn:hover {
+    background: rgba(255, 255, 255, .15);
     color: #fff;
 }
 
-.act-ai-chat-close .material-symbols-outlined {
-    font-size: 20px;
+.act-ai-chat-head-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* Minimised state — collapses body, input and footer; only header shows */
+.act-ai-chat.minimized .act-ai-chat-body,
+.act-ai-chat.minimized .act-ai-chat-input,
+.act-ai-chat.minimized .act-ai-chat-footer {
+    display: none;
+}
+
+.act-ai-chat.minimized {
+    border-radius: var(--radius-xl);
+}
+
+/* FAB pulse ring — small attention hint after chat is minimised */
+.act-ai-chat.minimized~.act-ai-fab::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary);
+    opacity: .4;
+    animation: fabPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes fabPulse {
+    0% {
+        transform: scale(1);
+        opacity: .4;
+    }
+
+    50% {
+        transform: scale(1.18);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: .4;
+    }
 }
 
 .act-ai-chat-body {

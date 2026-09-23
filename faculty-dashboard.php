@@ -2734,7 +2734,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
             </div><!-- /panel-activity -->
 
-            <!-- ── AI Support Hub ─────────────────────────────────────────── -->
+            <!-- ── AI Support Hub ──────────────────────────────────────────── -->
             <!-- Chat window -->
             <div class="act-ai-chat" id="actAiChat">
                 <div class="act-ai-chat-head">
@@ -2747,9 +2747,14 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             <div class="act-ai-chat-status">Online</div>
                         </div>
                     </div>
-                    <button class="act-ai-chat-close" onclick="document.getElementById('actAiChat').classList.remove('open')" title="Close">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
+                    <div class="act-ai-chat-head-btns">
+                        <button class="act-ai-chat-head-btn" data-action="ai-chat-minimize" title="Minimise">
+                            <span class="material-symbols-outlined">remove</span>
+                        </button>
+                        <button class="act-ai-chat-head-btn" data-action="ai-chat-close" title="Close">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="act-ai-chat-body" id="actAiChatBody">
                     <div class="act-chat-msg">
@@ -2761,60 +2766,25 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     </div>
                 </div>
                 <div class="act-ai-chat-input">
-                    <input type="text" id="actAiInput" placeholder="Type a message…"
-                        onkeydown="if(event.key==='Enter') actAiSend()">
-                    <button class="act-ai-chat-send" onclick="actAiSend()">
+                    <input type="text" id="actAiInput" placeholder="Type a message…">
+                    <button class="act-ai-chat-send" data-action="ai-chat-send">
                         <span class="material-symbols-outlined">send</span>
                     </button>
                 </div>
                 <div class="act-ai-chat-footer">
-                    <a href="#" onclick="event.preventDefault(); document.getElementById('actAiInput').value='I need to report a damaged or lost item.'; document.getElementById('actAiInput').focus();">
+                    <a href="#" data-action="ai-chat-report-issue">
                         <span class="material-symbols-outlined">error_outline</span>
                         Manual Form: Report Damaged / Lost Item
                     </a>
                 </div>
             </div>
 
-            <!-- FAB -->
-            <button class="act-ai-fab" id="actAiFab"
-                onclick="document.getElementById('actAiChat').classList.toggle('open')"
-                title="Chat with AI Support">
+            <!-- FAB — hidden by default; JS shows it only on the Dashboard tab -->
+            <button class="act-ai-fab" id="actAiFab" style="display:none;"
+                data-action="ai-fab-toggle" title="Chat with AI Support">
                 <span class="material-symbols-outlined">smart_toy</span>
                 <span class="act-ai-fab-tooltip">Chat with AI Support</span>
             </button>
-
-            <script nonce="<?php echo $csp_nonce; ?>">
-                // nonce for inline script — fix for csp vulnerability
-                /* AI chat send stub — wire to real endpoint later */
-                function actAiSend() {
-                    const input = document.getElementById('actAiInput');
-                    const msg = (input.value || '').trim();
-                    if (!msg) return;
-                    const body = document.getElementById('actAiChatBody');
-
-                    /* User bubble */
-                    const uDiv = document.createElement('div');
-                    uDiv.className = 'act-chat-msg act-chat-msg-user';
-                    uDiv.innerHTML = `<span class="act-chat-msg-time">You</span>
-                    <div class="act-chat-bubble act-chat-bubble-user">${msg.replace(/</g,'&lt;')}</div>`;
-                    body.appendChild(uDiv);
-                    input.value = '';
-                    body.scrollTop = body.scrollHeight;
-
-                    /* Stub AI reply */
-                    setTimeout(() => {
-                        const aDiv = document.createElement('div');
-                        aDiv.className = 'act-chat-msg';
-                        aDiv.innerHTML = `<span class="act-chat-msg-time">AI Assistant</span>
-                        <div class="act-chat-bubble act-chat-bubble-ai">
-                            Thanks for your message! AI response support coming soon.
-                        </div>`;
-                        body.appendChild(aDiv);
-                        body.scrollTop = body.scrollHeight;
-                    }, 600);
-                }
-            </script>
-
         </main><!-- /app-main -->
     </div><!-- /main-wrapper -->
 

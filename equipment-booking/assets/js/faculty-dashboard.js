@@ -339,6 +339,19 @@
             window.PUPSyncFacilities.start();
         }
 
+        /* ── AI chatbot: only visible on the Dashboard tab ─────────────── */
+        const aiFab = document.getElementById('actAiFab');
+        const aiChat = document.getElementById('actAiChat');
+        if (tabName === 'home') {
+            if (aiFab) aiFab.style.display = '';
+        } else {
+            if (aiFab) aiFab.style.display = 'none';
+            if (aiChat) {
+                aiChat.classList.remove('open');
+                aiChat.classList.remove('minimized');
+            }
+        }
+
         // SAFETY NET: if the lending panel is now active and no sub-tab has
         // the active class, default to 'browse' to prevent a blank content area.
         if (tabName === 'lending') {
@@ -1496,6 +1509,37 @@
                 case 'hist-page-next':
                     goToHistPage(histCurrentPage + 1);
                     break;
+
+                /* ── AI Chatbot ──────────────────────────────────────────── */
+                case 'ai-fab-toggle': {
+                    const chat = document.getElementById('actAiChat');
+                    if (!chat) break;
+                    const opening = !chat.classList.contains('open');
+                    chat.classList.toggle('open');
+                    if (opening) chat.classList.remove('minimized');
+                    break;
+                }
+                case 'ai-chat-close': {
+                    const chat = document.getElementById('actAiChat');
+                    if (chat) { chat.classList.remove('open'); chat.classList.remove('minimized'); }
+                    break;
+                }
+                case 'ai-chat-minimize': {
+                    const chat = document.getElementById('actAiChat');
+                    if (chat) chat.classList.toggle('minimized');
+                    break;
+                }
+                case 'ai-chat-send':
+                    actAiSend();
+                    break;
+                case 'ai-chat-report-issue': {
+                    const inp = document.getElementById('actAiInput');
+                    if (inp) {
+                        inp.value = 'I need to report a damaged or lost item.';
+                        inp.focus();
+                    }
+                    break;
+                }
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
@@ -3484,6 +3528,59 @@
 
     /* Init on DOMContentLoaded */
     function init() { if (document.getElementById('myactHistList')) renderHistPage(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
+/* ══════════════════════════════════════════════════════════════════
+   AI CHAT — send function + Enter-key wiring
+   (moved from inline <script> so we no longer need a nonce and CSP
+   inline-script policy stays tight)
+══════════════════════════════════════════════════════════════════ */
+(function () {
+    function actAiSend() {
+        var input = document.getElementById('actAiInput');
+        var msg = (input ? input.value : '').trim();
+        if (!msg) return;
+        var body = document.getElementById('actAiChatBody');
+        if (!body) return;
+
+        /* User bubble */
+        var uDiv = document.createElement('div');
+        uDiv.className = 'act-chat-msg act-chat-msg-user';
+        uDiv.innerHTML = '<span class="act-chat-msg-time">You</span>' +
+            '<div class="act-chat-bubble act-chat-bubble-user">' +
+            msg.replace(/</g, '&lt;') + '</div>';
+        body.appendChild(uDiv);
+        input.value = '';
+        body.scrollTop = body.scrollHeight;
+
+        /* Stub AI reply — wire to real endpoint later */
+        setTimeout(function () {
+            var aDiv = document.createElement('div');
+            aDiv.className = 'act-chat-msg';
+            aDiv.innerHTML = '<span class="act-chat-msg-time">AI Assistant</span>' +
+                '<div class="act-chat-bubble act-chat-bubble-ai">' +
+                'Thanks for your message! AI response support coming soon.' +
+                '</div>';
+            body.appendChild(aDiv);
+            body.scrollTop = body.scrollHeight;
+        }, 600);
+    }
+
+    /* Expose so any other surface can call it (keeps parity with the
+       old global function that lived in the inline script) */
+    window.actAiSend = actAiSend;
+
+    /* Enter key on the chat input */
+    function init() {
+        var inp = document.getElementById('actAiInput');
+        if (inp) {
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') actAiSend();
+            });
+        }
+    }
+
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
