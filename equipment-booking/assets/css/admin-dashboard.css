@@ -349,6 +349,117 @@ header.app-header {
     font-size: 17px;
 }
 
+/* ── Manage Admins panel ─────────────────────────────────────────── */
+
+/* Slot counter banner */
+.adm-slot-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent-light);
+    border: 1.5px solid var(--accent-maroon);
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    color: var(--accent-maroon);
+    font-weight: 500;
+}
+
+.adm-slot-banner .material-symbols-outlined {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.adm-slot-banner.adm-slot-full {
+    background: #fff5f5;
+    border-color: var(--danger, #e53e3e);
+    color: var(--danger, #e53e3e);
+}
+
+/* Form card */
+.adm-form-card {
+    margin-bottom: 1.5rem;
+}
+
+.adm-email-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.adm-email-hint code {
+    font-family: 'Courier New', monospace;
+    background: var(--secondary-cream);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.adm-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+}
+
+/* Accounts table */
+.adm-list-card {
+    margin-top: 0;
+}
+
+.adm-accounts-table tbody tr.adm-account-row td {
+    padding: 0.65rem 1.1rem;
+}
+
+/* Role badge */
+.adm-role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1.5px solid transparent;
+}
+
+.adm-role-super {
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
+    color: #fff;
+    border-color: var(--accent-maroon);
+}
+
+.adm-role-admin {
+    background: var(--secondary-cream);
+    color: var(--text-dark);
+    border-color: var(--khaki-border);
+}
+
+/* "You" badge next to the current admin's name */
+.adm-you-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 50px;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border: 1px solid var(--accent-maroon);
+    vertical-align: middle;
+}
+
+/* Dropdown slot badge */
+.adm-dd-slot-badge {
+    margin-left: auto;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border-radius: 50px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 /* ── QR Return Scanner modal ─────────────────────────────────────
    Was hardcoded inline with var(--surface,#fff) — --surface isn't
    an actual token in this file, so it silently always fell back to

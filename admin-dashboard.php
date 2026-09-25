@@ -115,6 +115,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">person</span>
                         </div>Admin
                     </button>
+                    <button class="dd-item" id="dd-manage-admins-btn">
+                        <div class="dd-icon">
+                            <span class="material-symbols-outlined">manage_accounts</span>
+                        </div>Manage Admins
+                        <?php if ($admin_accounts_remaining > 0): ?>
+                            <span class="adm-dd-slot-badge"><?php echo (int)$admin_accounts_remaining; ?> slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> left</span>
+                        <?php endif; ?>
+                    </button>
                     <div class="dd-divider"></div>
                     <button class="dd-item" id="openQrScannerBtn">
                         <div class="dd-icon">
@@ -2576,6 +2584,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
+                    <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
 
@@ -2741,6 +2750,159 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                 </div><!-- /sett-account -->
+
+                <!-- ── MANAGE ADMINS ──────────────────────────────────── -->
+                <div class="rq-sub-panel" id="sett-admins">
+
+                    <!-- Slot counter banner -->
+                    <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
+                        <span class="material-symbols-outlined">group</span>
+                        <span>
+                            <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
+                            <?php if ($admin_accounts_remaining > 0): ?>
+                                — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
+                                slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> remaining
+                            <?php else: ?>
+                                — limit reached
+                            <?php endif; ?>
+                        </span>
+                    </div>
+
+                    <!-- Add Admin form (hidden when limit reached) -->
+                    <?php if ($admin_accounts_remaining > 0): ?>
+                    <div class="eq-card adm-form-card" id="adm-form-card">
+                        <div class="eq-card-header">
+                            <h2>
+                                <span class="material-symbols-outlined">person_add</span>
+                                Add New Admin
+                            </h2>
+                        </div>
+                        <div class="eq-card-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                                    <input type="text" id="adm-fullname" name="adm_fullname"
+                                        class="form-control-custom"
+                                        placeholder="e.g. Juan dela Cruz"
+                                        maxlength="255" autocomplete="off">
+                                </div>
+                                <div class="form-group">
+                                    <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                                    <input type="email" id="adm-email" name="adm_email"
+                                        class="form-control-custom"
+                                        placeholder="name@admin.edu"
+                                        maxlength="255" autocomplete="off">
+                                    <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="adm-role">Role <span class="req-star">*</span></label>
+                                    <select id="adm-role" name="adm_role" class="form-control-custom">
+                                        <option value="Admin" selected>Admin</option>
+                                        <option value="Super Admin">Super Admin</option>
+                                    </select>
+                                    <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="adm-password">Password <span class="req-star">*</span></label>
+                                    <div class="fac-pw-wrap">
+                                        <input type="password" id="adm-password" name="adm_password"
+                                            class="form-control-custom"
+                                            placeholder="Min. 8 characters"
+                                            autocomplete="new-password">
+                                        <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                            <span class="material-symbols-outlined">visibility</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                                    <div class="fac-pw-wrap">
+                                        <input type="password" id="adm-confirm" name="adm_confirm"
+                                            class="form-control-custom"
+                                            placeholder="Re-enter password"
+                                            autocomplete="new-password">
+                                        <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                            <span class="material-symbols-outlined">visibility</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+
+                            <div class="adm-form-actions">
+                                <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
+                                    <span class="material-symbols-outlined">person_add</span>
+                                    Create Admin Account
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="eq-card" style="padding:1.5rem;text-align:center;color:var(--text-light);">
+                        <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
+                        Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
+                    </div>
+                    <?php endif; ?>
+
+                    <!-- Existing admin accounts list -->
+                    <div class="eq-card adm-list-card">
+                        <div class="eq-card-header">
+                            <h2>
+                                <span class="material-symbols-outlined">manage_accounts</span>
+                                Current Admins
+                            </h2>
+                        </div>
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table adm-accounts-table" id="admAccountsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Added</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admAccountsTbody">
+                                    <?php if (empty($admin_accounts_list)): ?>
+                                        <tr>
+                                            <td colspan="4" style="text-align:center;padding:2rem;color:var(--text-light);">
+                                                No accounts found.
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($admin_accounts_list as $acct): ?>
+                                        <tr class="adm-account-row">
+                                            <td class="td-fw">
+                                                <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
+                                                <?php if (strtolower($acct['email'] ?? '') === strtolower($admin_email)): ?>
+                                                    <span class="adm-you-badge">You</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
+                                            <td>
+                                                <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
+                                                    <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
+                                                </span>
+                                            </td>
+                                            <td class="td-sm">
+                                                <?php echo $acct['created_at']
+                                                    ? date('M j, Y', strtotime($acct['created_at']))
+                                                    : '—'; ?>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div><!-- /sett-admins -->
 
                 <!-- ── PREFERENCES ────────────────────────────────────── -->
                 <div class="rq-sub-panel" id="sett-prefs">

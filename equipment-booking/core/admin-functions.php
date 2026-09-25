@@ -308,7 +308,7 @@ if (isset($_POST['update_item'])) {
         $image_path = 'uploads/default.png';
     }
 
-        $description_val = ($description === '') ? null : $description;
+    $description_val = ($description === '') ? null : $description;
     $stmt = $conn->prepare(
         "UPDATE tbl_inventory
          SET item_name = ?,
@@ -515,6 +515,25 @@ $initials = strtoupper(substr($name_parts[0], 0, 1));
 if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 1));
 
 $admin_email = $_SESSION['admin_email'] ?? '';
+
+// How many admin accounts exist and how many slots remain (max 5).
+// Graceful fallback in case the schema migration hasn't run yet.
+$_ar = @mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts"));
+$admin_accounts_count     = (int)($_ar['c'] ?? 0);
+$admin_accounts_remaining = max(0, 5 - $admin_accounts_count);
+
+// Fetch the list of all admin accounts (for the Manage Admins panel).
+// Columns: fullName, email, role, created_at — id added by migration.
+$_admin_list_result = @mysqli_query(
+    $conn,
+    "SELECT fullName, email, role, created_at FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+);
+$admin_accounts_list = [];
+if ($_admin_list_result) {
+    while ($ar = mysqli_fetch_assoc($_admin_list_result)) {
+        $admin_accounts_list[] = $ar;
+    }
+}
 
 // Ensure we have the admin's previous last_login, and their last
 // password-change date, available for display. If not already cached in
