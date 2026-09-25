@@ -5388,6 +5388,32 @@ body {
     --redesign-text-muted: #a07070;
 }
 
+/* High-contrast was previously missing from this token set entirely,
+   so the sidebar / topbar / dashboard-home panel stayed in their
+   light-theme colors even when High Contrast was selected. Mirrors
+   the true-black / pure-white [data-theme="high-contrast"] --color-*
+   palette defined above. */
+[data-theme="high-contrast"] {
+    --redesign-sidebar-bg: #000000;
+    --redesign-sidebar-border: #666666;
+    --redesign-active-bg: #cc0000;
+    --redesign-active-color: #ffffff;
+    --redesign-nav-hover: #1a1a1a;
+    --redesign-nav-color: #eeeeee;
+    --redesign-nav-hover-color: #ffffff;
+    --redesign-top-bg: #000000;
+    --redesign-top-border: #666666;
+    --redesign-main-bg: #000000;
+    --redesign-card-border: #999999;
+    --redesign-card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+    --redesign-card-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.3);
+    --redesign-gradient-start: #cc0000;
+    --redesign-gradient-end: #800000;
+    --redesign-text-primary: #ffffff;
+    --redesign-text-secondary: #eeeeee;
+    --redesign-text-muted: #999999;
+}
+
 /* ================================================================
    SIDEBAR REDESIGN
 ================================================================ */
@@ -6196,6 +6222,147 @@ body {
 }
 
 [data-theme="dark"] .dash-empty-active-slot {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+}
+
+/* These four were previously missing any dark-mode override at all,
+   so they stayed at their light-mode hex values (light badge, light
+   grid line, light divider) even on a dark card. */
+[data-theme="dark"] .dash-code-active-badge {
+    background: var(--color-success-container);
+    color: var(--color-success);
+}
+
+[data-theme="dark"] .dash-timeline-time {
+    color: var(--color-on-surface-variant);
+    border-right-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] .dash-timeline-date {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="dark"] .dash-bar-chart-grid-line {
+    background: var(--color-outline-variant);
+}
+
+/* ── High-contrast theme ──────────────────────────────────────
+   This whole dashboard-home panel previously had zero high-contrast
+   overrides, so selecting High Contrast left every card, badge, and
+   chart on this panel at its light-mode colors. Mirrors the dark-theme
+   block above; most rules already resolve correctly through the
+   theme-aware --color-* tokens, three get explicit high-contrast
+   values since their dark-mode counterparts use hardcoded hex. ── */
+[data-theme="high-contrast"] #panel-home .dash-flat-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="high-contrast"] #panel-home .dash-flat-sub {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="high-contrast"] .dashboard-stats-col.dash-stats-row-layout {
+    background: var(--color-surface-container) !important;
+    border-color: var(--color-outline-variant) !important;
+}
+
+[data-theme="high-contrast"] .dash-stats-row-layout .stat-card+.stat-card {
+    border-left-color: var(--color-outline-variant) !important;
+}
+
+[data-theme="high-contrast"] .dash-stats-row-layout .stat-card-label {
+    color: var(--color-on-surface-variant) !important;
+}
+
+[data-theme="high-contrast"] .dash-stats-row-layout .stat-card-value {
+    background: var(--color-surface-high) !important;
+    color: var(--color-on-surface) !important;
+}
+
+[data-theme="high-contrast"] .dash-bento-btn {
+    background: linear-gradient(135deg, #cc0000 0%, #800000 100%);
+}
+
+[data-theme="high-contrast"] .dash-code-card {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="high-contrast"] .dash-code-card-title,
+[data-theme="high-contrast"] .dash-code-card .fcc-code-value {
+    color: var(--color-on-surface) !important;
+}
+
+[data-theme="high-contrast"] .dash-code-generate-btn {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+[data-theme="high-contrast"] .dash-code-generate-btn:hover {
+    background: var(--color-primary);
+    color: var(--color-surface);
+}
+
+[data-theme="high-contrast"] .dash-section-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="high-contrast"] .dash-activity-card {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="high-contrast"] .dash-activity-card-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="high-contrast"] .dash-activity-card-btn {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="high-contrast"] .dash-timeline::before {
+    background: var(--color-outline-variant);
+}
+
+[data-theme="high-contrast"] .dash-timeline-title {
+    color: var(--color-on-surface);
+}
+
+[data-theme="high-contrast"] .dash-timeline-dot {
+    border-color: var(--color-surface-container);
+}
+
+[data-theme="high-contrast"] .dash-timeline-time {
+    color: var(--color-on-surface-variant);
+    border-right-color: var(--color-outline-variant);
+}
+
+[data-theme="high-contrast"] .dash-timeline-date {
+    color: var(--color-on-surface-variant);
+}
+
+[data-theme="high-contrast"] .dash-bar {
+    background: #800000;
+}
+
+[data-theme="high-contrast"] .dash-bar.highlight {
+    background: #ff6666;
+}
+
+[data-theme="high-contrast"] .dash-bar-chart-grid-line {
+    background: var(--color-outline-variant);
+}
+
+[data-theme="high-contrast"] .dash-code-active-badge {
+    background: var(--color-success-container);
+    color: var(--color-success);
+}
+
+[data-theme="high-contrast"] .dash-empty-active-slot {
     background: var(--color-surface-container);
     border-color: var(--color-outline-variant);
     color: var(--color-on-surface-variant);
@@ -7502,7 +7669,8 @@ body {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 18px;
-    background: linear-gradient(135deg, var(--color-primary-container) 0%, color-mix(in srgb, var(--color-primary-container) 65%, black) 100%);
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
     border-radius: var(--radius-lg);
     padding: 24px 28px;
     box-shadow: var(--shadow-sm);
@@ -7520,8 +7688,7 @@ body {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.16);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: var(--color-primary-container);
     color: var(--color-on-primary);
     font-size: 1.2rem;
     font-weight: 700;
@@ -7532,12 +7699,6 @@ body {
     flex-shrink: 0;
 }
 
-.acct-banner-avatar .avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
 .acct-banner-text {
     min-width: 0;
 }
@@ -7546,15 +7707,14 @@ body {
     font-family: var(--font-display);
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--color-on-primary);
+    color: var(--color-on-surface);
     margin: 0 0 3px;
     letter-spacing: -0.01em;
 }
 
 .acct-banner-meta {
     font-size: 0.82rem;
-    color: var(--color-on-primary);
-    opacity: 0.82;
+    color: var(--color-secondary);
     margin: 0 0 9px;
 }
 
@@ -7562,8 +7722,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: rgba(255, 255, 255, 0.16);
-    color: var(--color-on-primary);
+    background: var(--color-success-container);
+    color: var(--color-success);
     padding: 4px 12px;
     border-radius: var(--radius-full);
     font-size: 0.7rem;
@@ -7577,20 +7737,17 @@ body {
 }
 
 .sov-nav-item.acct-banner-edit-btn {
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    color: var(--color-on-primary);
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface);
     flex-shrink: 0;
 }
 
-.sov-nav-item.acct-banner-edit-btn:hover {
-    background: rgba(255, 255, 255, 0.26);
-    color: var(--color-on-primary);
-}
-
+.sov-nav-item.acct-banner-edit-btn:hover,
 .sov-nav-item.acct-banner-edit-btn.active {
-    background: rgba(255, 255, 255, 0.3);
-    color: var(--color-on-primary);
+    background: var(--color-surface-container);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
 }
 
 /* ── Horizontal pill tabs ──────────────────────────────────────── */
