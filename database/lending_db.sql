@@ -33,18 +33,23 @@ SET time_zone = "+00:00";
 --
 
 CREATE TABLE `tbl_accounts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
   `fullName` varchar(255) DEFAULT NULL,
   `email` varchar(255) DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
-  `last_login` datetime DEFAULT NULL
+  `role` enum('Super Admin','Admin') NOT NULL DEFAULT 'Admin',
+  `created_at` datetime DEFAULT NULL,
+  `last_login` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbl_accounts`
 --
 
-INSERT INTO `tbl_accounts` (`fullName`, `email`, `password`, `last_login`) VALUES
-('Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', '2026-06-08 10:15:03');
+INSERT INTO `tbl_accounts` (`fullName`, `email`, `password`, `role`, `created_at`, `last_login`) VALUES
+('Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', '2026-01-01 00:00:00', '2026-06-08 10:15:03');
 
 -- --------------------------------------------------------
 
@@ -305,12 +310,6 @@ INSERT INTO `tbl_users` (`fullname`, `faculty_id`, `email`, `backup_email`, `pas
 --
 -- Indexes for dumped tables
 --
-
---
--- Indexes for table `tbl_accounts`
---
-ALTER TABLE `tbl_accounts`
-  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- Indexes for table `tbl_arbitration_config`

@@ -1086,6 +1086,7 @@
                 case 'toast':
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
+                    e.preventDefault();
                     closeDropdown();
                     if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
                     break;
@@ -1371,6 +1372,28 @@
         if (e.key === 'Escape') _closeMobileSidebar();
     });
 
+    /* ── Desktop sidebar collapse (icon-rail): logo icon box doubles
+       as the toggle. Independent of the mobile drawer above — this
+       only resizes the always-inline desktop sidebar; #app-main
+       (flex:1) naturally expands into the freed width. Preference
+       persists across reloads via localStorage. ── */
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+    function _setSidebarCollapsed(collapsed) {
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            sidebarCollapseBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        LS.set('sidebarCollapsed', collapsed ? '1' : '0');
+    }
+    if (sidebarCollapseBtn) {
+        sidebarCollapseBtn.addEventListener('click', function () {
+            _setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+        });
+        // Restore the person's last preference on load.
+        if (LS.get('sidebarCollapsed') === '1') _setSidebarCollapsed(true);
+    }
+
     /* ── Lending sub-nav ─────────────────────────────────────── */
     document.querySelectorAll('.lending-nav-btn').forEach(btn => {
         btn.addEventListener('click', function () { switchLendingSub(this.dataset.lendingNav); });
@@ -1427,6 +1450,161 @@
             switchSettMainTab('sett-prefs');
         });
     }
+
+    /* ── Manage Admins — dropdown shortcut ───────────────────── */
+    const ddManageAdminsBtn = document.getElementById('dd-manage-admins-btn');
+    if (ddManageAdminsBtn) {
+        ddManageAdminsBtn.addEventListener('click', function () {
+            closeDropdown();
+            _switchTabDOM('settings');
+            switchSettMainTab('sett-admins');
+        });
+    }
+
+    /* ── Manage Admins — Add Admin form ──────────────────────────
+       Mirrors the pattern used by the Add Faculty form exactly:
+       fetch + JSON, inline alert on error, showToast on success,
+       update the slot counter and table body without a page reload. */
+    (function initAddAdminForm() {
+        const submitBtn = document.getElementById('adm-submit-btn');
+        const alertEl = document.getElementById('adm-form-alert');
+        if (!submitBtn) return; // form not rendered (slot limit reached)
+
+        /* Password visibility toggles — same data-target pattern as faculty */
+        document.querySelectorAll('#sett-admins .fac-pw-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const input = document.getElementById(this.dataset.target);
+                if (!input) return;
+                const isText = input.type === 'text';
+                input.type = isText ? 'password' : 'text';
+                const icon = this.querySelector('.material-symbols-outlined');
+                if (icon) icon.textContent = isText ? 'visibility' : 'visibility_off';
+            });
+        });
+
+        function setAlert(msg, isError) {
+            if (!alertEl) return;
+            alertEl.textContent = msg;
+            alertEl.className = 'alert-banner' + (isError ? ' alert-error' : ' alert-success');
+            alertEl.classList.remove('hidden');
+        }
+
+        function clearAlert() {
+            if (!alertEl) return;
+            alertEl.className = 'alert-banner hidden';
+            alertEl.textContent = '';
+        }
+
+        submitBtn.addEventListener('click', function () {
+            clearAlert();
+
+            const fullName = (document.getElementById('adm-fullname')?.value || '').trim();
+            const email = (document.getElementById('adm-email')?.value || '').trim().toLowerCase();
+            const role = document.getElementById('adm-role')?.value || 'Admin';
+            const password = document.getElementById('adm-password')?.value || '';
+            const confirm = document.getElementById('adm-confirm')?.value || '';
+
+            /* Client-side pre-flight (mirrors server checks) */
+            if (!fullName) { setAlert('Full name is required.', true); return; }
+            if (!email) { setAlert('Admin email is required.', true); return; }
+            if (!email.endsWith('@admin.edu')) {
+                setAlert('Admin emails must end in @admin.edu (e.g. name@admin.edu).', true);
+                return;
+            }
+            if (!password) { setAlert('Password is required.', true); return; }
+            if (password.length < 8) { setAlert('Password must be at least 8 characters.', true); return; }
+            if (password !== confirm) { setAlert('Passwords do not match.', true); return; }
+
+            submitBtn.disabled = true;
+            const origText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Creating…';
+
+            const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
+            const fd = new FormData();
+            fd.append('csrf_token', csrf);
+            fd.append('full_name', fullName);
+            fd.append('email', email);
+            fd.append('role', role);
+            fd.append('password', password);
+            fd.append('confirm_password', confirm);
+
+            fetch('equipment-booking/api/create-admin-account.php', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origText;
+
+                    if (data.status === 'success') {
+                        /* Clear the form */
+                        ['adm-fullname', 'adm-email', 'adm-password', 'adm-confirm'].forEach(function (id) {
+                            const el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
+                        const roleEl = document.getElementById('adm-role');
+                        if (roleEl) roleEl.value = 'Admin';
+
+                        showToast('✅ ' + data.message);
+                        setAlert(data.message, false);
+
+                        /* Update the slot counter live */
+                        const remaining = typeof data.accounts_remaining === 'number'
+                            ? data.accounts_remaining : null;
+                        if (remaining !== null) {
+                            const slotEl = document.getElementById('adm-slots-remaining');
+                            if (slotEl) slotEl.textContent = remaining;
+
+                            /* Update the dropdown badge */
+                            const ddBadge = document.querySelector('#dd-manage-admins-btn .adm-dd-slot-badge');
+                            if (ddBadge) {
+                                if (remaining > 0) {
+                                    ddBadge.textContent = remaining + ' slot' + (remaining !== 1 ? 's' : '') + ' left';
+                                } else {
+                                    ddBadge.remove();
+                                }
+                            }
+
+                            /* Hide the form when the last slot is used */
+                            if (remaining === 0) {
+                                const card = document.getElementById('adm-form-card');
+                                if (card) card.remove();
+                                const banner = document.querySelector('.adm-slot-banner');
+                                if (banner) banner.classList.add('adm-slot-full');
+                            }
+                        }
+
+                        /* Append the new row to the accounts table immediately */
+                        const tbody = document.getElementById('admAccountsTbody');
+                        if (tbody) {
+                            /* Remove the "No accounts found" placeholder if present */
+                            const placeholder = tbody.querySelector('td[colspan]');
+                            if (placeholder) placeholder.closest('tr').remove();
+
+                            const roleClass = role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin';
+                            const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                            const tr = document.createElement('tr');
+                            tr.className = 'adm-account-row';
+                            tr.innerHTML =
+                                '<td class="td-fw">' + fullName.replace(/</g, '&lt;') + '</td>' +
+                                '<td>' + email.replace(/</g, '&lt;') + '</td>' +
+                                '<td><span class="adm-role-badge ' + roleClass + '">' + role.replace(/</g, '&lt;') + '</span></td>' +
+                                '<td class="td-sm">' + today + '</td>';
+                            tbody.appendChild(tr);
+                        }
+                    } else {
+                        setAlert(data.message || 'Something went wrong. Please try again.', true);
+                    }
+                })
+                .catch(function () {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = origText;
+                    setAlert('Network error — please check your connection and try again.', true);
+                });
+        });
+    })();
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
@@ -2454,7 +2632,10 @@
             }
         }
 
-        openBtn.addEventListener('click', startScanner);
+        openBtn.addEventListener('click', function () {
+            closeDropdown();
+            startScanner();
+        });
         closeBtn.addEventListener('click', stopScanner);
         modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
     })();

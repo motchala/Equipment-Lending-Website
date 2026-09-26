@@ -339,6 +339,19 @@
             window.PUPSyncFacilities.start();
         }
 
+        /* ── AI chatbot: only visible on the Dashboard tab ─────────────── */
+        const aiFab = document.getElementById('actAiFab');
+        const aiChat = document.getElementById('actAiChat');
+        if (tabName === 'home') {
+            if (aiFab) aiFab.style.display = '';
+        } else {
+            if (aiFab) aiFab.style.display = 'none';
+            if (aiChat) {
+                aiChat.classList.remove('open');
+                aiChat.classList.remove('minimized');
+            }
+        }
+
         // SAFETY NET: if the lending panel is now active and no sub-tab has
         // the active class, default to 'browse' to prevent a blank content area.
         if (tabName === 'lending') {
@@ -544,15 +557,38 @@
     }
 
     /* ── Notifications ─────────────────────────────────────────────────── */
-    function filterNotifs(cat) {
-        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
-        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('.notif-card').forEach(item => {
-            if (cat === 'all') item.style.display = '';
-            else if (cat === 'unread') item.style.display = item.classList.contains('unread') ? '' : 'none';
-            else item.style.display = item.dataset.cat === cat ? '' : 'none';
+    /* ── Notifications: filter + pagination ───────────────────────────
+       Front-end only for now (no backend yet) — but built the same way
+       the equipment catalog is: never render more than one page's worth
+       of cards at a time, so this doesn't get slow once real
+       notifications replace the sample ones.
+    ─────────────────────────────────────────────────────────────────── */
+    const NOTIF_PER_PAGE = 5;
+    let notifCurrentPage = 1;
+    let notifActiveCat = 'all';
+
+    function getMatchingNotifs(cat) {
+        return Array.from(document.querySelectorAll('.notif-card')).filter(item => {
+            if (cat === 'all') return true;
+            if (cat === 'unread') return item.classList.contains('unread');
+            return item.dataset.cat === cat;
         });
+    }
+
+    function renderNotifPage() {
+        const matches = getMatchingNotifs(notifActiveCat);
+        const total = matches.length;
+        const totalPages = Math.max(1, Math.ceil(total / NOTIF_PER_PAGE));
+        if (notifCurrentPage > totalPages) notifCurrentPage = totalPages;
+        if (notifCurrentPage < 1) notifCurrentPage = 1;
+
+        // Hide every card, then reveal only this page's slice of the matches
+        document.querySelectorAll('.notif-card').forEach(el => { el.style.display = 'none'; });
+        const start = (notifCurrentPage - 1) * NOTIF_PER_PAGE;
+        matches.slice(start, start + NOTIF_PER_PAGE).forEach(el => { el.style.display = ''; });
+
+        // Section labels ("Overdue", "Today"...) only show if something
+        // under them survived the filter + page slice
         document.querySelectorAll('.notif-section-label').forEach(label => {
             let next = label.nextElementSibling;
             let hasVisible = false;
@@ -563,11 +599,72 @@
             label.style.display = hasVisible ? '' : 'none';
         });
 
-        // "Nothing here" state when a filter matches no cards
-        const anyVisible = Array.from(document.querySelectorAll('.notif-card'))
-            .some(c => c.style.display !== 'none');
+        // "Nothing here" state when a filter matches no cards at all
         const empty = document.getElementById('notifEmptyState');
-        if (empty) empty.style.display = anyVisible ? 'none' : '';
+        if (empty) empty.style.display = total === 0 ? '' : 'none';
+
+        // Pagination bar — hidden entirely when everything fits on one page
+        const pager = document.getElementById('notifPagination');
+        if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages <= 1) return;
+
+        const info = document.getElementById('notifPageInfo');
+        if (info) {
+            info.textContent = 'Showing ' + (start + 1) + '–' +
+                Math.min(start + NOTIF_PER_PAGE, total) + ' of ' + total;
+        }
+
+        const prev = document.getElementById('notifPrevBtn');
+        const next = document.getElementById('notifNextBtn');
+        if (prev) prev.disabled = notifCurrentPage === 1;
+        if (next) next.disabled = notifCurrentPage === totalPages;
+
+        const nums = document.getElementById('notifPageNumbers');
+        if (nums) {
+            nums.innerHTML = '';
+            const pages = [];
+            if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                let lo = Math.max(2, notifCurrentPage - 1);
+                let hi = Math.min(totalPages - 1, notifCurrentPage + 1);
+                if (lo > 2) pages.push('…');
+                for (let i = lo; i <= hi; i++) pages.push(i);
+                if (hi < totalPages - 1) pages.push('…');
+                pages.push(totalPages);
+            }
+            pages.forEach(p => {
+                if (p === '…') {
+                    const s = document.createElement('span');
+                    s.className = 'fnotif-pg-ellipsis';
+                    s.textContent = '…';
+                    nums.appendChild(s);
+                    return;
+                }
+                const b = document.createElement('button');
+                b.className = 'fnotif-pg-num' + (p === notifCurrentPage ? ' active' : '');
+                b.textContent = p;
+                b.addEventListener('click', () => goToNotifPage(p));
+                nums.appendChild(b);
+            });
+        }
+    }
+
+    function goToNotifPage(page) {
+        notifCurrentPage = page;
+        renderNotifPage();
+        const body = document.querySelector('#notifModal .fnotif-body');
+        if (body) body.scrollTop = 0;
+    }
+
+    function filterNotifs(cat) {
+        document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+        const btn = document.querySelector('.notif-tab[data-notif-filter="' + cat + '"]');
+        if (btn) btn.classList.add('active');
+        notifActiveCat = cat;
+        notifCurrentPage = 1;
+        renderNotifPage();
     }
 
     function markAllRead() {
@@ -593,9 +690,9 @@
 
         LS.setJ('notifRead', readArr);
 
-        // If the Unread tab is active, re-run it so the list reflects the change
-        const activeTab = document.querySelector('.notif-tab.active');
-        if (activeTab) filterNotifs(activeTab.dataset.notifFilter || 'all');
+        // Re-render the current filter/page so it reflects the change
+        // (the Unread tab in particular may now have nothing left to show)
+        renderNotifPage();
 
         showToast('All notifications marked as read.');
     }
@@ -1090,39 +1187,53 @@
 
     function updateAvatarsToInitials() {
         const fullnameEl = document.querySelector('.acc-hero-info h2');
-        const fullname = fullnameEl ? fullnameEl.textContent : '';
-        const parts = fullname.trim().split(' ');
-        let ini = parts[0].charAt(0).toUpperCase();
+        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.dd-name')?.textContent || '');
+        const parts = fullname.trim().split(' ').filter(Boolean);
+        let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
 
-        // Remove images and set initials
-        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large').forEach(el => {
-            const img = el.querySelector('.avatar-img');
-            if (img) img.remove();
-            // Set text content (preserve cam-btn if present)
-            const textNode = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
-            if (textNode) {
-                textNode.textContent = ini;
-            } else if (!el.querySelector('.cam-btn')) {
-                el.textContent = ini;
-            } else {
-                el.insertBefore(document.createTextNode(ini), el.firstChild);
-            }
+        // Strip any existing image, fallback span, or stray initials text,
+        // then prepend fresh initials as a text node — this preserves other
+        // element children (e.g. the notification badge) untouched.
+        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+            [...el.childNodes].forEach(n => {
+                if (n.nodeType === Node.TEXT_NODE) n.remove();
+                if (n.classList && (n.classList.contains('avatar-img') || n.classList.contains('avatar-initials-fallback'))) n.remove();
+            });
+            el.insertBefore(document.createTextNode(ini), el.firstChild);
         });
     }
 
     function updateAvatarsToImage(url) {
-        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large').forEach(el => {
-            // Remove text nodes and existing images
+        // Figure out the initials once, so we have something to fall back to
+        // if this image URL also fails to load (e.g. stale/broken file).
+        const fullnameEl = document.querySelector('.acc-hero-info h2');
+        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.dd-name')?.textContent || '');
+        const parts = fullname.trim().split(' ').filter(Boolean);
+        let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
+        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
+
+        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+            // Remove text nodes and any existing image/fallback
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE && n.textContent.trim()) n.remove();
-                if (n.classList && n.classList.contains('avatar-img')) n.remove();
+                if (n.classList && (n.classList.contains('avatar-img') || n.classList.contains('avatar-initials-fallback'))) n.remove();
             });
+            // Fallback initials, hidden unless the image below fails to load
+            const fallback = document.createElement('span');
+            fallback.className = 'avatar-initials-fallback';
+            fallback.style.display = 'none';
+            fallback.textContent = ini;
+            el.insertBefore(fallback, el.firstChild);
             // Add new image
             const img = document.createElement('img');
             img.src = url;
             img.alt = 'Profile';
             img.className = 'avatar-img';
+            img.onerror = function () {
+                img.style.display = 'none';
+                fallback.style.removeProperty('display');
+            };
             el.insertBefore(img, el.firstChild);
         });
     }
@@ -1160,7 +1271,7 @@
                 .then(data => {
                     if (loadingEl) loadingEl.classList.remove('active');
                     if (data.success) {
-                        updateAvatarsToImage('/Equipment-Lending-Website/' + data.profile_picture + '?t=' + Date.now());
+                        updateAvatarsToImage(window.SERVER_BASE_URL + data.profile_picture + '?t=' + Date.now());
                         showToast(data.msg || 'Profile picture updated!');
                     } else {
                         showToast('Error: ' + (data.msg || 'Upload failed.'));
@@ -1280,6 +1391,17 @@
         renderRequestsTable();
     }
 
+    let _prevOverdueCount = null; // null = baseline not yet established
+
+    function showOverdueToast() {
+        const el = document.getElementById('overdue-alert');
+        if (!el) return;
+        el.style.display = ''; // undo any earlier manual dismiss (display:none)
+        requestAnimationFrame(() => el.classList.add('is-visible'));
+        clearTimeout(el._dismissTimer);
+        el._dismissTimer = setTimeout(() => el.classList.remove('is-visible'), 8000);
+    }
+
     function checkOverdueState() {
         const overdueCount = (typeof window.OVERDUE_COUNT !== 'undefined')
             ? window.OVERDUE_COUNT
@@ -1287,9 +1409,15 @@
         // Update overdue stat value
         const statEl = document.getElementById('statOverdueVal');
         if (statEl) statEl.textContent = overdueCount;
-        // Show/hide overdue alert
-        const alertEl = document.getElementById('overdue-alert');
-        if (alertEl) alertEl.style.display = overdueCount > 0 ? '' : 'none';
+        // Show the toast only on a genuine transition from clear to blocked
+        // detected during this session (e.g. an item newly goes overdue
+        // while the tab is open) — not on every check. The very first call
+        // just establishes the baseline; the initial-load toast (if any) is
+        // handled server-side via the session-gated data-should-show flag.
+        if (_prevOverdueCount !== null && overdueCount > 0 && _prevOverdueCount === 0) {
+            showOverdueToast();
+        }
+        _prevOverdueCount = overdueCount;
         // Update notification badges
         const baseUnread = 3 + overdueCount;
         document.querySelectorAll('.notif-badge').forEach(b => {
@@ -1403,6 +1531,43 @@
                         actInput.value = 'I need to report an issue with my "' + equipName + '"'
                             + (reqId ? ' (Request #' + reqId + ')' : '') + '.';
                         actInput.focus();
+                    }
+                    break;
+                }
+                case 'hist-page-prev':
+                    goToHistPage(histCurrentPage - 1);
+                    break;
+                case 'hist-page-next':
+                    goToHistPage(histCurrentPage + 1);
+                    break;
+
+                /* ── AI Chatbot ──────────────────────────────────────────── */
+                case 'ai-fab-toggle': {
+                    const chat = document.getElementById('actAiChat');
+                    if (!chat) break;
+                    const opening = !chat.classList.contains('open');
+                    chat.classList.toggle('open');
+                    if (opening) chat.classList.remove('minimized');
+                    break;
+                }
+                case 'ai-chat-close': {
+                    const chat = document.getElementById('actAiChat');
+                    if (chat) { chat.classList.remove('open'); chat.classList.remove('minimized'); }
+                    break;
+                }
+                case 'ai-chat-minimize': {
+                    const chat = document.getElementById('actAiChat');
+                    if (chat) chat.classList.toggle('minimized');
+                    break;
+                }
+                case 'ai-chat-send':
+                    actAiSend();
+                    break;
+                case 'ai-chat-report-issue': {
+                    const inp = document.getElementById('actAiInput');
+                    if (inp) {
+                        inp.value = 'I need to report a damaged or lost item.';
+                        inp.focus();
                     }
                     break;
                 }
@@ -1587,6 +1752,12 @@
             closeNotifModal();
         });
     });
+
+    /* Notification pagination: prev/next */
+    const notifPrev = document.getElementById('notifPrevBtn');
+    const notifNext = document.getElementById('notifNextBtn');
+    if (notifPrev) notifPrev.addEventListener('click', () => goToNotifPage(notifCurrentPage - 1));
+    if (notifNext) notifNext.addEventListener('click', () => goToNotifPage(notifCurrentPage + 1));
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         const m = document.getElementById('notifModal');
@@ -1749,185 +1920,6 @@
     if (eqNext) eqNext.addEventListener('click', () => goToEquipmentPage(eqCurrentPage + 1));
     if (document.getElementById('equipmentList')) renderEquipmentPage();
 
-    /* ── Global Live Search ───────────────────────────────────────────── */
-    (function initLiveSearch() {
-        const input = document.getElementById('globalSearch');
-        const dropdown = document.getElementById('liveSearchDropdown');
-        if (!input || !dropdown) return;
-
-        let debounceTimer = null;
-        let currentXhr = null; // cancel in-flight fetch when user keeps typing
-
-        function toTitleCase(str) {
-            return str.replace(/\b\w/g, c => c.toUpperCase());
-        }
-        function escHtml(s) {
-            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        }
-
-        /* Build and render dropdown from combined results */
-        function renderDropdown(q, inventoryItems) {
-            const ql = q.trim().toLowerCase();
-            if (ql.length < 2) { dropdown.style.display = 'none'; return; }
-
-            // Equipment results — from live-search.php JSON (always fresh, works on any tab)
-            const eqResults = (inventoryItems || []).slice(0, 5);
-
-            // Also search DOM .item-node elements as a fallback / supplement
-            // (these are rendered when the user visits the Equipment tab)
-            const domItemNames = new Set(eqResults.map(i => (i.name || '').toLowerCase()));
-            document.querySelectorAll('.item-node').forEach(el => {
-                const name = (el.dataset.name || '').toLowerCase();
-                const cat = (el.dataset.category || '').toLowerCase();
-                if ((name.includes(ql) || cat.includes(ql)) && !domItemNames.has(name)) {
-                    eqResults.push({
-                        id: null,
-                        name: el.dataset.name || '',
-                        category: el.dataset.category || '',
-                        quantity: null,
-                        available: true,
-                        image: ''
-                    });
-                    domItemNames.add(name);
-                }
-            });
-
-            // Requests — from pre-loaded window.REQUESTS_DATA (user's own requests)
-            const requests = window.REQUESTS_DATA || [];
-            const rqResults = [];
-            requests.forEach(r => {
-                const haystack = ((r.equipment_name || '') + ' ' + (r.status || '') + ' ' + (r.room || '')).toLowerCase();
-                if (haystack.includes(ql)) rqResults.push(r);
-            });
-            const rqSlice = rqResults.slice(0, 4);
-
-            if (!eqResults.length && !rqSlice.length) {
-                dropdown.innerHTML = '<div class="ls-empty"><span class="material-symbols-outlined">search_off</span> No results for "<strong>' + escHtml(q) + '</strong>"</div>';
-                dropdown.style.display = 'block';
-                attachClickHandlers();
-                return;
-            }
-
-            let html = '';
-
-            if (eqResults.length) {
-                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">inventory_2</span> Equipment</div>';
-                eqResults.forEach(item => {
-                    const availBadge = item.quantity !== null
-                        ? (item.available
-                            ? '<span class="status-chip chip-success" style="font-size:11px;padding:2px 8px;margin-left:auto"><span class="chip-dot"></span>Available</span>'
-                            : '<span class="status-chip chip-error"   style="font-size:11px;padding:2px 8px;margin-left:auto"><span class="chip-dot"></span>No Stock</span>')
-                        : '';
-                    html += '<div class="ls-item" data-ls-type="equipment" data-ls-name="' + escHtml(item.name) + '">' +
-                        '<span class="material-symbols-outlined ls-item-icon">inventory_2</span>' +
-                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(toTitleCase(item.name)) + '</div>' +
-                        '<div class="ls-item-sub">' + escHtml(toTitleCase(item.category)) + '</div></div>' +
-                        availBadge +
-                        '</div>';
-                });
-            }
-
-            if (rqSlice.length) {
-                html += '<div class="ls-group-label"><span class="material-symbols-outlined" style="font-size:14px">receipt_long</span> My Requests</div>';
-                rqSlice.forEach(r => {
-                    const chipClass = r.status === 'Approved' ? 'chip-success'
-                        : r.status === 'Overdue' ? 'chip-error'
-                            : r.status === 'Waiting' ? 'chip-warning'
-                                : 'chip-muted';
-                    html += '<div class="ls-item" data-ls-type="request" data-ls-status="' + escHtml(r.status) + '">' +
-                        '<span class="material-symbols-outlined ls-item-icon">receipt_long</span>' +
-                        '<div style="flex:1"><div class="ls-item-title">' + escHtml(r.equipment_name) + '</div>' +
-                        '<div class="ls-item-sub">' + escHtml(r.borrow_date) + ' → ' + escHtml(r.return_date) + '</div></div>' +
-                        '<span class="status-chip ' + chipClass + '" style="font-size:11px;padding:2px 8px;"><span class="chip-dot"></span>' + escHtml(r.status) + '</span>' +
-                        '</div>';
-                });
-            }
-
-            dropdown.innerHTML = html;
-            dropdown.style.display = 'block';
-            attachClickHandlers();
-        }
-
-        /* Wire up click/mousedown on rendered results */
-        function attachClickHandlers() {
-            dropdown.querySelectorAll('.ls-item').forEach(item => {
-                item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
-                    if (this.dataset.lsType === 'equipment') {
-                        switchTab('lending');
-                        switchLendingSub('browse');
-                        const es = document.getElementById('equipmentSearch');
-                        if (es) { es.value = this.dataset.lsName; filterEquipment(); }
-                    } else {
-                        switchTab('lending');
-                        switchLendingSub('requests');
-                        const sf = document.getElementById('reqStatusFilter');
-                        if (sf) { sf.value = this.dataset.lsStatus || 'All'; setRequestsFilter(sf.value); }
-                    }
-                    input.value = '';
-                    dropdown.style.display = 'none';
-                });
-            });
-        }
-
-        /* Main entry: show spinner, fetch from PHP, then render */
-        function buildDropdown(q) {
-            q = (q || '').trim();
-            if (q.length < 2) { dropdown.style.display = 'none'; return; }
-
-            // Show loading state immediately so the search feels responsive
-            dropdown.innerHTML = '<div class="ls-empty" style="padding:10px 14px;">' +
-                '<span class="material-symbols-outlined" style="animation:spin 1s linear infinite;display:inline-block;font-size:18px;vertical-align:middle;margin-right:6px">progress_activity</span>' +
-                'Searching…</div>';
-            dropdown.style.display = 'block';
-
-            // Cancel any in-flight request
-            if (currentXhr) { currentXhr.abort(); currentXhr = null; }
-
-            const ctrl = new AbortController();
-            currentXhr = ctrl;
-
-            fetch('equipment-booking/api/live-search.php?section=user_inventory&q=' + encodeURIComponent(q), {
-                signal: ctrl.signal
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error('Network error ' + res.status);
-                    return res.json();
-                })
-                .then(items => {
-                    currentXhr = null;
-                    renderDropdown(q, items);
-                })
-                .catch(err => {
-                    if (err.name === 'AbortError') return; // user typed again — ignore
-                    currentXhr = null;
-                    // Fall back to DOM-only search if PHP is unreachable
-                    renderDropdown(q, []);
-                });
-        }
-
-        input.addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            const val = this.value;
-            if (!val.trim() || val.trim().length < 2) { dropdown.style.display = 'none'; return; }
-            debounceTimer = setTimeout(() => buildDropdown(val), 220);
-        });
-
-        input.addEventListener('focus', function () {
-            dropdown.style.display = 'none';
-        });
-
-        document.addEventListener('click', function (e) {
-            if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
-        });
-
-        input.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') { dropdown.style.display = 'none'; input.blur(); }
-        });
-    })();
-
     /* ── Settings toggles — compact/reduceMotion/focusRing removed from new design */
     // const compactToggle = document.getElementById('compactToggle');
     // if (compactToggle) compactToggle.addEventListener('change', function () { applyCompact(this.checked); });
@@ -2008,6 +2000,8 @@
         initBorrowForm();
         renderRequestsTable();
         checkOverdueState();
+        const overdueToastEl = document.getElementById('overdue-alert');
+        if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();
         startRequestsPolling();
         initCodePanel();
         startInventoryPolling();
@@ -2650,7 +2644,7 @@
                         if (data.success) {
                             showToast(data.msg, 'success');
                             // Update all avatar displays
-                            const newPicUrl = '/Equipment-Lending-Website/' + data.profile_picture + '?t=' + Date.now();
+                            const newPicUrl = window.SERVER_BASE_URL + data.profile_picture + '?t=' + Date.now();
                             document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn, .top-bar-avatar').forEach(el => {
                                 el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
                             });
@@ -3292,4 +3286,155 @@
         doPoll();                        // fire immediately
         setInterval(doPoll, 5000);       // then every 5 seconds
     }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   MY ACTIVITY — History pagination
+   10 rows per page. Rows already in the DOM, each with
+   data-hist-idx="N". JS slices them: anything outside the current
+   page range gets display:none, the rest shows.
+══════════════════════════════════════════════════════════════════ */
+(function () {
+    var HIST_PER_PAGE = 10;
+    var histCurrentPage = 1;
+
+    function allHistRows() {
+        return Array.from(document.querySelectorAll('#myactHistList .myact-history-row'));
+    }
+
+    function renderHistPage() {
+        var rows = allHistRows();
+        var total = rows.length;
+        if (total === 0) return;
+
+        var totalPages = Math.max(1, Math.ceil(total / HIST_PER_PAGE));
+        if (histCurrentPage > totalPages) histCurrentPage = totalPages;
+        if (histCurrentPage < 1) histCurrentPage = 1;
+
+        var start = (histCurrentPage - 1) * HIST_PER_PAGE;
+        rows.forEach(function (row) {
+            var idx = parseInt(row.dataset.histIdx, 10);
+            row.style.display = (idx >= start && idx < start + HIST_PER_PAGE) ? '' : 'none';
+        });
+
+        /* Pagination bar */
+        var pg = document.getElementById('myactHistPg');
+        if (!pg) return;
+        pg.style.display = totalPages > 1 ? '' : 'none';
+        if (totalPages <= 1) return;
+
+        var info = document.getElementById('myactHistPgInfo');
+        if (info) {
+            info.textContent = 'Showing ' + (start + 1) + '–' +
+                Math.min(start + HIST_PER_PAGE, total) + ' of ' + total;
+        }
+
+        var prev = document.getElementById('myactHistPrev');
+        var next = document.getElementById('myactHistNext');
+        if (prev) prev.disabled = histCurrentPage === 1;
+        if (next) next.disabled = histCurrentPage === totalPages;
+
+        var nums = document.getElementById('myactHistNums');
+        if (!nums) return;
+        nums.innerHTML = '';
+        var pages = [];
+        if (totalPages <= 7) {
+            for (var i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            var lo = Math.max(2, histCurrentPage - 1);
+            var hi = Math.min(totalPages - 1, histCurrentPage + 1);
+            if (lo > 2) pages.push('…');
+            for (var i = lo; i <= hi; i++) pages.push(i);
+            if (hi < totalPages - 1) pages.push('…');
+            pages.push(totalPages);
+        }
+        pages.forEach(function (p) {
+            if (p === '…') {
+                var s = document.createElement('span');
+                s.className = 'myact-hist-pg-ellipsis';
+                s.textContent = '…';
+                nums.appendChild(s);
+                return;
+            }
+            var b = document.createElement('button');
+            b.className = 'myact-hist-pg-num' + (p === histCurrentPage ? ' active' : '');
+            b.textContent = p;
+            b.addEventListener('click', function () { goToHistPage(p); });
+            nums.appendChild(b);
+        });
+    }
+
+    function goToHistPage(page) {
+        histCurrentPage = page;
+        renderHistPage();
+        var list = document.getElementById('myactHistList');
+        if (list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /* Wire prev/next */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#myactHistPrev, #myactHistNext');
+        if (!btn) return;
+        if (btn.id === 'myactHistPrev') goToHistPage(histCurrentPage - 1);
+        if (btn.id === 'myactHistNext') goToHistPage(histCurrentPage + 1);
+    });
+
+    /* Init on DOMContentLoaded */
+    function init() { if (document.getElementById('myactHistList')) renderHistPage(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
+/* ══════════════════════════════════════════════════════════════════
+   AI CHAT — send function + Enter-key wiring
+   (moved from inline <script> so we no longer need a nonce and CSP
+   inline-script policy stays tight)
+══════════════════════════════════════════════════════════════════ */
+(function () {
+    function actAiSend() {
+        var input = document.getElementById('actAiInput');
+        var msg = (input ? input.value : '').trim();
+        if (!msg) return;
+        var body = document.getElementById('actAiChatBody');
+        if (!body) return;
+
+        /* User bubble */
+        var uDiv = document.createElement('div');
+        uDiv.className = 'act-chat-msg act-chat-msg-user';
+        uDiv.innerHTML = '<span class="act-chat-msg-time">You</span>' +
+            '<div class="act-chat-bubble act-chat-bubble-user">' +
+            msg.replace(/</g, '&lt;') + '</div>';
+        body.appendChild(uDiv);
+        input.value = '';
+        body.scrollTop = body.scrollHeight;
+
+        /* Stub AI reply — wire to real endpoint later */
+        setTimeout(function () {
+            var aDiv = document.createElement('div');
+            aDiv.className = 'act-chat-msg';
+            aDiv.innerHTML = '<span class="act-chat-msg-time">AI Assistant</span>' +
+                '<div class="act-chat-bubble act-chat-bubble-ai">' +
+                'Thanks for your message! AI response support coming soon.' +
+                '</div>';
+            body.appendChild(aDiv);
+            body.scrollTop = body.scrollHeight;
+        }, 600);
+    }
+
+    /* Expose so any other surface can call it (keeps parity with the
+       old global function that lived in the inline script) */
+    window.actAiSend = actAiSend;
+
+    /* Enter key on the chat input */
+    function init() {
+        var inp = document.getElementById('actAiInput');
+        if (inp) {
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') actAiSend();
+            });
+        }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();

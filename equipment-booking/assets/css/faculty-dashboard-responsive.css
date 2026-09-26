@@ -30,8 +30,9 @@ table,
 .eq-grid,
 .bento-grid,
 .active-cards-grid,
-.myact-stats-grid,
-.myact-timeline {
+.myact-summary,
+.myact-loan-grid,
+.myact-list {
     max-width: 100%;
 }
 
@@ -85,11 +86,6 @@ table,
     /* Reveal the mobile brand */
     .top-bar-mobile-brand {
         display: block;
-    }
-
-    /* Hide the full search bar on mobile */
-    .top-bar-search {
-        display: none;
     }
 
     /* Shrink icon button ring to save space */
@@ -717,58 +713,11 @@ table,
 
 
 /* ================================================================
-   § 15  MY ACTIVITY — stat grid, current-loan cards & timeline
-   NOTE: the redesigned My Activity tab reuses .stat-card (§8/§30),
-   .active-cards-grid/.active-card (§12) and .table-surface (§14),
-   so their responsive behaviour already applies here. This section
-   only covers what's unique to My Activity: the 4-up stat grid and
-   the "Upcoming" timeline.
+   § 15  MY ACTIVITY
+   Moved to its own dedicated stylesheet:
+   equipment-booking/assets/css/faculty-my-activity.css
+   (base styles + all responsive rules for #panel-activity live there).
 ================================================================ */
-@media (min-width: 769px) and (max-width: 1100px) {
-    .myact-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .myact-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
-
-    .myact-timeline-time {
-        width: 56px;
-        font-size: 0.72rem;
-    }
-
-    .myact-timeline-item {
-        gap: 10px;
-    }
-}
-
-@media (max-width: 480px) {
-    .myact-stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .myact-timeline {
-        padding: 4px 14px;
-    }
-
-    .myact-timeline-item {
-        flex-wrap: wrap;
-    }
-
-    .myact-timeline-time {
-        width: auto;
-    }
-
-    /* Download report button — full width on tiny screens */
-    .btn-download-report {
-        width: 100%;
-        justify-content: center;
-    }
-}
 
 
 /* ================================================================
@@ -799,106 +748,29 @@ table,
 
 
 /* ================================================================
-   § 17  SETTINGS / ACCOUNT OVERLAYS
+   § 17  SETTINGS OVERLAY
 ================================================================ */
 
-/* SOV overlay — content sizing on tablet */
+/* Tablet: tighten card padding */
 @media (min-width: 769px) and (max-width: 1100px) {
-    .sov-shell {
-        max-width: 100%;
+    .acct-card {
+        padding: 20px 22px;
     }
 
-    .sov-banner {
-        padding: 28px 20px 32px;
-    }
-
-    .sov-body {
-        gap: 20px;
-        padding: 20px 16px 40px;
-    }
-
-    .sov-form-card {
-        padding: 22px 24px;
-    }
-
-    .sov-form-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 14px 18px;
+    .acct-row-label {
+        width: 112px;
     }
 }
 
-/* SOV overlay — mobile already handled in main CSS (§8178+),
-   these supplement missing pieces */
+/* Mobile: supplement spacing only — base stacking rules live in
+   faculty-dashboard.css */
 @media (max-width: 768px) {
-    .sov-topbar {
-        padding: 0 14px;
-        height: 56px;
-        gap: 10px;
-    }
-
-    .sov-back-btn {
-        width: 34px;
-        height: 34px;
-    }
-
-    .sov-topbar-brand {
-        font-size: 0.875rem;
-    }
-
-    .sov-profile-card {
-        flex-direction: column;
-        gap: 16px;
-        padding: 16px 16px 20px;
-    }
-
-    .sov-pc-main {
-        margin-top: 0;
-        order: 0;
-    }
-
-    .sov-pc-meta {
-        display: none;
-        /* hide join date meta on mobile for cleanliness */
-    }
-
-    .sov-pc-actions {
-        align-items: stretch;
-        width: 100%;
-    }
-
-    .sov-action-btn {
-        width: 100%;
-        text-align: center;
-    }
-
-    .sov-clearance-pill {
-        justify-content: center;
-    }
-
-    .sov-form-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-
-    .sov-form-card {
-        padding: 18px 16px;
-        border-radius: 10px;
-    }
-
-    .sov-security-row,
-    .sov-privacy-action-row {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .sov-outline-btn,
-    .sov-danger-btn {
-        flex-shrink: 0;
+    .acct-banner-name {
+        font-size: 1.1rem;
     }
 
     .sov-theme-row {
         gap: 12px;
-        flex-wrap: wrap;
     }
 }
 
@@ -1419,8 +1291,6 @@ table,
     #app-toast,
     .modal-backdrop,
     .overlay-page,
-    .btn-download-report,
-    .myact-card-actions,
     .act-ai-fab,
     .act-ai-chat,
     .req-sort-btn,
@@ -1441,20 +1311,7 @@ table,
         overflow: visible;
     }
 
-    .myact-stats-grid {
-        display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 10px;
-    }
-
-    .myact-current-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, 1fr) !important;
-        gap: 10px;
-    }
-
     .active-card,
-    .myact-timeline-item,
     .requests-table tr {
         page-break-inside: avoid;
     }
@@ -1480,8 +1337,8 @@ table,
     .qa-btn,
     .btn-borrow,
     .btn-submit-form,
-    .sov-save-btn,
-    .sov-outline-btn,
+    .sov-btn-primary,
+    .sov-btn-outline,
     .fcc-generate-btn,
     .dash-code-generate-btn {
         min-height: 44px;
@@ -1634,18 +1491,6 @@ html {
 
     .unified-settings-grid {
         grid-template-columns: 1fr !important;
-    }
-}
-
-
-/* ================================================================
-   § 39  LIVE SEARCH DROPDOWN — mobile positioning
-================================================================ */
-@media (max-width: 768px) {
-    .live-search-dropdown {
-        left: 0;
-        right: 0;
-        min-width: unset;
     }
 }
 

@@ -5,6 +5,8 @@
     --accent-maroon: #600302;
     --accent-dark: #4a0f15;
     --accent-light: #f3e5e6;
+    --sidebar-red-1: #c0392b;
+    --sidebar-red-2: #7b241c;
     --text-dark: #2c2c2c;
     --text-light: #666666;
     --khaki-border: #e6e0d4;
@@ -115,6 +117,7 @@ main#app-main,
 /* ── Layout variables ─────────────────────────────────────────── */
 :root {
     --sidebar-w: 240px;
+    --sidebar-w-collapsed: 76px;
     --header-h: 62px;
 }
 
@@ -137,7 +140,7 @@ body {
 /* ── HEADER ───────────────────────────────────────────────────── */
 header.app-header {
     height: var(--header-h);
-    background: var(--primary-white);
+    background: linear-gradient(120deg, #ffffff 0%, var(--secondary-cream) 100%);
     border-bottom: 1px solid var(--khaki-border);
     display: flex;
     align-items: center;
@@ -209,17 +212,32 @@ header.app-header {
     padding: 0 1.25rem;
     border-right: 1px solid var(--khaki-border);
     flex-shrink: 0;
+    transition: width 0.22s ease;
+    overflow: hidden;
 }
 
-/* Maroon icon box */
+/* Maroon icon box — also the desktop sidebar collapse/expand toggle,
+   so it's a <button> under the hood; reset default button chrome. */
 .logo-icon-box {
     width: 32px;
     height: 32px;
     background: var(--accent-maroon);
+    border: none;
     border-radius: 8px;
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+}
+
+.logo-icon-box:hover {
+    background: var(--accent-dark);
+}
+
+.logo-icon-box:active {
+    transform: scale(0.93);
 }
 
 /* Logo text */
@@ -331,6 +349,117 @@ header.app-header {
     font-size: 17px;
 }
 
+/* ── Manage Admins panel ─────────────────────────────────────────── */
+
+/* Slot counter banner */
+.adm-slot-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--accent-light);
+    border: 1.5px solid var(--accent-maroon);
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    margin-bottom: 1.25rem;
+    font-size: 13px;
+    color: var(--accent-maroon);
+    font-weight: 500;
+}
+
+.adm-slot-banner .material-symbols-outlined {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.adm-slot-banner.adm-slot-full {
+    background: #fff5f5;
+    border-color: var(--danger, #e53e3e);
+    color: var(--danger, #e53e3e);
+}
+
+/* Form card */
+.adm-form-card {
+    margin-bottom: 1.5rem;
+}
+
+.adm-email-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.adm-email-hint code {
+    font-family: 'Courier New', monospace;
+    background: var(--secondary-cream);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.adm-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+}
+
+/* Accounts table */
+.adm-list-card {
+    margin-top: 0;
+}
+
+.adm-accounts-table tbody tr.adm-account-row td {
+    padding: 0.65rem 1.1rem;
+}
+
+/* Role badge */
+.adm-role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 50px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1.5px solid transparent;
+}
+
+.adm-role-super {
+    background: linear-gradient(135deg, var(--accent-maroon), var(--accent-dark));
+    color: #fff;
+    border-color: var(--accent-maroon);
+}
+
+.adm-role-admin {
+    background: var(--secondary-cream);
+    color: var(--text-dark);
+    border-color: var(--khaki-border);
+}
+
+/* "You" badge next to the current admin's name */
+.adm-you-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 50px;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border: 1px solid var(--accent-maroon);
+    vertical-align: middle;
+}
+
+/* Dropdown slot badge */
+.adm-dd-slot-badge {
+    margin-left: auto;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border-radius: 50px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 /* ── QR Return Scanner modal ─────────────────────────────────────
    Was hardcoded inline with var(--surface,#fff) — --surface isn't
    an actual token in this file, so it silently always fell back to
@@ -433,13 +562,39 @@ header.app-header {
 /* ── SIDEBAR ──────────────────────────────────────────────────── */
 nav.sidebar {
     width: var(--sidebar-w);
-    background: var(--primary-white);
-    border-right: 1px solid var(--khaki-border);
+    background: linear-gradient(180deg, var(--sidebar-red-1) 0%, var(--sidebar-red-2) 100%);
+    border-right: 1px solid rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     padding: 1rem 0.75rem;
     flex-shrink: 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    transition: width 0.22s ease;
+}
+
+/* ── Collapsed (icon-rail) sidebar — toggled by clicking the logo
+   icon box (#sidebarCollapseBtn); #app-main naturally fills the
+   freed width since it's flex:1 in .app-body. Desktop-oriented;
+   harmless if ever triggered on the off-canvas mobile layout. ── */
+body.sidebar-collapsed nav.sidebar {
+    width: var(--sidebar-w-collapsed);
+}
+
+body.sidebar-collapsed .header-logo {
+    width: var(--sidebar-w-collapsed);
+}
+
+body.sidebar-collapsed .logo-text,
+body.sidebar-collapsed .nav-group-label,
+body.sidebar-collapsed .nav-item span:not(.material-symbols-outlined),
+body.sidebar-collapsed .nav-badge {
+    display: none;
+}
+
+body.sidebar-collapsed .nav-item {
+    justify-content: center;
+    padding: 0.6rem;
 }
 
 .nav-group-label {
@@ -447,7 +602,7 @@ nav.sidebar {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 1.2px;
-    color: var(--text-light);
+    color: rgba(255, 255, 255, 0.55);
     padding: 0 0.6rem;
     margin: 1rem 0 0.4rem;
 }
@@ -463,7 +618,7 @@ nav.sidebar {
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
     cursor: pointer;
-    color: var(--text-light);
+    color: #ffffff;
     font-weight: 500;
     transition: all 0.15s;
     text-decoration: none;
@@ -473,13 +628,13 @@ nav.sidebar {
 }
 
 .nav-item:hover {
-    background: var(--accent-light);
-    color: var(--accent-maroon);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 .nav-item.active {
-    background: var(--accent-light);
-    color: var(--accent-maroon);
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
     font-weight: 600;
 }
 
@@ -490,6 +645,7 @@ nav.sidebar {
 .nav-item .material-symbols-outlined {
     font-size: 20px;
     flex-shrink: 0;
+    color: #ffffff;
 }
 
 .nav-badge {
@@ -500,11 +656,12 @@ nav.sidebar {
     padding: 1px 7px;
     border-radius: 50px;
     margin-left: auto;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5);
 }
 
 .nav-divider {
     border: none;
-    border-top: 1px solid var(--khaki-border);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
     margin: 0.5rem 0.6rem;
 }
 
@@ -960,6 +1117,45 @@ main#app-main {
     border-radius: var(--radius);
     border: 1px solid var(--khaki-border);
     overflow: hidden;
+}
+
+/* ── Container header accent ──────────────────────────────────────
+   Every "table/list container" header across the app (Requests,
+   Equipment, Rooms, Faculty, Settings info-cards, Settings Preferences
+   and Borrowing Rules cards) shares one small maroon-gradient accent
+   stripe along its top edge. This is deliberately independent of each
+   header's background/text styling — it's the one consistent visual
+   marker that says "a container starts here", so the header reads as
+   clearly separated from the body below it even though the header
+   itself stays light. The outer card's overflow:hidden + border-radius
+   (already shared by every card wrapper) clips this automatically to
+   match each card's rounded top corners, so no per-card radius
+   handling is needed here.
+   NOTE: modal dialog headers (.ps-modal-head, .form-card-header) are a
+   different UI pattern (popups, not page containers) and intentionally
+   excluded, matching the header-consolidation pass earlier. */
+.ps-card-header,
+.inv-list-header,
+#panel-rooms .pr-card-header,
+.eq-card-header,
+.info-card-head,
+.sett-card-head {
+    position: relative;
+}
+
+.ps-card-header::before,
+.inv-list-header::before,
+#panel-rooms .pr-card-header::before,
+.eq-card-header::before,
+.info-card-head::before,
+.sett-card-head::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-maroon), var(--accent-dark));
 }
 
 .ps-card-header {
@@ -4145,6 +4341,14 @@ input[type="range"] {
 
     .logo-text {
         display: none;
+    }
+
+    /* The logo/collapse toggle is a desktop-only affordance — on mobile
+       the hamburger already handles showing/hiding the sidebar via the
+       off-canvas drawer, so disable double-duty here to avoid the two
+       mechanisms fighting over the same nav.sidebar width. */
+    #sidebarCollapseBtn {
+        pointer-events: none;
     }
 
     /* Search drops to its own full-width row beneath the top row
