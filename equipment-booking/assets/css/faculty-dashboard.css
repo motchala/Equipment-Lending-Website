@@ -303,7 +303,7 @@ body {
     border-bottom: 2px solid var(--color-outline-variant);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     padding: 0 28px;
     position: sticky;
     top: 0;
@@ -313,48 +313,11 @@ body {
     transition: background var(--transition);
 }
 
-.top-bar-search {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--color-surface-container);
-    border: 1px solid transparent;
-    border-radius: var(--radius-full);
-    padding: 8px 18px;
-    flex: 1;
-    max-width: 440px;
-    transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-.top-bar-search:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
-}
-
-.top-bar-search .material-symbols-outlined {
-    font-size: 18px;
-    color: var(--color-secondary);
-    flex-shrink: 0;
-}
-
-.top-bar-search input {
-    border: none;
-    background: transparent;
-    outline: none;
-    font-family: var(--font-sans);
-    font-size: 0.875rem;
-    color: var(--color-on-surface);
-    width: 100%;
-}
-
-.top-bar-search input::placeholder {
-    color: var(--color-secondary);
-}
-
 .top-bar-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-left: auto;
 }
 
 .top-bar-icon-btn {
@@ -770,6 +733,70 @@ body {
 
 .hidden {
     display: none !important;
+}
+
+/* ── "Borrowing Blocked" toast — bottom-center overlay ────────────────
+   position:fixed keeps it fully out of document flow (never shifts the
+   page layout), regardless of where this element sits in the DOM. */
+.overdue-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 9999;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    width: calc(100% - 40px);
+    max-width: 480px;
+    padding: 14px 16px;
+    background: var(--color-error-container);
+    color: var(--color-error);
+    border: 1px solid #fcc;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+}
+
+.overdue-toast.is-visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+}
+
+.overdue-toast>.material-symbols-outlined {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.overdue-toast-text {
+    flex: 1;
+}
+
+.overdue-toast-close {
+    flex-shrink: 0;
+    margin: -2px -2px 0 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    display: flex;
+    align-items: center;
+}
+
+.overdue-toast-close .material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 640px) {
+    .overdue-toast {
+        bottom: 16px;
+        width: calc(100% - 24px);
+    }
 }
 
 /* ── Page Header Block ─────────────────────────────────────── */
@@ -1609,6 +1636,11 @@ body {
 .stock-unavail {
     background: var(--color-error-container);
     color: var(--color-error);
+}
+
+.stock-popular {
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
 }
 
 .btn-borrow {
@@ -4104,10 +4136,6 @@ body {
         width: 100%;
     }
 
-    .top-bar-search {
-        display: none;
-    }
-
     .app-main {
         padding: 16px 12px;
     }
@@ -4871,89 +4899,6 @@ body {
 }
 
 /* ================================================================
-   GLOBAL LIVE SEARCH DROPDOWN
-================================================================ */
-.live-search-dropdown {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    width: 100%;
-    min-width: 320px;
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    z-index: 400;
-    overflow: hidden;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.ls-group-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px 4px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-secondary);
-    background: var(--color-surface-container);
-}
-
-.ls-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    cursor: pointer;
-    transition: background var(--transition);
-    border-bottom: 1px solid color-mix(in srgb, var(--color-outline-variant) 40%, transparent);
-}
-
-.ls-item:last-child {
-    border-bottom: none;
-}
-
-.ls-item:hover {
-    background: var(--color-surface-container);
-}
-
-.ls-item-icon {
-    font-size: 18px !important;
-    color: var(--color-secondary);
-    flex-shrink: 0;
-}
-
-.ls-item-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-on-surface);
-}
-
-.ls-item-sub {
-    font-size: 0.775rem;
-    color: var(--color-secondary);
-    margin-top: 1px;
-}
-
-.ls-empty {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 16px 14px;
-    font-size: 0.875rem;
-    color: var(--color-secondary);
-}
-
-.ls-empty .material-symbols-outlined {
-    font-size: 18px;
-}
-
-/* Responsive — handled in the consolidated @media block above */
-
-/* ================================================================
    BENTO SETTINGS OVERLAY
 ================================================================ */
 .settings-bento-wrap {
@@ -5388,32 +5333,6 @@ body {
     --redesign-text-muted: #a07070;
 }
 
-/* High-contrast was previously missing from this token set entirely,
-   so the sidebar / topbar / dashboard-home panel stayed in their
-   light-theme colors even when High Contrast was selected. Mirrors
-   the true-black / pure-white [data-theme="high-contrast"] --color-*
-   palette defined above. */
-[data-theme="high-contrast"] {
-    --redesign-sidebar-bg: #000000;
-    --redesign-sidebar-border: #666666;
-    --redesign-active-bg: #cc0000;
-    --redesign-active-color: #ffffff;
-    --redesign-nav-hover: #1a1a1a;
-    --redesign-nav-color: #eeeeee;
-    --redesign-nav-hover-color: #ffffff;
-    --redesign-top-bg: #000000;
-    --redesign-top-border: #666666;
-    --redesign-main-bg: #000000;
-    --redesign-card-border: #999999;
-    --redesign-card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
-    --redesign-card-shadow-hover: 0 0 0 1px rgba(255, 255, 255, 0.3);
-    --redesign-gradient-start: #cc0000;
-    --redesign-gradient-end: #800000;
-    --redesign-text-primary: #ffffff;
-    --redesign-text-secondary: #eeeeee;
-    --redesign-text-muted: #999999;
-}
-
 /* ================================================================
    SIDEBAR REDESIGN
 ================================================================ */
@@ -5517,36 +5436,6 @@ body {
     box-shadow: none !important;
     height: var(--topbar-h) !important;
     padding: 0 32px !important;
-}
-
-/* Search: bordered input style */
-.top-bar-search {
-    background: #ffffff !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-    max-width: 480px !important;
-    flex: 1 !important;
-    transition: border-color 0.15s, box-shadow 0.15s !important;
-}
-
-.top-bar-search:focus-within {
-    border-color: var(--redesign-active-color) !important;
-    box-shadow: 0 0 0 3px rgba(128, 0, 0, 0.08) !important;
-}
-
-.top-bar-search .material-symbols-outlined {
-    font-size: 16px !important;
-    color: #9ca3af !important;
-}
-
-.top-bar-search input {
-    font-size: 0.875rem !important;
-    color: var(--redesign-text-primary) !important;
-}
-
-.top-bar-search input::placeholder {
-    color: #9ca3af !important;
 }
 
 /* Notification bell: no border, clean */
@@ -6222,147 +6111,6 @@ body {
 }
 
 [data-theme="dark"] .dash-empty-active-slot {
-    background: var(--color-surface-container);
-    border-color: var(--color-outline-variant);
-    color: var(--color-on-surface-variant);
-}
-
-/* These four were previously missing any dark-mode override at all,
-   so they stayed at their light-mode hex values (light badge, light
-   grid line, light divider) even on a dark card. */
-[data-theme="dark"] .dash-code-active-badge {
-    background: var(--color-success-container);
-    color: var(--color-success);
-}
-
-[data-theme="dark"] .dash-timeline-time {
-    color: var(--color-on-surface-variant);
-    border-right-color: var(--color-outline-variant);
-}
-
-[data-theme="dark"] .dash-timeline-date {
-    color: var(--color-on-surface-variant);
-}
-
-[data-theme="dark"] .dash-bar-chart-grid-line {
-    background: var(--color-outline-variant);
-}
-
-/* ── High-contrast theme ──────────────────────────────────────
-   This whole dashboard-home panel previously had zero high-contrast
-   overrides, so selecting High Contrast left every card, badge, and
-   chart on this panel at its light-mode colors. Mirrors the dark-theme
-   block above; most rules already resolve correctly through the
-   theme-aware --color-* tokens, three get explicit high-contrast
-   values since their dark-mode counterparts use hardcoded hex. ── */
-[data-theme="high-contrast"] #panel-home .dash-flat-title {
-    color: var(--color-on-surface);
-}
-
-[data-theme="high-contrast"] #panel-home .dash-flat-sub {
-    color: var(--color-on-surface-variant);
-}
-
-[data-theme="high-contrast"] .dashboard-stats-col.dash-stats-row-layout {
-    background: var(--color-surface-container) !important;
-    border-color: var(--color-outline-variant) !important;
-}
-
-[data-theme="high-contrast"] .dash-stats-row-layout .stat-card+.stat-card {
-    border-left-color: var(--color-outline-variant) !important;
-}
-
-[data-theme="high-contrast"] .dash-stats-row-layout .stat-card-label {
-    color: var(--color-on-surface-variant) !important;
-}
-
-[data-theme="high-contrast"] .dash-stats-row-layout .stat-card-value {
-    background: var(--color-surface-high) !important;
-    color: var(--color-on-surface) !important;
-}
-
-[data-theme="high-contrast"] .dash-bento-btn {
-    background: linear-gradient(135deg, #cc0000 0%, #800000 100%);
-}
-
-[data-theme="high-contrast"] .dash-code-card {
-    background: var(--color-surface-container);
-    border-color: var(--color-outline-variant);
-}
-
-[data-theme="high-contrast"] .dash-code-card-title,
-[data-theme="high-contrast"] .dash-code-card .fcc-code-value {
-    color: var(--color-on-surface) !important;
-}
-
-[data-theme="high-contrast"] .dash-code-generate-btn {
-    color: var(--color-primary);
-    border-color: var(--color-primary);
-}
-
-[data-theme="high-contrast"] .dash-code-generate-btn:hover {
-    background: var(--color-primary);
-    color: var(--color-surface);
-}
-
-[data-theme="high-contrast"] .dash-section-title {
-    color: var(--color-on-surface);
-}
-
-[data-theme="high-contrast"] .dash-activity-card {
-    background: var(--color-surface-container);
-    border-color: var(--color-outline-variant);
-}
-
-[data-theme="high-contrast"] .dash-activity-card-title {
-    color: var(--color-on-surface);
-}
-
-[data-theme="high-contrast"] .dash-activity-card-btn {
-    background: var(--color-surface-container);
-    border-color: var(--color-outline-variant);
-    color: var(--color-on-surface-variant);
-}
-
-[data-theme="high-contrast"] .dash-timeline::before {
-    background: var(--color-outline-variant);
-}
-
-[data-theme="high-contrast"] .dash-timeline-title {
-    color: var(--color-on-surface);
-}
-
-[data-theme="high-contrast"] .dash-timeline-dot {
-    border-color: var(--color-surface-container);
-}
-
-[data-theme="high-contrast"] .dash-timeline-time {
-    color: var(--color-on-surface-variant);
-    border-right-color: var(--color-outline-variant);
-}
-
-[data-theme="high-contrast"] .dash-timeline-date {
-    color: var(--color-on-surface-variant);
-}
-
-[data-theme="high-contrast"] .dash-bar {
-    background: #800000;
-}
-
-[data-theme="high-contrast"] .dash-bar.highlight {
-    background: #ff6666;
-}
-
-[data-theme="high-contrast"] .dash-bar-chart-grid-line {
-    background: var(--color-outline-variant);
-}
-
-[data-theme="high-contrast"] .dash-code-active-badge {
-    background: var(--color-success-container);
-    color: var(--color-success);
-}
-
-[data-theme="high-contrast"] .dash-empty-active-slot {
     background: var(--color-surface-container);
     border-color: var(--color-outline-variant);
     color: var(--color-on-surface-variant);
@@ -7669,8 +7417,7 @@ body {
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 18px;
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
+    background: linear-gradient(135deg, var(--color-primary-container) 0%, color-mix(in srgb, var(--color-primary-container) 65%, black) 100%);
     border-radius: var(--radius-lg);
     padding: 24px 28px;
     box-shadow: var(--shadow-sm);
@@ -7688,7 +7435,8 @@ body {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: var(--color-primary-container);
+    background: rgba(255, 255, 255, 0.16);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     color: var(--color-on-primary);
     font-size: 1.2rem;
     font-weight: 700;
@@ -7699,6 +7447,12 @@ body {
     flex-shrink: 0;
 }
 
+.acct-banner-avatar .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
 .acct-banner-text {
     min-width: 0;
 }
@@ -7707,14 +7461,15 @@ body {
     font-family: var(--font-display);
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--color-on-surface);
+    color: var(--color-on-primary);
     margin: 0 0 3px;
     letter-spacing: -0.01em;
 }
 
 .acct-banner-meta {
     font-size: 0.82rem;
-    color: var(--color-secondary);
+    color: var(--color-on-primary);
+    opacity: 0.82;
     margin: 0 0 9px;
 }
 
@@ -7722,8 +7477,8 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    background: var(--color-success-container);
-    color: var(--color-success);
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--color-on-primary);
     padding: 4px 12px;
     border-radius: var(--radius-full);
     font-size: 0.7rem;
@@ -7737,17 +7492,20 @@ body {
 }
 
 .sov-nav-item.acct-banner-edit-btn {
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
-    color: var(--color-on-surface);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: var(--color-on-primary);
     flex-shrink: 0;
 }
 
-.sov-nav-item.acct-banner-edit-btn:hover,
+.sov-nav-item.acct-banner-edit-btn:hover {
+    background: rgba(255, 255, 255, 0.26);
+    color: var(--color-on-primary);
+}
+
 .sov-nav-item.acct-banner-edit-btn.active {
-    background: var(--color-surface-container);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
+    background: rgba(255, 255, 255, 0.3);
+    color: var(--color-on-primary);
 }
 
 /* ── Horizontal pill tabs ──────────────────────────────────────── */

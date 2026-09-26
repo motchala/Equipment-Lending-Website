@@ -88,11 +88,6 @@ table,
         display: block;
     }
 
-    /* Hide the full search bar on mobile */
-    .top-bar-search {
-        display: none;
-    }
-
     /* Shrink icon button ring to save space */
     .top-bar-icon-btn {
         width: 36px;
@@ -1496,18 +1491,6 @@ html {
 
     .unified-settings-grid {
         grid-template-columns: 1fr !important;
-    }
-}
-
-
-/* ================================================================
-   § 39  LIVE SEARCH DROPDOWN — mobile positioning
-================================================================ */
-@media (max-width: 768px) {
-    .live-search-dropdown {
-        left: 0;
-        right: 0;
-        min-width: unset;
     }
 }
 
