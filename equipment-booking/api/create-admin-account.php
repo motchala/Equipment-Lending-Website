@@ -23,18 +23,43 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 // ── Ensure tbl_accounts has the new columns (graceful migration for
-//    existing installs that haven't re-imported the SQL file yet) ───────────
-foreach ([
-    "ALTER TABLE tbl_accounts ADD COLUMN IF NOT EXISTS `id` int(11) NOT NULL AUTO_INCREMENT FIRST, ADD PRIMARY KEY IF NOT EXISTS (`id`)",
-    "ALTER TABLE tbl_accounts ADD COLUMN IF NOT EXISTS `role` enum('Super Admin','Admin') NOT NULL DEFAULT 'Admin' AFTER `password`",
-    "ALTER TABLE tbl_accounts ADD COLUMN IF NOT EXISTS `created_at` datetime DEFAULT NULL AFTER `role`",
-    "ALTER TABLE tbl_accounts ADD UNIQUE IF NOT EXISTS `email` (`email`)",
-] as $ddl) {
-    @$conn->query($ddl);
+//    existing installs that haven't re-imported the SQL file yet).
+//    Uses SHOW COLUMNS + conditional ALTER rather than "ADD COLUMN IF
+//    NOT EXISTS" — that syntax needs a fairly recent MySQL/MariaDB,
+//    and this same SHOW COLUMNS pattern is already proven to work
+//    against this project's actual database (see last_login in
+//    landing-page.php). ───────────────────────────────────────────
+$_existing_cols = [];
+$_col_result = $conn->query("SHOW COLUMNS FROM tbl_accounts");
+if ($_col_result) {
+    while ($_col_row = $_col_result->fetch_assoc()) {
+        $_existing_cols[] = $_col_row['Field'];
+    }
+}
+if (!in_array('id', $_existing_cols, true)) {
+    @$conn->query("ALTER TABLE tbl_accounts ADD COLUMN `id` int(11) NOT NULL AUTO_INCREMENT FIRST, ADD PRIMARY KEY (`id`)");
+}
+if (!in_array('role', $_existing_cols, true)) {
+    @$conn->query("ALTER TABLE tbl_accounts ADD COLUMN `role` enum('Super Admin','Admin') NOT NULL DEFAULT 'Admin' AFTER `password`");
+    @$conn->query("UPDATE tbl_accounts SET role = 'Super Admin' WHERE email = 'main@admin.edu'");
+}
+if (!in_array('created_at', $_existing_cols, true)) {
+    @$conn->query("ALTER TABLE tbl_accounts ADD COLUMN `created_at` datetime DEFAULT NULL AFTER `role`");
+}
+
+// Only a Super Admin may create new admin accounts. Checked after the
+// migration above so $_SESSION['admin_role'] (set at login from the
+// now-guaranteed-to-exist role column) can be trusted.
+$_requester_role = ($_SESSION['admin_role'] ?? '') === 'Super Admin' ? 'Super Admin' : 'Admin';
+if ($_requester_role !== 'Super Admin') {
+    http_response_code(403);
+    echo json_encode(['status' => 'error', 'message' => 'Only a Super Admin can create admin accounts.']);
+    exit;
 }
 
 // ── Helper ───────────────────────────────────────────────────────────────────
-function send_json(int $code, string $status, string $message): void {
+function send_json(int $code, string $status, string $message): void
+{
     http_response_code($code);
     echo json_encode(['status' => $status, 'message' => $message]);
     exit;
