@@ -115,6 +115,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined">person</span>
                         </div>Admin
                     </button>
+                    <?php if ($is_super_admin): ?>
                     <button class="dd-item" id="dd-manage-admins-btn">
                         <div class="dd-icon">
                             <span class="material-symbols-outlined">manage_accounts</span>
@@ -123,6 +124,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="adm-dd-slot-badge"><?php echo (int)$admin_accounts_remaining; ?> slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> left</span>
                         <?php endif; ?>
                     </button>
+                    <?php endif; ?>
                     <div class="dd-divider"></div>
                     <button class="dd-item" id="openQrScannerBtn">
                         <div class="dd-icon">
@@ -179,10 +181,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <span class="material-symbols-outlined">meeting_room</span>
                 <span>Rooms</span>
             </a>
+            <?php if ($is_super_admin): ?>
             <a class="nav-item" data-tab="faculty" href="#">
                 <span class="material-symbols-outlined">group</span>
                 <span>Faculty</span>
             </a>
+            <?php endif; ?>
 
             <hr class="nav-divider">
 
@@ -476,7 +480,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="ps-card">
                         <div class="ps-card-header">
                             <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
+                            <?php if ($is_super_admin): ?>
                             <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
+                            <?php endif; ?>
                         </div>
                         <div class="ps-card-body">
                             <?php
@@ -870,14 +876,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo count($rooms_archived); ?></span>
                             <?php endif; ?>
                         </button>
+                        <?php if ($is_super_admin): ?>
                         <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
                             <span class="material-symbols-outlined">add</span>
                             Add Room
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <!-- ── Add / Edit Room form (hidden by default) ────────── -->
+                <!-- Shared by both Add and Edit — only hiding the Add Room
+                     button above for regular Admins, not this whole block,
+                     since Admins can still edit existing rooms via each
+                     row's Edit icon, which reuses this same form. -->
                 <div id="room-form-wrap" class="<?php echo $edit_room ? '' : 'hidden'; ?>">
                     <div class="eq-card form-card">
 
@@ -2016,8 +2028,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
 
             <!-- ============================================================
-         TAB: FACULTY
+         TAB: FACULTY  (Super Admin only)
     ============================================================ -->
+            <?php if ($is_super_admin): ?>
             <div class="tab-panel" id="panel-faculty">
 
                 <div style="margin-bottom:1.5rem">
@@ -2248,6 +2261,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 </div><!-- /faculty-layout -->
             </div><!-- /panel-faculty -->
+            <?php endif; ?>
 
 
 
@@ -2583,8 +2597,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rq-sub-tabs" id="settMainTabs">
                     <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
+                    <?php if ($is_super_admin): ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
+                    <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
 
@@ -2751,7 +2767,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /sett-account -->
 
-                <!-- ── MANAGE ADMINS ──────────────────────────────────── -->
+                <!-- ── MANAGE ADMINS (Super Admin only) ────────────────── -->
+                <?php if ($is_super_admin): ?>
                 <div class="rq-sub-panel" id="sett-admins">
 
                     <!-- Slot counter banner -->
@@ -2903,6 +2920,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
 
                 </div><!-- /sett-admins -->
+                <?php endif; ?>
 
                 <!-- ── PREFERENCES ────────────────────────────────────── -->
                 <div class="rq-sub-panel" id="sett-prefs">
@@ -3043,7 +3061,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /sett-prefs -->
 
-                <!-- ── BORROWING RULES (was the standalone Arbitration tab) ── -->
+                <!-- ── BORROWING RULES (was the standalone Arbitration tab; Super Admin only) ── -->
+                <?php if ($is_super_admin): ?>
                 <div class="rq-sub-panel" id="sett-rules">
                     <!-- Sub-tabs -->
                     <div class="rq-sub-tabs" id="arbSubTabs">
@@ -3198,6 +3217,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div><!-- /arb-sub-log -->
 
                 </div><!-- /sett-rules -->
+                <?php endif; ?>
 
                 <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->
                 <div class="rq-sub-panel" id="sett-help">

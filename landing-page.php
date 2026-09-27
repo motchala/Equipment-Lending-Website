@@ -88,7 +88,23 @@ if (isset($_POST['login'])) {
     // Generalized to look up whichever email was submitted against
     // tbl_accounts, since the admin's email is now editable from
     // Settings → My Account and must not be able to lock them out.
-    $stmt_acc  = $conn->prepare("SELECT fullName, password FROM tbl_accounts WHERE email = ? LIMIT 1");
+    //
+    // Self-heal the `role` column here (same pattern already used below
+    // for last_login) — this SELECT now needs it, but a site running an
+    // older tbl_accounts export won't have it yet, and login must not
+    // start throwing SQL errors just because that migration hasn't run.
+    $role_col_check = mysqli_query($conn, "SHOW COLUMNS FROM tbl_accounts LIKE 'role'");
+    if ($role_col_check && mysqli_num_rows($role_col_check) === 0) {
+        @mysqli_query($conn, "ALTER TABLE tbl_accounts ADD COLUMN role ENUM('Super Admin','Admin') NOT NULL DEFAULT 'Admin'");
+        // The pre-existing account predates roles entirely — promote the
+        // original main@admin.edu account to Super Admin specifically
+        // (not just "whoever logs in first triggers this migration"),
+        // so the one true original admin doesn't end up locked out of
+        // Super-Admin-only screens after this runs.
+        @mysqli_query($conn, "UPDATE tbl_accounts SET role = 'Super Admin' WHERE email = 'main@admin.edu'");
+    }
+
+    $stmt_acc  = $conn->prepare("SELECT fullName, password, role FROM tbl_accounts WHERE email = ? LIMIT 1");
     $row_acc   = null;
     if ($stmt_acc) {
         $stmt_acc->bind_param("s", $email);
@@ -145,6 +161,11 @@ if (isset($_POST['login'])) {
 
             $_SESSION['admin_name']  = $admin_name_db;
             $_SESSION['admin_email'] = $email;
+            // Defaults to 'Admin' (the more restrictive role) if the role
+            // column is somehow missing/empty, rather than silently
+            // granting Super Admin — fail closed, not open.
+            $_SESSION['admin_role']  = (!empty($row_acc['role']) && $row_acc['role'] === 'Super Admin')
+                ? 'Super Admin' : 'Admin';
 
             // Clear flash_login_email — no longer needed on success.
             unset($_SESSION['flash_login_email']);

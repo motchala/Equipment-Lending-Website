@@ -516,6 +516,11 @@ if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 
 
 $admin_email = $_SESSION['admin_email'] ?? '';
 
+// Fail closed: anything other than an explicit 'Super Admin' session value
+// is treated as the more restrictive 'Admin' role.
+$admin_role     = ($_SESSION['admin_role'] ?? '') === 'Super Admin' ? 'Super Admin' : 'Admin';
+$is_super_admin = ($admin_role === 'Super Admin');
+
 // How many admin accounts exist and how many slots remain (max 5).
 // Graceful fallback in case the schema migration hasn't run yet.
 $_ar = @mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_accounts"));
