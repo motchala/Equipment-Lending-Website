@@ -517,9 +517,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
          snapshot of this same stylesheet (predating several redesigns) that
          was silently overriding current styles because it loaded last. -->
 
-    <!-- My Activity — dedicated stylesheet -->
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-my-activity.css">
-
     <!-- Responsive System -->
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css">
 
@@ -532,9 +529,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
     <style nonce="<?php echo $csp_nonce; ?>">
         /* fix for csp vulnerability. inline styles */
         /* ================================================================
-       DASHBOARD REDESIGN v3 — panel-home overrides only
-       All JS-referenced classes are preserved; only visual/layout
-       styles are added or overridden here.
+       DASHBOARD — #panel-home style overrides
     ================================================================ */
 
         /* ── Hero Header ──────────────────────────────────────────────── */
@@ -818,8 +813,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
         }
 
         /* ================================================================
-           EQUIPMENT PANEL REDESIGN v4
-           Scoped 100% to #panel-lending — zero impact on other tabs.
+           EQUIPMENT PANEL — scoped to #panel-lending only
         ================================================================ */
 
         /* ── Sub-nav ──────────────────────────────────────────────── */
@@ -1586,7 +1580,9 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 ================================================================ -->
     <nav class="side-nav" id="sideNav">
         <div class="side-nav-brand">
-            <div class="side-nav-logo">
+            <button type="button" class="side-nav-logo" id="sidebarCollapseBtn"
+                title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
+                aria-controls="sideNav">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
                     aria-hidden="true">
@@ -1594,7 +1590,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-            </div>
+            </button>
             <div class="side-nav-brand-text">
                 <span class="side-nav-title"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
                 <span class="side-nav-sub">Faculty Portal</span>
@@ -1615,7 +1611,7 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <span>Facilities</span>
             </a>
             <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
-                <span class="material-symbols-outlined">history_edu</span>
+                <span class="material-symbols-outlined">history</span>
                 <span>My Activity</span>
             </a>
         </div>

@@ -1787,6 +1787,25 @@
     const navBackdrop = document.getElementById('navBackdrop');
     if (navBackdrop) navBackdrop.addEventListener('click', closeMobileNav);
 
+    /* ── Desktop sidebar collapse (icon-rail): the logo doubles as the
+       toggle. Separate from the mobile drawer above; preference persists
+       via localStorage. ── */
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+    function setSidebarCollapsed(collapsed) {
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            sidebarCollapseBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        LS.set('sidebarCollapsed', collapsed ? '1' : '0');
+    }
+    if (sidebarCollapseBtn) {
+        sidebarCollapseBtn.addEventListener('click', function () {
+            setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+        });
+        if (LS.get('sidebarCollapsed') === '1') setSidebarCollapsed(true);
+    }
+
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', function (e) {

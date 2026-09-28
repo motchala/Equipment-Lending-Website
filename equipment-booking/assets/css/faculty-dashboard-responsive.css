@@ -714,9 +714,8 @@ table,
 
 /* ================================================================
    § 15  MY ACTIVITY
-   Moved to its own dedicated stylesheet:
-   equipment-booking/assets/css/faculty-my-activity.css
-   (base styles + all responsive rules for #panel-activity live there).
+   Base styles + all responsive rules for #panel-activity now live
+   in faculty-dashboard.css (search "MY ACTIVITY").
 ================================================================ */
 
 
@@ -1106,7 +1105,7 @@ table,
 
 
 /* ================================================================
-   § 27  DASHBOARD REDESIGN v3 — inline <style> overrides for mobile
+   § 27  DASHBOARD — inline <style> overrides for mobile
    These patch the <style> block inside faculty-dashboard.php that
    defines dash-hero, dash-stats-row-layout, dash-body-layout, etc.
 ================================================================ */
