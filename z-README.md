@@ -40,12 +40,15 @@ Monolithic, module-per-feature PHP app. No MVC framework — each role has one l
 │   ├── core/
 │   └── assets/
 │
+├── assets/                   # Shared static files: landing-page + role-splash css/js, fonts, images
+│
 ├── config/                   # Cross-cutting bootstrap, required by every entry point
 │   ├── db.php                #   getDB() — cached MySQLi connection (gitignored, see Setup)
 │   ├── env.php                #   Minimal .env parser → $_ENV
 │   ├── session.php             #   Hardened session_start() wrapper
 │   ├── csrf.php                #   csrf_token() / csrf_field() / csrf_verify()
-│   └── security-headers.php     #   CSP/X-Frame-Options fallback for AJAX endpoints
+│   ├── security-headers.php     #   CSP/X-Frame-Options fallback for AJAX endpoints
+│   └── role-splash.php          #   role_splash_head() / render_role_splash() — post-login overlay markup
 │
 ├── database/lending_db.sql   # Full schema + seed data (idempotent migrations baked in as
 │                              #   "ALTER TABLE IF NOT EXISTS column" guards — see below)
@@ -108,7 +111,10 @@ Inventory CRUD (with archiving, not hard deletes), request oversight and manual 
 ### 5. Notifications (`notif-functions.php`)
 Deliberately **not stored as generated events** — the feed is computed fresh on every load from the current state of `tbl_requests`, `tbl_room_issues`, and `tbl_inventory` (e.g. "3 items overdue" is a live query, not a row someone inserted). Only read/deleted state per notification persists, in `tbl_notif_state`, keyed by a synthetic id like `overdue-12`.
 
-### 6. Security hardening
+### 6. Role splash (post-login transition)
+A short full-screen overlay (PUPSYNC wordmark → role name: Admin / Super Admin / Faculty / Student) shown when the landing page hands off to a dashboard. Purely cosmetic — no auth or DB logic. Three files: `config/role-splash.php` (markup helper), `assets/css/role-splash.css` (look + entire timeline, tunable via the `--rs-t-*` variables), `assets/js/role-splash.js` (cleanup/skip only). Each dashboard integrates it with three lines: a `require_once`, `role_splash_head()` in `<head>`, and `render_role_splash('<Role>')` right after `<body>`.
+
+### 7. Security hardening
 This codebase has clearly been through an OWASP ZAP pass — worth knowing before you "simplify" something:
 - Per-request CSP with a nonce for inline scripts (`landing-page.php`, dashboards) or a static fallback CSP for API/utility files (`config/security-headers.php`).
 - Custom CSRF tokens (`config/csrf.php`), checked on every state-changing POST, with a header fallback (`X-CSRF-TOKEN`) for JSON/AJAX calls.

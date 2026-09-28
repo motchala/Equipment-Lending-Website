@@ -1,6 +1,7 @@
 <?php require_once __DIR__ . '/equipment-booking/core/admin-functions.php'; ?>
 <?php require_once __DIR__ . '/room-reservation/core/admin-rooms-functions.php'; ?>
 <?php require_once __DIR__ . '/equipment-booking/core/notif-functions.php'; ?>
+<?php require_once __DIR__ . '/config/role-splash.php'; ?>
 <?php
 // ================= NOTIFICATIONS (live feed) =================
 // Computed fresh on every load from tbl_requests / tbl_room_issues /
@@ -44,9 +45,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css?v=<?php echo filemtime('equipment-booking/assets/css/admin-dashboard.css'); ?>">
+    <?php role_splash_head(); ?>
 </head>
 
 <body>
+
+    <?php render_role_splash(($_SESSION['admin_role'] ?? 'Admin') === 'Super Admin' ? 'Super Admin' : 'Admin'); ?>
 
     <!-- ================================================================
      HEADER
@@ -116,14 +120,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>Admin
                     </button>
                     <?php if ($is_super_admin): ?>
-                    <button class="dd-item" id="dd-manage-admins-btn">
-                        <div class="dd-icon">
-                            <span class="material-symbols-outlined">manage_accounts</span>
-                        </div>Manage Admins
-                        <?php if ($admin_accounts_remaining > 0): ?>
-                            <span class="adm-dd-slot-badge"><?php echo (int)$admin_accounts_remaining; ?> slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> left</span>
-                        <?php endif; ?>
-                    </button>
+                        <button class="dd-item" id="dd-manage-admins-btn">
+                            <div class="dd-icon">
+                                <span class="material-symbols-outlined">manage_accounts</span>
+                            </div>Manage Admins
+                            <?php if ($admin_accounts_remaining > 0): ?>
+                                <span class="adm-dd-slot-badge"><?php echo (int)$admin_accounts_remaining; ?> slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> left</span>
+                            <?php endif; ?>
+                        </button>
                     <?php endif; ?>
                     <div class="dd-divider"></div>
                     <button class="dd-item" id="openQrScannerBtn">
@@ -182,10 +186,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <span>Rooms</span>
             </a>
             <?php if ($is_super_admin): ?>
-            <a class="nav-item" data-tab="faculty" href="#">
-                <span class="material-symbols-outlined">group</span>
-                <span>Faculty</span>
-            </a>
+                <a class="nav-item" data-tab="faculty" href="#">
+                    <span class="material-symbols-outlined">group</span>
+                    <span>Faculty</span>
+                </a>
             <?php endif; ?>
 
             <hr class="nav-divider">
@@ -481,7 +485,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="ps-card-header">
                             <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
                             <?php if ($is_super_admin): ?>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
+                                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
                             <?php endif; ?>
                         </div>
                         <div class="ps-card-body">
@@ -877,10 +881,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <?php endif; ?>
                         </button>
                         <?php if ($is_super_admin): ?>
-                        <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
-                            <span class="material-symbols-outlined">add</span>
-                            Add Room
-                        </button>
+                            <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
+                                <span class="material-symbols-outlined">add</span>
+                                Add Room
+                            </button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -2031,236 +2035,236 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
          TAB: FACULTY  (Super Admin only)
     ============================================================ -->
             <?php if ($is_super_admin): ?>
-            <div class="tab-panel" id="panel-faculty">
+                <div class="tab-panel" id="panel-faculty">
 
-                <div style="margin-bottom:1.5rem">
-                    <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
-                    <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create and manage faculty accounts. Enable or disable org borrowing privileges.</p>
-                </div>
+                    <div style="margin-bottom:1.5rem">
+                        <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
+                        <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create and manage faculty accounts. Enable or disable org borrowing privileges.</p>
+                    </div>
 
-                <div class="faculty-layout">
+                    <div class="faculty-layout">
 
-                    <!-- CREATE FORM -->
-                    <div class="eq-card faculty-form-card">
-                        <div class="eq-card-header">
-                            <h2>
-                                <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">person_add</span>
-                                Create Faculty Account
-                            </h2>
-                        </div>
-                        <div class="eq-card-body">
-                            <?= csrf_field() ?>
-
-                            <div class="form-group">
-                                <label for="fac-email">PUPSync Email <span class="req-star">*</span></label>
-                                <input type="email" id="fac-email" name="pupsync_email"
-                                    class="form-control-custom" maxlength="254" required
-                                    placeholder="faculty@example.com">
+                        <!-- CREATE FORM -->
+                        <div class="eq-card faculty-form-card">
+                            <div class="eq-card-header">
+                                <h2>
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">person_add</span>
+                                    Create Faculty Account
+                                </h2>
                             </div>
+                            <div class="eq-card-body">
+                                <?= csrf_field() ?>
 
-                            <div class="form-group">
-                                <label for="fac-backup">Google / Backup Email</label>
-                                <input type="email" id="fac-backup" name="backup_email"
-                                    class="form-control-custom" maxlength="254"
-                                    placeholder="backup@gmail.com">
-                            </div>
-
-                            <div class="form-row">
                                 <div class="form-group">
-                                    <label for="fac-first">First Name <span class="req-star">*</span></label>
-                                    <input type="text" id="fac-first" name="first_name"
-                                        class="form-control-custom" maxlength="100" required placeholder="First">
+                                    <label for="fac-email">PUPSync Email <span class="req-star">*</span></label>
+                                    <input type="email" id="fac-email" name="pupsync_email"
+                                        class="form-control-custom" maxlength="254" required
+                                        placeholder="faculty@example.com">
                                 </div>
+
                                 <div class="form-group">
-                                    <label for="fac-middle">Middle Name</label>
-                                    <input type="text" id="fac-middle" name="middle_name"
-                                        class="form-control-custom" maxlength="100" placeholder="Middle">
+                                    <label for="fac-backup">Google / Backup Email</label>
+                                    <input type="email" id="fac-backup" name="backup_email"
+                                        class="form-control-custom" maxlength="254"
+                                        placeholder="backup@gmail.com">
                                 </div>
-                            </div>
 
-                            <div class="form-group">
-                                <label for="fac-last">Last Name <span class="req-star">*</span></label>
-                                <input type="text" id="fac-last" name="last_name"
-                                    class="form-control-custom" maxlength="100" required placeholder="Last">
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="fac-password">Password <span class="req-star">*</span></label>
-                                    <div class="fac-pw-wrap">
-                                        <input type="password" id="fac-password" name="password"
-                                            class="form-control-custom" maxlength="128" required
-                                            placeholder="Min. 8 characters">
-                                        <button type="button" class="fac-pw-toggle"
-                                            data-target="fac-password" aria-label="Toggle password">
-                                            <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
-                                        </button>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="fac-first">First Name <span class="req-star">*</span></label>
+                                        <input type="text" id="fac-first" name="first_name"
+                                            class="form-control-custom" maxlength="100" required placeholder="First">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="fac-middle">Middle Name</label>
+                                        <input type="text" id="fac-middle" name="middle_name"
+                                            class="form-control-custom" maxlength="100" placeholder="Middle">
                                     </div>
                                 </div>
+
                                 <div class="form-group">
-                                    <label for="fac-confirm">Confirm Password <span class="req-star">*</span></label>
-                                    <div class="fac-pw-wrap">
-                                        <input type="password" id="fac-confirm" name="confirm_password"
-                                            class="form-control-custom" maxlength="128" required
-                                            placeholder="Re-enter password">
-                                        <button type="button" class="fac-pw-toggle"
-                                            data-target="fac-confirm" aria-label="Toggle password">
-                                            <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
-                                        </button>
+                                    <label for="fac-last">Last Name <span class="req-star">*</span></label>
+                                    <input type="text" id="fac-last" name="last_name"
+                                        class="form-control-custom" maxlength="100" required placeholder="Last">
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="fac-password">Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="fac-password" name="password"
+                                                class="form-control-custom" maxlength="128" required
+                                                placeholder="Min. 8 characters">
+                                            <button type="button" class="fac-pw-toggle"
+                                                data-target="fac-password" aria-label="Toggle password">
+                                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="fac-confirm">Confirm Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="fac-confirm" name="confirm_password"
+                                                class="form-control-custom" maxlength="128" required
+                                                placeholder="Re-enter password">
+                                            <button type="button" class="fac-pw-toggle"
+                                                data-target="fac-confirm" aria-label="Toggle password">
+                                                <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
-                                <div class="form-group faculty-adviser-toggle-wrap" style="margin-bottom:0.65rem">
-                                    <label class="faculty-toggle-label">
-                                        <input type="checkbox" id="fac-adviser" name="is_org_adviser"
-                                            value="1" class="faculty-toggle-input">
-                                        <span class="faculty-toggle-track"></span>
-                                        Organization adviser
-                                    </label>
+                                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
+                                    <div class="form-group faculty-adviser-toggle-wrap" style="margin-bottom:0.65rem">
+                                        <label class="faculty-toggle-label">
+                                            <input type="checkbox" id="fac-adviser" name="is_org_adviser"
+                                                value="1" class="faculty-toggle-input">
+                                            <span class="faculty-toggle-track"></span>
+                                            Organization adviser
+                                        </label>
+                                    </div>
+                                    <div id="fac-org-group" style="display:none;">
+                                        <label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">Organization</label>
+                                        <?php
+                                        $org_opts_res = $conn->query(
+                                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                                        );
+                                        if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
+                                            <select id="fac-org" name="organization_id"
+                                                class="form-control-custom">
+                                                <option value="">&#8212; Select Organization &#8212;</option>
+                                                <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
+                                                    <option value="<?= (int)$org_row['id'] ?>">
+                                                        <?= htmlspecialchars($org_row['name']) ?>
+                                                    </option>
+                                                <?php endwhile; ?>
+                                            </select>
+                                        <?php else: ?>
+                                            <select id="fac-org" name="organization_id"
+                                                class="form-control-custom" disabled>
+                                                <option value="">&#8212; Organizations unavailable &#8212;</option>
+                                            </select>
+                                            <small class="faculty-field-error">
+                                                Could not load organizations.
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
-                                <div id="fac-org-group" style="display:none;">
-                                    <label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">Organization</label>
-                                    <?php
-                                    $org_opts_res = $conn->query(
-                                        "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                                    );
-                                    if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
-                                        <select id="fac-org" name="organization_id"
-                                            class="form-control-custom">
-                                            <option value="">&#8212; Select Organization &#8212;</option>
-                                            <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
-                                                <option value="<?= (int)$org_row['id'] ?>">
-                                                    <?= htmlspecialchars($org_row['name']) ?>
-                                                </option>
-                                            <?php endwhile; ?>
-                                        </select>
-                                    <?php else: ?>
-                                        <select id="fac-org" name="organization_id"
-                                            class="form-control-custom" disabled>
-                                            <option value="">&#8212; Organizations unavailable &#8212;</option>
-                                        </select>
-                                        <small class="faculty-field-error">
-                                            Could not load organizations.
-                                        </small>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
 
-                            <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
+                                <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
 
-                            <button type="button" id="fac-submit-btn"
-                                class="ps-btn ps-btn--primary" style="width:100%">
-                                <span class="material-symbols-outlined">person_add</span>
-                                Create Account
-                            </button>
-                        </div><!-- /eq-card-body -->
-                    </div><!-- /faculty-form-card -->
-
-
-                    <!-- FACULTY LIST -->
-                    <div class="eq-card">
-                        <div class="eq-card-header" style="flex-wrap:wrap;gap:0.75rem">
-                            <h2>
-                                <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
-                                Faculty List
-                                <span class="fac-count-badge">(<?php
-                                                                $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
-                                                                echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
-                                                                ?>)</span>
-                            </h2>
-                            <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
-                                <input type="text" id="fac-search-input"
-                                    class="form-control-custom"
-                                    style="width:180px;font-size:12px"
-                                    placeholder="Search faculty...">
-                                <button class="ps-btn ps-btn--ghost ps-btn--sm" id="fac-gen-code-btn">
-                                    <span class="material-symbols-outlined">key</span> Gen Code
+                                <button type="button" id="fac-submit-btn"
+                                    class="ps-btn ps-btn--primary" style="width:100%">
+                                    <span class="material-symbols-outlined">person_add</span>
+                                    Create Account
                                 </button>
+                            </div><!-- /eq-card-body -->
+                        </div><!-- /faculty-form-card -->
+
+
+                        <!-- FACULTY LIST -->
+                        <div class="eq-card">
+                            <div class="eq-card-header" style="flex-wrap:wrap;gap:0.75rem">
+                                <h2>
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
+                                    Faculty List
+                                    <span class="fac-count-badge">(<?php
+                                                                    $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
+                                                                    echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
+                                                                    ?>)</span>
+                                </h2>
+                                <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+                                    <input type="text" id="fac-search-input"
+                                        class="form-control-custom"
+                                        style="width:180px;font-size:12px"
+                                        placeholder="Search faculty...">
+                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" id="fac-gen-code-btn">
+                                        <span class="material-symbols-outlined">key</span> Gen Code
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="tbl-wrap">
-                            <table class="admin-table" id="fac-list-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Faculty ID</th>
-                                        <th>Email</th>
-                                        <th>Org Borrowing</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="faculty-list-tbody">
-                                    <?php
-                                    $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-                                    $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
-                                    $fac_res = $conn->query(
-                                        "SELECT u.fullname, u.email, u.backup_email, u.role,"
-                                            . " u.faculty_id, u.organization_id,"
-                                            . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
-                                            . "     o.name AS org_name"
-                                            . " FROM tbl_users u"
-                                            . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
-                                            . " ORDER BY u.fullname ASC"
-                                    );
-                                    if ($fac_res && $fac_res->num_rows > 0):
-                                        while ($frow = $fac_res->fetch_assoc()):
-                                            $isAdviser = ($frow['role'] === 'Organization Adviser');
-                                            $subLabel  = $isAdviser && !empty($frow['org_name'])
-                                                ? 'Org Adviser &middot; ' . htmlspecialchars($frow['org_name'])
-                                                : 'Active Faculty';
-                                            $initFac   = strtoupper(substr($frow['fullname'] ?? 'F', 0, 1));
-                                    ?>
-                                            <tr
-                                                data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
-                                                data-email="<?= htmlspecialchars($frow['email']) ?>"
-                                                data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
-                                                data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
-                                                data-role="<?= htmlspecialchars($frow['role']) ?>"
-                                                data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
-                                                data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
-                                                data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
-                                                data-init="<?= $initFac ?>">
-                                                <td>
-                                                    <div style="font-weight:600"><?= htmlspecialchars($frow['fullname']) ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?= $subLabel ?></div>
-                                                </td>
-                                                <td style="font-size:12px;color:var(--text-light)"><?= htmlspecialchars($frow['faculty_id']) ?></td>
-                                                <td style="font-size:12px"><?= htmlspecialchars($frow['email']) ?></td>
-                                                <td>
-                                                    <label class="faculty-toggle-label">
-                                                        <input type="checkbox"
-                                                            class="faculty-toggle-input org-borrowing-toggle"
-                                                            data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
-                                                            <?= $frow['allow_org_borrowing'] == 1 ? 'checked' : '' ?>>
-                                                        <span class="faculty-toggle-track"></span>
-                                                    </label>
-                                                </td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">
-                                                        <span class="material-symbols-outlined">edit</span>
-                                                    </button>
+                            <div class="tbl-wrap">
+                                <table class="admin-table" id="fac-list-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Faculty ID</th>
+                                            <th>Email</th>
+                                            <th>Org Borrowing</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="faculty-list-tbody">
+                                        <?php
+                                        $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
+                                        $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
+                                        $fac_res = $conn->query(
+                                            "SELECT u.fullname, u.email, u.backup_email, u.role,"
+                                                . " u.faculty_id, u.organization_id,"
+                                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
+                                                . "     o.name AS org_name"
+                                                . " FROM tbl_users u"
+                                                . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
+                                                . " ORDER BY u.fullname ASC"
+                                        );
+                                        if ($fac_res && $fac_res->num_rows > 0):
+                                            while ($frow = $fac_res->fetch_assoc()):
+                                                $isAdviser = ($frow['role'] === 'Organization Adviser');
+                                                $subLabel  = $isAdviser && !empty($frow['org_name'])
+                                                    ? 'Org Adviser &middot; ' . htmlspecialchars($frow['org_name'])
+                                                    : 'Active Faculty';
+                                                $initFac   = strtoupper(substr($frow['fullname'] ?? 'F', 0, 1));
+                                        ?>
+                                                <tr
+                                                    data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
+                                                    data-email="<?= htmlspecialchars($frow['email']) ?>"
+                                                    data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
+                                                    data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                                                    data-role="<?= htmlspecialchars($frow['role']) ?>"
+                                                    data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
+                                                    data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
+                                                    data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
+                                                    data-init="<?= $initFac ?>">
+                                                    <td>
+                                                        <div style="font-weight:600"><?= htmlspecialchars($frow['fullname']) ?></div>
+                                                        <div style="font-size:11px;color:var(--text-light)"><?= $subLabel ?></div>
+                                                    </td>
+                                                    <td style="font-size:12px;color:var(--text-light)"><?= htmlspecialchars($frow['faculty_id']) ?></td>
+                                                    <td style="font-size:12px"><?= htmlspecialchars($frow['email']) ?></td>
+                                                    <td>
+                                                        <label class="faculty-toggle-label">
+                                                            <input type="checkbox"
+                                                                class="faculty-toggle-input org-borrowing-toggle"
+                                                                data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                                                                <?= $frow['allow_org_borrowing'] == 1 ? 'checked' : '' ?>>
+                                                            <span class="faculty-toggle-track"></span>
+                                                        </label>
+                                                    </td>
+                                                    <td>
+                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">
+                                                            <span class="material-symbols-outlined">edit</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endwhile;
+                                        else: ?>
+                                            <tr id="fac-empty-row">
+                                                <td colspan="5"
+                                                    style="text-align:center;padding:3rem;color:var(--text-light)">
+                                                    <span class="material-symbols-outlined"
+                                                        style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
+                                                    No faculty accounts yet.
                                                 </td>
                                             </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr id="fac-empty-row">
-                                            <td colspan="5"
-                                                style="text-align:center;padding:3rem;color:var(--text-light)">
-                                                <span class="material-symbols-outlined"
-                                                    style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
-                                                No faculty accounts yet.
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div><!-- /faculty-list-card -->
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div><!-- /faculty-list-card -->
 
-                </div><!-- /faculty-layout -->
-            </div><!-- /panel-faculty -->
+                    </div><!-- /faculty-layout -->
+                </div><!-- /panel-faculty -->
             <?php endif; ?>
 
 
@@ -2598,8 +2602,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="rq-sub-tab active" data-sett-panel="sett-account">My Account</button>
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <?php if ($is_super_admin): ?>
-                    <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
-                    <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
+                        <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
+                        <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
                     <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
@@ -2769,157 +2773,157 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- ── MANAGE ADMINS (Super Admin only) ────────────────── -->
                 <?php if ($is_super_admin): ?>
-                <div class="rq-sub-panel" id="sett-admins">
+                    <div class="rq-sub-panel" id="sett-admins">
 
-                    <!-- Slot counter banner -->
-                    <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
-                        <span class="material-symbols-outlined">group</span>
-                        <span>
-                            <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
-                            <?php if ($admin_accounts_remaining > 0): ?>
-                                — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
-                                slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> remaining
-                            <?php else: ?>
-                                — limit reached
-                            <?php endif; ?>
-                        </span>
-                    </div>
-
-                    <!-- Add Admin form (hidden when limit reached) -->
-                    <?php if ($admin_accounts_remaining > 0): ?>
-                    <div class="eq-card adm-form-card" id="adm-form-card">
-                        <div class="eq-card-header">
-                            <h2>
-                                <span class="material-symbols-outlined">person_add</span>
-                                Add New Admin
-                            </h2>
+                        <!-- Slot counter banner -->
+                        <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
+                            <span class="material-symbols-outlined">group</span>
+                            <span>
+                                <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
+                                <?php if ($admin_accounts_remaining > 0): ?>
+                                    — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
+                                    slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> remaining
+                                <?php else: ?>
+                                    — limit reached
+                                <?php endif; ?>
+                            </span>
                         </div>
-                        <div class="eq-card-body">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
-                                    <input type="text" id="adm-fullname" name="adm_fullname"
-                                        class="form-control-custom"
-                                        placeholder="e.g. Juan dela Cruz"
-                                        maxlength="255" autocomplete="off">
+
+                        <!-- Add Admin form (hidden when limit reached) -->
+                        <?php if ($admin_accounts_remaining > 0): ?>
+                            <div class="eq-card adm-form-card" id="adm-form-card">
+                                <div class="eq-card-header">
+                                    <h2>
+                                        <span class="material-symbols-outlined">person_add</span>
+                                        Add New Admin
+                                    </h2>
                                 </div>
-                                <div class="form-group">
-                                    <label for="adm-email">Admin Email <span class="req-star">*</span></label>
-                                    <input type="email" id="adm-email" name="adm_email"
-                                        class="form-control-custom"
-                                        placeholder="name@admin.edu"
-                                        maxlength="255" autocomplete="off">
-                                    <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="adm-role">Role <span class="req-star">*</span></label>
-                                    <select id="adm-role" name="adm_role" class="form-control-custom">
-                                        <option value="Admin" selected>Admin</option>
-                                        <option value="Super Admin">Super Admin</option>
-                                    </select>
-                                    <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="adm-password">Password <span class="req-star">*</span></label>
-                                    <div class="fac-pw-wrap">
-                                        <input type="password" id="adm-password" name="adm_password"
-                                            class="form-control-custom"
-                                            placeholder="Min. 8 characters"
-                                            autocomplete="new-password">
-                                        <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
-                                            <span class="material-symbols-outlined">visibility</span>
+                                <div class="eq-card-body">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                                            <input type="text" id="adm-fullname" name="adm_fullname"
+                                                class="form-control-custom"
+                                                placeholder="e.g. Juan dela Cruz"
+                                                maxlength="255" autocomplete="off">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                                            <input type="email" id="adm-email" name="adm_email"
+                                                class="form-control-custom"
+                                                placeholder="name@admin.edu"
+                                                maxlength="255" autocomplete="off">
+                                            <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="adm-role">Role <span class="req-star">*</span></label>
+                                            <select id="adm-role" name="adm_role" class="form-control-custom">
+                                                <option value="Admin" selected>Admin</option>
+                                                <option value="Super Admin">Super Admin</option>
+                                            </select>
+                                            <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="adm-password">Password <span class="req-star">*</span></label>
+                                            <div class="fac-pw-wrap">
+                                                <input type="password" id="adm-password" name="adm_password"
+                                                    class="form-control-custom"
+                                                    placeholder="Min. 8 characters"
+                                                    autocomplete="new-password">
+                                                <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                                    <span class="material-symbols-outlined">visibility</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                                            <div class="fac-pw-wrap">
+                                                <input type="password" id="adm-confirm" name="adm_confirm"
+                                                    class="form-control-custom"
+                                                    placeholder="Re-enter password"
+                                                    autocomplete="new-password">
+                                                <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                                    <span class="material-symbols-outlined">visibility</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+
+                                    <div class="adm-form-actions">
+                                        <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
+                                            <span class="material-symbols-outlined">person_add</span>
+                                            Create Admin Account
                                         </button>
                                     </div>
                                 </div>
-                                <div class="form-group">
-                                    <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
-                                    <div class="fac-pw-wrap">
-                                        <input type="password" id="adm-confirm" name="adm_confirm"
-                                            class="form-control-custom"
-                                            placeholder="Re-enter password"
-                                            autocomplete="new-password">
-                                        <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
-                                            <span class="material-symbols-outlined">visibility</span>
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
-
-                            <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
-
-                            <div class="adm-form-actions">
-                                <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
-                                    <span class="material-symbols-outlined">person_add</span>
-                                    Create Admin Account
-                                </button>
+                        <?php else: ?>
+                            <div class="eq-card" style="padding:1.5rem;text-align:center;color:var(--text-light);">
+                                <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
+                                Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
                             </div>
-                        </div>
-                    </div>
-                    <?php else: ?>
-                    <div class="eq-card" style="padding:1.5rem;text-align:center;color:var(--text-light);">
-                        <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
-                        Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
-                    </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
 
-                    <!-- Existing admin accounts list -->
-                    <div class="eq-card adm-list-card">
-                        <div class="eq-card-header">
-                            <h2>
-                                <span class="material-symbols-outlined">manage_accounts</span>
-                                Current Admins
-                            </h2>
-                        </div>
-                        <div class="pr-tbl-wrap">
-                            <table class="pr-table adm-accounts-table" id="admAccountsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Role</th>
-                                        <th>Added</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admAccountsTbody">
-                                    <?php if (empty($admin_accounts_list)): ?>
+                        <!-- Existing admin accounts list -->
+                        <div class="eq-card adm-list-card">
+                            <div class="eq-card-header">
+                                <h2>
+                                    <span class="material-symbols-outlined">manage_accounts</span>
+                                    Current Admins
+                                </h2>
+                            </div>
+                            <div class="pr-tbl-wrap">
+                                <table class="pr-table adm-accounts-table" id="admAccountsTable">
+                                    <thead>
                                         <tr>
-                                            <td colspan="4" style="text-align:center;padding:2rem;color:var(--text-light);">
-                                                No accounts found.
-                                            </td>
+                                            <th>Name</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                            <th>Added</th>
                                         </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($admin_accounts_list as $acct): ?>
-                                        <tr class="adm-account-row">
-                                            <td class="td-fw">
-                                                <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
-                                                <?php if (strtolower($acct['email'] ?? '') === strtolower($admin_email)): ?>
-                                                    <span class="adm-you-badge">You</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
-                                            <td>
-                                                <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
-                                                    <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
-                                                </span>
-                                            </td>
-                                            <td class="td-sm">
-                                                <?php echo $acct['created_at']
-                                                    ? date('M j, Y', strtotime($acct['created_at']))
-                                                    : '—'; ?>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody id="admAccountsTbody">
+                                        <?php if (empty($admin_accounts_list)): ?>
+                                            <tr>
+                                                <td colspan="4" style="text-align:center;padding:2rem;color:var(--text-light);">
+                                                    No accounts found.
+                                                </td>
+                                            </tr>
+                                        <?php else: ?>
+                                            <?php foreach ($admin_accounts_list as $acct): ?>
+                                                <tr class="adm-account-row">
+                                                    <td class="td-fw">
+                                                        <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
+                                                        <?php if (strtolower($acct['email'] ?? '') === strtolower($admin_email)): ?>
+                                                            <span class="adm-you-badge">You</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
+                                                    <td>
+                                                        <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
+                                                            <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="td-sm">
+                                                        <?php echo $acct['created_at']
+                                                            ? date('M j, Y', strtotime($acct['created_at']))
+                                                            : '—'; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
 
-                </div><!-- /sett-admins -->
+                    </div><!-- /sett-admins -->
                 <?php endif; ?>
 
                 <!-- ── PREFERENCES ────────────────────────────────────── -->
@@ -3063,160 +3067,160 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- ── BORROWING RULES (was the standalone Arbitration tab; Super Admin only) ── -->
                 <?php if ($is_super_admin): ?>
-                <div class="rq-sub-panel" id="sett-rules">
-                    <!-- Sub-tabs -->
-                    <div class="rq-sub-tabs" id="arbSubTabs">
-                        <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
-                        <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
-                    </div>
-
-                    <!-- ── CONFIGURATION ─────────────────────────────────────── -->
-                    <div class="arb-sub-panel active" id="arb-sub-config">
-                        <div class="ps-two-col">
-                            <!-- Left: Rules -->
-                            <div class="ps-card">
-                                <div class="ps-card-header">
-                                    <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
-                                </div>
-                                <div class="ps-card-body">
-                                    <div class="arb-rule">
-                                        <h4>
-                                            <span class="material-symbols-outlined">check_circle</span>
-                                            Auto-approve Faculty Requests
-                                            <label class="ps-toggle" style="margin-left:auto">
-                                                <input type="checkbox" checked>
-                                                <span class="ps-toggle-track"></span>
-                                            </label>
-                                        </h4>
-                                        <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
-                                    </div>
-                                    <div class="arb-rule">
-                                        <h4>
-                                            <span class="material-symbols-outlined">block</span>
-                                            Block Overdue Borrowers
-                                            <label class="ps-toggle" style="margin-left:auto">
-                                                <input type="checkbox"
-                                                    <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
-                                                <span class="ps-toggle-track"></span>
-                                            </label>
-                                        </h4>
-                                        <p>Automatically decline new requests from users with overdue items.</p>
-                                    </div>
-                                    <div class="arb-rule">
-                                        <h4>
-                                            <span class="material-symbols-outlined">inventory</span>
-                                            Stock-Based Rejection
-                                            <label class="ps-toggle" style="margin-left:auto">
-                                                <input type="checkbox"
-                                                    <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
-                                                <span class="ps-toggle-track"></span>
-                                            </label>
-                                        </h4>
-                                        <p>Automatically decline if available stock falls below minimum threshold.</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Right: Thresholds -->
-                            <div class="ps-card">
-                                <div class="ps-card-header">
-                                    <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
-                                </div>
-                                <div class="ps-card-body">
-                                    <div class="ps-form-group">
-                                        <label class="ps-form-label">Maximum Borrow Days</label>
-                                        <input class="ps-form-control" type="number" min="1" max="60"
-                                            value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
-                                        <div class="ps-form-hint">Items must be returned within this many days.</div>
-                                    </div>
-                                    <div class="ps-form-group">
-                                        <label class="ps-form-label">Max Items Per Borrower</label>
-                                        <input class="ps-form-control" type="number" min="1" max="20"
-                                            value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
-                                        <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
-                                    </div>
-                                    <div class="ps-form-group">
-                                        <label class="ps-form-label">Low Stock Threshold</label>
-                                        <input class="ps-form-control" type="number" min="0" max="10"
-                                            value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
-                                        <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
-                                    </div>
-                                    <button type="button" class="ps-btn ps-btn--primary"
-                                        style="width:100%;justify-content:center;margin-top:0.25rem">
-                                        <span class="material-symbols-outlined">save</span> Save Configuration
-                                    </button>
-                                </div>
-                            </div>
+                    <div class="rq-sub-panel" id="sett-rules">
+                        <!-- Sub-tabs -->
+                        <div class="rq-sub-tabs" id="arbSubTabs">
+                            <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
+                            <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
                         </div>
-                    </div><!-- /arb-sub-config -->
 
-                    <!-- ── DECISION LOG ───────────────────────────────────────── -->
-                    <div class="arb-sub-panel" id="arb-sub-log">
-                        <div class="ps-card">
-                            <div class="ps-card-header">
-                                <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
-                                <select class="ps-form-control" style="width:160px" id="arb-log-filter">
-                                    <option value="">All decisions</option>
-                                    <option value="Approved">Auto-approved</option>
-                                    <option value="Declined">Auto-declined</option>
-                                </select>
+                        <!-- ── CONFIGURATION ─────────────────────────────────────── -->
+                        <div class="arb-sub-panel active" id="arb-sub-config">
+                            <div class="ps-two-col">
+                                <!-- Left: Rules -->
+                                <div class="ps-card">
+                                    <div class="ps-card-header">
+                                        <h3><span class="material-symbols-outlined">rule</span> Auto-Approval Rules</h3>
+                                    </div>
+                                    <div class="ps-card-body">
+                                        <div class="arb-rule">
+                                            <h4>
+                                                <span class="material-symbols-outlined">check_circle</span>
+                                                Auto-approve Faculty Requests
+                                                <label class="ps-toggle" style="margin-left:auto">
+                                                    <input type="checkbox" checked>
+                                                    <span class="ps-toggle-track"></span>
+                                                </label>
+                                            </h4>
+                                            <p>Automatically approve equipment requests from verified faculty with cleared status.</p>
+                                        </div>
+                                        <div class="arb-rule">
+                                            <h4>
+                                                <span class="material-symbols-outlined">block</span>
+                                                Block Overdue Borrowers
+                                                <label class="ps-toggle" style="margin-left:auto">
+                                                    <input type="checkbox"
+                                                        <?php echo (($arb_config['rule_overdue_block_enabled'] ?? '1') == '1') ? 'checked' : ''; ?>>
+                                                    <span class="ps-toggle-track"></span>
+                                                </label>
+                                            </h4>
+                                            <p>Automatically decline new requests from users with overdue items.</p>
+                                        </div>
+                                        <div class="arb-rule">
+                                            <h4>
+                                                <span class="material-symbols-outlined">inventory</span>
+                                                Stock-Based Rejection
+                                                <label class="ps-toggle" style="margin-left:auto">
+                                                    <input type="checkbox"
+                                                        <?php echo (($arb_config['rule_duplicate_block_enabled'] ?? '0') == '1') ? 'checked' : ''; ?>>
+                                                    <span class="ps-toggle-track"></span>
+                                                </label>
+                                            </h4>
+                                            <p>Automatically decline if available stock falls below minimum threshold.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Right: Thresholds -->
+                                <div class="ps-card">
+                                    <div class="ps-card-header">
+                                        <h3><span class="material-symbols-outlined">tune</span> Thresholds &amp; Limits</h3>
+                                    </div>
+                                    <div class="ps-card-body">
+                                        <div class="ps-form-group">
+                                            <label class="ps-form-label">Maximum Borrow Days</label>
+                                            <input class="ps-form-control" type="number" min="1" max="60"
+                                                value="<?php echo htmlspecialchars($arb_config['max_borrow_days'] ?? 7); ?>">
+                                            <div class="ps-form-hint">Items must be returned within this many days.</div>
+                                        </div>
+                                        <div class="ps-form-group">
+                                            <label class="ps-form-label">Max Items Per Borrower</label>
+                                            <input class="ps-form-control" type="number" min="1" max="20"
+                                                value="<?php echo htmlspecialchars($arb_config['max_items_per_borrower'] ?? 3); ?>">
+                                            <div class="ps-form-hint">Maximum number of items a user can have at once.</div>
+                                        </div>
+                                        <div class="ps-form-group">
+                                            <label class="ps-form-label">Low Stock Threshold</label>
+                                            <input class="ps-form-control" type="number" min="0" max="10"
+                                                value="<?php echo htmlspecialchars($arb_config['low_stock_threshold'] ?? 2); ?>">
+                                            <div class="ps-form-hint">Trigger low-stock alert when quantity drops below this.</div>
+                                        </div>
+                                        <button type="button" class="ps-btn ps-btn--primary"
+                                            style="width:100%;justify-content:center;margin-top:0.25rem">
+                                            <span class="material-symbols-outlined">save</span> Save Configuration
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ps-table-wrap">
-                                <table class="ps-table" id="arb-log-new-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Request ID</th>
-                                            <th>Decision</th>
-                                            <th>Rule Triggered</th>
-                                            <th>Borrower</th>
-                                            <th>Equipment</th>
-                                            <th>Timestamp</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php
-                                        if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
-                                        ?>
+                        </div><!-- /arb-sub-config -->
+
+                        <!-- ── DECISION LOG ───────────────────────────────────────── -->
+                        <div class="arb-sub-panel" id="arb-sub-log">
+                            <div class="ps-card">
+                                <div class="ps-card-header">
+                                    <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
+                                    <select class="ps-form-control" style="width:160px" id="arb-log-filter">
+                                        <option value="">All decisions</option>
+                                        <option value="Approved">Auto-approved</option>
+                                        <option value="Declined">Auto-declined</option>
+                                    </select>
+                                </div>
+                                <div class="ps-table-wrap">
+                                    <table class="ps-table" id="arb-log-new-table">
+                                        <thead>
                                             <tr>
-                                                <td colspan="6">
-                                                    <div class="ps-empty-state">
-                                                        <span class="material-symbols-outlined">history</span>
-                                                        <p>No arbitration log entries yet.</p>
-                                                    </div>
-                                                </td>
+                                                <th>Request ID</th>
+                                                <th>Decision</th>
+                                                <th>Rule Triggered</th>
+                                                <th>Borrower</th>
+                                                <th>Equipment</th>
+                                                <th>Timestamp</th>
                                             </tr>
-                                            <?php else:
-                                            mysqli_data_seek($arb_log_result, 0);
-                                            while ($r = mysqli_fetch_assoc($arb_log_result)):
-                                                $dec    = $r['decision'];
-                                                $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
+                                        </thead>
+                                        <tbody>
+                                            <?php
+                                            if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
                                             ?>
-                                                <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
-                                                    <td style="font-weight:600;color:var(--accent-maroon)">
-                                                        <?php echo htmlspecialchars($r['request_id']); ?>
-                                                    </td>
-                                                    <td>
-                                                        <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
-                                                            <?php echo htmlspecialchars($dec); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td style="font-size:12px;color:var(--text-light)">
-                                                        <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
-                                                    <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                    <td style="font-size:12px;color:var(--text-light)">
-                                                        <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
+                                                <tr>
+                                                    <td colspan="6">
+                                                        <div class="ps-empty-state">
+                                                            <span class="material-symbols-outlined">history</span>
+                                                            <p>No arbitration log entries yet.</p>
+                                                        </div>
                                                     </td>
                                                 </tr>
-                                        <?php endwhile;
-                                        endif; ?>
-                                    </tbody>
-                                </table>
+                                                <?php else:
+                                                mysqli_data_seek($arb_log_result, 0);
+                                                while ($r = mysqli_fetch_assoc($arb_log_result)):
+                                                    $dec    = $r['decision'];
+                                                    $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
+                                                ?>
+                                                    <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
+                                                        <td style="font-weight:600;color:var(--accent-maroon)">
+                                                            <?php echo htmlspecialchars($r['request_id']); ?>
+                                                        </td>
+                                                        <td>
+                                                            <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
+                                                                <?php echo htmlspecialchars($dec); ?>
+                                                            </span>
+                                                        </td>
+                                                        <td style="font-size:12px;color:var(--text-light)">
+                                                            <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
+                                                        </td>
+                                                        <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
+                                                        <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
+                                                        <td style="font-size:12px;color:var(--text-light)">
+                                                            <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
+                                                        </td>
+                                                    </tr>
+                                            <?php endwhile;
+                                            endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    </div><!-- /arb-sub-log -->
+                        </div><!-- /arb-sub-log -->
 
-                </div><!-- /sett-rules -->
+                    </div><!-- /sett-rules -->
                 <?php endif; ?>
 
                 <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->

@@ -941,3 +941,44 @@ body {
     font-weight: 700;
     letter-spacing: 0.5px;
 }
+
+/* ================================================================
+   SIGN-IN DEPARTURE — brief exit cue while the credential POST is
+   in flight, so the handoff to the destination dashboard's own
+   role-splash overlay feels continuous rather than an abrupt cut.
+================================================================ */
+.gateway.is-leaving {
+    opacity: 0;
+    transform: scale(1.015);
+    transition: opacity 0.45s var(--ease-in), transform 0.45s var(--ease-in);
+    pointer-events: none;
+}
+
+#loginSubmitIcon.is-spinning {
+    animation: loginSpin 0.7s linear infinite;
+}
+
+@keyframes loginSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Cross-document view transition (Chromium): crossfades this page into the
+   role-splash overlay of the destination dashboard. Ignored elsewhere. */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gateway.is-leaving {
+        transition: opacity 0.2s linear;
+        transform: none;
+    }
+
+    #loginSubmitIcon.is-spinning {
+        animation: none;
+    }
+}

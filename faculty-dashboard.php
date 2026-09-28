@@ -13,6 +13,7 @@ header("X-Frame-Options: DENY");
 
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/csrf.php';
+require_once __DIR__ . '/config/role-splash.php';
 if (!isset($_SESSION['faculty_id'])) {
     header("Location: landing-page.php");
     exit();
@@ -1573,9 +1574,12 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             color: var(--color-on-surface-variant) !important;
         }
     </style>
+    <?php role_splash_head(); ?>
 </head>
 
 <body>
+
+    <?php render_role_splash('Faculty'); ?>
 
     <!-- ================================================================
      SIDE NAVIGATION
@@ -2026,7 +2030,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                                         <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
                                                         <?php echo (int)$featured_hero['quantity']; ?> available
                                                     </span>
-                                                    <?php $heroBorrowCount = actBorrowCount($featured_hero['item_name']); if ($heroBorrowCount > 0): ?>
+                                                    <?php $heroBorrowCount = actBorrowCount($featured_hero['item_name']);
+                                                    if ($heroBorrowCount > 0): ?>
                                                         <span class="stock-badge stock-popular" style="margin-bottom:0;">
                                                             <span class="material-symbols-outlined" style="font-size:12px;">local_fire_department</span>
                                                             Borrowed <?php echo $heroBorrowCount; ?>&times;
@@ -2078,7 +2083,8 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                                 <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
                                                 <?php echo (int)$featured_sec['quantity']; ?> available
                                             </span>
-                                            <?php $secBorrowCount = actBorrowCount($featured_sec['item_name']); if ($secBorrowCount > 0): ?>
+                                            <?php $secBorrowCount = actBorrowCount($featured_sec['item_name']);
+                                            if ($secBorrowCount > 0): ?>
                                                 <span class="stock-badge stock-popular"
                                                     style="position:absolute;top:10px;right:10px;margin-bottom:0;z-index:2;background:rgba(255,255,255,.85);backdrop-filter:blur(4px);">
                                                     <span class="material-symbols-outlined" style="font-size:12px;">local_fire_department</span>

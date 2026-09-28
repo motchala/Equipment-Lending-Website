@@ -335,7 +335,7 @@ if (isset($_POST['login'])) {
                             <?php endif; ?>
                         </div>
                     <?php endif; ?>
-                    <form method="POST" action="">
+                    <form method="POST" action="" id="loginForm">
                         <?= csrf_field() ?>
                         <div class="form-group">
                             <label for="login-email">Email</label>
@@ -365,8 +365,8 @@ if (isset($_POST['login'])) {
                             disabled
                             data-lockout-seconds="<?= (int)$lockout_seconds ?>"
                             <?php endif; ?>>
-                            <i class="fa-solid fa-arrow-right-to-bracket"></i>
-                            Sign In
+                            <i class="fa-solid fa-arrow-right-to-bracket" id="loginSubmitIcon"></i>
+                            <span id="loginSubmitLabel">Sign In</span>
                         </button>
                     </form>
                 </div>
