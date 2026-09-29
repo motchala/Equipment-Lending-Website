@@ -1,27 +1,85 @@
 <?php
+
 /**
  * Role splash — post-login transition overlay for PUPSync.
  *
- * Shown for a few seconds when landing-page.php hands off to a dashboard.
- * Purely presentational: it never touches sessions, the database or auth.
+ * Purely presentational: it never touches the database or decides who is
+ * allowed in. The only thing it stores is a one-shot flag in the session.
+ *
+ * WHEN IT SHOWS
+ *   Only right after a successful sign-in. landing-page.php "arms" a
+ *   one-shot flag in the session (role_splash_arm) just before it redirects
+ *   to the dashboard; the dashboard takes that flag on its very first load.
+ *   A refresh, a navigation or a re-opened tab finds no flag, so nothing
+ *   shows. Logging out destroys the session, so the next login arms it again.
+ *   Students don't authenticate: "Continue as Student" goes through
+ *   landing-page.php?go=student, which arms it for them the same way.
  *
  * Files that make up the feature
- *   config/role-splash.php        this file (markup)
+ *   config/role-splash.php        this file (markup + one-shot flag)
  *   assets/css/role-splash.css    look + whole animation timeline
  *   assets/js/role-splash.js      cleanup / skip / fail-safe only
  *
- * Usage in a dashboard (3 lines):
+ * Usage in a dashboard (3 lines; the session must already be started):
  *   require_once __DIR__ . '/config/role-splash.php';   // top of file
  *   <?php role_splash_head(); ?>                        // inside <head>
  *   <?php render_role_splash('Faculty'); ?>             // right after <body>
+ * Both calls print nothing unless the flag was armed for that same role.
+ *
+ * Usage at the sign-in point (landing-page.php):
+ *   role_splash_arm('Faculty');   // right before header('Location: ...')
  *
  * Accepted labels: 'Admin', 'Super Admin', 'Faculty', 'Student'.
- * Any other value renders nothing (better no splash than a wrong one).
+ * Any other value is ignored (better no splash than a wrong one).
  *
  * CSP note: the letters carry an inline style="--i:N" (stagger index).
  * The dashboards already allow inline styles (style-src 'unsafe-inline');
  * if that is ever tightened, the letters still animate, just all at once.
  */
+
+if (!function_exists('_rs_variants')) {
+    /** Role label => CSS modifier class. Single source of truth for the accepted labels. */
+    function _rs_variants(): array
+    {
+        return [
+            'Admin'       => 'admin',
+            'Super Admin' => 'super-admin',
+            'Faculty'     => 'faculty',
+            'Student'     => 'student',
+        ];
+    }
+}
+
+if (!function_exists('role_splash_arm')) {
+    /** Flag "a sign-in just happened for this role". Consumed once by the dashboard's first load. */
+    function role_splash_arm(string $role): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE && isset(_rs_variants()[$role])) {
+            $_SESSION['role_splash_pending'] = $role;
+        }
+    }
+}
+
+if (!function_exists('_rs_take_pending')) {
+    /**
+     * Read and clear the one-shot flag. The first call in a request consumes it;
+     * later calls (head, then body) get the same cached answer, so both agree.
+     */
+    function _rs_take_pending(): ?string
+    {
+        static $taken = false, $value = null;
+        if ($taken) {
+            return $value;
+        }
+        $taken = true;
+        if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['role_splash_pending'])) {
+            $flag  = $_SESSION['role_splash_pending'];
+            $value = is_string($flag) ? $flag : null;
+            unset($_SESSION['role_splash_pending']);
+        }
+        return $value;
+    }
+}
 
 if (!function_exists('_rs_asset_version')) {
     /** Cache-busting version for a file under the project root (same idea as the filemtime() links elsewhere). */
@@ -44,16 +102,19 @@ if (!function_exists('_rs_letters')) {
         $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         foreach ($chars as $ch) {
             $out .= '<span class="rs-l ' . $extra_class . '" style="--i:' . $i++ . '">'
-                  . '<span class="rs-c">' . htmlspecialchars($ch, ENT_QUOTES, 'UTF-8') . '</span></span>';
+                . '<span class="rs-c">' . htmlspecialchars($ch, ENT_QUOTES, 'UTF-8') . '</span></span>';
         }
         return $out;
     }
 }
 
 if (!function_exists('role_splash_head')) {
-    /** Print the <link> tags the splash needs. Call once inside <head>. */
+    /** Print the <link> tags the splash needs. Call once inside <head>. Prints nothing unless a sign-in just happened. */
     function role_splash_head(): void
     {
+        if (_rs_take_pending() === null) {
+            return;
+        }
         $v = _rs_asset_version('assets/css/role-splash.css');
         echo '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&amp;family=Outfit:wght@400;500;600&amp;display=swap">' . "\n";
         echo '    <link rel="stylesheet" href="assets/css/role-splash.css?v=' . $v . '">' . "\n";
@@ -61,17 +122,12 @@ if (!function_exists('role_splash_head')) {
 }
 
 if (!function_exists('render_role_splash')) {
-    /** Print the splash overlay for the given role label. Call once, right after <body>. */
+    /** Print the splash overlay for the given role label. Call once, right after <body>. Prints nothing unless armed for this role. */
     function render_role_splash(string $role): void
     {
         static $rendered = false;
-        $variants = [
-            'Admin'       => 'admin',
-            'Super Admin' => 'super-admin',
-            'Faculty'     => 'faculty',
-            'Student'     => 'student',
-        ];
-        if ($rendered || !isset($variants[$role])) {
+        $variants = _rs_variants();
+        if ($rendered || !isset($variants[$role]) || _rs_take_pending() !== $role) {
             return;
         }
         $rendered = true;

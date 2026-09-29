@@ -11,6 +11,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 require_once __DIR__ . '/config/session.php';
 require_once __DIR__ . '/config/csrf.php';
+require_once __DIR__ . '/config/role-splash.php';
 date_default_timezone_set('Asia/Manila');
 
 if (isset($_SESSION['faculty_id'])) {
@@ -19,6 +20,15 @@ if (isset($_SESSION['faculty_id'])) {
 }
 if (isset($_SESSION['admin'])) {
     header("Location: admin-dashboard.php");
+    exit();
+}
+
+// "Continue as Student": students don't authenticate, so this hand-off from the
+// landing page is their entry event. Arm the one-shot role splash, then go on to
+// the portal. (Opening or refreshing student-dashboard.php directly stays splash-free.)
+if (($_GET['go'] ?? '') === 'student') {
+    role_splash_arm('Student');
+    header("Location: student-dashboard.php");
     exit();
 }
 
@@ -171,6 +181,7 @@ if (isset($_POST['login'])) {
             unset($_SESSION['flash_login_email']);
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
+            role_splash_arm($_SESSION['admin_role']); // one-shot: splash shows once, on this hand-off only
             header("Location: admin-dashboard.php");
             exit();
         } else {
@@ -205,6 +216,7 @@ if (isset($_POST['login'])) {
             unset($_SESSION['flash_login_email']);
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
+            role_splash_arm('Faculty'); // one-shot: splash shows once, on this hand-off only
             header("Location: faculty-dashboard.php");
             exit();
         } else {
@@ -247,6 +259,7 @@ if (isset($_POST['login'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#4a0f15">
     <title>PUPSYNC — Institutional Access Portal</title>
     <!-- Performance: preconnect to font origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -282,11 +295,11 @@ if (isset($_POST['login'])) {
 
             <div class="visual-content">
                 <h1 class="visual-heading">
-                    Borrow smart,<br>
-                    <em>return proud.</em>
+                    What matters,<br>
+                    <em>made easy.</em>
                 </h1>
                 <p class="visual-sub">
-                    A secure, centralized platform that puts essential school equipment right at your fingertips — tracked, trusted, and always ready.
+                    A secure, centralized platform for borrowing equipment and reserving rooms across campus — tracked, trusted, and always ready.
                 </p>
             </div>
         </section>
@@ -379,7 +392,7 @@ if (isset($_POST['login'])) {
                     <span class="panel-dot">&middot;</span>
                     <a href="#">FAQs</a>
                     <span class="panel-dot">&middot;</span>
-                    <a href="student-dashboard.php" id="studentLink">Continue as Student</a>
+                    <a href="landing-page.php?go=student" id="studentLink">Continue as Student</a>
                 </div>
                 <div class="panel-badges">
                     <span><i class="fa-solid fa-circle-check"></i> Secure Auth</span>

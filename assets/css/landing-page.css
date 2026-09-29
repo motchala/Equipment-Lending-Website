@@ -22,6 +22,11 @@
 
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+
+    /* Academic gold — PUP's own secondary institutional color alongside
+       maroon. Used sparingly, as fine-detail accents only. */
+    --gold: #c8a35c;
+    --gold-soft: rgba(200, 163, 92, 0.4);
 }
 
 /* ================================================================
@@ -87,7 +92,31 @@ body {
     height: 100%;
     background-size: cover;
     background-repeat: no-repeat;
-    transform: scale(1.02);
+    filter: sepia(0.22) saturate(1.22) hue-rotate(-6deg) brightness(0.96) contrast(1.04);
+    animation: photoDrift 32s var(--ease-out) infinite alternate;
+    transform-origin: center;
+}
+
+.strip-photo:not(:first-child) {
+    box-shadow: inset 1px 0 0 rgba(245, 240, 232, 0.14);
+}
+
+.strip-photo-2 {
+    animation-delay: -8s;
+}
+
+.strip-photo-3 {
+    animation-delay: -16s;
+}
+
+@keyframes photoDrift {
+    from {
+        transform: scale(1.04);
+    }
+
+    to {
+        transform: scale(1.12);
+    }
 }
 
 .strip-photo-1 {
@@ -111,7 +140,8 @@ body {
     pointer-events: none;
     background:
         linear-gradient(180deg, rgba(20, 3, 4, 0.12) 0%, rgba(20, 3, 4, 0.02) 32%, rgba(20, 3, 4, 0.72) 100%),
-        linear-gradient(102deg, rgba(74, 15, 21, 0.97) 0%, rgba(74, 15, 21, 0.9) 20%, rgba(74, 15, 21, 0.5) 44%, rgba(74, 15, 21, 0.1) 64%, transparent 78%);
+        linear-gradient(102deg, rgba(74, 15, 21, 0.97) 0%, rgba(74, 15, 21, 0.9) 20%, rgba(74, 15, 21, 0.5) 44%, rgba(74, 15, 21, 0.1) 64%, transparent 78%),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px);
 }
 
 .visual-content {
@@ -121,7 +151,19 @@ body {
     bottom: clamp(2.25rem, 7vh, 4.5rem);
     z-index: 2;
     max-width: 480px;
+    padding-left: 1.15rem;
     animation: fadeDown 0.8s 0.15s var(--ease-out) both;
+}
+
+.visual-content::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.2em;
+    bottom: 0.55em;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--gold) 0%, rgba(200, 163, 92, 0.15) 100%);
 }
 
 .visual-heading {
@@ -146,7 +188,8 @@ body {
     font-weight: 300;
     font-size: clamp(0.82rem, 1.05vw, 0.95rem);
     line-height: 1.7;
-    color: rgba(255, 255, 255, 0.72);
+    color: rgba(255, 255, 255, 0.78);
+    text-shadow: 0 1px 14px rgba(10, 2, 3, 0.4);
     max-width: 420px;
 }
 
@@ -184,7 +227,9 @@ body {
     flex: 1 1 40%;
     max-width: 560px;
     min-width: 340px;
-    background: var(--cream);
+    background:
+        radial-gradient(rgba(96, 3, 2, 0.05) 1px, transparent 1.2px) 0 0/22px 22px,
+        var(--cream);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -197,7 +242,7 @@ body {
 .panel-logo {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
+    gap: 1rem;
     animation: fadeDown 0.7s 0.05s var(--ease-out) both;
 }
 
@@ -212,7 +257,10 @@ body {
     background: linear-gradient(150deg, var(--maroon) 0%, var(--maroon-deep) 100%);
     border-radius: var(--r-md);
     color: var(--cream);
-    box-shadow: 0 8px 18px rgba(96, 3, 2, 0.28);
+    box-shadow:
+        0 8px 18px rgba(96, 3, 2, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -8px 12px rgba(0, 0, 0, 0.16);
 }
 
 .panel-logo-icon svg {
@@ -394,6 +442,10 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
+    padding: 5px 11px 5px 9px;
+    background: rgba(96, 3, 2, 0.05);
+    border: 1px solid rgba(96, 3, 2, 0.09);
+    border-radius: 100px;
 }
 
 .panel-badges i {
@@ -404,7 +456,7 @@ body {
 /* ---------------------------------------------------------------
    RESPONSIVE — stack the panel below the photo on narrow screens
 --------------------------------------------------------------- */
-@media (max-width: 980px) {
+@media (max-width: 991.98px) {
     .gateway {
         flex-direction: column;
         height: auto;
@@ -446,6 +498,7 @@ body {
         line-height: 1.6;
         display: -webkit-box;
         -webkit-line-clamp: 3;
+        line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
@@ -501,7 +554,7 @@ body {
     }
 }
 
-@media (max-height: 700px) and (min-width: 981px) {
+@media (max-height: 700px) and (min-width: 992px) {
     .gateway-panel {
         gap: 1.5rem;
         padding-top: 1.75rem;
@@ -521,8 +574,18 @@ body {
 ================================================================ */
 .panel-stage {
     position: relative;
-    border-top: 1px solid rgba(96, 3, 2, 0.1);
-    padding-top: clamp(1.5rem, 3.5vh, 2.1rem);
+    padding-top: clamp(1.75rem, 4vh, 2.4rem);
+}
+
+.panel-stage::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--maroon));
 }
 
 .panel-view {
@@ -604,6 +667,11 @@ body {
     margin-bottom: 5px;
     letter-spacing: 1.5px;
     text-transform: uppercase;
+    transition: color 0.2s;
+}
+
+.form-group:focus-within label {
+    color: var(--maroon);
 }
 
 .input-wrap {
@@ -620,6 +688,10 @@ body {
     font-size: 0.78rem;
     pointer-events: none;
     transition: color 0.2s;
+}
+
+.input-wrap:focus-within>i {
+    color: var(--maroon);
 }
 
 /* Explicit left-icon alias (used on all field icons) */
@@ -693,6 +765,7 @@ body {
 .form-field:focus {
     border-color: rgba(109, 27, 35, 0.45);
     box-shadow: 0 0 0 3px rgba(109, 27, 35, 0.08);
+    transform: translateY(-1px);
 }
 
 .form-field:-webkit-autofill,
@@ -759,6 +832,14 @@ body {
     opacity: 0.9;
     transform: translateY(-1px);
     box-shadow: 0 6px 20px rgba(109, 27, 35, 0.5);
+}
+
+.btn-auth i {
+    transition: transform 0.25s var(--ease-out);
+}
+
+.btn-auth:hover i {
+    transform: translateX(2px);
 }
 
 .btn-auth:active {
@@ -980,5 +1061,244 @@ body {
 
     #loginSubmitIcon.is-spinning {
         animation: none;
+    }
+}
+
+
+/* ================================================================
+   RESPONSIVE & ADAPTIVE LAYER
+   ----------------------------------------------------------------
+   Breakpoints mirror Bootstrap 5 so every page in PUPSync shares one
+   scheme:  sm >= 576px | md >= 768px | lg >= 992px | xl >= 1200px
+
+   Everything below lives inside max-width media queries (<= 991.98px),
+   so desktop (lg / xl) rendering is byte-for-byte unchanged.
+
+   Tiers
+     lg and up   : original split-screen desktop layout (untouched)
+     md / tablet : stacked, form centred in a readable column
+     sm / phone  : stacked, full-width form, 44px touch targets
+     landscape   : short phone/tablet screens go side-by-side again so
+                   the sign-in form is never pushed below the fold
+================================================================ */
+
+/* ---------- Tablet & below (< lg) — shared touch/mobile rules ---------- */
+@media (max-width: 991.98px) {
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        -webkit-tap-highlight-color: rgba(96, 3, 2, 0.12);
+    }
+
+    .gateway {
+        width: 100%;
+        /* 100vw ignores the scrollbar and can cause sideways scroll */
+    }
+
+    /* Hero: use the *small* viewport height so the mobile browser's
+       collapsing address bar can't resize the hero mid-scroll. */
+    @supports (height: 1svh) {
+        .gateway-visual {
+            height: 40svh;
+        }
+    }
+
+    /* Inputs — 16px minimum stops iOS/Android zooming on focus.
+       Right padding leaves room for the 44px eye button so typed
+       characters never run underneath it. */
+    .form-field {
+        font-size: 16px;
+        min-height: 48px;
+        padding: 12px 48px 12px 40px;
+    }
+
+    .form-field::placeholder {
+        font-size: inherit;
+    }
+
+    .form-group label {
+        font-size: 0.75rem;
+    }
+
+    .input-wrap>i {
+        font-size: 0.9rem;
+    }
+
+    /* Eye toggle — 44 x 44 hit area, icon stays visually where it was. */
+    .eye-toggle {
+        right: 2px;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+    }
+
+    .eye-toggle i {
+        font-size: 1rem;
+    }
+
+    .btn-auth {
+        min-height: 48px;
+        padding: 14px;
+        font-size: 1rem;
+    }
+
+    .auth-alert {
+        font-size: 0.85rem;
+    }
+
+    /* Campus chip is a link — give it a full touch target. */
+    .visual-brand {
+        min-height: 44px;
+        padding: 0 16px 0 12px;
+        font-size: 0.8rem;
+        text-decoration: none;
+    }
+
+    /* Footer links — 44px tall rows, no cramped tap zones. */
+    .panel-links a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* Touch screens have no real hover — stop the button "sticking"
+       in its lifted hover state after a tap. */
+    @media (hover: none) {
+        .btn-auth:hover {
+            opacity: 1;
+            transform: none;
+            box-shadow: 0 4px 16px rgba(109, 27, 35, 0.35);
+        }
+    }
+}
+
+/* ---------- md: tablets in portrait (576px – 991.98px) ---------- */
+@media (min-width: 576px) and (max-width: 991.98px) {
+
+    /* Keep the form at a comfortable reading width instead of
+       stretching edge-to-edge across a 768px+ screen. */
+    .gateway-panel>* {
+        width: 100%;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* ---------- sm: phones in portrait (< 576px) ---------- */
+@media (max-width: 575.98px) {
+    .gateway-visual {
+        min-height: 240px;
+        /* tall enough for chip + headline + sub without overlap */
+    }
+
+    @supports (height: 1svh) {
+        .gateway-visual {
+            height: 36svh;
+        }
+    }
+
+    .gateway-panel {
+        padding-left: max(1.4rem, env(safe-area-inset-left));
+        padding-right: max(1.4rem, env(safe-area-inset-right));
+    }
+
+    .visual-brand {
+        top: 0.9rem;
+        left: 1.1rem;
+    }
+
+    .panel-bottom {
+        font-size: 0.85rem;
+        gap: 0.25rem 1rem;
+    }
+
+    /* Three footer links spread evenly across the row; the middle-dot
+       separators are redundant once each link has its own 44px box. */
+    .panel-links {
+        width: 100%;
+        justify-content: space-between;
+        gap: 0;
+    }
+
+    .panel-dot {
+        display: none;
+    }
+}
+
+/* ---------- Landscape phones / small tablets (short & wide) ----------
+   Stacking would leave only the hero above the fold, so go side-by-side
+   and let the form column scroll on its own if it is taller than the
+   screen. */
+@media (max-width: 991.98px) and (orientation: landscape) and (max-height: 500px) {
+    .gateway {
+        flex-direction: row;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .gateway-visual {
+        flex: 1 1 50%;
+        height: auto;
+        min-height: 0;
+    }
+
+    .gateway-panel {
+        flex: 1 1 50%;
+        min-width: 0;
+        max-width: none;
+        gap: 1rem;
+        padding: 1rem max(1.5rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) 1.5rem !important;
+        overflow-y: auto;
+    }
+
+    .gateway-panel>* {
+        max-width: 480px;
+    }
+
+    .visual-brand {
+        top: 0.75rem;
+        left: max(1.25rem, env(safe-area-inset-left));
+    }
+
+    .visual-content {
+        left: max(1.25rem, env(safe-area-inset-left));
+        right: 1.25rem;
+        bottom: 1rem;
+    }
+
+    .visual-heading {
+        font-size: clamp(1.5rem, 3.6vw, 2rem);
+    }
+
+    .visual-sub {
+        margin-top: 0.6rem;
+        font-size: 0.78rem;
+        line-height: 1.55;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .panel-logo-icon {
+        width: 42px;
+        height: 42px;
+    }
+
+    .panel-stage {
+        padding-top: 1rem;
+    }
+
+    .auth-head {
+        margin-bottom: 1rem;
+    }
+
+    .panel-bottom {
+        padding-top: 0.5rem;
     }
 }
