@@ -817,14 +817,16 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
         ================================================================ */
 
         /* ── Sub-nav ──────────────────────────────────────────────── */
-        #panel-lending .lending-subnav {
+        #panel-lending .lending-subnav,
+        #panel-rooms .lending-subnav {
             display: flex;
             gap: 8px;
             margin-bottom: 28px;
             flex-wrap: wrap;
         }
 
-        #panel-lending .lending-nav-btn {
+        #panel-lending .lending-nav-btn,
+        #panel-rooms .lending-nav-btn {
             display: inline-flex;
             align-items: center;
             gap: 7px;
@@ -841,18 +843,21 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             transition: all .2s cubic-bezier(.4, 0, .2, 1);
         }
 
-        #panel-lending .lending-nav-btn .material-symbols-outlined {
+        #panel-lending .lending-nav-btn .material-symbols-outlined,
+        #panel-rooms .lending-nav-btn .material-symbols-outlined {
             font-size: 16px;
         }
 
-        #panel-lending .lending-nav-btn.active {
+        #panel-lending .lending-nav-btn.active,
+        #panel-rooms .lending-nav-btn.active {
             background: #570000;
             color: #fff;
             border-color: #570000;
             box-shadow: 0 3px 12px rgba(87, 0, 0, .28);
         }
 
-        #panel-lending .lending-nav-btn:not(.active):hover {
+        #panel-lending .lending-nav-btn:not(.active):hover,
+        #panel-rooms .lending-nav-btn:not(.active):hover {
             background: #fdf1f1;
             border-color: #c0a0a0;
             color: #570000;
@@ -1518,13 +1523,15 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             color: var(--color-on-surface) !important;
         }
 
-        [data-theme="dark"] #panel-lending .lending-nav-btn {
+        [data-theme="dark"] #panel-lending .lending-nav-btn,
+        [data-theme="dark"] #panel-rooms .lending-nav-btn {
             background: var(--color-surface-container) !important;
             border-color: var(--color-outline-variant) !important;
             color: var(--color-on-surface-variant) !important;
         }
 
-        [data-theme="dark"] #panel-lending .lending-nav-btn.active {
+        [data-theme="dark"] #panel-lending .lending-nav-btn.active,
+        [data-theme="dark"] #panel-rooms .lending-nav-btn.active {
             background: var(--color-primary-container) !important;
             border-color: var(--color-primary-container) !important;
             color: #fff !important;
@@ -2285,10 +2292,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                 <!-- Rooms Sub-Nav — Browse | My Reservations -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-rooms-nav="browse">
-                        <span class="material-symbols-outlined">meeting_room</span> Browse Facilities
+                        <span class="material-symbols-outlined">search</span> Browse Facilities
                     </button>
                     <button class="lending-nav-btn" data-rooms-nav="history">
-                        <span class="material-symbols-outlined">event_note</span> My Reservations
+                        <span class="material-symbols-outlined">receipt_long</span> My Reservations
                         <?php if (!empty($room_reservations)): ?>
                             <span class="lnb-badge"><?php echo count($room_reservations); ?></span>
                         <?php endif; ?>

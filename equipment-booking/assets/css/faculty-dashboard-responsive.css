@@ -594,7 +594,8 @@ table,
     }
 
     /* Lending sub-nav pills: horizontal scroll on mobile */
-    #panel-lending .lending-subnav {
+    #panel-lending .lending-subnav,
+    #panel-rooms .lending-subnav {
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -603,11 +604,13 @@ table,
         gap: 6px;
     }
 
-    #panel-lending .lending-subnav::-webkit-scrollbar {
+    #panel-lending .lending-subnav::-webkit-scrollbar,
+    #panel-rooms .lending-subnav::-webkit-scrollbar {
         display: none;
     }
 
-    #panel-lending .lending-nav-btn {
+    #panel-lending .lending-nav-btn,
+    #panel-rooms .lending-nav-btn {
         white-space: nowrap;
         flex-shrink: 0;
         padding: 8px 14px;

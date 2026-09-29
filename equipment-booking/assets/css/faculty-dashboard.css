@@ -1435,7 +1435,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 9px 20px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-md);
     border: 1px solid var(--color-outline-variant);
     background: var(--color-surface);
     color: var(--color-secondary);
@@ -6366,14 +6366,16 @@ body {
 ================================================================ */
 
 /* ── Sub-nav buttons: pill style matching reference ─────────── */
-#panel-lending .lending-subnav {
+#panel-lending .lending-subnav,
+#panel-rooms .lending-subnav {
     display: flex;
     gap: 10px;
     margin-bottom: 28px;
     flex-wrap: wrap;
 }
 
-#panel-lending .lending-nav-btn {
+#panel-lending .lending-nav-btn,
+#panel-rooms .lending-nav-btn {
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -6390,18 +6392,21 @@ body {
     transition: all 0.18s;
 }
 
-#panel-lending .lending-nav-btn .material-symbols-outlined {
+#panel-lending .lending-nav-btn .material-symbols-outlined,
+#panel-rooms .lending-nav-btn .material-symbols-outlined {
     font-size: 16px;
 }
 
-#panel-lending .lending-nav-btn.active {
+#panel-lending .lending-nav-btn.active,
+#panel-rooms .lending-nav-btn.active {
     background: #570000;
     color: #ffffff;
     border-color: #570000;
     box-shadow: 0 2px 8px rgba(87, 0, 0, 0.22);
 }
 
-#panel-lending .lending-nav-btn:not(.active):hover {
+#panel-lending .lending-nav-btn:not(.active):hover,
+#panel-rooms .lending-nav-btn:not(.active):hover {
     background: #f9fafb;
     border-color: #9ca3af;
     color: #111827;
@@ -6771,13 +6776,15 @@ body {
     color: var(--color-on-surface);
 }
 
-[data-theme="dark"] #panel-lending .lending-nav-btn {
+[data-theme="dark"] #panel-lending .lending-nav-btn,
+[data-theme="dark"] #panel-rooms .lending-nav-btn {
     background: var(--color-surface-container);
     border-color: var(--color-outline-variant);
     color: var(--color-on-surface-variant);
 }
 
-[data-theme="dark"] #panel-lending .lending-nav-btn.active {
+[data-theme="dark"] #panel-lending .lending-nav-btn.active,
+[data-theme="dark"] #panel-rooms .lending-nav-btn.active {
     background: var(--color-primary-container);
     border-color: var(--color-primary-container);
     color: #ffffff;
@@ -9688,6 +9695,10 @@ body {
 .myact-ledger-table tbody tr {
     border-bottom: 1px solid var(--color-outline);
     transition: background var(--transition);
+}
+
+.myact-ledger-table tbody .myact-history-row {
+    display: table-row;
 }
 
 .myact-ledger-table tbody tr:last-child {
