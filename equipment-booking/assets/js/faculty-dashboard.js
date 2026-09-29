@@ -1932,6 +1932,40 @@
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
+    /* ── Global dashboard search ─────────────────────────────────────── */
+    const globalSearch = document.getElementById('globalSearch');
+    const globalSearchSelector = [
+        '#panel-lending .item-node',
+        '#panel-lending #requestsTbody tr',
+        '#panel-rooms .fcty-campus-card',
+        '#panel-rooms #roomReservationsTable tbody tr',
+        '#panel-activity #myactHistList .myact-history-row'
+    ].join(',');
+
+    function filterGlobalDashboard() {
+        const query = (globalSearch ? globalSearch.value : '').trim().toLowerCase();
+        const activePanel = document.querySelector('.tab-panel.active');
+        if (!activePanel) return;
+
+        activePanel.querySelectorAll(globalSearchSelector).forEach(item => {
+            item.style.display = !query || item.textContent.toLowerCase().includes(query) ? '' : 'none';
+        });
+    }
+
+    if (globalSearch) globalSearch.addEventListener('input', filterGlobalDashboard);
+
+    const globalSearchWrap = document.getElementById('globalSearchWrap');
+    const globalSearchToggle = document.getElementById('globalSearchToggle');
+    if (globalSearchWrap && globalSearchToggle && globalSearch) {
+        globalSearchToggle.addEventListener('click', function () {
+            const expanded = globalSearchWrap.classList.toggle('expanded');
+            globalSearchToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            globalSearchToggle.setAttribute('aria-label', expanded ? 'Close dashboard search' : 'Open dashboard search');
+            if (expanded) globalSearch.focus();
+        });
+
+    }
+
     /* Pagination: prev/next + first paint */
     const eqPrev = document.getElementById('equipPrevBtn');
     const eqNext = document.getElementById('equipNextBtn');

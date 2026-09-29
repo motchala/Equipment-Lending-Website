@@ -488,7 +488,11 @@ $gender_locked      = !empty($db_gender);
 $nationality_locked = !empty($db_nationality);
 $backup_locked      = !empty($db_backup_email);
 $department_locked  = !empty($db_department);
-$profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures/' . $db_profile_pic : '';
+$profile_pic_file = basename(str_replace('\\', '/', trim($db_profile_pic)));
+$profile_pic_path = __DIR__ . '/uploads/profile_pictures/' . $profile_pic_file;
+$profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
+    ? $uploads_url . 'profile_pictures/' . rawurlencode($profile_pic_file)
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -1649,11 +1653,28 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
             <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation">
                 <span class="material-symbols-outlined">menu</span>
             </button>
+            <div class="top-bar-global-search" id="globalSearchWrap">
+                <button type="button" class="top-bar-global-search-toggle" id="globalSearchToggle"
+                    aria-label="Open dashboard search" aria-expanded="false">
+                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                </button>
+                <input type="search" id="globalSearch" placeholder="Search dashboard" autocomplete="off"
+                    aria-label="Search dashboard">
+            </div>
+            <div class="top-bar-identity">
+                <span class="top-bar-context">A.Y. 2026–2027</span>
+            </div>
+            <span class="top-bar-control-separator" aria-hidden="true"></span>
             <div class="top-bar-actions">
-                <!-- Avatar (now also carries the notification indicator) -->
-                <div class="top-bar-profile-wrap" id="avatarWrap" data-name="<?php echo htmlspecialchars($fullname); ?>">
+                <button class="top-bar-icon-btn" type="button" data-action="open-notif-modal"
+                    aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <span class="top-bar-badge" id="notifBadge"
+                        <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
+                </button>
+                <div class="top-bar-profile-wrap" id="avatarWrap">
                     <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false"
-                        aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread notifications' : ''; ?>">
+                        aria-label="Account menu">
                         <?php if ($profile_pic_url): ?>
                             <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img"
                                 onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');">
@@ -1661,8 +1682,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                         <?php else: ?>
                             <?php echo htmlspecialchars($initials); ?>
                         <?php endif; ?>
-                        <span class="avatar-notif-badge" id="notifBadge"
-                            <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
                     </button>
                     <!-- Simple Avatar Dropdown -->
                     <div class="profile-dropdown" id="profileDropdown" role="menu">
@@ -1682,12 +1701,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                             </div>
                         </div>
                         <div class="dd-menu">
-                            <button class="dd-item" data-action="open-notif-modal">
-                                <span class="material-symbols-outlined dd-item-icon">notifications</span>
-                                <span>Notifications</span>
-                                <span class="dd-item-count" id="notifDdCount"
-                                    <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
-                            </button>
                             <button class="dd-item dd-logout" data-action="logout">
                                 <span class="material-symbols-outlined dd-item-icon">logout</span> Log Out
                             </button>
@@ -1940,7 +1953,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
                                 <div class="active-card-body">
                                     <div class="active-card-meta">Equipment</div>
                                     <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
-                                    <div class="active-card-sub"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
                                 </div>
                                 <div class="active-card-footer">
                                     <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?></span>
@@ -2304,6 +2316,10 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                 <!-- ── Sub: Browse Facilities ─────────────────────────────── -->
                 <div class="lending-sub active" id="rooms-browse">
+                    <div class="page-header-block">
+                        <h2 class="page-title-sm">Browse Facilities</h2>
+                        <p class="page-subtitle">Explore available rooms and submit a reservation.</p>
+                    </div>
                     <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
                 </div><!-- /rooms-browse -->
 
@@ -2709,29 +2725,6 @@ $profile_pic_url    = !empty($db_profile_pic) ? $uploads_url . 'profile_pictures
 
                     <!-- ═══════════ RIGHT: stats + activity ledger ═══════════ -->
                     <div class="myact-main">
-
-                        <!-- ── Summary ──────────────────────────────────────── -->
-                        <!-- Each stat jumps to My Requests pre-filtered to that exact status,
-                             reusing the same filter-requests action the Home tab's stat
-                             cards already use — so the data landed on is always correct. -->
-                        <div class="myact-stats-bar">
-                            <button type="button" class="myact-stat" data-action="filter-requests" data-status="Approved">
-                                <span class="myact-stat-value"><?php echo (int)$act_stat_current; ?></span>
-                                <span class="myact-stat-label">Borrowing</span>
-                            </button>
-                            <button type="button" class="myact-stat" data-action="filter-requests" data-status="Waiting">
-                                <span class="myact-stat-value"><?php echo (int)$act_stat_waiting; ?></span>
-                                <span class="myact-stat-label">Awaiting Approval</span>
-                            </button>
-                            <button type="button" class="myact-stat<?php echo $act_stat_overdue > 0 ? ' myact-stat--warn' : ''; ?>" data-action="filter-requests" data-status="Overdue">
-                                <span class="myact-stat-value"><?php echo (int)$act_stat_overdue; ?></span>
-                                <span class="myact-stat-label">Overdue</span>
-                            </button>
-                            <button type="button" class="myact-stat" data-action="filter-requests" data-status="Returned">
-                                <span class="myact-stat-value"><?php echo (int)$act_stat_completed; ?></span>
-                                <span class="myact-stat-label">Completed</span>
-                            </button>
-                        </div>
 
                         <!-- ── Activity Ledger ─────────────────────────────── -->
                         <div class="myact-ledger-card">
