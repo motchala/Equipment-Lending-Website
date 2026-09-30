@@ -1,0 +1,625 @@
+/* ================================================================
+   PUPSYNC ADMIN DASHBOARD — Responsive Supplement
+   ----------------------------------------------------------------
+   admin-dashboard.css already ships a solid mobile foundation: an
+   off-canvas sidebar drawer, and breakpoints at 1024 / 768 / 480 /
+   400px covering the header, stats grid, room cards, overlays and
+   forms. This file does NOT redo that work. It closes the specific
+   gaps left after that pass:
+
+     §1  Global safety rails
+     §2  Tablet (769–1024px): icon-rail sidebar (was full-width)
+     §3  Data tables -> stacked info cards on phones (was: scroll
+         only, via .admin-table { min-width } etc.)
+     §4  Room Schedule weekly grid -> single-day agenda on phones
+     §5  Filter toolbar polish (rooms registry search + selects)
+     §6  Touch targets >= 44x44 on touch devices
+     §7  Form input font-size >= 16px (stop iOS/Android auto-zoom)
+
+   Drop this file AFTER admin-dashboard.css. Zero class renames —
+   all existing JS hooks (admin-dashboard.js, admin-live-render.js,
+   the inline Room Schedule / Room Registry modules) are untouched.
+   Companion script: admin-dashboard-responsive.js (adds data-label
+   attributes for §3 and the day-tabs for §4; everything else here
+   is pure CSS).
+================================================================ */
+
+
+/* ================================================================
+   § 1  GLOBAL SAFETY RAILS
+================================================================ */
+html {
+    overflow-x: hidden;
+}
+
+img,
+video,
+iframe,
+table {
+    max-width: 100%;
+}
+
+
+/* ================================================================
+   § 2  TABLET (769–1024px) — icon-rail sidebar
+   Below 1024px, a fixed 240px sidebar starts crowding real content
+   (an iPad in portrait is ~820px wide). Reuse the same icon-rail
+   look the desktop "collapse" button already produces, but make it
+   the automatic default for this range — screen real estate is too
+   tight here for the collapse toggle to be a per-user preference.
+   (The toggle itself already goes inert below 768px; extend that
+   the same "desktop-only affordance" up through 1024px.)
+================================================================ */
+@media (max-width: 1024px) {
+    #sidebarCollapseBtn {
+        pointer-events: none;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    nav.sidebar {
+        width: var(--sidebar-w-collapsed);
+    }
+
+    .header-logo {
+        width: var(--sidebar-w-collapsed);
+    }
+
+    .logo-text,
+    .nav-group-label,
+    .nav-item span:not(.material-symbols-outlined),
+    .nav-badge {
+        display: none;
+    }
+
+    .nav-item {
+        justify-content: center;
+        padding: 0.6rem;
+    }
+
+    main#app-main {
+        padding: 0 1.5rem 2rem;
+    }
+}
+
+
+/* Faculty Management: a fixed 400px form column beside the list leaves
+   the list ~470px wide in this range. admin-dashboard.css stacks it at
+   <=900px; carry that up through Bootstrap's "md" band (<=991px) so a
+   tablet in portrait gets the list at full width. >=992px ("lg",
+   e.g. an iPad in landscape) keeps the two-column desktop layout. */
+@media (min-width: 901px) and (max-width: 991px) {
+    .faculty-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---------------------------------------------------------------
+   § 2b  TABLET TABLES (769–1024px)
+   Tables stay tables here (cards are for phones), but a 7-column
+   ledger loses ~220px to cell padding alone. Tighten it, and add
+   soft "there's more this way" edge shadows to the scroll wrappers
+   for whatever still doesn't fit (the classic scroll-shadow trick:
+   the two 'local' layers cover the shadows once you reach an edge).
+--------------------------------------------------------------- */
+@media (min-width: 769px) and (max-width: 1024px) {
+
+    .ps-table th,
+    .ps-table td,
+    .admin-table thead th,
+    .admin-table tbody td,
+    .pr-table th,
+    .pr-table td,
+    #panel-rooms .pr-table thead th,
+    #panel-rooms .pr-table tbody td {
+        padding-left: 0.6rem;
+        padding-right: 0.6rem;
+    }
+
+    /* Approve/Decline sit in an inline-styled flex row; let them wrap
+       so that column can narrow instead of forcing a scroll. */
+    .ps-table td:last-child>div {
+        flex-wrap: wrap;
+    }
+
+    .ps-table-wrap,
+    .pr-tbl-wrap,
+    .tbl-wrap {
+        overflow-x: auto;
+        background-image:
+            linear-gradient(to right, var(--card-bg) 30%, rgba(255, 255, 255, 0)),
+            linear-gradient(to left, var(--card-bg) 30%, rgba(255, 255, 255, 0)),
+            linear-gradient(to right, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0)),
+            linear-gradient(to left, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0));
+        background-position: left center, right center, left center, right center;
+        background-repeat: no-repeat;
+        background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+        background-attachment: local, local, scroll, scroll;
+    }
+}
+
+
+/* ================================================================
+   § 3  DATA TABLES -> STACKED INFO CARDS (< 768px)
+   ----------------------------------------------------------------
+   Covers every table in the admin portal: .ps-table (Requests,
+   Arbitration Log), .pr-table (Room Reservations, Rooms Registry,
+   Archived Rooms, Room Issues, Accounts) and .admin-table (Faculty
+   List, Inventory) — 13 tables total, all built the same way
+   (thead > th labels, tbody > td values), so one generic transform
+   covers all of them.
+
+   admin-dashboard-responsive.js walks each table's <thead> once
+   (and again whenever AJAX/live-render swaps in new rows) and
+   copies each column's header text onto every <td> in that column
+   as data-label="...". The CSS below turns that into a label above
+   each value. It also tags:
+     - the first meaningful column as .rc-title (bold "headline" of
+       the card — e.g. the requester, borrower, room, or name)
+     - an "Image"/"Photo" column as .rc-thumb (shown as a plain
+       thumbnail, no label)
+     - an "Actions"/"Action" column as .rc-actions (full-width
+       footer row of buttons, no label)
+   Rows that are really full-width banners rather than a record —
+   an empty-state message, or the "Building — Floor" divider rows
+   in the Rooms Registry — use <td colspan>, which this CSS
+   recognises and renders as a plain band instead of a card.
+================================================================ */
+@media (max-width: 768px) {
+
+    .ps-table-wrap,
+    .pr-tbl-wrap,
+    .tbl-wrap {
+        overflow-x: visible;
+    }
+
+    .ps-table,
+    .pr-table,
+    .admin-table {
+        display: block;
+        width: 100%;
+        min-width: 0 !important;
+    }
+
+    .ps-table thead,
+    .pr-table thead,
+    .admin-table thead {
+        display: none;
+    }
+
+    .ps-table tbody,
+    .pr-table tbody,
+    .admin-table tbody {
+        display: block;
+    }
+
+    .ps-table tbody tr,
+    .pr-table tbody tr,
+    .admin-table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--card-bg);
+        border: 1px solid var(--khaki-border);
+        border-radius: var(--radius, 16px);
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        box-shadow: var(--shadow);
+    }
+
+    .ps-table tbody tr:last-child,
+    .pr-table tbody tr:last-child,
+    .admin-table tbody tr:last-child {
+        margin-bottom: 0;
+    }
+
+    /* A row that's really a full-width band (empty state, the Rooms
+       Registry's "Building — Floor" divider) — not a record, so no
+       card chrome and no label/value split. */
+    .ps-table tbody tr:has(td[colspan]),
+    .pr-table tbody tr:has(td[colspan]),
+    .admin-table tbody tr:has(td[colspan]) {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 6px 2px;
+    }
+
+    /* Same band treatment without :has(), for browsers that predate it
+       (a selector list containing an unsupported selector is dropped
+       whole, so this can't share the rule above). Covers the Rooms
+       Registry floor dividers; an empty-state row in such a browser
+       simply renders as a card. */
+    .pr-table tbody tr.pr-floor-divider {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 6px 2px;
+    }
+
+    .ps-table td,
+    .pr-table td,
+    .admin-table td {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 7px 0 !important;
+        border: none !important;
+        text-align: right;
+        background: transparent !important;
+    }
+
+    .ps-table td[colspan],
+    .pr-table td[colspan],
+    .admin-table td[colspan] {
+        display: block;
+        text-align: left;
+    }
+
+    /* Label above/beside each value, sourced from the column's own
+       header text (set by admin-dashboard-responsive.js). A cell
+       with no data-label (the title/thumbnail/actions cells below)
+       simply gets none — attr() on a missing attribute is empty. */
+    .ps-table td[data-label]::before,
+    .pr-table td[data-label]::before,
+    .admin-table td[data-label]::before {
+        content: attr(data-label);
+        flex: 1 1 auto;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-light);
+        text-align: left;
+    }
+
+    /* Card headline — first meaningful column (or the second, when
+       the first is a thumbnail or an ID/# column; see .rc-thumb
+       below). Rows are flex columns so the headline can be pulled to
+       the top of the card regardless of where its column sits. */
+    .ps-table td.rc-title,
+    .pr-table td.rc-title,
+    .admin-table td.rc-title {
+        order: -1;
+        justify-content: flex-start;
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text-dark);
+        padding-bottom: 9px !important;
+        margin-bottom: 5px;
+        border-bottom: 1px dashed var(--khaki-border) !important;
+    }
+
+    /* Thumbnail column (Inventory's "Image") — plain image, no label. */
+    .ps-table td.rc-thumb,
+    .pr-table td.rc-thumb,
+    .admin-table td.rc-thumb {
+        order: -2;
+        justify-content: flex-start;
+        padding-bottom: 9px !important;
+    }
+
+    .ps-table td.rc-thumb img,
+    .pr-table td.rc-thumb img,
+    .admin-table td.rc-thumb img {
+        width: 48px;
+        height: 48px;
+        border-radius: 10px;
+        object-fit: cover;
+    }
+
+    /* Actions column — full-width footer of the card, buttons free
+       to wrap, no label prefix. */
+    .ps-table td.rc-actions,
+    .pr-table td.rc-actions,
+    .admin-table td.rc-actions {
+        order: 99;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--khaki-border) !important;
+        margin-top: 6px;
+        padding-top: 10px !important;
+    }
+
+    .ps-table td.rc-actions>*,
+    .pr-table td.rc-actions>*,
+    .admin-table td.rc-actions>* {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    /* admin-dashboard.css hides the Rooms Registry's Capacity column
+       at <=640px (display:none on td/th:nth-child(2), plus
+       visibility:collapse on .pr-col-capacity) because a 4-column
+       table was too tight. That pre-dates the card view: a card has
+       room for the row, so show it again. The selectors below
+       deliberately repeat the originals' "tbody" so they carry the
+       same specificity and win by source order. */
+    #panel-rooms .pr-rooms-table .pr-col-capacity {
+        visibility: visible;
+    }
+
+    #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
+        display: flex;
+    }
+
+    #panel-rooms .pr-rooms-table tbody tr.pr-floor-divider td:nth-child(2) {
+        display: none;
+    }
+}
+
+
+/* ================================================================
+   § 4  ROOM SCHEDULE — weekly timeline -> single-day agenda (< 768px)
+   ----------------------------------------------------------------
+   The desktop grid (admin-dashboard.php, inline "PUPSync Room
+   Schedule module") is a CSS Grid: 6 equal-order children per row
+   — TIME, MON, TUE, WED, THU, FRI — repeated for .rsm-grid-head
+   and every .rsm-grid-row. admin-dashboard-responsive.js adds a
+   day-tab strip and sets data-mobile-day="1..5" on .rsm-grid; the
+   rules below hide every day column except the selected one. With
+   only two children left (TIME + the one selected day), the same
+   6-column grid definition below is overridden to a 2-column one,
+   so what remains reads as a plain vertical time-ordered agenda —
+   no change to the render logic that builds the grid, no new
+   markup structure, just fewer (CSS-hidden) columns.
+================================================================ */
+@media (max-width: 768px) {
+    .rsm-card {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+
+    #roomScheduleModal {
+        padding: 0;
+    }
+
+    .rsm-mobile-daytabs {
+        display: flex;
+        gap: 6px;
+        padding: 0.75rem 1.1rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-shrink: 0;
+    }
+
+    .rsm-mobile-daytabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .rsm-daytab-btn {
+        flex: 1 0 auto;
+        min-width: 44px;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--khaki-border);
+        background: var(--card-bg);
+        color: var(--text-dark);
+        font-size: 11.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .rsm-daytab-btn.active {
+        background: var(--accent-maroon);
+        border-color: var(--accent-maroon);
+        color: #fff;
+    }
+
+    .rsm-grid {
+        min-width: 0;
+        border-radius: 8px;
+        font-size: 12.5px;
+    }
+
+    .rsm-grid-head,
+    .rsm-grid-row {
+        grid-template-columns: 80px 1fr;
+    }
+
+    /* "11 AM-12 PM" needs ~75px at this size; the desktop column is 74px
+       with roomier padding, which clipped it once the grid got narrower. */
+    .rsm-grid-time {
+        padding: 0 3px;
+        font-size: 11px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .rsm-grid-cell {
+        min-height: 40px;
+        padding: 4px 6px;
+    }
+
+    .rsm-block {
+        font-size: 11px;
+        padding: 5px 8px;
+        white-space: normal;
+    }
+
+    /* Hide every day column except the one selected via the day
+       tabs above. Position 1 (TIME) always stays; MON..FRI sit at
+       positions 2..6 in DOM order in both .rsm-grid-head and every
+       .rsm-grid-row, so this is the same 4-of-5 hidden set either
+       way. A .rsm-grid with no data-mobile-day yet (JS hasn't run)
+       falls back to showing Monday, matching the default markup. */
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(3),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(4),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(5),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(6),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(3),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(4),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(5),
+    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(6),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(3),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(4),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(5),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(6),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(3),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(4),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(5),
+    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(6) {
+        display: none;
+    }
+
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(2),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(4),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(5),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(6),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(2),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(4),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(5),
+    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(6) {
+        display: none;
+    }
+
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(2),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(3),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(5),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(6),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(2),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(3),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(5),
+    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(6) {
+        display: none;
+    }
+
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(2),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(3),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(4),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(6),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(2),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(3),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(4),
+    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(6) {
+        display: none;
+    }
+
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(2),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(3),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(4),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(5),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(2),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(3),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(4),
+    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(5) {
+        display: none;
+    }
+}
+
+/* Desktop/tablet: the day-tab strip only exists for mobile agenda mode. */
+@media (min-width: 769px) {
+    .rsm-mobile-daytabs {
+        display: none;
+    }
+}
+
+
+/* ================================================================
+   § 5  FILTER TOOLBAR POLISH — Rooms Registry (< 480px)
+   admin-dashboard.css already stacks the search + Building/Floor/
+   Status selects at <=700px (see .pr-rooms-toolbar). Just tighten
+   spacing further on small phones.
+================================================================ */
+@media (max-width: 480px) {
+    #panel-rooms .pr-rooms-toolbar {
+        gap: 8px;
+    }
+
+    #panel-rooms .pr-search-wrap,
+    #panel-rooms .pr-filter-select {
+        width: 100%;
+    }
+}
+
+
+/* ================================================================
+   § 6  TOUCH TARGETS — minimum 44x44px tap area (<= 1024px)
+   ----------------------------------------------------------------
+   Two techniques, chosen per control:
+     - Controls with room to breathe (nav items, avatar, notification
+       bell, the mobile hamburger, Approve/Decline buttons) are simply grown.
+     - Small icon buttons packed tightly together (the 3 action
+       icons in a Rooms row, the schedule modal's close/week-nav
+       buttons, an alert banner's close icon) keep their compact
+       visual size — growing them would crowd their neighbours or
+       blow out a tight banner — and instead get an invisible,
+       centred ::after hit-area of at least 44x44px. This is the
+       standard technique for dense icon rows (used by e.g. Apple's
+       and Google's own HIG/Material guidance).
+================================================================ */
+@media (max-width: 1024px) {
+
+    .nav-item,
+    .avatar-btn,
+    .notif-btn,
+    .sidebar-toggle-btn,
+    .ps-btn--sm,
+    .qr-scan-btn,
+    .rsm-daytab-btn {
+        min-height: 44px;
+    }
+
+    .avatar-btn,
+    .notif-btn,
+    .sidebar-toggle-btn {
+        min-width: 44px;
+    }
+
+    .pr-icon-btn,
+    .rsm-close-btn,
+    .rsm-week-nav-btn,
+    .ps-alert__close {
+        position: relative;
+    }
+
+    .pr-icon-btn::after,
+    .rsm-close-btn::after,
+    .rsm-week-nav-btn::after,
+    .ps-alert__close::after {
+        content: '';
+        position: absolute;
+        inset: 50%;
+        width: max(44px, 100%);
+        height: max(44px, 100%);
+        transform: translate(-50%, -50%);
+    }
+}
+
+
+/* ================================================================
+   § 7  FORM INPUTS — 16px minimum font-size (<= 768px)
+   ----------------------------------------------------------------
+   iOS Safari (and some Android browsers) auto-zoom the viewport
+   when a focused text input's computed font-size is under 16px.
+   Dozens of input/select/textarea classes exist across this
+   stylesheet (.ps-form-control, .pr-filter-select, .pr-search-wrap
+   input, and more); rather than chase each one, this targets every
+   native text-entry control by type, with !important so it wins
+   over whichever class-specific font-size happens to apply. Only
+   font-size changes — no layout/size impact otherwise.
+================================================================ */
+@media (max-width: 768px) {
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    input:not([type]),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}

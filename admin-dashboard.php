@@ -45,6 +45,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css?v=<?php echo filemtime('equipment-booking/assets/css/admin-dashboard.css'); ?>">
+    <!-- Mobile/tablet adaptations; must load after admin-dashboard.css -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('equipment-booking/assets/css/admin-dashboard-responsive.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
@@ -4062,6 +4064,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/admin-dashboard.js"></script>
     <script src="equipment-booking/assets/js/admin-live-render.js"></script>
+    <script src="equipment-booking/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('equipment-booking/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast">
