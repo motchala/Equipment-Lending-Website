@@ -102,3 +102,42 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 }());
+
+/* ================================================================
+   SIGN-IN DEPARTURE ANIMATION
+   Fires on submit, in parallel with the real POST — never calls
+   preventDefault(), so the form still submits normally. Swaps the
+   button's icon/label to a "signing in" state and fades the gateway
+   panel out, so the transition into the destination dashboard's own
+   role-splash overlay reads as one continuous handoff. If login
+   fails, the PRG redirect back to this same page simply reloads a
+   fresh, un-faded gateway — nothing to reset manually.
+================================================================ */
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('loginForm');
+    const gateway = document.getElementById('gateway');
+    const icon = document.getElementById('loginSubmitIcon');
+    const label = document.getElementById('loginSubmitLabel');
+
+    if (!form || !gateway) return;
+
+    form.addEventListener('submit', function (e) {
+        const submitBtn = document.getElementById('loginSubmitBtn');
+        if (submitBtn && submitBtn.hasAttribute('disabled')) return; // locked out
+
+        if (icon) {
+            icon.classList.remove('fa-arrow-right-to-bracket');
+            icon.classList.add('fa-circle-notch', 'is-spinning');
+        }
+        if (label) label.textContent = 'Signing in\u2026';
+
+        gateway.classList.add('is-leaving');
+    });
+
+    const studentLink = document.getElementById('studentLink');
+    if (studentLink) {
+        studentLink.addEventListener('click', function () {
+            gateway.classList.add('is-leaving');
+        });
+    }
+});

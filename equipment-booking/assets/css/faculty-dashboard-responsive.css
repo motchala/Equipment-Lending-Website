@@ -594,7 +594,8 @@ table,
     }
 
     /* Lending sub-nav pills: horizontal scroll on mobile */
-    #panel-lending .lending-subnav {
+    #panel-lending .lending-subnav,
+    #panel-rooms .lending-subnav {
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -603,11 +604,13 @@ table,
         gap: 6px;
     }
 
-    #panel-lending .lending-subnav::-webkit-scrollbar {
+    #panel-lending .lending-subnav::-webkit-scrollbar,
+    #panel-rooms .lending-subnav::-webkit-scrollbar {
         display: none;
     }
 
-    #panel-lending .lending-nav-btn {
+    #panel-lending .lending-nav-btn,
+    #panel-rooms .lending-nav-btn {
         white-space: nowrap;
         flex-shrink: 0;
         padding: 8px 14px;
@@ -714,9 +717,8 @@ table,
 
 /* ================================================================
    § 15  MY ACTIVITY
-   Moved to its own dedicated stylesheet:
-   equipment-booking/assets/css/faculty-my-activity.css
-   (base styles + all responsive rules for #panel-activity live there).
+   Base styles + all responsive rules for #panel-activity now live
+   in faculty-dashboard.css (search "MY ACTIVITY").
 ================================================================ */
 
 
@@ -1106,7 +1108,7 @@ table,
 
 
 /* ================================================================
-   § 27  DASHBOARD REDESIGN v3 — inline <style> overrides for mobile
+   § 27  DASHBOARD — inline <style> overrides for mobile
    These patch the <style> block inside faculty-dashboard.php that
    defines dash-hero, dash-stats-row-layout, dash-body-layout, etc.
 ================================================================ */

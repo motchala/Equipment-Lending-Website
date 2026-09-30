@@ -1088,7 +1088,8 @@
                 case 'logout':
                     e.preventDefault();
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
+                    if (window.PSLogout) window.PSLogout.open(el);
+                    else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
 
                 /* \u2500\u2500 ps-modal \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
@@ -2016,6 +2017,18 @@
         // Poll for new notifications (new requests, overdue items, room
         // issues, stock drops) every 25s without a full page reload.
         setInterval(_notifPoll, 25000);
+        // Timers are throttled in background tabs, so also refresh the bell
+        // the moment the admin comes back to this tab or window.
+        // (Throttled: returning to a tab fires both events at once.)
+        let _lastResumePoll = 0;
+        function _pollOnResume() {
+            const now = Date.now();
+            if (document.hidden || now - _lastResumePoll < 2000) return;
+            _lastResumePoll = now;
+            _notifPoll();
+        }
+        document.addEventListener('visibilitychange', _pollOnResume);
+        window.addEventListener('focus', _pollOnResume);
 
         // Live search
         setupLiveSearch('waitingSearch', 'waiting-body', 'waiting');

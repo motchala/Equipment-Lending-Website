@@ -1,0 +1,462 @@
+/* ================================================================
+   ROLE SPLASH — post-login transition overlay
+   ----------------------------------------------------------------
+   Shown once when landing-page.php hands off to a dashboard
+   (Admin / Super Admin / Faculty / Student). Markup comes from
+   config/role-splash.php, behaviour from assets/js/role-splash.js.
+
+   The whole timeline is pure CSS, so the overlay dismisses itself
+   even if the JS never runs. Tune the pacing with the --rs-t-*
+   variables below.
+
+     Stage 1  PUPSYNC wordmark bounces in, letter by letter
+     Stage 2  wordmark lifts away, role name bounces in below it
+     Exit     iris closes to the centre, revealing the dashboard
+================================================================ */
+
+/* Cross-document view transition: smooth crossfade from the landing
+   page into this overlay (Chromium; ignored elsewhere). */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
+}
+
+.role-splash {
+    /* palette — same tokens as landing-page.css */
+    --rs-accent: #600302;
+    --rs-accent-deep: #4a0f15;
+    --rs-ink: #2c2c2c;
+    --rs-mute: #666666;
+    --rs-serif: 'Cormorant Garamond', 'Times New Roman', serif;
+    --rs-sans: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    /* timeline */
+    --rs-t-letters: 0.2s;   /* wordmark letters start dropping */
+    --rs-t-shift: 1.3s;     /* wordmark lifts away, stage 2 begins */
+    --rs-t-role: 1.6s;      /* role letters start dropping */
+    --rs-t-exit: 3.3s;      /* overlay starts closing */
+    --rs-up: clamp(72px, 17vh, 170px);
+
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-family: var(--rs-sans);
+    color: var(--rs-ink);
+    background: radial-gradient(120% 90% at 50% 0%, #fbf8f2 0%, #f5f0e8 55%, #ebe2d4 100%);
+    user-select: none;
+    animation: rsExit 0.8s cubic-bezier(0.7, 0, 0.2, 1) var(--rs-t-exit) forwards;
+}
+
+.role-splash *,
+.role-splash *::before,
+.role-splash *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Per-role hooks (all roles share the same look today; override tokens
+   here if one ever needs its own accent). */
+.role-splash--super-admin { --rs-accent: #600302; }
+
+/* ---------------------------------------------------------------
+   BACKDROP — dot grid, drifting maroon glows, orbit rings, grain
+--------------------------------------------------------------- */
+.rs-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.rs-grid {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(96, 3, 2, 0.2) 1.2px, transparent 1.7px);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 15%, transparent 70%);
+    mask-image: radial-gradient(ellipse at center, #000 15%, transparent 70%);
+    animation: rsFadeIn 1.4s ease 0.1s backwards;
+}
+
+.rs-blob {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+}
+
+.rs-blob--a {
+    width: 52vmax;
+    height: 52vmax;
+    left: -16vmax;
+    top: -22vmax;
+    background: radial-gradient(circle, rgba(96, 3, 2, 0.34), transparent 68%);
+    animation: rsFadeIn 1.4s ease backwards, rsFloatA 9s ease-in-out infinite alternate;
+}
+
+.rs-blob--b {
+    width: 56vmax;
+    height: 56vmax;
+    right: -20vmax;
+    bottom: -26vmax;
+    background: radial-gradient(circle, rgba(170, 52, 62, 0.3), transparent 68%);
+    animation: rsFadeIn 1.6s ease 0.1s backwards, rsFloatB 11s ease-in-out infinite alternate;
+}
+
+.rs-blob--c {
+    width: 38vmax;
+    height: 38vmax;
+    left: calc(50% - 19vmax);
+    top: calc(50% - 19vmax);
+    background: radial-gradient(circle, rgba(96, 3, 2, 0.13), transparent 66%);
+    animation: rsFadeIn 1.6s ease 0.2s backwards, rsPulse 5s ease-in-out infinite;
+}
+
+.rs-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--d);
+    height: var(--d);
+    margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+    border-radius: 50%;
+    border: 1px solid rgba(96, 3, 2, 0.16);
+}
+
+.rs-ring--1 {
+    --d: min(44vmin, 440px);
+    animation: rsFadeIn 1.2s ease 0.2s backwards, rsSpin 28s linear infinite reverse;
+}
+
+.rs-ring--2 {
+    --d: min(68vmin, 680px);
+    border-style: dashed;
+    border-color: rgba(96, 3, 2, 0.24);
+    animation: rsFadeIn 1.2s ease 0.35s backwards, rsSpin 54s linear infinite;
+}
+
+.rs-ring--3 {
+    --d: min(96vmin, 960px);
+    border-color: rgba(96, 3, 2, 0.1);
+    animation: rsRingIn 1.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s backwards;
+}
+
+/* little satellites orbiting on rings 1 and 2 */
+.rs-ring--1::after,
+.rs-ring--2::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    margin-left: -4px;
+    border-radius: 50%;
+    background: var(--rs-accent);
+}
+
+.rs-ring--2::after {
+    width: 6px;
+    height: 6px;
+    margin-left: -3px;
+    top: -3px;
+    background: rgba(96, 3, 2, 0.55);
+}
+
+/* film grain */
+.rs-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.07;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* viewfinder-style corner brackets */
+.rs-corner {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    border: 0 solid rgba(96, 3, 2, 0.4);
+    animation: rsFadeIn 0.9s ease 0.6s backwards;
+}
+.rs-corner--tl { top: 28px; left: 28px; border-top-width: 1.5px; border-left-width: 1.5px; }
+.rs-corner--tr { top: 28px; right: 28px; border-top-width: 1.5px; border-right-width: 1.5px; }
+.rs-corner--bl { bottom: 28px; left: 28px; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.rs-corner--br { bottom: 28px; right: 28px; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+/* ---------------------------------------------------------------
+   STAGE — lockup (mark + wordmark) and role block share one grid cell
+--------------------------------------------------------------- */
+.rs-stage {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    max-width: 1100px;
+    padding: 0 20px;
+}
+
+.rs-stage > * {
+    grid-area: 1 / 1;
+}
+
+.rs-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    animation: rsLockupShift 0.9s cubic-bezier(0.65, 0, 0.2, 1) var(--rs-t-shift) forwards;
+}
+
+.rs-mark {
+    position: relative;
+    width: 66px;
+    height: 66px;
+    display: grid;
+    place-items: center;
+    color: #f5f0e8;
+    border-radius: 19px;
+    background: linear-gradient(150deg, var(--rs-accent) 0%, var(--rs-accent-deep) 100%);
+    box-shadow: 0 16px 34px -10px rgba(96, 3, 2, 0.6);
+    animation: rsPop 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s backwards;
+}
+
+.rs-mark svg {
+    width: 30px;
+    height: 30px;
+}
+
+/* soft ping that radiates from the mark while the screen "loads" */
+.rs-mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 2px solid var(--rs-accent);
+    opacity: 0;
+    animation: rsPing 1.8s ease-out 0.9s infinite;
+}
+
+/* ---------------------------------------------------------------
+   LETTERS — every glyph is its own bouncing element
+   (.rs-l drops in once, .rs-c idles with a travelling wave)
+--------------------------------------------------------------- */
+.rs-l {
+    display: inline-block;
+    transform-origin: 50% 100%;
+    animation: rsDrop 0.8s linear backwards;
+    animation-delay: calc(var(--rs-t-letters) + var(--i) * 0.06s);
+}
+
+.rs-c {
+    display: inline-block;
+}
+
+.rs-brand {
+    display: flex;
+    font-family: var(--rs-serif);
+    font-size: clamp(46px, 12vw, 108px);
+    line-height: 1;
+    letter-spacing: 0.06em;
+    padding-left: 0.06em; /* optically re-centre the tracked text */
+}
+
+.rs-brand .rs-c { text-transform: uppercase; }
+.rs-pup { color: var(--rs-accent); font-weight: 700; }
+.rs-sync { color: var(--rs-ink); font-weight: 500; }
+
+/* ---------------------------------------------------------------
+   ROLE BLOCK — kicker, bouncing role name, drawn rule
+--------------------------------------------------------------- */
+.rs-role-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+    transform: translateY(calc(var(--rs-up) * 0.32));
+}
+
+.rs-kicker {
+    padding-left: 0.44em;
+    font-size: clamp(11px, 1.5vw, 13px);
+    font-weight: 600;
+    letter-spacing: 0.44em;
+    text-transform: uppercase;
+    color: var(--rs-accent);
+    animation: rsKicker 0.8s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--rs-t-role) - 0.1s) backwards;
+}
+
+.rs-role {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    column-gap: 0.3em;
+    font-family: var(--rs-serif);
+    font-weight: 700;
+    font-size: clamp(40px, 10vw, 92px);
+    line-height: 1.05;
+    letter-spacing: 0.01em;
+}
+
+.rs-word {
+    display: inline-flex;
+    white-space: nowrap;
+}
+
+.rs-role .rs-l {
+    animation-delay: calc(var(--rs-t-role) + var(--i) * 0.05s);
+}
+
+/* idle wave: a maroon ripple runs through the word while it "loads" */
+.rs-role .rs-c {
+    animation: rsWave 1.15s ease-in-out infinite;
+    animation-delay: calc(var(--rs-t-role) + var(--i) * 0.05s + 0.75s);
+}
+
+.rs-rule {
+    width: min(240px, 52vw);
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, var(--rs-accent), transparent);
+    transform-origin: center;
+    animation: rsRule 0.9s cubic-bezier(0.65, 0, 0.2, 1) calc(var(--rs-t-role) + 0.55s) backwards;
+}
+
+.rs-caption {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: max(30px, env(safe-area-inset-bottom));
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--rs-mute);
+    animation: rsKicker 0.8s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--rs-t-role) + 0.2s) backwards;
+}
+
+.rs-caption::before,
+.rs-caption::after {
+    content: '';
+    width: 30px;
+    height: 1px;
+    background: rgba(96, 3, 2, 0.45);
+}
+
+/* ---------------------------------------------------------------
+   KEYFRAMES
+--------------------------------------------------------------- */
+@keyframes rsDrop {
+    0%   { opacity: 0; transform: translateY(-1.05em) scale(0.9) rotate(-6deg); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+    36%  { opacity: 1; transform: translateY(0) scale(1.1, 0.88) rotate(0); animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1); }
+    54%  { transform: translateY(-0.26em) scale(0.97, 1.05); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+    70%  { transform: translateY(0) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0, 0.55, 0.45, 1); }
+    84%  { transform: translateY(-0.07em) scale(1); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes rsWave {
+    0%, 55%, 100% { transform: translateY(0); color: var(--rs-ink); }
+    28%           { transform: translateY(-0.13em); color: var(--rs-accent); }
+}
+
+@keyframes rsLockupShift {
+    to { transform: translateY(calc(var(--rs-up) * -1)) scale(0.5); }
+}
+
+@keyframes rsPop {
+    from { opacity: 0; transform: scale(0.4) rotate(-14deg); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes rsPing {
+    0%   { opacity: 0.5; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.9); }
+}
+
+@keyframes rsKicker {
+    from { opacity: 0; letter-spacing: 0.9em; transform: translateY(8px); }
+}
+
+@keyframes rsRule {
+    from { transform: scaleX(0); opacity: 0; }
+}
+
+@keyframes rsFadeIn {
+    from { opacity: 0; }
+}
+
+@keyframes rsRingIn {
+    from { opacity: 0; transform: scale(0.6); }
+}
+
+@keyframes rsSpin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes rsFloatA {
+    to { transform: translate3d(6vmax, 5vmax, 0) scale(1.12); }
+}
+
+@keyframes rsFloatB {
+    to { transform: translate3d(-7vmax, -4vmax, 0) scale(1.1); }
+}
+
+@keyframes rsPulse {
+    0%, 100% { transform: scale(0.9); }
+    50%      { transform: scale(1.15); }
+}
+
+/* iris closes toward the centre; opacity is the fallback where
+   clip-path animation isn't supported */
+@keyframes rsExit {
+    0%   { opacity: 1; visibility: visible; clip-path: circle(150% at 50% 50%); }
+    65%  { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; clip-path: circle(0% at 50% 50%); }
+}
+
+/* ---------------------------------------------------------------
+   REDUCED MOTION — show the finished composition, then a soft fade
+--------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    .role-splash {
+        animation: rsExitSoft 0.4s ease 1.4s forwards;
+    }
+
+    .role-splash *,
+    .role-splash *::before,
+    .role-splash *::after {
+        animation: none !important;
+    }
+
+    .rs-lockup {
+        transform: translateY(calc(var(--rs-up) * -1)) scale(0.5);
+    }
+}
+
+@keyframes rsExitSoft {
+    to { opacity: 0; visibility: hidden; }
+}
+
+/* small screens: tighten the decoration */
+@media (max-width: 520px) {
+    .rs-corner { width: 20px; height: 20px; }
+    .rs-corner--tl, .rs-corner--tr { top: 16px; }
+    .rs-corner--bl, .rs-corner--br { bottom: 16px; }
+    .rs-corner--tl, .rs-corner--bl { left: 16px; }
+    .rs-corner--tr, .rs-corner--br { right: 16px; }
+    .rs-caption { letter-spacing: 0.26em; font-size: 10px; }
+    .rs-caption::before, .rs-caption::after { width: 18px; }
+}

@@ -40,12 +40,15 @@ Monolithic, module-per-feature PHP app. No MVC framework — each role has one l
 │   ├── core/
 │   └── assets/
 │
+├── assets/                   # Shared static files: landing-page + role-splash css/js, fonts, images
+│
 ├── config/                   # Cross-cutting bootstrap, required by every entry point
 │   ├── db.php                #   getDB() — cached MySQLi connection (gitignored, see Setup)
 │   ├── env.php                #   Minimal .env parser → $_ENV
 │   ├── session.php             #   Hardened session_start() wrapper
 │   ├── csrf.php                #   csrf_token() / csrf_field() / csrf_verify()
-│   └── security-headers.php     #   CSP/X-Frame-Options fallback for AJAX endpoints
+│   ├── security-headers.php     #   CSP/X-Frame-Options fallback for AJAX endpoints
+│   └── role-splash.php          #   role_splash_head() / render_role_splash() — post-login overlay markup
 │
 ├── database/lending_db.sql   # Full schema + seed data (idempotent migrations baked in as
 │                              #   "ALTER TABLE IF NOT EXISTS column" guards — see below)
@@ -108,7 +111,10 @@ Inventory CRUD (with archiving, not hard deletes), request oversight and manual 
 ### 5. Notifications (`notif-functions.php`)
 Deliberately **not stored as generated events** — the feed is computed fresh on every load from the current state of `tbl_requests`, `tbl_room_issues`, and `tbl_inventory` (e.g. "3 items overdue" is a live query, not a row someone inserted). Only read/deleted state per notification persists, in `tbl_notif_state`, keyed by a synthetic id like `overdue-12`.
 
-### 6. Security hardening
+### 6. Role splash (post-login transition)
+A short full-screen overlay (PUPSYNC wordmark → role name: Admin / Super Admin / Faculty / Student) shown **only right after a successful sign-in** — never on a refresh or ordinary navigation. `landing-page.php` arms a one-shot session flag (`role_splash_arm()`) just before redirecting; the dashboard consumes it on that first load. Logging out destroys the session, so the next login shows it again. Students don't log in, so "Continue as Student" routes through `landing-page.php?go=student`, which arms the flag for them. Purely cosmetic — no auth or DB logic. Three files: `config/role-splash.php` (markup helper + flag), `assets/css/role-splash.css` (look + entire timeline, tunable via the `--rs-t-*` variables), `assets/js/role-splash.js` (cleanup/skip only). Each dashboard integrates it with three lines: a `require_once`, `role_splash_head()` in `<head>`, and `render_role_splash('<Role>')` right after `<body>`.
+
+### 7. Security hardening
 This codebase has clearly been through an OWASP ZAP pass — worth knowing before you "simplify" something:
 - Per-request CSP with a nonce for inline scripts (`landing-page.php`, dashboards) or a static fallback CSP for API/utility files (`config/security-headers.php`).
 - Custom CSRF tokens (`config/csrf.php`), checked on every state-changing POST, with a header fallback (`X-CSRF-TOKEN`) for JSON/AJAX calls.
@@ -143,7 +149,7 @@ Full schema with all columns lives in `database/lending_db.sql`. Summary:
 
 ## Getting started (local setup)
 
-**Requirements:** PHP 8.0+, MySQL/MariaDB, Apache (or any server that honors `.htaccess`/`mod_headers`), a mail account for SMTP (Gmail used in dev).
+**Requirements:** PHP 8.0+ (with the `mysqli` and `mbstring` extensions), MySQL/MariaDB, Apache (or any server that honors `.htaccess`/`mod_headers`), a mail account for SMTP (Gmail used in dev).
 
 1. **Clone** the repo and serve it from a local stack (XAMPP/Laragon/MAMP) — there's no `artisan serve`/built-in dev server, this is plain Apache+PHP. `.htaccess` sets `DirectoryIndex landing-page.php` as the site root.
 2. **Database:** import `database/lending_db.sql` into a fresh schema (matches the default name `lending_db`).

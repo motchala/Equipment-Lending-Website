@@ -1686,7 +1686,8 @@
                 }
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
+                    if (window.PSLogout) window.PSLogout.open(el);
+                    else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
             }
         } catch (err) {
@@ -1786,6 +1787,25 @@
 
     const navBackdrop = document.getElementById('navBackdrop');
     if (navBackdrop) navBackdrop.addEventListener('click', closeMobileNav);
+
+    /* ── Desktop sidebar collapse (icon-rail): the logo doubles as the
+       toggle. Separate from the mobile drawer above; preference persists
+       via localStorage. ── */
+    const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
+    function setSidebarCollapsed(collapsed) {
+        document.body.classList.toggle('sidebar-collapsed', collapsed);
+        if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            sidebarCollapseBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+        }
+        LS.set('sidebarCollapsed', collapsed ? '1' : '0');
+    }
+    if (sidebarCollapseBtn) {
+        sidebarCollapseBtn.addEventListener('click', function () {
+            setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+        });
+        if (LS.get('sidebarCollapsed') === '1') setSidebarCollapsed(true);
+    }
 
     /* ── Side nav clicks ──────────────────────────────────────────────── */
     document.querySelectorAll('.side-nav-item[data-tab]').forEach(btn => {
@@ -1913,6 +1933,40 @@
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
+    /* ── Global dashboard search ─────────────────────────────────────── */
+    const globalSearch = document.getElementById('globalSearch');
+    const globalSearchSelector = [
+        '#panel-lending .item-node',
+        '#panel-lending #requestsTbody tr',
+        '#panel-rooms .fcty-campus-card',
+        '#panel-rooms #roomReservationsTable tbody tr',
+        '#panel-activity #myactHistList .myact-history-row'
+    ].join(',');
+
+    function filterGlobalDashboard() {
+        const query = (globalSearch ? globalSearch.value : '').trim().toLowerCase();
+        const activePanel = document.querySelector('.tab-panel.active');
+        if (!activePanel) return;
+
+        activePanel.querySelectorAll(globalSearchSelector).forEach(item => {
+            item.style.display = !query || item.textContent.toLowerCase().includes(query) ? '' : 'none';
+        });
+    }
+
+    if (globalSearch) globalSearch.addEventListener('input', filterGlobalDashboard);
+
+    const globalSearchWrap = document.getElementById('globalSearchWrap');
+    const globalSearchToggle = document.getElementById('globalSearchToggle');
+    if (globalSearchWrap && globalSearchToggle && globalSearch) {
+        globalSearchToggle.addEventListener('click', function () {
+            const expanded = globalSearchWrap.classList.toggle('expanded');
+            globalSearchToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            globalSearchToggle.setAttribute('aria-label', expanded ? 'Close dashboard search' : 'Open dashboard search');
+            if (expanded) globalSearch.focus();
+        });
+
+    }
+
     /* Pagination: prev/next + first paint */
     const eqPrev = document.getElementById('equipPrevBtn');
     const eqNext = document.getElementById('equipNextBtn');
@@ -2002,6 +2056,19 @@
         checkOverdueState();
         const overdueToastEl = document.getElementById('overdue-alert');
         if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();
+
+        // AI chatbot FAB: previously it stayed hidden (it starts with
+        // display:none in the markup) until the user switched tabs away
+        // from Dashboard and back, because the code that reveals it only
+        // ran inside _switchTabDOM(). Sync it here too so it's already
+        // visible on the very first load, matching whichever tab is
+        // actually active server-side.
+        const aiFabInit = document.getElementById('actAiFab');
+        const initialActivePanel = document.querySelector('.tab-panel.active');
+        if (aiFabInit && initialActivePanel && initialActivePanel.id === 'panel-home') {
+            aiFabInit.style.display = '';
+        }
+
         startRequestsPolling();
         initCodePanel();
         startInventoryPolling();
@@ -3289,23 +3356,66 @@
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   MY ACTIVITY — History pagination
-   10 rows per page. Rows already in the DOM, each with
-   data-hist-idx="N". JS slices them: anything outside the current
-   page range gets display:none, the rest shows.
+   MY ACTIVITY — History pagination + search/filter
+   10 rows per page by default (rows already in the DOM, each with
+   data-hist-idx="N" — JS slices them, anything outside the current
+   page range gets display:none). While a search query or status
+   filter is active, pagination is bypassed entirely and every
+   matching row is shown at once instead (there's a 200-row ceiling
+   server-side, so this stays reasonable).
 ══════════════════════════════════════════════════════════════════ */
 (function () {
     var HIST_PER_PAGE = 10;
     var histCurrentPage = 1;
+    var histSearchQuery = '';
+    var histStatusFilter = 'all';
 
     function allHistRows() {
         return Array.from(document.querySelectorAll('#myactHistList .myact-history-row'));
+    }
+
+    function isFiltering() {
+        return histSearchQuery !== '' || histStatusFilter !== 'all';
+    }
+
+    function rowMatches(row) {
+        if (histStatusFilter !== 'all' && row.dataset.status !== histStatusFilter) return false;
+        if (histSearchQuery && row.textContent.toLowerCase().indexOf(histSearchQuery) === -1) return false;
+        return true;
     }
 
     function renderHistPage() {
         var rows = allHistRows();
         var total = rows.length;
         if (total === 0) return;
+
+        var pg = document.getElementById('myactHistPg');
+        var noResults = document.getElementById('myactHistNoResults');
+
+        if (isFiltering()) {
+            var matchCount = 0;
+            rows.forEach(function (row) {
+                var show = rowMatches(row);
+                row.style.display = show ? '' : 'none';
+                if (show) matchCount++;
+            });
+
+            if (pg) {
+                var info = document.getElementById('myactHistPgInfo');
+                if (info) info.textContent = matchCount + ' of ' + total + ' matching';
+                var controls = document.getElementById('myactHistPgControls');
+                if (controls) controls.style.display = 'none';
+                pg.style.display = '';
+            }
+            if (noResults) noResults.style.display = matchCount === 0 ? '' : 'none';
+            return;
+        }
+
+        if (noResults) noResults.style.display = 'none';
+        if (pg) {
+            var controlsRestore = document.getElementById('myactHistPgControls');
+            if (controlsRestore) controlsRestore.style.display = '';
+        }
 
         var totalPages = Math.max(1, Math.ceil(total / HIST_PER_PAGE));
         if (histCurrentPage > totalPages) histCurrentPage = totalPages;
@@ -3318,7 +3428,6 @@
         });
 
         /* Pagination bar */
-        var pg = document.getElementById('myactHistPg');
         if (!pg) return;
         pg.style.display = totalPages > 1 ? '' : 'none';
         if (totalPages <= 1) return;
@@ -3378,6 +3487,26 @@
         if (!btn) return;
         if (btn.id === 'myactHistPrev') goToHistPage(histCurrentPage - 1);
         if (btn.id === 'myactHistNext') goToHistPage(histCurrentPage + 1);
+    });
+
+    /* Wire search box */
+    document.addEventListener('input', function (e) {
+        if (e.target.id !== 'myactHistSearch') return;
+        histSearchQuery = e.target.value.trim().toLowerCase();
+        renderHistPage();
+    });
+
+    /* Wire status filter pills */
+    document.addEventListener('click', function (e) {
+        var tab = e.target.closest('.myact-filter-tab');
+        if (!tab) return;
+        var group = tab.closest('.myact-filter-tabs');
+        if (group) group.querySelectorAll('.myact-filter-tab').forEach(function (t) {
+            t.classList.remove('active');
+        });
+        tab.classList.add('active');
+        histStatusFilter = tab.dataset.statusFilter || 'all';
+        renderHistPage();
     });
 
     /* Init on DOMContentLoaded */
