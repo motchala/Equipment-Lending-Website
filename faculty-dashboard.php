@@ -417,11 +417,18 @@ if ($room_res_stmt) {
     $room_res_stmt->close();
 }
 
-// ── Overdue for notifications ──────────────────────────────────────────────
-$overdue_items_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status='Overdue' ORDER BY return_date ASC");
-$overdue_notifs = [];
-while ($row = mysqli_fetch_assoc($overdue_items_raw)) $overdue_notifs[] = $row;
-$notif_count = count($overdue_notifs);
+// ── Notifications (live feed for the bell / modal) ─────────────────────────
+// Built from this faculty member's own requests, reservations, waitlist,
+// room issues and account activity — see faculty-notif-functions.php.
+// Read/deleted state lives in tbl_faculty_notif_state; the modal is rendered
+// client-side from this JSON and kept in sync via api/faculty-notif.php.
+require_once __DIR__ . '/equipment-booking/core/faculty-notif-functions.php';
+$notifications = fnotif_build_list($conn, $_SESSION['faculty_id']);
+$notif_count   = fnotif_count_unread($notifications);
+$notif_json    = json_encode(
+    ['notifications' => $notifications, 'unread_count' => $notif_count],
+    JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE
+);
 
 // ── Avatar initials ────────────────────────────────────────────────────────
 $name_parts = explode(' ', trim($fullname));
@@ -1631,11 +1638,34 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-footer">
-            <a class="side-nav-item" id="nav-settings" data-action="open-overlay" data-target="settingsOverlay"
-                href="#">
-                <span class="material-symbols-outlined">settings</span>
-                <span>Settings</span>
-            </a>
+            <!-- Account group: the toggle shows the avatar + faculty name. Clicking it opens a
+                 flyout that pops up and to the right of the sidebar (Settings + Notifications). -->
+            <div class="side-nav-group" id="navAccountGroup">
+                <button type="button" class="side-nav-item side-nav-group-toggle" id="navAccountToggle"
+                    aria-haspopup="menu" aria-expanded="false" aria-controls="navAccountMenu"
+                    aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
+                    <span class="side-nav-avatar"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></span>
+                    <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
+                    <b class="side-nav-notif-dot" id="navNotifDot" aria-hidden="true"
+                        <?php if ($notif_count <= 0) echo 'hidden'; ?>></b>
+                    <span class="material-symbols-outlined side-nav-chevron" aria-hidden="true">chevron_right</span>
+                </button>
+                <div class="side-nav-flyout" id="navAccountMenu" role="menu" aria-label="Account">
+                    <a class="side-nav-item side-nav-subitem" id="nav-settings" role="menuitem" data-action="open-overlay"
+                        data-target="settingsOverlay" href="#">
+                        <span class="material-symbols-outlined">settings</span>
+                        <span>Settings</span>
+                    </a>
+                    <button type="button" class="side-nav-item side-nav-subitem" id="nav-notifications" role="menuitem"
+                        data-action="open-notif-modal"
+                        aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <span>Notifications</span>
+                        <b class="side-nav-badge" id="notifBadge"
+                            <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
+                    </button>
+                </div>
+            </div>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
                 <span class="material-symbols-outlined">logout</span>
@@ -1649,70 +1679,28 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 ================================================================ -->
     <div class="main-wrapper">
 
-        <!-- ================================================================
-     TOP APP BAR
-================================================================ -->
-        <header class="top-bar" id="topBar">
-            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation">
-                <span class="material-symbols-outlined">menu</span>
-            </button>
-            <div class="top-bar-global-search" id="globalSearchWrap">
-                <button type="button" class="top-bar-global-search-toggle" id="globalSearchToggle"
-                    aria-label="Open dashboard search" aria-expanded="false">
-                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
-                </button>
-                <input type="search" id="globalSearch" placeholder="Search dashboard" autocomplete="off"
-                    aria-label="Search dashboard">
-            </div>
-            <div class="top-bar-identity">
-                <span class="top-bar-context">A.Y. 2026–2027</span>
-            </div>
-            <span class="top-bar-control-separator" aria-hidden="true"></span>
-            <div class="top-bar-actions">
-                <button class="top-bar-icon-btn" type="button" data-action="open-notif-modal"
-                    aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                    <span class="material-symbols-outlined">notifications</span>
-                    <span class="top-bar-badge" id="notifBadge"
-                        <?php if ($notif_count <= 0) echo 'style="display:none;"'; ?>><?php echo $notif_count; ?></span>
-                </button>
-                <div class="top-bar-profile-wrap" id="avatarWrap">
-                    <button class="top-bar-avatar" id="avatarBtn" aria-haspopup="true" aria-expanded="false"
-                        aria-label="Account menu">
-                        <?php if ($profile_pic_url): ?>
-                            <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img"
-                                onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');">
-                            <span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span>
-                        <?php else: ?>
-                            <?php echo htmlspecialchars($initials); ?>
-                        <?php endif; ?>
-                    </button>
-                    <!-- Simple Avatar Dropdown -->
-                    <div class="profile-dropdown" id="profileDropdown" role="menu">
-                        <div class="dd-header">
-                            <div class="dd-avatar">
-                                <?php if ($profile_pic_url): ?>
-                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img"
-                                        onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');">
-                                    <span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span>
-                                <?php else: ?>
-                                    <?php echo htmlspecialchars($initials); ?>
-                                <?php endif; ?>
-                            </div>
-                            <div>
-                                <span class="dd-name"><?php echo htmlspecialchars($fullname); ?></span>
-                                <span class="dd-sub">Faculty &mdash; ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
-                            </div>
-                        </div>
-                        <div class="dd-menu">
-                            <button class="dd-item dd-logout" data-action="logout">
-                                <span class="material-symbols-outlined dd-item-icon">logout</span> Log Out
-                            </button>
-                        </div>
+        <!-- Top bar removed. Only the mobile menu button remains (shown at <=768px)
+             so the sidebar drawer can still be opened on phones. -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation">
+            <span class="material-symbols-outlined">menu</span>
+        </button>
 
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php
+        /* ── GLOBAL SEARCH — DORMANT ──────────────────────────────────────
+           Switched off on purpose for now and not rendered. Markup kept so
+           it can be restored: put it back in a container and set
+           GLOBAL_SEARCH_ENABLED = true in faculty-dashboard.js.
+
+           <div class="top-bar-global-search" id="globalSearchWrap">
+               <button type="button" class="top-bar-global-search-toggle" id="globalSearchToggle"
+                   aria-label="Open dashboard search" aria-expanded="false">
+                   <span class="material-symbols-outlined" aria-hidden="true">search</span>
+               </button>
+               <input type="search" id="globalSearch" placeholder="Search dashboard" autocomplete="off"
+                   aria-label="Search dashboard">
+           </div>
+        ─────────────────────────────────────────────────────────────────── */
+        ?>
 
         <!-- ================================================================
      MAIN CANVAS
@@ -3586,9 +3574,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <!-- ================================================================
      MODAL: NOTIFICATIONS  (faculty)
      Same structural pattern as the admin notification modal — opened
-     from the avatar dropdown instead of living on its own page.
-     Content is scoped to what a faculty member actually gets:
-     overdue items, borrow-request updates, and system notices.
+     from the account flyout in the sidebar instead of living on its own page.
+     Content is scoped to what a faculty member actually gets — live from
+     the DB: borrow-request updates, overdue/return reminders, room
+     reservations, waitlist, reported room issues and account activity.
 ================================================================ -->
     <div class="modal-backdrop fnotif-backdrop" id="notifModal" style="display:none;" role="dialog" aria-modal="true"
         aria-labelledby="notifModalTitle">
@@ -3608,128 +3597,77 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <!-- Unread count + mark all read -->
             <div class="fnotif-subhead">
                 <p class="fnotif-count-text">
-                    You have <strong id="unreadCount"><?php echo $notif_count; ?> unread</strong>
-                    notification<?php echo $notif_count !== 1 ? 's' : ''; ?>.
+                    You have <strong id="unreadCount"><?php echo (int)$notif_count; ?> unread</strong>
+                    notification<span id="unreadPlural"><?php echo $notif_count !== 1 ? 's' : ''; ?></span>.
                 </p>
                 <button class="fnotif-markall-btn" data-action="mark-all-read">Mark all as read</button>
             </div>
 
-            <!-- Filter pills (counts are front-end only for now) -->
+            <!-- Filter pills (counts are filled in live by faculty-dashboard.js) -->
             <div class="fnotif-tabs">
                 <button class="notif-tab active" data-notif-filter="all">All</button>
                 <button class="notif-tab" data-notif-filter="unread">Unread</button>
                 <button class="notif-tab" data-notif-filter="overdue">
-                    Overdue
-                    <?php if (!empty($overdue_notifs)): ?>
-                        <span class="fnotif-pill-count"><?php echo count($overdue_notifs); ?></span>
-                    <?php endif; ?>
+                    Overdue <span class="fnotif-pill-count" data-pill="overdue" hidden>0</span>
                 </button>
                 <button class="notif-tab" data-notif-filter="borrow">
-                    Borrow <span class="fnotif-pill-count">3</span>
+                    Borrow <span class="fnotif-pill-count" data-pill="borrow" hidden>0</span>
+                </button>
+                <button class="notif-tab" data-notif-filter="room">
+                    Rooms <span class="fnotif-pill-count" data-pill="room" hidden>0</span>
                 </button>
                 <button class="notif-tab" data-notif-filter="system">
-                    System <span class="fnotif-pill-count">1</span>
+                    System <span class="fnotif-pill-count" data-pill="system" hidden>0</span>
                 </button>
             </div>
 
-            <!-- Scrollable list -->
+            <!-- Toolbar: Select / Delete all  ⇄  bulk actions while selecting -->
+            <div class="fnotif-toolbar" id="notifToolbar">
+                <div class="fnotif-toolbar-normal" id="notifToolbarNormal">
+                    <button type="button" class="fnotif-tool-btn" id="notifSelectBtn" data-nbar="select">
+                        <span class="material-symbols-outlined">checklist</span> Select
+                    </button>
+                    <button type="button" class="fnotif-tool-btn fnotif-tool-danger" id="notifDeleteAllBtn" data-nbar="delete-all">
+                        <span class="material-symbols-outlined">delete_sweep</span> Delete all
+                    </button>
+                </div>
+                <div class="fnotif-toolbar-select" id="notifToolbarSelect" hidden>
+                    <label class="fnotif-selall">
+                        <input type="checkbox" id="notifSelectAll">
+                        <span>Select all</span>
+                    </label>
+                    <span class="fnotif-sel-count" id="notifSelCount" aria-live="polite">0 selected</span>
+                    <div class="fnotif-sel-actions">
+                        <button type="button" class="fnotif-tool-btn" data-nbar="mark-read" data-needs-sel>
+                            <span class="material-symbols-outlined">drafts</span> Read
+                        </button>
+                        <button type="button" class="fnotif-tool-btn" data-nbar="mark-unread" data-needs-sel>
+                            <span class="material-symbols-outlined">mark_email_unread</span> Unread
+                        </button>
+                        <button type="button" class="fnotif-tool-btn fnotif-tool-danger" data-nbar="delete-selected" data-needs-sel>
+                            <span class="material-symbols-outlined">delete</span> Delete
+                        </button>
+                        <button type="button" class="fnotif-tool-btn" data-nbar="done">Done</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inline confirmation for bulk deletes -->
+            <div class="fnotif-confirm" id="notifConfirm" role="alertdialog" aria-live="assertive" hidden>
+                <span class="material-symbols-outlined">warning</span>
+                <span class="fnotif-confirm-text" id="notifConfirmText"></span>
+                <button type="button" class="fnotif-tool-btn" data-nbar="confirm-cancel">Cancel</button>
+                <button type="button" class="fnotif-tool-btn fnotif-tool-solid-danger" data-nbar="confirm-ok">Delete</button>
+            </div>
+
+            <!-- Scrollable list — cards are rendered by faculty-dashboard.js -->
             <div class="fnotif-body">
-                <div class="notif-card-list">
+                <div class="notif-card-list" id="notifList"></div>
 
-                    <?php if (!empty($overdue_notifs)): ?>
-                        <div class="notif-section-label notif-section-overdue">
-                            <span class="material-symbols-outlined">warning</span>
-                            OVERDUE — IMMEDIATE ACTION NEEDED
-                        </div>
-                        <?php foreach ($overdue_notifs as $on): ?>
-                            <?php
-                            $due_ts   = strtotime($on['return_date']);
-                            $days_late = $due_ts ? max(0, (int)floor((time() - $due_ts) / 86400)) : 0;
-                            ?>
-                            <div class="notif-card unread notif-card-overdue" data-cat="overdue">
-                                <div class="notif-card-icon ni-overdue">
-                                    <span class="material-symbols-outlined">schedule</span>
-                                </div>
-                                <div class="notif-card-body">
-                                    <div class="notif-card-title">Overdue: <?php echo htmlspecialchars($on['equipment_name']); ?></div>
-                                    <div class="notif-card-sub">
-                                        You have not returned this item.
-                                        <?php echo $days_late; ?> day<?php echo $days_late === 1 ? '' : 's'; ?> overdue.
-                                    </div>
-                                </div>
-                                <div class="notif-card-meta">
-                                    <span class="notif-time">Due <?php echo $due_ts ? date('M j', $due_ts) : '—'; ?></span>
-                                    <div class="unread-dot"></div>
-                                </div>
-                            </div>
-                    <?php endforeach;
-                    endif; ?>
-
-                    <div class="notif-section-label">TODAY</div>
-
-                    <div class="notif-card unread" data-cat="borrow">
-                        <div class="notif-card-icon ni-success">
-                            <span class="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <div class="notif-card-body">
-                            <div class="notif-card-title">Borrow Request Approved</div>
-                            <div class="notif-card-sub">Your latest borrow request has been approved. Pick up at the Admin Office before 5:00 PM.</div>
-                        </div>
-                        <div class="notif-card-meta">
-                            <span class="notif-time">9:42 AM</span>
-                            <div class="unread-dot"></div>
-                        </div>
-                    </div>
-
-                    <div class="notif-card unread" data-cat="system">
-                        <div class="notif-card-icon ni-alert">
-                            <span class="material-symbols-outlined">settings</span>
-                        </div>
-                        <div class="notif-card-body">
-                            <div class="notif-card-title">System Maintenance Tonight</div>
-                            <div class="notif-card-sub">PUPSYNC will undergo scheduled maintenance from 11:00 PM to 1:00 AM.</div>
-                        </div>
-                        <div class="notif-card-meta">
-                            <span class="notif-time">8:00 AM</span>
-                            <div class="unread-dot"></div>
-                        </div>
-                    </div>
-
-                    <div class="notif-section-label">YESTERDAY</div>
-
-                    <div class="notif-card unread" data-cat="borrow">
-                        <div class="notif-card-icon ni-warn">
-                            <span class="material-symbols-outlined">warning</span>
-                        </div>
-                        <div class="notif-card-body">
-                            <div class="notif-card-title">Return Reminder</div>
-                            <div class="notif-card-sub">You have a borrowed item due in 1 day. Please return it on time to avoid penalties.</div>
-                        </div>
-                        <div class="notif-card-meta">
-                            <span class="notif-time">4:15 PM</span>
-                            <div class="unread-dot"></div>
-                        </div>
-                    </div>
-
-                    <div class="notif-card" data-cat="borrow">
-                        <div class="notif-card-icon ni-success">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                        </div>
-                        <div class="notif-card-body">
-                            <div class="notif-card-title">Request Submitted</div>
-                            <div class="notif-card-sub">Your borrow request was successfully submitted and is under review.</div>
-                        </div>
-                        <div class="notif-card-meta">
-                            <span class="notif-time">2:00 PM</span>
-                        </div>
-                    </div>
-
-                    <div class="fnotif-empty" id="notifEmptyState" style="display:none;">
-                        <span class="material-symbols-outlined">notifications_off</span>
-                        <p>Nothing here right now.</p>
-                    </div>
-
-                </div><!-- /notif-card-list -->
+                <div class="fnotif-empty" id="notifEmptyState" style="display:none;">
+                    <span class="material-symbols-outlined">notifications_off</span>
+                    <p id="notifEmptyText">Nothing here right now.</p>
+                </div>
             </div><!-- /fnotif-body -->
 
             <!-- Pagination — client-side only for now; keeps the list from
@@ -4346,6 +4284,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
     <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+        window.FNOTIF_DATA = <?php echo $notif_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;
         window.SERVER_BASE_URL = '<?php

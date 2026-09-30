@@ -5597,12 +5597,10 @@ body {
    TOP BAR REDESIGN
 ================================================================ */
 .top-bar {
-    background: linear-gradient(
-        90deg,
-        rgba(251, 191, 36, 0.2) 0%,
-        rgba(251, 191, 36, 0.06) 52%,
-        transparent 100%
-    ), #570000 !important;
+    background: linear-gradient(90deg,
+            rgba(251, 191, 36, 0.2) 0%,
+            rgba(251, 191, 36, 0.06) 52%,
+            transparent 100%), #570000 !important;
     border-bottom: none !important;
     box-shadow: 0 8px 24px rgba(87, 0, 0, 0.36) !important;
     height: var(--topbar-h) !important;
@@ -7725,7 +7723,7 @@ body {
     flex-direction: column;
     overflow-y: auto;
     background: var(--redesign-main-bg);
-    top: var(--topbar-h);
+    top: 0;
     z-index: 220 !important;
 }
 
@@ -8860,6 +8858,402 @@ body {
 .fnotif-empty p {
     margin: 0;
     font-size: 0.86rem;
+}
+
+/* ── 4c. Notifications: expand, select, delete ────────────────────────── */
+.fnotif-body .notif-card {
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.fnotif-body .notif-card:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* Read cards recede slightly; unread keep the tinted surface + dot */
+.fnotif-body .notif-card:not(.unread) .notif-card-title {
+    font-weight: 600;
+}
+
+.fnotif-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 26px;
+}
+
+.fnotif-icon-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background var(--transition), color var(--transition), transform var(--transition);
+}
+
+.fnotif-icon-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.fnotif-icon-btn:hover {
+    background: var(--color-surface-high);
+    color: var(--color-on-surface);
+}
+
+.fnotif-del:hover {
+    background: var(--color-error-container);
+    color: var(--color-error);
+}
+
+/* Trash icon appears on hover/focus (always visible on touch) */
+.fnotif-del {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.notif-card:hover .fnotif-del,
+.notif-card:focus-within .fnotif-del,
+.notif-card.is-expanded .fnotif-del {
+    opacity: 1;
+    width: 26px;
+}
+
+@media (hover: none) {
+    .fnotif-del {
+        opacity: 1;
+        width: 26px;
+    }
+}
+
+.fnotif-expand .material-symbols-outlined {
+    transition: transform 0.2s ease;
+}
+
+.notif-card.is-expanded .fnotif-expand .material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+/* Expanded details */
+.fnotif-detail {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--color-outline-variant);
+    cursor: default;
+}
+
+.notif-card.is-expanded .fnotif-detail {
+    display: block;
+    animation: fnotifOpen 0.18s ease-out both;
+}
+
+@keyframes fnotifOpen {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.fnotif-dl {
+    margin: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.fnotif-dl-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 34%) 1fr;
+    gap: 10px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.fnotif-dl-row dt {
+    color: var(--color-secondary);
+    font-weight: 600;
+}
+
+.fnotif-dl-row dd {
+    margin: 0;
+    color: var(--color-on-surface);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.fnotif-dl-row dd.is-danger {
+    color: var(--color-error);
+    font-weight: 700;
+}
+
+.fnotif-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.fnotif-act-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 13px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.fnotif-act-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.fnotif-act-btn:hover {
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+
+.fnotif-act-primary {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.fnotif-act-primary:hover {
+    background: var(--color-primary);
+    color: #ffffff;
+    filter: brightness(1.12);
+}
+
+.fnotif-act-danger:hover {
+    background: var(--color-error-container);
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+/* Toolbar: Select / Delete all  ⇄  bulk actions */
+.fnotif-toolbar {
+    flex-shrink: 0;
+    padding: 0 22px 12px;
+}
+
+.fnotif-toolbar-normal,
+.fnotif-toolbar-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fnotif-toolbar-normal[hidden],
+.fnotif-toolbar-select[hidden],
+.fnotif-confirm[hidden] {
+    display: none;
+}
+
+.fnotif-toolbar-normal {
+    justify-content: flex-end;
+}
+
+.fnotif-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 13px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface-variant);
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.fnotif-tool-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+.fnotif-tool-btn:hover:not(:disabled) {
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+
+.fnotif-tool-btn:disabled,
+.fnotif-markall-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.fnotif-tool-danger {
+    color: var(--color-error);
+}
+
+.fnotif-tool-danger:hover:not(:disabled) {
+    background: var(--color-error-container);
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+.fnotif-tool-solid-danger {
+    background: var(--color-error);
+    border-color: var(--color-error);
+    color: #ffffff;
+}
+
+.fnotif-tool-solid-danger:hover:not(:disabled) {
+    background: var(--color-error);
+    color: #ffffff;
+    filter: brightness(1.1);
+}
+
+.fnotif-selall {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+    cursor: pointer;
+}
+
+.fnotif-selall input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+.fnotif-sel-count {
+    font-size: 0.78rem;
+    color: var(--color-on-surface-variant);
+    margin-right: auto;
+}
+
+.fnotif-sel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Inline delete confirmation */
+.fnotif-confirm {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 22px 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--color-error-container);
+    border: 1px solid var(--color-error);
+    color: var(--color-on-surface);
+    font-size: 0.8rem;
+}
+
+.fnotif-confirm>.material-symbols-outlined {
+    font-size: 20px;
+    color: var(--color-error);
+}
+
+.fnotif-confirm-text {
+    flex: 1;
+    min-width: 160px;
+    font-weight: 600;
+}
+
+/* Selection mode: checkbox replaces nothing — it slides in on the left */
+.fnotif-check {
+    display: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 10px;
+    border-radius: 6px;
+    border: 2px solid var(--color-outline);
+    background: var(--color-surface-lowest);
+    color: transparent;
+    flex-shrink: 0;
+    place-items: center;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.fnotif-check .material-symbols-outlined {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.notif-card-list.is-selecting .fnotif-check {
+    display: grid;
+}
+
+.notif-card-list.is-selecting .notif-card {
+    user-select: none;
+}
+
+.notif-card-list.is-selecting .fnotif-expand,
+.notif-card-list.is-selecting .fnotif-del {
+    display: none;
+}
+
+.notif-card.is-selected {
+    border-color: var(--color-primary);
+    background: var(--color-surface-container);
+}
+
+.notif-card.is-selected .fnotif-check {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+@media (max-width: 600px) {
+    .fnotif-toolbar {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .fnotif-confirm {
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .fnotif-dl-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .fnotif-sel-count {
+        margin-right: 0;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .notif-card.is-expanded .fnotif-detail,
+    .fnotif-expand .material-symbols-outlined {
+        animation: none;
+        transition: none;
+    }
 }
 
 @media (max-width: 600px) {
@@ -10246,5 +10640,249 @@ body {
 
     .myact-hist-pg-controls {
         margin-left: 0;
+    }
+}
+
+
+/* ================================================================
+   TOP BAR REMOVED — the sidebar is now the only app chrome
+   ----------------------------------------------------------------
+   --chrome-top = vertical space reserved above page content.
+   0 on desktop; on phones it clears the floating menu button.
+   (--topbar-h is left alone: the sidebar brand and the account
+   overlay header still use it for their own height.)
+================================================================ */
+:root {
+    --chrome-top: 0px;
+}
+
+/* ── Account group (bottom of the sidebar) ──────────────────────── */
+.side-nav-group {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.side-nav-group-toggle {
+    position: relative;
+}
+
+.side-nav-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-full);
+    background: linear-gradient(135deg, #9b1c1c 0%, #600000 100%);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.side-nav-avatar .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* Faculty name: one line, truncated with an ellipsis */
+.side-nav-user-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.side-nav-group-toggle.active .side-nav-user-name {
+    color: inherit;
+}
+
+.side-nav-chevron {
+    margin-left: auto;
+    transition: transform var(--transition);
+}
+
+.side-nav-group-toggle[aria-expanded="true"] .side-nav-chevron {
+    transform: translateX(3px);
+}
+
+/* Unread dot on the toggle, so notifications are never fully hidden */
+.side-nav-notif-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    flex-shrink: 0;
+}
+
+.side-nav-notif-dot[hidden],
+.side-nav-badge[hidden],
+.side-nav-group-toggle[aria-expanded="true"] .side-nav-notif-dot {
+    display: none;
+}
+
+/* ── Flyout: opens UP and to the RIGHT, outside the sidebar's box ──
+   position:fixed lets it escape the sidebar (which clips on tablet).
+   JS sets --flyout-left / --flyout-bottom from the toggle's position. */
+.side-nav-flyout {
+    position: fixed;
+    left: var(--flyout-left, calc(var(--sidebar-w) + 8px));
+    bottom: var(--flyout-bottom, 16px);
+    min-width: 220px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 260;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-8px) scale(0.96);
+    transform-origin: bottom left;
+    transition: opacity 0.16s ease,
+        transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0s linear 0.2s;
+}
+
+.side-nav-flyout.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    transition-delay: 0s;
+}
+
+/* Small notch pointing back at the toggle */
+.side-nav-flyout::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    bottom: 17px;
+    width: 10px;
+    height: 10px;
+    background: var(--color-surface);
+    border-left: 1px solid var(--color-outline-variant);
+    border-bottom: 1px solid var(--color-outline-variant);
+    transform: rotate(45deg);
+}
+
+/* Items keep labels + left alignment even when the sidebar is an icon rail */
+.side-nav .side-nav-flyout .side-nav-item {
+    justify-content: flex-start;
+}
+
+body .side-nav .side-nav-flyout .side-nav-item span:not(.material-symbols-outlined) {
+    display: inline;
+}
+
+.side-nav-badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--color-error);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+/* Icon-rail states (desktop collapsed + tablet): avatar only on the toggle.
+   The rail hides every <span> in a nav item, so re-show the avatar. */
+@media (min-width: 1025px) {
+    body.sidebar-collapsed .side-nav .side-nav-item .side-nav-avatar {
+        display: flex;
+    }
+
+    body.sidebar-collapsed .side-nav-group-toggle {
+        justify-content: center;
+        padding: 10px 0 !important;
+    }
+
+    body.sidebar-collapsed .side-nav-chevron {
+        display: none;
+    }
+
+    body.sidebar-collapsed .side-nav-notif-dot {
+        position: absolute;
+        top: 6px;
+        right: 16px;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .side-nav .side-nav-item .side-nav-avatar {
+        display: flex;
+    }
+
+    .side-nav-group-toggle {
+        justify-content: center;
+        padding: 10px 0 !important;
+    }
+
+    .side-nav-chevron {
+        display: none;
+    }
+
+    .side-nav-notif-dot {
+        position: absolute;
+        top: 6px;
+        right: 16px;
+    }
+}
+
+/* ── Phones: floating menu button replaces the top bar ──────────── */
+@media (max-width: 768px) {
+    :root {
+        --chrome-top: 64px;
+    }
+
+    .mobile-menu-btn {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 200;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .app-main {
+        padding-top: var(--chrome-top) !important;
+    }
+
+    /* The drawer already covers most of the screen, so the flyout opens
+       upward inside it instead of out to the right. */
+    .side-nav-flyout {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(100% + 8px);
+        min-width: 0;
+        transform: translateY(8px) scale(0.98);
+        transform-origin: bottom center;
+    }
+
+    .side-nav-flyout.open {
+        transform: none;
+    }
+
+    .side-nav-flyout::before {
+        display: none;
     }
 }
