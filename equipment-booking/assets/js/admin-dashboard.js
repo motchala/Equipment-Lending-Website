@@ -1551,30 +1551,9 @@
                         showToast('✅ ' + data.message);
                         setAlert(data.message, false);
 
-                        /* Update the slot counter live */
-                        const remaining = typeof data.accounts_remaining === 'number'
-                            ? data.accounts_remaining : null;
-                        if (remaining !== null) {
-                            const slotEl = document.getElementById('adm-slots-remaining');
-                            if (slotEl) slotEl.textContent = remaining;
-
-                            /* Update the dropdown badge */
-                            const ddBadge = document.querySelector('#dd-manage-admins-btn .adm-dd-slot-badge');
-                            if (ddBadge) {
-                                if (remaining > 0) {
-                                    ddBadge.textContent = remaining + ' slot' + (remaining !== 1 ? 's' : '') + ' left';
-                                } else {
-                                    ddBadge.remove();
-                                }
-                            }
-
-                            /* Hide the form when the last slot is used */
-                            if (remaining === 0) {
-                                const card = document.getElementById('adm-form-card');
-                                if (card) card.remove();
-                                const banner = document.querySelector('.adm-slot-banner');
-                                if (banner) banner.classList.add('adm-slot-full');
-                            }
+                        /* Update the slot counter / form visibility live */
+                        if (typeof data.accounts_remaining === 'number') {
+                            admUpdateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                         }
 
                         /* Append the new row to the accounts table immediately */
@@ -1584,16 +1563,7 @@
                             const placeholder = tbody.querySelector('td[colspan]');
                             if (placeholder) placeholder.closest('tr').remove();
 
-                            const roleClass = role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin';
-                            const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                            const tr = document.createElement('tr');
-                            tr.className = 'adm-account-row';
-                            tr.innerHTML =
-                                '<td class="td-fw">' + fullName.replace(/</g, '&lt;') + '</td>' +
-                                '<td>' + email.replace(/</g, '&lt;') + '</td>' +
-                                '<td><span class="adm-role-badge ' + roleClass + '">' + role.replace(/</g, '&lt;') + '</span></td>' +
-                                '<td class="td-sm">' + today + '</td>';
-                            tbody.appendChild(tr);
+                            tbody.appendChild(admBuildRow(data.id, fullName, email, role));
                         }
                     } else {
                         setAlert(data.message || 'Something went wrong. Please try again.', true);
@@ -1606,6 +1576,409 @@
                 });
         });
     })();
+
+    /* ▼ MANAGE-ADMINS-BEGIN ─────────────────────────────────────────────────
+       Settings → Manage Admins → Current Admins (Super Admin only).
+       Edit login details · make dormant · reactivate · delete, plus the
+       shared helpers the Add Admin form above uses (seat counter, row builder).
+       Talks to api/manage-admin-account.php; the server re-checks every rule. */
+
+    const ADM_API = 'equipment-booking/api/manage-admin-account.php';
+    const ADM_MAX_DAYS = 30;
+
+    function admEl(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    function admIcon(name) {
+        const s = admEl('span', 'material-symbols-outlined', name);
+        s.setAttribute('aria-hidden', 'true');
+        return s;
+    }
+
+    /* "Oct 7" — day shown in the Status pill (campus timezone) */
+    function admShortDate(ts) {
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+    }
+
+    /* "Oct 7, 2026, 3:00 PM" */
+    function admLongDate(ts) {
+        return new Date(ts * 1000).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila'
+        });
+    }
+
+    /* Seat counter, banner, and Add-form / "maximum reached" card */
+    function admUpdateSeats(count, remaining) {
+        const text = document.getElementById('adm-slot-text');
+        if (text) {
+            text.textContent = '';
+            text.appendChild(admEl('strong', '', count + ' of 5'));
+            text.appendChild(document.createTextNode(' admin accounts in use — '));
+            if (remaining > 0) {
+                text.appendChild(admEl('span', '', String(remaining))).id = 'adm-slots-remaining';
+                text.appendChild(document.createTextNode(' slot' + (remaining !== 1 ? 's' : '') + ' remaining'));
+            } else {
+                text.appendChild(document.createTextNode('limit reached'));
+            }
+        }
+        const banner = document.querySelector('.adm-slot-banner');
+        if (banner) banner.classList.toggle('adm-slot-full', remaining <= 0);
+        const form = document.getElementById('adm-form-card');
+        if (form) form.hidden = remaining <= 0;
+        const max = document.getElementById('adm-max-card');
+        if (max) max.hidden = remaining > 0;
+    }
+
+    function admStatusCell(dormantUntil) {
+        const td = admEl('td', 'adm-td-status');
+        if (dormantUntil) {
+            const pill = admEl('span', 'adm-status adm-status--dormant');
+            pill.title = 'Dormant until ' + admLongDate(dormantUntil);
+            pill.appendChild(admIcon('bedtime'));
+            pill.appendChild(document.createTextNode('Dormant until ' + admShortDate(dormantUntil)));
+            td.appendChild(pill);
+        } else {
+            td.appendChild(admEl('span', 'adm-status adm-status--active', 'Active'));
+        }
+        return td;
+    }
+
+    function admActButton(action, icon, label, extra) {
+        const b = admEl('button', 'adm-act' + (extra ? ' ' + extra : ''));
+        b.type = 'button';
+        b.setAttribute('data-adm-action', action);
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        b.appendChild(admIcon(icon));
+        return b;
+    }
+
+    function admActionsCell(manageable, dormant) {
+        const td = admEl('td', 'adm-td-actions');
+        if (!manageable) {
+            const dash = admEl('span', 'adm-protected', '—');
+            dash.title = 'Super Admin accounts are protected';
+            td.appendChild(dash);
+            return td;
+        }
+        const wrap = admEl('div', 'adm-actions');
+        wrap.appendChild(admActButton('edit', 'edit', 'Edit login details'));
+        wrap.appendChild(dormant
+            ? admActButton('reactivate', 'play_circle', 'Reactivate account')
+            : admActButton('dormant', 'bedtime', 'Make dormant'));
+        wrap.appendChild(admActButton('delete', 'delete', 'Delete account', 'adm-act--danger'));
+        td.appendChild(wrap);
+        return td;
+    }
+
+    /* A brand-new row (Add Admin form) — same cells as the PHP-rendered rows */
+    function admBuildRow(id, fullName, email, role) {
+        const tr = admEl('tr', 'adm-account-row');
+        tr.setAttribute('data-id', String(id || ''));
+        tr.setAttribute('data-name', fullName);
+        tr.setAttribute('data-email', email);
+        tr.appendChild(admEl('td', 'td-fw', fullName));
+        tr.appendChild(admEl('td', 'adm-td-email', email));
+        const roleTd = admEl('td');
+        roleTd.appendChild(admEl('span', 'adm-role-badge ' + (role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin'), role));
+        tr.appendChild(roleTd);
+        tr.appendChild(admStatusCell(null));
+        tr.appendChild(admEl('td', 'td-sm', new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
+        tr.appendChild(admActionsCell(role === 'Admin' && !!id, false));
+        return tr;
+    }
+
+    (function initManageAdmins() {
+        const tbody = document.getElementById('admAccountsTbody');
+        const editModal = document.getElementById('admEditModal');
+        if (!tbody || !editModal) return; // not a Super Admin — nothing rendered
+
+        const dormantModal = document.getElementById('admDormantModal');
+        const deleteModal = document.getElementById('admDeleteModal');
+        let currentRow = null;
+        let busy = false;
+
+        /* ── modal plumbing ───────────────────────────────────── */
+        function openModal(m) { m.classList.add('ps-modal-open'); }
+        function closeModal(m) { m.classList.remove('ps-modal-open'); currentRow = null; busy = false; }
+
+        function showAlert(id, msg) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'alert-banner alert-error';
+        }
+        function clearAlert(id) {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = ''; el.className = 'alert-banner hidden'; }
+        }
+        function resetPasswordFields(ids) {
+            ids.forEach(function (i) {
+                const f = document.getElementById(i);
+                if (!f) return;
+                f.value = '';
+                f.type = 'password';
+            });
+            document.querySelectorAll('.adm-reauth .fac-pw-toggle .material-symbols-outlined, #admEditModal .fac-pw-toggle .material-symbols-outlined')
+                .forEach(function (ic) { ic.textContent = 'visibility'; });
+        }
+
+        document.querySelectorAll('[data-adm-close]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                closeModal(document.getElementById(b.getAttribute('data-adm-close')));
+            });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            [editModal, dormantModal, deleteModal].forEach(function (m) {
+                if (m && m.classList.contains('ps-modal-open')) closeModal(m);
+            });
+        });
+
+        /* Password show/hide (modals only — the Add form binds its own) */
+        document.querySelectorAll('#admEditModal .fac-pw-toggle, #admDeleteModal .fac-pw-toggle').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const ids = (btn.getAttribute('data-target') || '').split(',');
+                const first = document.getElementById(ids[0]);
+                if (!first) return;
+                const show = first.type === 'password';
+                ids.forEach(function (i) { const f = document.getElementById(i); if (f) f.type = show ? 'text' : 'password'; });
+                const ic = btn.querySelector('.material-symbols-outlined');
+                if (ic) ic.textContent = show ? 'visibility_off' : 'visibility';
+            });
+        });
+
+        /* ── one POST helper for every action ─────────────────── */
+        function call(fields) {
+            const fd = new FormData();
+            Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
+            fd.append('csrf_token', getCsrfToken());
+            return fetch(ADM_API, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (res) {
+                    return res.json().catch(function () { return {}; }).then(function (j) {
+                        return { ok: res.ok, data: j };
+                    });
+                });
+        }
+        function msgOf(r) {
+            return (r.data && (r.data.message || r.data.error)) || 'Something went wrong. Please try again.';
+        }
+        function setBusy(btn, on, html) {
+            btn.disabled = on;
+            if (html !== undefined) btn.innerHTML = html;
+        }
+
+        /* ── row helpers ──────────────────────────────────────── */
+        function setRowDormant(tr, until) {
+            const oldStatus = tr.querySelector('.adm-td-status');
+            const oldActions = tr.querySelector('.adm-td-actions');
+            oldStatus.replaceWith(admStatusCell(until || null));
+            oldActions.replaceWith(admActionsCell(true, !!until));
+        }
+
+        /* ── click delegation on the table ────────────────────── */
+        tbody.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-adm-action]');
+            if (!btn || busy) return;
+            const tr = btn.closest('tr.adm-account-row');
+            if (!tr) return;
+            currentRow = tr;
+            const action = btn.getAttribute('data-adm-action');
+
+            if (action === 'edit') openEdit(tr);
+            else if (action === 'dormant') openDormant(tr);
+            else if (action === 'delete') openDelete(tr);
+            else if (action === 'reactivate') doReactivate(tr, btn);
+        });
+
+        /* ── EDIT ─────────────────────────────────────────────── */
+        function openEdit(tr) {
+            clearAlert('adm-edit-alert');
+            document.getElementById('adm-edit-name').value = tr.getAttribute('data-name') || '';
+            document.getElementById('adm-edit-email').value = tr.getAttribute('data-email') || '';
+            resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth']);
+            openModal(editModal);
+            currentRow = tr;
+            document.getElementById('adm-edit-name').focus();
+        }
+
+        document.getElementById('adm-edit-save').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const name = document.getElementById('adm-edit-name').value.trim();
+            const email = document.getElementById('adm-edit-email').value.trim().toLowerCase();
+            const pw = document.getElementById('adm-edit-pw').value;
+            const pw2 = document.getElementById('adm-edit-pw2').value;
+            const reauth = document.getElementById('adm-edit-reauth').value;
+
+            clearAlert('adm-edit-alert');
+            if (!name) return showAlert('adm-edit-alert', 'Full name is required.');
+            if (!/^[^\s@]+@admin\.edu$/i.test(email)) return showAlert('adm-edit-alert', 'Admin emails must end in @admin.edu.');
+            if (pw && pw.length < 8) return showAlert('adm-edit-alert', 'New password must be at least 8 characters.');
+            if (pw !== pw2) return showAlert('adm-edit-alert', 'New passwords do not match.');
+            if (!reauth) return showAlert('adm-edit-alert', 'Enter your own password to confirm.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
+            call({
+                action: 'update', id: tr.getAttribute('data-id'),
+                full_name: name, email: email,
+                new_password: pw, confirm_password: pw2, current_password: reauth
+            }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') {
+                    document.getElementById('adm-edit-reauth').value = '';
+                    return showAlert('adm-edit-alert', msgOf(r));
+                }
+                tr.setAttribute('data-name', r.data.full_name);
+                tr.setAttribute('data-email', r.data.email);
+                const nameCell = tr.querySelector('td.td-fw');
+                nameCell.firstChild.textContent = r.data.full_name + ' ';
+                tr.querySelector('.adm-td-email').textContent = r.data.email;
+                closeModal(editModal);
+                showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-edit-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+
+        /* ── DORMANT ──────────────────────────────────────────── */
+        const customWrap = document.getElementById('adm-custom-days');
+        const customInput = document.getElementById('adm-dormant-custom');
+        const untilText = document.getElementById('adm-dormant-until-text');
+
+        function selectedDays() {
+            const chosen = document.querySelector('input[name="adm-dormant-days"]:checked');
+            if (!chosen) return null;
+            const raw = chosen.value === 'custom' ? customInput.value.trim() : chosen.value;
+            if (!/^\d+$/.test(raw)) return null;
+            const n = parseInt(raw, 10);
+            return (n >= 1 && n <= ADM_MAX_DAYS) ? n : null;
+        }
+
+        function refreshUntil() {
+            const chosen = document.querySelector('input[name="adm-dormant-days"]:checked');
+            customWrap.hidden = !(chosen && chosen.value === 'custom');
+            const n = selectedDays();
+            untilText.textContent = n
+                ? 'Dormant until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
+                : 'Pick 1 to ' + ADM_MAX_DAYS + ' days (maximum ' + ADM_MAX_DAYS + ').';
+        }
+
+        document.querySelectorAll('input[name="adm-dormant-days"]').forEach(function (r) {
+            r.addEventListener('change', function () {
+                refreshUntil();
+                if (r.value === 'custom' && r.checked) customInput.focus();
+            });
+        });
+        customInput.addEventListener('input', refreshUntil);
+
+        function openDormant(tr) {
+            clearAlert('adm-dormant-alert');
+            document.getElementById('adm-dormant-name').textContent = tr.getAttribute('data-name') || 'This admin';
+            const def = document.querySelector('input[name="adm-dormant-days"][value="7"]');
+            if (def) def.checked = true;
+            customInput.value = '';
+            refreshUntil();
+            openModal(dormantModal);
+            currentRow = tr;
+        }
+
+        document.getElementById('adm-dormant-save').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const days = selectedDays();
+            clearAlert('adm-dormant-alert');
+            if (!days) return showAlert('adm-dormant-alert', 'Choose between 1 and ' + ADM_MAX_DAYS + ' days.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
+            call({ action: 'dormant', id: tr.getAttribute('data-id'), days: days }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') return showAlert('adm-dormant-alert', msgOf(r));
+                setRowDormant(tr, r.data.dormant_until);
+                closeModal(dormantModal);
+                showToast(r.data.message, 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-dormant-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+
+        /* ── REACTIVATE (reversible, so no confirmation dialog) ── */
+        function doReactivate(tr, btn) {
+            busy = true;
+            btn.disabled = true;
+            call({ action: 'reactivate', id: tr.getAttribute('data-id') }).then(function (r) {
+                busy = false;
+                if (!r.ok || r.data.status !== 'success') {
+                    btn.disabled = false;
+                    return showToast(msgOf(r), 'error');
+                }
+                setRowDormant(tr, null);
+                showToast('Account reactivated.', 'success');
+            }).catch(function () {
+                busy = false;
+                btn.disabled = false;
+                showToast('Network error — please try again.', 'error');
+            });
+        }
+
+        /* ── DELETE ───────────────────────────────────────────── */
+        function openDelete(tr) {
+            clearAlert('adm-delete-alert');
+            document.getElementById('adm-delete-name').textContent = tr.getAttribute('data-name') || 'this admin';
+            resetPasswordFields(['adm-delete-reauth']);
+            openModal(deleteModal);
+            currentRow = tr;
+            document.getElementById('adm-delete-reauth').focus();
+        }
+
+        document.getElementById('adm-delete-confirm').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const reauth = document.getElementById('adm-delete-reauth').value;
+            clearAlert('adm-delete-alert');
+            if (!reauth) return showAlert('adm-delete-alert', 'Enter your own password to confirm.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Deleting…');
+            call({ action: 'delete', id: tr.getAttribute('data-id'), current_password: reauth }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') {
+                    document.getElementById('adm-delete-reauth').value = '';
+                    return showAlert('adm-delete-alert', msgOf(r));
+                }
+                tr.remove();
+                if (typeof r.data.accounts_count === 'number') {
+                    admUpdateSeats(r.data.accounts_count, r.data.accounts_remaining);
+                }
+                closeModal(deleteModal);
+                showToast('Admin account deleted. A seat is free for a new admin.', 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-delete-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+    })();
+    /* ▲ MANAGE-ADMINS-END ───────────────────────────────────────────────── */
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {

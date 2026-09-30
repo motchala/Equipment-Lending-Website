@@ -44,3 +44,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
     session_start();
 }
+
+// ── Admin session re-validation ─────────────────────────────────────────
+// Ends admin sessions whose account was deleted, made dormant, or had its
+// credentials changed by a Super Admin. No-op for visitors/faculty/students.
+require_once __DIR__ . '/admin-auth.php';
+admin_session_guard();

@@ -531,7 +531,7 @@ $admin_accounts_remaining = max(0, 5 - $admin_accounts_count);
 // Columns: fullName, email, role, created_at — id added by migration.
 $_admin_list_result = @mysqli_query(
     $conn,
-    "SELECT fullName, email, role, created_at FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
 );
 $admin_accounts_list = [];
 if ($_admin_list_result) {

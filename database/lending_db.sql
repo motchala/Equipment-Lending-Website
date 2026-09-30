@@ -40,6 +40,8 @@ CREATE TABLE `tbl_accounts` (
   `role` enum('Super Admin','Admin') NOT NULL DEFAULT 'Admin',
   `created_at` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
+  `dormant_until` bigint(20) unsigned DEFAULT NULL,
+  `session_epoch` bigint(20) unsigned NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

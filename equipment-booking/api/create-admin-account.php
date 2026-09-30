@@ -149,6 +149,7 @@ if (!$ins_stmt->execute()) {
     error_log('[create-admin-account] INSERT execute failed: ' . $conn->error);
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
+$new_id = (int)$ins_stmt->insert_id;
 $ins_stmt->close();
 
 // ── Success ───────────────────────────────────────────────────────────────────
@@ -157,6 +158,7 @@ http_response_code(201);
 echo json_encode([
     'status'       => 'success',
     'message'      => "Admin account for {$full_name} created successfully.",
+    'id'           => $new_id,
     'accounts_remaining' => $remaining,
 ]);
 exit;

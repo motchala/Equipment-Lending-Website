@@ -111,9 +111,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <?php echo htmlspecialchars($initials); ?>
             </div>
 
-            <!-- Profile Dropdown — also hosts Scan Return + Admin (My
-                 Account, renamed) since those moved out of the navbar.
-                 Logout lives in the sidebar instead; see /sidebar below. -->
+            <!-- Profile Dropdown — hosts Scan Return, Settings and Log Out.
+                 (Log Out is also available in the sidebar; both open the same
+                 confirmation dialog via data-action="logout".) -->
             <div class="profile-dropdown" id="profileDropdown" role="menu">
                 <div class="dd-header">
                     <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
@@ -133,6 +133,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="dd-icon">
                             <span class="material-symbols-outlined">settings</span>
                         </div>Settings
+                    </button>
+                    <div class="dd-divider"></div>
+                    <button class="dd-item dd-logout" type="button" data-action="logout">
+                        <div class="dd-icon">
+                            <span class="material-symbols-outlined">logout</span>
+                        </div>Log Out
                     </button>
                 </div>
             </div>
@@ -2766,7 +2772,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <!-- Slot counter banner -->
                         <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
                             <span class="material-symbols-outlined">group</span>
-                            <span>
+                            <span id="adm-slot-text">
                                 <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
                                 <?php if ($admin_accounts_remaining > 0): ?>
                                     — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
@@ -2778,85 +2784,83 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
 
                         <!-- Add Admin form (hidden when limit reached) -->
-                        <?php if ($admin_accounts_remaining > 0): ?>
-                            <div class="eq-card adm-form-card" id="adm-form-card">
-                                <div class="eq-card-header">
-                                    <h2>
+                        <div class="eq-card adm-form-card" id="adm-form-card" <?php echo $admin_accounts_remaining > 0 ? '' : 'hidden'; ?>>
+                            <div class="eq-card-header">
+                                <h2>
+                                    <span class="material-symbols-outlined">person_add</span>
+                                    Add New Admin
+                                </h2>
+                            </div>
+                            <div class="eq-card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                                        <input type="text" id="adm-fullname" name="adm_fullname"
+                                            class="form-control-custom"
+                                            placeholder="e.g. Juan dela Cruz"
+                                            maxlength="255" autocomplete="off">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                                        <input type="email" id="adm-email" name="adm_email"
+                                            class="form-control-custom"
+                                            placeholder="name@admin.edu"
+                                            maxlength="255" autocomplete="off">
+                                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-role">Role <span class="req-star">*</span></label>
+                                        <select id="adm-role" name="adm_role" class="form-control-custom">
+                                            <option value="Admin" selected>Admin</option>
+                                            <option value="Super Admin">Super Admin</option>
+                                        </select>
+                                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-password">Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="adm-password" name="adm_password"
+                                                class="form-control-custom"
+                                                placeholder="Min. 8 characters"
+                                                autocomplete="new-password">
+                                            <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                                <span class="material-symbols-outlined">visibility</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="adm-confirm" name="adm_confirm"
+                                                class="form-control-custom"
+                                                placeholder="Re-enter password"
+                                                autocomplete="new-password">
+                                            <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                                <span class="material-symbols-outlined">visibility</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+
+                                <div class="adm-form-actions">
+                                    <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
                                         <span class="material-symbols-outlined">person_add</span>
-                                        Add New Admin
-                                    </h2>
-                                </div>
-                                <div class="eq-card-body">
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
-                                            <input type="text" id="adm-fullname" name="adm_fullname"
-                                                class="form-control-custom"
-                                                placeholder="e.g. Juan dela Cruz"
-                                                maxlength="255" autocomplete="off">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="adm-email">Admin Email <span class="req-star">*</span></label>
-                                            <input type="email" id="adm-email" name="adm_email"
-                                                class="form-control-custom"
-                                                placeholder="name@admin.edu"
-                                                maxlength="255" autocomplete="off">
-                                            <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
-                                        </div>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-role">Role <span class="req-star">*</span></label>
-                                            <select id="adm-role" name="adm_role" class="form-control-custom">
-                                                <option value="Admin" selected>Admin</option>
-                                                <option value="Super Admin">Super Admin</option>
-                                            </select>
-                                            <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
-                                        </div>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-password">Password <span class="req-star">*</span></label>
-                                            <div class="fac-pw-wrap">
-                                                <input type="password" id="adm-password" name="adm_password"
-                                                    class="form-control-custom"
-                                                    placeholder="Min. 8 characters"
-                                                    autocomplete="new-password">
-                                                <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
-                                                    <span class="material-symbols-outlined">visibility</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
-                                            <div class="fac-pw-wrap">
-                                                <input type="password" id="adm-confirm" name="adm_confirm"
-                                                    class="form-control-custom"
-                                                    placeholder="Re-enter password"
-                                                    autocomplete="new-password">
-                                                <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
-                                                    <span class="material-symbols-outlined">visibility</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
-
-                                    <div class="adm-form-actions">
-                                        <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
-                                            <span class="material-symbols-outlined">person_add</span>
-                                            Create Admin Account
-                                        </button>
-                                    </div>
+                                        Create Admin Account
+                                    </button>
                                 </div>
                             </div>
-                        <?php else: ?>
-                            <div class="eq-card" style="padding:1.5rem;text-align:center;color:var(--text-light);">
-                                <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
-                                Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
-                            </div>
-                        <?php endif; ?>
+                        </div>
+                        <div class="eq-card" id="adm-max-card" <?php echo $admin_accounts_remaining > 0 ? 'hidden' : ''; ?>
+                            style="padding:1.5rem;text-align:center;color:var(--text-light);">
+                            <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
+                            Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
+                        </div>
 
                         <!-- Existing admin accounts list -->
                         <div class="eq-card adm-list-card">
@@ -2873,35 +2877,85 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <th>Name</th>
                                             <th>Email</th>
                                             <th>Role</th>
+                                            <th>Status</th>
                                             <th>Added</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="admAccountsTbody">
                                         <?php if (empty($admin_accounts_list)): ?>
                                             <tr>
-                                                <td colspan="4" style="text-align:center;padding:2rem;color:var(--text-light);">
+                                                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-light);">
                                                     No accounts found.
                                                 </td>
                                             </tr>
                                         <?php else: ?>
-                                            <?php foreach ($admin_accounts_list as $acct): ?>
-                                                <tr class="adm-account-row">
+                                            <?php foreach ($admin_accounts_list as $acct):
+                                                $acct_is_you  = strtolower($acct['email'] ?? '') === strtolower($admin_email);
+                                                $acct_dormant = admin_is_dormant($acct['dormant_until'] ?? null);
+                                                // Only plain "Admin" accounts other than yourself can be managed;
+                                                // Super Admins are protected (enforced again on the server).
+                                                $acct_manage  = !$acct_is_you && ($acct['role'] ?? '') === 'Admin';
+                                            ?>
+                                                <tr class="adm-account-row"
+                                                    data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
+                                                    data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
+                                                    data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>">
                                                     <td class="td-fw">
                                                         <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
-                                                        <?php if (strtolower($acct['email'] ?? '') === strtolower($admin_email)): ?>
+                                                        <?php if ($acct_is_you): ?>
                                                             <span class="adm-you-badge">You</span>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
+                                                    <td class="adm-td-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
                                                     <td>
                                                         <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
                                                             <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
                                                         </span>
                                                     </td>
+                                                    <td class="adm-td-status">
+                                                        <?php if ($acct_dormant): ?>
+                                                            <span class="adm-status adm-status--dormant"
+                                                                title="Dormant until <?php echo htmlspecialchars(admin_format_time((int)$acct['dormant_until'])); ?>">
+                                                                <span class="material-symbols-outlined">bedtime</span>
+                                                                Dormant until <?php echo htmlspecialchars((new DateTime('@' . (int)$acct['dormant_until']))->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j')); ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="adm-status adm-status--active">Active</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td class="td-sm">
                                                         <?php echo $acct['created_at']
                                                             ? date('M j, Y', strtotime($acct['created_at']))
                                                             : '—'; ?>
+                                                    </td>
+                                                    <td class="adm-td-actions">
+                                                        <?php if ($acct_manage): ?>
+                                                            <div class="adm-actions">
+                                                                <button type="button" class="adm-act" data-adm-action="edit"
+                                                                    title="Edit login details" aria-label="Edit login details">
+                                                                    <span class="material-symbols-outlined">edit</span>
+                                                                </button>
+                                                                <?php if ($acct_dormant): ?>
+                                                                    <button type="button" class="adm-act" data-adm-action="reactivate"
+                                                                        title="Reactivate account" aria-label="Reactivate account">
+                                                                        <span class="material-symbols-outlined">play_circle</span>
+                                                                    </button>
+                                                                <?php else: ?>
+                                                                    <button type="button" class="adm-act" data-adm-action="dormant"
+                                                                        title="Make dormant" aria-label="Make dormant">
+                                                                        <span class="material-symbols-outlined">bedtime</span>
+                                                                    </button>
+                                                                <?php endif; ?>
+                                                                <button type="button" class="adm-act adm-act--danger" data-adm-action="delete"
+                                                                    title="Delete account" aria-label="Delete account">
+                                                                    <span class="material-symbols-outlined">delete</span>
+                                                                </button>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="adm-protected"
+                                                                title="<?php echo $acct_is_you ? 'This is you — use My Account' : 'Super Admin accounts are protected'; ?>">—</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -3443,6 +3497,168 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
     </div>
+
+    <?php if ($is_super_admin): ?>
+        <!-- ═══ MANAGE ADMINS — edit / dormant / delete (Super Admin only) ═══
+         Direct children of <body>, same ps-modal system as the Requests modals.
+         Driven by the "Manage Admins" block in admin-dashboard.js. -->
+
+        <!-- MODAL: EDIT ADMIN LOGIN DETAILS -->
+        <div class="ps-modal-backdrop" id="admEditModal">
+            <div class="ps-modal">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                    </div>
+                    <h3>Edit Admin Login Details</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admEditModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-edit-alert" class="alert-banner hidden" role="alert"></div>
+                    <div class="form-group">
+                        <label for="adm-edit-name">Full Name <span class="req-star">*</span></label>
+                        <input type="text" id="adm-edit-name" class="form-control-custom" maxlength="255" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="adm-edit-email">Admin Email <span class="req-star">*</span></label>
+                        <input type="email" id="adm-edit-email" class="form-control-custom" maxlength="255" autocomplete="off">
+                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-edit-pw">New Password</label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-edit-pw" class="form-control-custom"
+                                    placeholder="Leave blank to keep" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-edit-pw,adm-edit-pw2" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-edit-pw2">Confirm New Password</label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-edit-pw2" class="form-control-custom"
+                                    placeholder="Re-enter new password" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-edit-pw,adm-edit-pw2" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="adm-modal-note">
+                        <span class="material-symbols-outlined">info</span>
+                        Changing the email or password signs this admin out of every device.
+                    </p>
+                    <div class="form-group adm-reauth">
+                        <label for="adm-edit-reauth">Your password <span class="req-star">*</span></label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="adm-edit-reauth" class="form-control-custom"
+                                placeholder="Confirm it's you" autocomplete="current-password">
+                            <button type="button" class="fac-pw-toggle" data-target="adm-edit-reauth" title="Show/hide password">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admEditModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-edit-save">
+                        <span class="material-symbols-outlined">save</span> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: MAKE ADMIN DORMANT -->
+        <div class="ps-modal-backdrop" id="admDormantModal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--warning">
+                        <span class="material-symbols-outlined">bedtime</span>
+                    </div>
+                    <h3>Make Account Dormant</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admDormantModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-dormant-alert" class="alert-banner hidden" role="alert"></div>
+                    <p class="adm-modal-text">
+                        <strong id="adm-dormant-name">This admin</strong> keeps their account, but will be signed out and
+                        cannot log in until the period ends. You can reactivate it any time.
+                    </p>
+                    <div class="adm-days" role="radiogroup" aria-label="Dormant for">
+                        <?php foreach (ADMIN_DORMANT_CHOICES as $d): ?>
+                            <label class="adm-day-chip">
+                                <input type="radio" name="adm-dormant-days" value="<?php echo (int)$d; ?>" <?php echo $d === 7 ? 'checked' : ''; ?>>
+                                <span><?php echo (int)$d; ?> day<?php echo $d === 1 ? '' : 's'; ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                        <label class="adm-day-chip">
+                            <input type="radio" name="adm-dormant-days" value="custom">
+                            <span>Custom</span>
+                        </label>
+                    </div>
+                    <div class="form-group adm-custom-days" id="adm-custom-days" hidden>
+                        <label for="adm-dormant-custom">Number of days (1–<?php echo (int)ADMIN_DORMANT_MAX_DAYS; ?>)</label>
+                        <input type="number" id="adm-dormant-custom" class="form-control-custom"
+                            min="1" max="<?php echo (int)ADMIN_DORMANT_MAX_DAYS; ?>" step="1" inputmode="numeric" placeholder="e.g. 10">
+                    </div>
+                    <p class="adm-modal-note" id="adm-dormant-until-note">
+                        <span class="material-symbols-outlined">event</span>
+                        <span id="adm-dormant-until-text"></span>
+                    </p>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDormantModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-dormant-save">
+                        <span class="material-symbols-outlined">bedtime</span> Make Dormant
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: DELETE ADMIN -->
+        <div class="ps-modal-backdrop" id="admDeleteModal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--danger">
+                        <span class="material-symbols-outlined">delete</span>
+                    </div>
+                    <h3>Delete Admin Account</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admDeleteModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-delete-alert" class="alert-banner hidden" role="alert"></div>
+                    <p class="adm-modal-text">
+                        Delete <strong id="adm-delete-name">this admin</strong>? The account is removed permanently and its
+                        seat becomes free for a new admin. This can't be undone.
+                    </p>
+                    <div class="form-group adm-reauth">
+                        <label for="adm-delete-reauth">Your password <span class="req-star">*</span></label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="adm-delete-reauth" class="form-control-custom"
+                                placeholder="Confirm it's you" autocomplete="current-password">
+                            <button type="button" class="fac-pw-toggle" data-target="adm-delete-reauth" title="Show/hide password">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDeleteModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--danger" id="adm-delete-confirm">
+                        <span class="material-symbols-outlined">delete</span> Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- MODAL: CONFIRM RETURN -->
     <div class="ps-modal-backdrop" id="ps-return-modal">

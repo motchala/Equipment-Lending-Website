@@ -623,3 +623,93 @@ table {
         font-size: 16px !important;
     }
 }
+
+/* ================================================================
+   § 9  SETTINGS SCREEN — responds to the space it actually has
+   ----------------------------------------------------------------
+   Settings used a mix of viewport breakpoints (.sett-grid stacked at
+   900px, .ps-two-col / .form-row only at 768px), so collapsing or
+   expanding the sidebar — which changes the room available without
+   changing the viewport — never re-flowed it, and the cards were
+   squeezed at in-between widths.
+
+   admin-dashboard-responsive.js (§ C) measures #panel-settings with a
+   ResizeObserver and sets data-sett-size on it:
+       wide   >= 760px   normal two-column layout (no overrides here)
+       narrow  < 760px   cards / form rows stack to one column
+       tiny    < 480px   rows stack label-over-value, buttons full width
+   Because it measures the panel itself, expanding / collapsing the
+   sidebar (and the 0.22s width transition) is handled automatically.
+   Without JS the existing viewport rules above still apply.
+================================================================ */
+
+/* Sub-tab strip (Account / Manage Admins / Preferences / …): scroll
+   inside its own row instead of overflowing the panel at any width. */
+#panel-settings .rq-sub-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+#panel-settings .rq-sub-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+#panel-settings .rq-sub-tab {
+    flex-shrink: 0;
+}
+
+/* Grid children may shrink instead of forcing horizontal overflow. */
+#panel-settings .sett-grid>*,
+#panel-settings .ps-two-col>*,
+#panel-settings .form-row>* {
+    min-width: 0;
+}
+
+/* Long values (emails, names) wrap rather than push the card wider. */
+#panel-settings .info-val,
+#panel-settings .sett-notif-sub,
+#panel-settings .sett-profile-meta {
+    overflow-wrap: anywhere;
+}
+
+/* ── narrow: less than ~760px available ───────────────────────── */
+#panel-settings[data-sett-size="narrow"] .sett-grid,
+#panel-settings[data-sett-size="narrow"] .ps-two-col,
+#panel-settings[data-sett-size="narrow"] .form-row,
+#panel-settings[data-sett-size="tiny"] .sett-grid,
+#panel-settings[data-sett-size="tiny"] .ps-two-col,
+#panel-settings[data-sett-size="tiny"] .form-row {
+    grid-template-columns: 1fr;
+}
+
+#panel-settings[data-sett-size="narrow"] .sett-profile-banner,
+#panel-settings[data-sett-size="narrow"] .ov-profile-hero,
+#panel-settings[data-sett-size="tiny"] .sett-profile-banner,
+#panel-settings[data-sett-size="tiny"] .ov-profile-hero {
+    flex-wrap: wrap;
+}
+
+#panel-settings[data-sett-size="narrow"] .ov-hero-actions,
+#panel-settings[data-sett-size="tiny"] .ov-hero-actions {
+    flex-basis: 100%;
+}
+
+/* ── tiny: less than ~480px available ─────────────────────────── */
+#panel-settings[data-sett-size="tiny"] .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+#panel-settings[data-sett-size="tiny"] .sett-edit-btn,
+#panel-settings[data-sett-size="tiny"] .ov-hero-actions>* {
+    flex: 1 1 auto;
+    justify-content: center;
+    text-align: center;
+}
+
+#panel-settings[data-sett-size="tiny"] .sett-card-body,
+#panel-settings[data-sett-size="tiny"] .eq-card-body {
+    padding: 1rem;
+}
