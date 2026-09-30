@@ -530,6 +530,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <!-- facilities tab portal -->
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
 
+    <!-- Shared logout confirmation dialog + loading state -->
+    <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
+
     <style nonce="<?php echo $csp_nonce; ?>">
         /* fix for csp vulnerability. inline styles */
         /* ================================================================
@@ -4363,6 +4366,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <!-- Mobile Nav Backdrop -->
     <div class="nav-backdrop" id="navBackdrop"></div>
 
+    <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-dashboard.js"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
 </body>

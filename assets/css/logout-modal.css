@@ -1,0 +1,352 @@
+/* ════════════════════════════════════════════════════════════════════
+   logout-modal.css
+   Shared by: admin-dashboard.php, faculty-dashboard.php
+   Pairs with: assets/js/logout-modal.js
+
+   Surfaces, text and border colours are read from whichever dashboard
+   stylesheet is active (admin: --card-bg / --text-dark / --khaki-border,
+   faculty: --color-surface-lowest / --color-on-surface / ...), so the
+   dialog automatically matches each interface — including Dark and
+   High-Contrast themes — without duplicating either design system.
+   Everything is prefixed `ps-lo` so it cannot collide with existing CSS.
+   ════════════════════════════════════════════════════════════════════ */
+
+.ps-lo {
+    /* Colours inherited from the host dashboard, with safe fallbacks */
+    --ps-lo-surface: var(--card-bg, var(--color-surface-lowest, #ffffff));
+    --ps-lo-text: var(--text-dark, var(--color-on-surface, #2c1f1f));
+    --ps-lo-muted: var(--text-light, var(--color-on-surface-variant, #6b5c5c));
+    --ps-lo-border: var(--khaki-border, var(--color-outline-variant, #e6e0d4));
+
+    /* Accent (maroon in light mode) */
+    --ps-lo-accent: var(--accent-maroon, var(--color-primary, #7a0c0c));
+    --ps-lo-accent-fg: var(--ps-lo-accent);
+    --ps-lo-accent-hover: color-mix(in srgb, var(--ps-lo-accent) 80%, #000000);
+    --ps-lo-on-accent: #ffffff;
+    --ps-lo-tint: color-mix(in srgb, var(--ps-lo-accent) 10%, transparent);
+    --ps-lo-tint-ring: color-mix(in srgb, var(--ps-lo-accent) 6%, transparent);
+    --ps-lo-focus: color-mix(in srgb, var(--ps-lo-accent) 35%, transparent);
+
+    --ps-lo-overlay: rgba(28, 8, 10, 0.55);
+    --ps-lo-shadow: 0 28px 64px -14px rgba(40, 6, 8, 0.38), 0 10px 24px -10px rgba(40, 6, 8, 0.22);
+    --ps-lo-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    /* above every existing modal / dropdown (highest in use: 99999) */
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: var(--ps-lo-overlay);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    font-family: inherit;
+}
+
+.ps-lo[hidden] {
+    display: none;
+}
+
+.ps-lo.is-open {
+    opacity: 1;
+}
+
+/* ── Theme overrides ──────────────────────────────────────────────── */
+[data-theme="dark"] .ps-lo {
+    --ps-lo-accent: #b02f48;
+    --ps-lo-accent-fg: #f19bab;
+    --ps-lo-overlay: rgba(6, 3, 5, 0.7);
+    --ps-lo-shadow: 0 28px 64px -14px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="high-contrast"] .ps-lo {
+    --ps-lo-accent: #ff4455;
+    --ps-lo-accent-fg: #ff4455;
+    --ps-lo-accent-hover: #ff7a86;
+    --ps-lo-on-accent: #000000;
+    --ps-lo-overlay: rgba(0, 0, 0, 0.88);
+    --ps-lo-shadow: none;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────── */
+.ps-lo__card {
+    position: relative;
+    width: min(340px, 100%);
+    padding: 24px 22px 20px;
+    text-align: center;
+    color: var(--ps-lo-text);
+    background: var(--ps-lo-surface);
+    border: 1px solid var(--ps-lo-border);
+    border-radius: 16px;
+    box-shadow: var(--ps-lo-shadow);
+    overflow: hidden;
+    outline: none;
+    transform: translateY(10px) scale(0.96);
+    transition: transform 0.3s var(--ps-lo-ease);
+}
+
+.ps-lo.is-open .ps-lo__card {
+    transform: translateY(0) scale(1);
+}
+
+[data-theme="high-contrast"] .ps-lo__card {
+    border: 2px solid var(--ps-lo-text);
+}
+
+/* ── State views ──────────────────────────────────────────────────── */
+.ps-lo__view {
+    display: none;
+}
+
+.ps-lo__card[data-state="confirm"] .ps-lo__view--confirm,
+.ps-lo__card[data-state="loading"] .ps-lo__view--busy,
+.ps-lo__card[data-state="done"] .ps-lo__view--busy {
+    display: block;
+    animation: ps-lo-fade 0.28s ease both;
+}
+
+/* ── Icon badge ───────────────────────────────────────────────────── */
+.ps-lo__badge {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 12px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--ps-lo-accent-fg);
+    background: var(--ps-lo-tint);
+    box-shadow: 0 0 0 5px var(--ps-lo-tint-ring);
+}
+
+.ps-lo__badge .material-symbols-outlined {
+    font-size: 24px;
+    line-height: 1;
+}
+
+/* ── Text ─────────────────────────────────────────────────────────── */
+.ps-lo__title {
+    margin: 0 0 4px;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    color: var(--ps-lo-text);
+}
+
+.ps-lo__desc {
+    margin: 0 auto;
+    max-width: 280px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ps-lo-muted);
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────── */
+.ps-lo__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.ps-lo__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.18s ease, border-color 0.18s ease,
+        color 0.18s ease, transform 0.18s var(--ps-lo-ease), box-shadow 0.18s ease;
+}
+
+.ps-lo__btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.ps-lo__btn:active {
+    transform: scale(0.97);
+}
+
+.ps-lo__btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--ps-lo-focus);
+}
+
+.ps-lo__btn--ghost {
+    color: var(--ps-lo-text);
+    background: transparent;
+    border-color: var(--ps-lo-border);
+}
+
+.ps-lo__btn--ghost:hover {
+    background: var(--ps-lo-tint);
+    border-color: var(--ps-lo-accent-fg);
+}
+
+.ps-lo__btn--primary {
+    color: var(--ps-lo-on-accent);
+    background: var(--ps-lo-accent);
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ps-lo-accent) 70%, transparent);
+}
+
+.ps-lo__btn--primary:hover {
+    background: var(--ps-lo-accent-hover);
+}
+
+[data-theme="high-contrast"] .ps-lo__btn {
+    border: 2px solid var(--ps-lo-text);
+}
+
+/* ── Loading / success state ──────────────────────────────────────── */
+.ps-lo__spin,
+.ps-lo__check {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+}
+
+.ps-lo__spin::before {
+    content: "";
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 3px solid var(--ps-lo-tint);
+    border-top-color: var(--ps-lo-accent-fg);
+    animation: ps-lo-spin 0.85s linear infinite;
+}
+
+.ps-lo__spin .material-symbols-outlined {
+    position: absolute;
+    font-size: 20px;
+}
+
+.ps-lo__check {
+    opacity: 0;
+    transform: scale(0.5);
+}
+
+.ps-lo__card[data-state="done"] .ps-lo__spin {
+    display: none;
+}
+
+.ps-lo__card[data-state="done"] .ps-lo__check {
+    opacity: 1;
+    transform: scale(1);
+    animation: ps-lo-pop 0.45s var(--ps-lo-ease) both;
+}
+
+.ps-lo__bar {
+    position: relative;
+    height: 4px;
+    margin: 16px auto 0;
+    max-width: 200px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--ps-lo-tint);
+}
+
+.ps-lo__bar::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    border-radius: inherit;
+    background: var(--ps-lo-accent-fg);
+    animation: ps-lo-bar 1.15s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.ps-lo__card[data-state="done"] .ps-lo__bar::after {
+    width: 100%;
+    animation: none;
+}
+
+/* ── Keyframes ────────────────────────────────────────────────────── */
+@keyframes ps-lo-fade {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes ps-lo-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes ps-lo-bar {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(260%);
+    }
+}
+
+@keyframes ps-lo-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ── Small screens ────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+    .ps-lo__card {
+        padding: 22px 18px 18px;
+    }
+}
+
+@media (max-width: 340px) {
+    .ps-lo__actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Respect reduced-motion preferences ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+
+    .ps-lo,
+    .ps-lo__card,
+    .ps-lo__btn {
+        transition-duration: 0.01ms;
+    }
+
+    .ps-lo__view,
+    .ps-lo__check {
+        animation-duration: 0.01ms !important;
+    }
+
+    .ps-lo__spin::before {
+        animation-duration: 2.4s;
+    }
+
+    .ps-lo__bar::after {
+        animation-duration: 2.4s;
+    }
+}

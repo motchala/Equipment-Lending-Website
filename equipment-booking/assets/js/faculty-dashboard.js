@@ -1686,7 +1686,8 @@
                 }
                 case 'logout':
                     closeDropdown();
-                    if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php';
+                    if (window.PSLogout) window.PSLogout.open(el);
+                    else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
             }
         } catch (err) {

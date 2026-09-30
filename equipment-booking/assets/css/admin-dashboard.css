@@ -747,13 +747,21 @@ main#app-main {
     color: #fff;
     font-size: 0.6rem;
     font-weight: 700;
-    width: 16px;
+    min-width: 16px;
     height: 16px;
-    border-radius: 50%;
+    padding: 0 3px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 2px solid var(--primary-white);
+}
+
+.notif-btn:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
 }
 
 /* ── PROFILE DROPDOWN ─────────────────────────────────────────── */

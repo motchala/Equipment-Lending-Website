@@ -45,6 +45,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css?v=<?php echo filemtime('equipment-booking/assets/css/admin-dashboard.css'); ?>">
+    <!-- Shared logout confirmation dialog + loading state -->
+    <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
 </head>
 
@@ -92,9 +94,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
         <!-- Right: User + Avatar + Dropdown -->
         <div class="header-right">
-            <div class="header-user-info">
-                <span class="u-name"><?php echo htmlspecialchars($admin_name); ?></span>
-            </div>
+            <!-- Notifications: icon-only bell; the icon itself is the button.
+                 Opens the notifications modal via the existing data-action.
+                 The badge (.notif-btn-badge) is kept in sync by _updateBadges() in admin-dashboard.js. -->
+            <button type="button" class="notif-btn" id="notifBellBtn" data-action="open-notif-modal"
+                aria-label="Notifications" title="Notifications">
+                <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
+                <span class="notif-btn-badge" id="notifBellBadge"
+                    style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
+            </button>
 
             <div class="avatar-btn" id="avatarBtn" role="button" aria-haspopup="true" aria-expanded="false"
                 title="Account menu">
@@ -114,32 +122,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div>
                 <div class="dd-menu">
-                    <button class="dd-item" id="dd-account-btn">
-                        <div class="dd-icon">
-                            <span class="material-symbols-outlined">person</span>
-                        </div>Admin
-                    </button>
-                    <?php if ($is_super_admin): ?>
-                        <button class="dd-item" id="dd-manage-admins-btn">
-                            <div class="dd-icon">
-                                <span class="material-symbols-outlined">manage_accounts</span>
-                            </div>Manage Admins
-                            <?php if ($admin_accounts_remaining > 0): ?>
-                                <span class="adm-dd-slot-badge"><?php echo (int)$admin_accounts_remaining; ?> slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> left</span>
-                            <?php endif; ?>
-                        </button>
-                    <?php endif; ?>
-                    <div class="dd-divider"></div>
                     <button class="dd-item" id="openQrScannerBtn">
                         <div class="dd-icon">
                             <span class="material-symbols-outlined">qr_code_scanner</span>
                         </div>Scan Return
-                    </button>
-                    <button class="dd-item" data-action="open-notif-modal">
-                        <div class="dd-icon">
-                            <span class="material-symbols-outlined">notifications</span>
-                        </div>Notifications
-                        <span class="notif-badge" id="notifDdBadge" style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo $notif_unread; ?></span>
                     </button>
                     <button class="dd-item" id="dd-settings-btn">
                         <div class="dd-icon">
@@ -4073,6 +4059,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
+    <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/admin-dashboard.js"></script>
     <script src="equipment-booking/assets/js/admin-live-render.js"></script>
 
