@@ -1,14 +1,4 @@
 /* ================================================================
-   PUPSYNC FACULTY DASHBOARD — Comprehensive Responsive System
-   Covers: mobile (≤768px), small-mobile (≤480px),
-           tablet (769px–1024px), wide-tablet (769px–900px),
-           and fixes for the new v3 dashboard components.
-   
-   Drop this file AFTER faculty-dashboard.css and faculty-code-card.css.
-   Zero class renames — all existing JS hooks remain intact.
-================================================================ */
-
-/* ================================================================
    § 1  GLOBAL FLUID SAFETY RAILS
    Prevent any element from causing horizontal scroll on any device.
 ================================================================ */
@@ -36,7 +26,6 @@ table,
     max-width: 100%;
 }
 
-
 /* ================================================================
    § 2  CSS CUSTOM PROPERTIES — RESPONSIVE OVERRIDES
 ================================================================ */
@@ -53,25 +42,9 @@ table,
     }
 }
 
-
 /* ================================================================
    § 3  TOP BAR — mobile polish
 ================================================================ */
-
-/* Mobile brand text: hidden on desktop, fills space on mobile */
-.top-bar-mobile-brand {
-    display: none;
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 0.95rem;
-    color: var(--color-primary);
-    letter-spacing: -0.3px;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-    pointer-events: none;
-    /* decorative — no tap action needed */
-}
 
 @media (max-width: 768px) {
     .top-bar {
@@ -83,45 +56,7 @@ table,
         z-index: 230;
     }
 
-    /* Reveal the mobile brand */
-    .top-bar-mobile-brand {
-        display: block;
-    }
-
-    /* Shrink icon button ring to save space */
-    .top-bar-icon-btn {
-        width: 36px;
-        height: 36px;
-    }
-
-    .top-bar-avatar {
-        width: 34px;
-        height: 34px;
-    }
-
-    /* Notification / profile popovers go full-width */
-    .notif-popover,
-    .profile-dropdown {
-        position: fixed;
-        top: var(--topbar-h);
-        left: 8px;
-        right: 8px;
-        width: auto;
-        max-height: calc(100dvh - var(--topbar-h) - 16px);
-        overflow-y: auto;
-    }
 }
-
-@media (max-width: 480px) {
-    .top-bar-divider {
-        display: none;
-    }
-
-    .top-bar-actions {
-        gap: 4px;
-    }
-}
-
 
 /* ================================================================
    § 4  SIDEBAR — slide-in drawer on mobile (existing, polished)
@@ -198,7 +133,6 @@ table,
     }
 }
 
-
 /* ================================================================
    § 5  MAIN CANVAS PADDING
 ================================================================ */
@@ -225,11 +159,6 @@ table,
         padding: 12px 10px 28px;
     }
 }
-
-
-/* ================================================================
-   § 6  DASHBOARD HOME — v3 flat header
-================================================================ */
 
 /* The inline-style hero used in v3 redesign */
 .dash-flat-header {
@@ -271,11 +200,6 @@ table,
         font-size: 1.15rem;
     }
 }
-
-
-/* ================================================================
-   § 7  DASHBOARD HOME — dash-top-grid (stats + code card)
-================================================================ */
 
 /* Desktop: two columns: wide left (stats+bento) | narrow right (code card) */
 .dash-top-grid {
@@ -326,56 +250,6 @@ table,
     }
 }
 
-
-/* ================================================================
-   § 8  DASHBOARD HOME — stats row (dash-stats-row-layout)
-================================================================ */
-@media (max-width: 768px) {
-
-    /* Keep horizontal row on mobile but shrink */
-    .dash-stats-row-layout {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 8px !important;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 4px;
-        /* room for scrollbar */
-        scrollbar-width: none;
-    }
-
-    .dash-stats-row-layout::-webkit-scrollbar {
-        display: none;
-    }
-
-    .dash-stats-row-layout .stat-card {
-        flex: 0 0 auto;
-        min-width: 110px;
-        padding: 14px 14px 12px !important;
-    }
-
-    .dash-stats-row-layout .stat-card-value {
-        font-size: 1.6rem !important;
-    }
-
-    .dash-stats-row-layout .stat-card-label {
-        font-size: 0.62rem !important;
-        white-space: nowrap;
-    }
-}
-
-@media (max-width: 480px) {
-    .dash-stats-row-layout .stat-card {
-        min-width: 95px;
-        padding: 10px 10px 8px !important;
-    }
-
-    .dash-stats-row-layout .stat-card-value {
-        font-size: 1.4rem !important;
-    }
-}
-
-
 /* ================================================================
    § 9  DASHBOARD HOME — bento action buttons row
    NOTE: Base styles (.dash-bento-btn, .dash-bento-icon, .dash-bento-label)
@@ -412,7 +286,6 @@ table,
         font-size: 0.75rem;
     }
 }
-
 
 /* ================================================================
    § 10  FACULTY ACCESS CODE CARD (dash-code-card)
@@ -466,7 +339,6 @@ table,
     }
 }
 
-
 /* ================================================================
    § 11  DASHBOARD HOME — Activity Overview section
    NOTE: Base styles (.dash-section-title, .dash-activity-card,
@@ -490,11 +362,7 @@ table,
         padding: 14px 16px;
     }
 
-    .dash-timeline-name {
-        font-size: 0.8rem;
-    }
 }
-
 
 /* ================================================================
    § 12  ACTIVE REQUESTS / BORROW CARDS
@@ -538,11 +406,6 @@ table,
         margin-top: 0;
     }
 }
-
-
-/* ================================================================
-   § 13  EQUIPMENT PANEL — featured grid & catalog
-================================================================ */
 
 /* Featured section: 2+1 grid */
 #panel-lending .featured-grid {
@@ -680,7 +543,6 @@ table,
     }
 }
 
-
 /* ================================================================
    § 14  REQUESTS TABLE — horizontal scroll wrapper
 ================================================================ */
@@ -714,14 +576,6 @@ table,
     }
 }
 
-
-/* ================================================================
-   § 15  MY ACTIVITY
-   Base styles + all responsive rules for #panel-activity now live
-   in faculty-dashboard.css (search "MY ACTIVITY").
-================================================================ */
-
-
 /* ================================================================
    § 16  ROOMS / FACILITIES PANEL
    NOTE: Base styles (.room-list, .room-card) are defined in
@@ -729,29 +583,11 @@ table,
 ================================================================ */
 
 @media (max-width: 768px) {
-    .room-card {
-        flex-direction: column;
-    }
-
-    .room-card-thumb {
-        width: 100%;
-        height: 72px;
-    }
-
-    .room-card-body {
-        padding: 14px 16px;
-        gap: 8px;
-    }
 
     .room-amenities {
         gap: 10px;
     }
 }
-
-
-/* ================================================================
-   § 17  SETTINGS OVERLAY
-================================================================ */
 
 /* Tablet: tighten card padding */
 @media (min-width: 769px) and (max-width: 1100px) {
@@ -776,37 +612,10 @@ table,
     }
 }
 
-
 /* ================================================================
    § 18  NOTIFICATIONS OVERLAY
 ================================================================ */
 @media (max-width: 768px) {
-    .notif-overlay-wrap {
-        padding: 16px 12px 48px;
-    }
-
-    .notif-overlay-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    .mark-read-btn {
-        align-self: flex-end;
-    }
-
-    .notif-filter-tabs {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        flex-wrap: nowrap;
-        padding-bottom: 4px;
-    }
-
-    .notif-filter-tabs::-webkit-scrollbar {
-        display: none;
-    }
 
     .notif-tab {
         white-space: nowrap;
@@ -826,7 +635,6 @@ table,
         font-size: 0.75rem;
     }
 }
-
 
 /* ================================================================
    § 19  MODALS — full-screen on mobile
@@ -883,22 +691,15 @@ table,
     }
 }
 
-
 /* ================================================================
    § 20  FORMS — borrow form & room form
 ================================================================ */
 @media (max-width: 768px) {
-    .form-surface {
-        max-width: 100%;
-        padding: 16px 14px;
-        border-radius: var(--radius-lg);
-    }
 
     .form-row-2 {
         grid-template-columns: 1fr;
     }
 }
-
 
 /* ================================================================
    § 21  ACCOUNT OVERLAY INFO CARDS
@@ -948,26 +749,16 @@ table,
         display: none;
     }
 
-    .account-nav-btn,
-    .settings-nav-btn {
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
     .account-content,
     .settings-content {
         padding: 14px 12px;
     }
 }
 
-
 /* ================================================================
    § 22  HELP CENTER OVERLAY
 ================================================================ */
 @media (max-width: 768px) {
-    .help-wrap {
-        padding: 16px 14px 48px;
-    }
 
     .help-contact-card {
         padding: 20px 16px;
@@ -978,7 +769,6 @@ table,
         padding: 14px 16px;
     }
 }
-
 
 /* ================================================================
    § 23  TOAST — bottom-center on mobile
@@ -993,87 +783,6 @@ table,
         font-size: 0.82rem;
     }
 }
-
-
-/* ================================================================
-   § 24  COMING SOON BANNER
-================================================================ */
-.coming-soon-banner {
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    padding: 18px 22px;
-    background: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
-    border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
-    border-radius: var(--radius-xl);
-    margin-bottom: 20px;
-    box-shadow: var(--shadow-sm);
-}
-
-.coming-soon-banner .material-symbols-outlined {
-    font-size: 28px;
-    color: var(--color-warning);
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-.coming-soon-banner h3 {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--color-on-surface);
-    margin-bottom: 4px;
-}
-
-.coming-soon-banner p {
-    font-size: 0.85rem;
-    color: var(--color-on-surface-variant);
-    margin: 0;
-}
-
-@media (max-width: 768px) {
-    .coming-soon-banner {
-        flex-direction: row;
-        gap: 10px;
-        padding: 14px 16px;
-        border-radius: var(--radius-lg);
-    }
-
-    .coming-soon-banner .material-symbols-outlined {
-        font-size: 22px;
-    }
-
-    .coming-soon-banner h3 {
-        font-size: 0.9rem;
-    }
-
-    .coming-soon-banner p {
-        font-size: 0.78rem;
-    }
-}
-
-
-/* ================================================================
-   § 25  URGENT CARD (overdue block)
-================================================================ */
-@media (max-width: 768px) {
-    .urgent-card {
-        flex-direction: column;
-        gap: 10px;
-        padding: 16px;
-        border-radius: var(--radius-lg);
-    }
-
-    .urgent-card-actions {
-        flex-wrap: wrap;
-    }
-
-    .btn-urgent-primary {
-        font-size: 0.8rem;
-        padding: 8px 16px;
-    }
-}
-
 
 /* ================================================================
    § 26  SECTION / PAGE HEADERS
@@ -1106,80 +815,13 @@ table,
     }
 }
 
-
-/* ================================================================
-   § 27  DASHBOARD — inline <style> overrides for mobile
-   These patch the <style> block inside faculty-dashboard.php that
-   defines dash-hero, dash-stats-row-layout, dash-body-layout, etc.
-================================================================ */
-
 /* Hero block (legacy, used by older panel-home) */
-@media (max-width: 768px) {
-    .dash-hero {
-        padding: 20px 20px 18px !important;
-        border-radius: var(--radius-lg) !important;
-    }
-
-    .dash-hero-title {
-        font-size: 1.4rem !important;
-    }
-
-    .dash-hero-sub {
-        font-size: 0.78rem !important;
-    }
-
-    .dash-hero-ornament {
-        width: 70px !important;
-        height: 70px !important;
-        right: 12px !important;
-    }
-}
 
 /* Stats row in hero layout */
-@media (max-width: 768px) {
-    .dash-stats-row-layout .stat-card-icon {
-        width: 28px !important;
-        height: 28px !important;
-        margin-bottom: 6px !important;
-    }
-}
 
 /* Sidebar bento column → stacked on mobile */
-@media (max-width: 768px) {
-    .dash-body-layout {
-        grid-template-columns: 1fr !important;
-        gap: 14px !important;
-    }
-
-    .dash-sidebar-col {
-        order: -1;
-    }
-}
 
 /* Bento grid in home panel */
-@media (max-width: 768px) {
-    #panel-home .bento-grid {
-        grid-template-columns: 1fr 1fr !important;
-        gap: 10px !important;
-    }
-
-    #panel-home .bento-item {
-        min-height: 120px !important;
-        padding: 16px !important;
-    }
-
-    #panel-home .bento-title {
-        font-size: 0.875rem !important;
-        margin-top: 10px !important;
-    }
-}
-
-@media (max-width: 400px) {
-    #panel-home .bento-grid {
-        grid-template-columns: 1fr !important;
-    }
-}
-
 
 /* ================================================================
    § 28  LENDING PANEL — filter bar + sub-nav responsive fixes
@@ -1221,65 +863,6 @@ table,
         border-radius: var(--radius-lg);
     }
 }
-
-
-/* ================================================================
-   § 29  TIMELINE (My Activity legacy view)
-================================================================ */
-@media (max-width: 768px) {
-    .timeline-container {
-        max-width: 100%;
-    }
-
-    .timeline-items {
-        padding-left: 24px;
-    }
-
-    .timeline-indicator {
-        left: -24px;
-        width: 20px;
-        height: 20px;
-    }
-
-    .timeline-card {
-        padding: 12px 14px;
-    }
-
-    .timeline-card-top {
-        flex-direction: column;
-        gap: 6px;
-    }
-
-    .timeline-card-title {
-        font-size: 0.9rem;
-    }
-
-    .timeline-end {
-        margin-top: 20px;
-    }
-}
-
-
-/* ================================================================
-   § 30  STAT CARD ADJUSTMENTS (legacy vertical stats col)
-================================================================ */
-@media (max-width: 768px) {
-    .dashboard-stats-col:not(.dash-stats-row-layout) {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-    }
-
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
-
-    .stat-card-value {
-        font-size: 1.8rem;
-    }
-}
-
 
 /* ================================================================
    § 31  PRINT STYLES — clean activity report
@@ -1327,7 +910,6 @@ table,
     }
 }
 
-
 /* ================================================================
    § 32  ACCESSIBILITY — touch targets & focus
 ================================================================ */
@@ -1366,7 +948,6 @@ table,
     }
 }
 
-
 /* ================================================================
    § 33  SCROLL BEHAVIOUR
    Smooth scrolling for anchor/tab transitions; disabled when user
@@ -1375,7 +956,6 @@ table,
 html {
     scroll-behavior: smooth;
 }
-
 
 /* ================================================================
    § 34  BODY LAYOUT FIX
@@ -1393,7 +973,7 @@ html {
 
     .main-wrapper {
         flex: 1;
-        height: calc(100dvh - var(--topbar-h));
+        height: 100dvh;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -1413,7 +993,6 @@ html {
     }
 }
 
-
 /* ================================================================
    § 35  CATALOG SECTION HEADER
 ================================================================ */
@@ -1427,7 +1006,6 @@ html {
         font-size: 0.9rem !important;
     }
 }
-
 
 /* ================================================================
    § 36  FEATURE CHIPS & MISC SMALL COMPONENTS
@@ -1458,18 +1036,6 @@ html {
     }
 }
 
-
-/* ================================================================
-   § 37  OVERDUE / URGENT CARD STAT on mobile home
-================================================================ */
-@media (max-width: 768px) {
-    .stat-card-overdue {
-        /* Force the pulsing overdue card to not grow taller than others */
-        min-height: auto !important;
-    }
-}
-
-
 /* ================================================================
    § 38  GENERAL GRID COLLAPSE HELPER
    Any .form-row-2 or two-col grids not already covered above.
@@ -1479,23 +1045,7 @@ html {
         grid-template-columns: 1fr !important;
     }
 
-    .sov-form-grid {
-        grid-template-columns: 1fr !important;
-    }
-
-    .u-form-grid {
-        grid-template-columns: 1fr !important;
-    }
-
-    .u-card-full {
-        grid-column: 1 !important;
-    }
-
-    .unified-settings-grid {
-        grid-template-columns: 1fr !important;
-    }
 }
-
 
 /* ================================================================
    § 40  VERY WIDE SCREENS (≥1440px) — cap content width

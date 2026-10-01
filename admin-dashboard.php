@@ -45,6 +45,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         rel="stylesheet">
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css?v=<?php echo filemtime('equipment-booking/assets/css/admin-dashboard.css'); ?>">
+    <!-- Mobile/tablet adaptations; must load after admin-dashboard.css -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('equipment-booking/assets/css/admin-dashboard-responsive.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
@@ -55,87 +57,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <?php render_role_splash(($_SESSION['admin_role'] ?? 'Admin') === 'Super Admin' ? 'Super Admin' : 'Admin'); ?>
 
     <!-- ================================================================
-     HEADER
+     MOBILE MENU BUTTON
+     The top bar is gone — the sidebar is the only app chrome. On phones the
+     sidebar is an off-canvas drawer, and this floating button opens it.
+     (Hidden on tablet/desktop; see .sidebar-toggle-btn in the CSS.)
 ================================================================ -->
-    <header class="app-header">
-
-        <div class="header-left">
-            <!-- Sidebar toggle — visible on mobile only (see responsive CSS) -->
-            <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Open menu"
-                aria-expanded="false" aria-controls="adminSidebar">
-                <span class="material-symbols-outlined">menu</span>
-            </button>
-
-            <!-- Logo block — sits flush above the sidebar. The icon box
-                 doubles as the desktop sidebar collapse/expand toggle
-                 (see #sidebarCollapseBtn wiring in admin-dashboard.js);
-                 the hamburger above is the separate mobile off-canvas
-                 toggle and is untouched by this. -->
-            <div class="header-logo">
-                <button type="button" class="logo-icon-box" id="sidebarCollapseBtn"
-                    title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
-                    aria-controls="adminSidebar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                        <polyline points="2 17 12 22 22 17" />
-                        <polyline points="2 12 12 17 22 12" />
-                    </svg>
-                </button>
-                <div class="logo-text">
-                    <span style="white-space:nowrap;line-height:1.2;">
-                        <strong>PUP</strong><span style="font-weight:500;">SYNC</span>
-                        <span class="logo-badge">Admin</span>
-                    </span>
-                    <span class="logo-subtitle">Admin Portal</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right: User + Avatar + Dropdown -->
-        <div class="header-right">
-            <!-- Notifications: icon-only bell; the icon itself is the button.
-                 Opens the notifications modal via the existing data-action.
-                 The badge (.notif-btn-badge) is kept in sync by _updateBadges() in admin-dashboard.js. -->
-            <button type="button" class="notif-btn" id="notifBellBtn" data-action="open-notif-modal"
-                aria-label="Notifications" title="Notifications">
-                <span class="material-symbols-outlined" aria-hidden="true">notifications</span>
-                <span class="notif-btn-badge" id="notifBellBadge"
-                    style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
-            </button>
-
-            <div class="avatar-btn" id="avatarBtn" role="button" aria-haspopup="true" aria-expanded="false"
-                title="Account menu">
-                <?php echo htmlspecialchars($initials); ?>
-            </div>
-
-            <!-- Profile Dropdown — also hosts Scan Return + Admin (My
-                 Account, renamed) since those moved out of the navbar.
-                 Logout lives in the sidebar instead; see /sidebar below. -->
-            <div class="profile-dropdown" id="profileDropdown" role="menu">
-                <div class="dd-header">
-                    <div class="dd-avatar"><?php echo htmlspecialchars($initials); ?></div>
-                    <div>
-                        <span class="dd-name"><?php echo htmlspecialchars($admin_name); ?></span>
-                        <span class="dd-sub">Administrator</span>
-                        <span class="dd-sub" style="margin-top:2px;">Full Access</span>
-                    </div>
-                </div>
-                <div class="dd-menu">
-                    <button class="dd-item" id="openQrScannerBtn">
-                        <div class="dd-icon">
-                            <span class="material-symbols-outlined">qr_code_scanner</span>
-                        </div>Scan Return
-                    </button>
-                    <button class="dd-item" id="dd-settings-btn">
-                        <div class="dd-icon">
-                            <span class="material-symbols-outlined">settings</span>
-                        </div>Settings
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
+    <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Open menu"
+        aria-expanded="false" aria-controls="adminSidebar">
+        <span class="material-symbols-outlined">menu</span>
+    </button>
 
     <!-- ================================================================
      APP BODY
@@ -150,44 +80,102 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 ================================================================ -->
         <nav class="sidebar" id="adminSidebar">
 
-            <div class="nav-group-label">Main</div>
+            <!-- Brand row: [logo] [PUPSYNC / Admin Portal] ........ [collapse toggle].
+                 On phones the same toggle closes the drawer (see admin-dashboard.js). -->
+            <div class="sidebar-brand">
+                <div class="sidebar-logo" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
+                        aria-hidden="true">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                        <polyline points="2 17 12 22 22 17" />
+                        <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                </div>
+                <div class="sidebar-brand-text">
+                    <span class="sidebar-title"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
+                    <span class="sidebar-sub">Admin Portal</span>
+                </div>
+                <button type="button" class="sidebar-toggle" id="sidebarCollapseBtn"
+                    title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
+                    aria-controls="adminSidebar">
+                    <svg class="sn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <rect x="3" y="4" width="18" height="16" rx="3.5" />
+                        <path d="M9.5 4v16" />
+                        <rect class="sn-fill" x="4.6" y="5.6" width="3.3" height="12.8" rx="1.4"
+                            fill="currentColor" stroke="none" />
+                    </svg>
+                </button>
+            </div>
 
-            <a class="nav-item active" data-tab="dashboard" href="#">
-                <span class="material-symbols-outlined">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-            <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
-                <span class="material-symbols-outlined">assignment</span>
-                <span>Requests</span>
-                <?php if ($stat_waiting > 0): ?>
-                    <span class="nav-badge"><?php echo $stat_waiting; ?></span>
+            <div class="sidebar-links">
+                <a class="nav-item active" data-tab="dashboard" href="#">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
+                    <span class="material-symbols-outlined">assignment</span>
+                    <span class="nav-label">Requests</span>
+                    <?php if ($stat_waiting > 0): ?>
+                        <span class="nav-badge"><?php echo $stat_waiting; ?></span>
+                    <?php endif; ?>
+                </a>
+                <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span class="nav-label">Equipment</span>
+                </a>
+                <a class="nav-item" data-tab="rooms" href="#">
+                    <span class="material-symbols-outlined">meeting_room</span>
+                    <span class="nav-label">Rooms</span>
+                </a>
+                <?php if ($is_super_admin): ?>
+                    <a class="nav-item" data-tab="faculty" href="#">
+                        <span class="material-symbols-outlined">group</span>
+                        <span class="nav-label">Faculty</span>
+                    </a>
                 <?php endif; ?>
-            </a>
-            <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
-                <span class="material-symbols-outlined">inventory_2</span>
-                <span>Equipment</span>
-            </a>
-            <a class="nav-item" data-tab="rooms" href="#">
-                <span class="material-symbols-outlined">meeting_room</span>
-                <span>Rooms</span>
-            </a>
-            <?php if ($is_super_admin): ?>
-                <a class="nav-item" data-tab="faculty" href="#">
-                    <span class="material-symbols-outlined">group</span>
-                    <span>Faculty</span>
-                </a>
-            <?php endif; ?>
+            </div>
 
-            <hr class="nav-divider">
-
-            <div class="sidebar-bottom">
-                <a class="nav-item" data-tab="settings" id="snav-settings" href="#">
-                    <span class="material-symbols-outlined">settings</span>
-                    <span>Settings</span>
-                </a>
-                <a class="nav-item" id="snav-logout" data-action="logout" href="#">
+            <div class="sidebar-footer">
+                <!-- Account group: the toggle shows the avatar + admin name. Clicking it expands
+                     Scan Return, Notifications and Settings inline, directly under the toggle
+                     and above Log Out. -->
+                <div class="nav-account" id="navAccountGroup">
+                    <button type="button" class="nav-item nav-account-toggle" id="navAccountToggle"
+                        aria-expanded="false" aria-controls="navAccountMenu"
+                        aria-label="Account menu<?php echo $notif_unread > 0 ? ' — ' . (int)$notif_unread . ' unread' : ''; ?>"
+                        title="<?php echo htmlspecialchars($admin_role); ?>">
+                        <span class="nav-account-avatar"><?php echo htmlspecialchars($initials); ?></span>
+                        <span class="nav-label nav-account-name"><?php echo htmlspecialchars($admin_name); ?></span>
+                        <b class="nav-account-dot" id="navNotifDot" aria-hidden="true"
+                            <?php if ($notif_unread <= 0) echo 'hidden'; ?>></b>
+                        <span class="material-symbols-outlined nav-account-chevron" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div class="nav-submenu" id="navAccountMenu" role="group" aria-label="Account">
+                        <div class="nav-submenu-inner">
+                            <button type="button" class="nav-item nav-subitem" id="openQrScannerBtn">
+                                <span class="material-symbols-outlined">qr_code_scanner</span>
+                                <span class="nav-label">Scan Return</span>
+                            </button>
+                            <button type="button" class="nav-item nav-subitem" id="navNotifBtn"
+                                data-action="open-notif-modal" aria-label="Open notifications">
+                                <span class="material-symbols-outlined">notifications</span>
+                                <span class="nav-label">Notifications</span>
+                                <span class="nav-badge notif-badge" id="notifBellBadge"
+                                    style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
+                            </button>
+                            <a class="nav-item nav-subitem" data-tab="settings" id="snav-settings" href="#">
+                                <span class="material-symbols-outlined">settings</span>
+                                <span class="nav-label">Settings</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <!-- Log Out — pinned to the very bottom of the sidebar -->
+                <a class="nav-item nav-signout" id="snav-logout" data-action="logout" href="#">
                     <span class="material-symbols-outlined">logout</span>
-                    <span>Logout</span>
+                    <span class="nav-label">Log Out</span>
                 </a>
             </div>
 
@@ -2025,7 +2013,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <div style="margin-bottom:1.5rem">
                         <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
-                        <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create and manage faculty accounts. Enable or disable org borrowing privileges.</p>
+                        <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and remove faculty accounts.</p>
                     </div>
 
                     <div class="faculty-layout">
@@ -2155,19 +2143,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <h2>
                                     <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
                                     Faculty List
-                                    <span class="fac-count-badge">(<?php
-                                                                    $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
-                                                                    echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
-                                                                    ?>)</span>
+                                    <span class="fac-count-badge" id="fac-count-badge">(<?php
+                                                                                        $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
+                                                                                        echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
+                                                                                        ?>)</span>
                                 </h2>
                                 <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
                                     <input type="text" id="fac-search-input"
                                         class="form-control-custom"
                                         style="width:180px;font-size:12px"
                                         placeholder="Search faculty...">
-                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" id="fac-gen-code-btn">
-                                        <span class="material-symbols-outlined">key</span> Gen Code
-                                    </button>
                                 </div>
                             </div>
                             <div class="tbl-wrap">
@@ -2177,7 +2162,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <th>Name</th>
                                             <th>Faculty ID</th>
                                             <th>Email</th>
-                                            <th>Org Borrowing</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
@@ -2219,15 +2203,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <td style="font-size:12px;color:var(--text-light)"><?= htmlspecialchars($frow['faculty_id']) ?></td>
                                                     <td style="font-size:12px"><?= htmlspecialchars($frow['email']) ?></td>
                                                     <td>
-                                                        <label class="faculty-toggle-label">
-                                                            <input type="checkbox"
-                                                                class="faculty-toggle-input org-borrowing-toggle"
-                                                                data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
-                                                                <?= $frow['allow_org_borrowing'] == 1 ? 'checked' : '' ?>>
-                                                            <span class="faculty-toggle-track"></span>
-                                                        </label>
-                                                    </td>
-                                                    <td>
                                                         <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">
                                                             <span class="material-symbols-outlined">edit</span>
                                                         </button>
@@ -2236,7 +2211,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <?php endwhile;
                                         else: ?>
                                             <tr id="fac-empty-row">
-                                                <td colspan="5"
+                                                <td colspan="4"
                                                     style="text-align:center;padding:3rem;color:var(--text-light)">
                                                     <span class="material-symbols-outlined"
                                                         style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
@@ -2764,7 +2739,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <!-- Slot counter banner -->
                         <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
                             <span class="material-symbols-outlined">group</span>
-                            <span>
+                            <span id="adm-slot-text">
                                 <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
                                 <?php if ($admin_accounts_remaining > 0): ?>
                                     — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
@@ -2776,85 +2751,83 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
 
                         <!-- Add Admin form (hidden when limit reached) -->
-                        <?php if ($admin_accounts_remaining > 0): ?>
-                            <div class="eq-card adm-form-card" id="adm-form-card">
-                                <div class="eq-card-header">
-                                    <h2>
+                        <div class="eq-card adm-form-card" id="adm-form-card" <?php echo $admin_accounts_remaining > 0 ? '' : 'hidden'; ?>>
+                            <div class="eq-card-header">
+                                <h2>
+                                    <span class="material-symbols-outlined">person_add</span>
+                                    Add New Admin
+                                </h2>
+                            </div>
+                            <div class="eq-card-body">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                                        <input type="text" id="adm-fullname" name="adm_fullname"
+                                            class="form-control-custom"
+                                            placeholder="e.g. Juan dela Cruz"
+                                            maxlength="255" autocomplete="off">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                                        <input type="email" id="adm-email" name="adm_email"
+                                            class="form-control-custom"
+                                            placeholder="name@admin.edu"
+                                            maxlength="255" autocomplete="off">
+                                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-role">Role <span class="req-star">*</span></label>
+                                        <select id="adm-role" name="adm_role" class="form-control-custom">
+                                            <option value="Admin" selected>Admin</option>
+                                            <option value="Super Admin">Super Admin</option>
+                                        </select>
+                                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="adm-password">Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="adm-password" name="adm_password"
+                                                class="form-control-custom"
+                                                placeholder="Min. 8 characters"
+                                                autocomplete="new-password">
+                                            <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                                <span class="material-symbols-outlined">visibility</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                                        <div class="fac-pw-wrap">
+                                            <input type="password" id="adm-confirm" name="adm_confirm"
+                                                class="form-control-custom"
+                                                placeholder="Re-enter password"
+                                                autocomplete="new-password">
+                                            <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                                <span class="material-symbols-outlined">visibility</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+
+                                <div class="adm-form-actions">
+                                    <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
                                         <span class="material-symbols-outlined">person_add</span>
-                                        Add New Admin
-                                    </h2>
-                                </div>
-                                <div class="eq-card-body">
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
-                                            <input type="text" id="adm-fullname" name="adm_fullname"
-                                                class="form-control-custom"
-                                                placeholder="e.g. Juan dela Cruz"
-                                                maxlength="255" autocomplete="off">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="adm-email">Admin Email <span class="req-star">*</span></label>
-                                            <input type="email" id="adm-email" name="adm_email"
-                                                class="form-control-custom"
-                                                placeholder="name@admin.edu"
-                                                maxlength="255" autocomplete="off">
-                                            <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
-                                        </div>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-role">Role <span class="req-star">*</span></label>
-                                            <select id="adm-role" name="adm_role" class="form-control-custom">
-                                                <option value="Admin" selected>Admin</option>
-                                                <option value="Super Admin">Super Admin</option>
-                                            </select>
-                                            <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
-                                        </div>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group">
-                                            <label for="adm-password">Password <span class="req-star">*</span></label>
-                                            <div class="fac-pw-wrap">
-                                                <input type="password" id="adm-password" name="adm_password"
-                                                    class="form-control-custom"
-                                                    placeholder="Min. 8 characters"
-                                                    autocomplete="new-password">
-                                                <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
-                                                    <span class="material-symbols-outlined">visibility</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
-                                            <div class="fac-pw-wrap">
-                                                <input type="password" id="adm-confirm" name="adm_confirm"
-                                                    class="form-control-custom"
-                                                    placeholder="Re-enter password"
-                                                    autocomplete="new-password">
-                                                <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
-                                                    <span class="material-symbols-outlined">visibility</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
-
-                                    <div class="adm-form-actions">
-                                        <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
-                                            <span class="material-symbols-outlined">person_add</span>
-                                            Create Admin Account
-                                        </button>
-                                    </div>
+                                        Create Admin Account
+                                    </button>
                                 </div>
                             </div>
-                        <?php else: ?>
-                            <div class="eq-card" style="padding:1.5rem;text-align:center;color:var(--text-light);">
-                                <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
-                                Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
-                            </div>
-                        <?php endif; ?>
+                        </div>
+                        <div class="eq-card" id="adm-max-card" <?php echo $admin_accounts_remaining > 0 ? 'hidden' : ''; ?>
+                            style="padding:1.5rem;text-align:center;color:var(--text-light);">
+                            <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
+                            Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
+                        </div>
 
                         <!-- Existing admin accounts list -->
                         <div class="eq-card adm-list-card">
@@ -2871,35 +2844,85 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <th>Name</th>
                                             <th>Email</th>
                                             <th>Role</th>
+                                            <th>Status</th>
                                             <th>Added</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="admAccountsTbody">
                                         <?php if (empty($admin_accounts_list)): ?>
                                             <tr>
-                                                <td colspan="4" style="text-align:center;padding:2rem;color:var(--text-light);">
+                                                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-light);">
                                                     No accounts found.
                                                 </td>
                                             </tr>
                                         <?php else: ?>
-                                            <?php foreach ($admin_accounts_list as $acct): ?>
-                                                <tr class="adm-account-row">
+                                            <?php foreach ($admin_accounts_list as $acct):
+                                                $acct_is_you  = strtolower($acct['email'] ?? '') === strtolower($admin_email);
+                                                $acct_dormant = admin_is_dormant($acct['dormant_until'] ?? null);
+                                                // Only plain "Admin" accounts other than yourself can be managed;
+                                                // Super Admins are protected (enforced again on the server).
+                                                $acct_manage  = !$acct_is_you && ($acct['role'] ?? '') === 'Admin';
+                                            ?>
+                                                <tr class="adm-account-row"
+                                                    data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
+                                                    data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
+                                                    data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>">
                                                     <td class="td-fw">
                                                         <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
-                                                        <?php if (strtolower($acct['email'] ?? '') === strtolower($admin_email)): ?>
+                                                        <?php if ($acct_is_you): ?>
                                                             <span class="adm-you-badge">You</span>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
+                                                    <td class="adm-td-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
                                                     <td>
                                                         <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
                                                             <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
                                                         </span>
                                                     </td>
+                                                    <td class="adm-td-status">
+                                                        <?php if ($acct_dormant): ?>
+                                                            <span class="adm-status adm-status--dormant"
+                                                                title="Dormant until <?php echo htmlspecialchars(admin_format_time((int)$acct['dormant_until'])); ?>">
+                                                                <span class="material-symbols-outlined">bedtime</span>
+                                                                Dormant until <?php echo htmlspecialchars((new DateTime('@' . (int)$acct['dormant_until']))->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j')); ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="adm-status adm-status--active">Active</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td class="td-sm">
                                                         <?php echo $acct['created_at']
                                                             ? date('M j, Y', strtotime($acct['created_at']))
                                                             : '—'; ?>
+                                                    </td>
+                                                    <td class="adm-td-actions">
+                                                        <?php if ($acct_manage): ?>
+                                                            <div class="adm-actions">
+                                                                <button type="button" class="adm-act" data-adm-action="edit"
+                                                                    title="Edit login details" aria-label="Edit login details">
+                                                                    <span class="material-symbols-outlined">edit</span>
+                                                                </button>
+                                                                <?php if ($acct_dormant): ?>
+                                                                    <button type="button" class="adm-act" data-adm-action="reactivate"
+                                                                        title="Reactivate account" aria-label="Reactivate account">
+                                                                        <span class="material-symbols-outlined">play_circle</span>
+                                                                    </button>
+                                                                <?php else: ?>
+                                                                    <button type="button" class="adm-act" data-adm-action="dormant"
+                                                                        title="Make dormant" aria-label="Make dormant">
+                                                                        <span class="material-symbols-outlined">bedtime</span>
+                                                                    </button>
+                                                                <?php endif; ?>
+                                                                <button type="button" class="adm-act adm-act--danger" data-adm-action="delete"
+                                                                    title="Delete account" aria-label="Delete account">
+                                                                    <span class="material-symbols-outlined">delete</span>
+                                                                </button>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <span class="adm-protected"
+                                                                title="<?php echo $acct_is_you ? 'This is you — use My Account' : 'Super Admin accounts are protected'; ?>">—</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -3441,6 +3464,168 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
     </div>
+
+    <?php if ($is_super_admin): ?>
+        <!-- ═══ MANAGE ADMINS — edit / dormant / delete (Super Admin only) ═══
+         Direct children of <body>, same ps-modal system as the Requests modals.
+         Driven by the "Manage Admins" block in admin-dashboard.js. -->
+
+        <!-- MODAL: EDIT ADMIN LOGIN DETAILS -->
+        <div class="ps-modal-backdrop" id="admEditModal">
+            <div class="ps-modal">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                    </div>
+                    <h3>Edit Admin Login Details</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admEditModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-edit-alert" class="alert-banner hidden" role="alert"></div>
+                    <div class="form-group">
+                        <label for="adm-edit-name">Full Name <span class="req-star">*</span></label>
+                        <input type="text" id="adm-edit-name" class="form-control-custom" maxlength="255" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="adm-edit-email">Admin Email <span class="req-star">*</span></label>
+                        <input type="email" id="adm-edit-email" class="form-control-custom" maxlength="255" autocomplete="off">
+                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-edit-pw">New Password</label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-edit-pw" class="form-control-custom"
+                                    placeholder="Leave blank to keep" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-edit-pw,adm-edit-pw2" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-edit-pw2">Confirm New Password</label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-edit-pw2" class="form-control-custom"
+                                    placeholder="Re-enter new password" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-edit-pw,adm-edit-pw2" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="adm-modal-note">
+                        <span class="material-symbols-outlined">info</span>
+                        Changing the email or password signs this admin out of every device.
+                    </p>
+                    <div class="form-group adm-reauth">
+                        <label for="adm-edit-reauth">Your password <span class="req-star">*</span></label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="adm-edit-reauth" class="form-control-custom"
+                                placeholder="Confirm it's you" autocomplete="current-password">
+                            <button type="button" class="fac-pw-toggle" data-target="adm-edit-reauth" title="Show/hide password">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admEditModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-edit-save">
+                        <span class="material-symbols-outlined">save</span> Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: MAKE ADMIN DORMANT -->
+        <div class="ps-modal-backdrop" id="admDormantModal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--warning">
+                        <span class="material-symbols-outlined">bedtime</span>
+                    </div>
+                    <h3>Make Account Dormant</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admDormantModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-dormant-alert" class="alert-banner hidden" role="alert"></div>
+                    <p class="adm-modal-text">
+                        <strong id="adm-dormant-name">This admin</strong> keeps their account, but will be signed out and
+                        cannot log in until the period ends. You can reactivate it any time.
+                    </p>
+                    <div class="adm-days" role="radiogroup" aria-label="Dormant for">
+                        <?php foreach (ADMIN_DORMANT_CHOICES as $d): ?>
+                            <label class="adm-day-chip">
+                                <input type="radio" name="adm-dormant-days" value="<?php echo (int)$d; ?>" <?php echo $d === 7 ? 'checked' : ''; ?>>
+                                <span><?php echo (int)$d; ?> day<?php echo $d === 1 ? '' : 's'; ?></span>
+                            </label>
+                        <?php endforeach; ?>
+                        <label class="adm-day-chip">
+                            <input type="radio" name="adm-dormant-days" value="custom">
+                            <span>Custom</span>
+                        </label>
+                    </div>
+                    <div class="form-group adm-custom-days" id="adm-custom-days" hidden>
+                        <label for="adm-dormant-custom">Number of days (1–<?php echo (int)ADMIN_DORMANT_MAX_DAYS; ?>)</label>
+                        <input type="number" id="adm-dormant-custom" class="form-control-custom"
+                            min="1" max="<?php echo (int)ADMIN_DORMANT_MAX_DAYS; ?>" step="1" inputmode="numeric" placeholder="e.g. 10">
+                    </div>
+                    <p class="adm-modal-note" id="adm-dormant-until-note">
+                        <span class="material-symbols-outlined">event</span>
+                        <span id="adm-dormant-until-text"></span>
+                    </p>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDormantModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-dormant-save">
+                        <span class="material-symbols-outlined">bedtime</span> Make Dormant
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: DELETE ADMIN -->
+        <div class="ps-modal-backdrop" id="admDeleteModal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--danger">
+                        <span class="material-symbols-outlined">delete</span>
+                    </div>
+                    <h3>Delete Admin Account</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="admDeleteModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-delete-alert" class="alert-banner hidden" role="alert"></div>
+                    <p class="adm-modal-text">
+                        Delete <strong id="adm-delete-name">this admin</strong>? The account is removed permanently and its
+                        seat becomes free for a new admin. This can't be undone.
+                    </p>
+                    <div class="form-group adm-reauth">
+                        <label for="adm-delete-reauth">Your password <span class="req-star">*</span></label>
+                        <div class="fac-pw-wrap">
+                            <input type="password" id="adm-delete-reauth" class="form-control-custom"
+                                placeholder="Confirm it's you" autocomplete="current-password">
+                            <button type="button" class="fac-pw-toggle" data-target="adm-delete-reauth" title="Show/hide password">
+                                <span class="material-symbols-outlined">visibility</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDeleteModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--danger" id="adm-delete-confirm">
+                        <span class="material-symbols-outlined">delete</span> Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- MODAL: CONFIRM RETURN -->
     <div class="ps-modal-backdrop" id="ps-return-modal">
@@ -4062,6 +4247,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/admin-dashboard.js"></script>
     <script src="equipment-booking/assets/js/admin-live-render.js"></script>
+    <script src="equipment-booking/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('equipment-booking/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
 
     <!-- Admin poll toast -->
     <div id="admin-poll-toast">
@@ -4502,7 +4688,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-top:1rem"></div>
 
                 <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
-                    <button class="ps-btn ps-btn--danger" id="fac-edit-delete-btn" type="button" disabled>
+                    <button class="ps-btn ps-btn--danger" id="fac-edit-delete-btn" type="button">
                         <span class="material-symbols-outlined">person_remove</span> Delete Account
                     </button>
                 </div>
@@ -4537,66 +4723,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <span class="material-symbols-outlined">warning</span>
                     This action cannot be undone. All associated borrowing history will be preserved.
                 </div>
+                <div id="fac-delete-alert" class="alert-banner alert-danger hidden" role="alert" style="margin-top:0.75rem"></div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" id="fac-delete-cancel">Cancel</button>
                 <button class="ps-btn ps-btn--danger" id="fac-delete-confirm">
                     <span class="material-symbols-outlined">delete</span> Delete Account
-                </button>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- ================================================================
-     MODAL: GENERATE FACULTY CODE
-    ================================================================ -->
-    <div class="ps-modal-backdrop" id="fac-code-modal">
-        <div class="ps-modal ps-modal--sm">
-            <div class="ps-modal-head">
-                <div class="ps-modal-head-icon ps-mhi--maroon">
-                    <span class="material-symbols-outlined">key</span>
-                </div>
-                <h3>Generate Faculty Code</h3>
-                <button class="ps-modal-close" id="fac-code-close" aria-label="Close">
-                    <span class="material-symbols-outlined">close</span>
-                </button>
-            </div>
-            <div class="ps-modal-body">
-                <div class="form-group" style="margin-bottom:1.25rem">
-                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Faculty Member</label>
-                    <select id="fac-code-select" class="form-control-custom">
-                        <?php
-                        $fac_ddl = $conn->query("SELECT faculty_id, fullname FROM tbl_users ORDER BY fullname ASC");
-                        if ($fac_ddl && $fac_ddl->num_rows > 0):
-                            while ($fdrow = $fac_ddl->fetch_assoc()):
-                        ?>
-                                <option value="<?= htmlspecialchars($fdrow['faculty_id']) ?>">
-                                    <?= htmlspecialchars($fdrow['fullname']) ?>
-                                </option>
-                            <?php endwhile;
-                        else: ?>
-                            <option value="">&#8212; No faculty accounts yet &#8212;</option>
-                        <?php endif; ?>
-                    </select>
-                </div>
-
-                <div class="fac-code-display">
-                    <div class="fac-code-label">ORGANIZATION BORROWING CODE</div>
-                    <div class="fac-code-val" id="fac-code-value">PUP&#8211;&#8211;&#8211;&#8211;</div>
-                    <div class="fac-code-sub">Valid for one-time org borrowing activation</div>
-                    <button class="fac-code-copy-btn" id="fac-code-copy-btn">
-                        <span class="material-symbols-outlined">content_copy</span> Copy Code
-                    </button>
-                </div>
-                <p style="font-size:12px;color:var(--text-light);text-align:center;margin-top:0.75rem">
-                    Share this code with the faculty member. It expires in 48 hours.
-                </p>
-            </div>
-            <div class="ps-modal-foot">
-                <button class="ps-btn ps-btn--ghost" id="fac-code-close-btn">Close</button>
-                <button class="ps-btn ps-btn--outline" id="fac-code-regen-btn">
-                    <span class="material-symbols-outlined">refresh</span> Regenerate
                 </button>
             </div>
         </div>
@@ -4640,6 +4772,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 if (!chk || !grp) return;
                 grp.style.display = chk.checked ? '' : 'none';
                 if (sel && !chk.checked) sel.value = '';
+
+                /* Org borrowing only applies to org advisers: switch it off and
+                   lock it when the account isn't an adviser, so a regular
+                   faculty account can never be saved with it enabled. */
+                var aobChk = document.getElementById('fac-edit-aob');
+                if (aobChk) {
+                    if (!chk.checked) aobChk.checked = false;
+                    aobChk.disabled = !chk.checked;
+                }
             }
 
             var _facEditAdviserChk = document.getElementById('fac-edit-adviser');
@@ -4713,7 +4854,47 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Delete Account: non-functional until later dev stage */
+            /* Delete Account: hand off from the edit modal to the confirm modal */
+            function _showFacDeleteAlert(msg) {
+                var box = document.getElementById('fac-delete-alert');
+                if (!box) return;
+                box.textContent = msg;
+                box.classList.remove('hidden');
+            }
+
+            function _clearFacDeleteAlert() {
+                var box = document.getElementById('fac-delete-alert');
+                if (!box) return;
+                box.classList.add('hidden');
+                box.textContent = '';
+            }
+
+            var facEditDelBtn = document.getElementById('fac-edit-delete-btn');
+            if (facEditDelBtn) {
+                facEditDelBtn.addEventListener('click', function() {
+                    if (!_facEditRow) return;
+                    var nameEl = document.getElementById('fac-delete-name');
+                    if (nameEl) nameEl.textContent = _facEditRow.dataset.fullname || 'this faculty member';
+                    _clearFacDeleteAlert();
+                    closeFacModal('fac-edit-modal');
+                    openFacModal('fac-delete-modal');
+                });
+            }
+
+            /* Keep the "Faculty List (N)" badge in step with the table, whether a
+               row is added (create form) or removed (delete). */
+            var _facTbody = document.getElementById('faculty-list-tbody');
+
+            function _facRefreshCount() {
+                var badge = document.getElementById('fac-count-badge');
+                if (!badge || !_facTbody) return;
+                badge.textContent = '(' + _facTbody.querySelectorAll('tr[data-faculty-id]').length + ')';
+            }
+            if (_facTbody && window.MutationObserver) {
+                new MutationObserver(_facRefreshCount).observe(_facTbody, {
+                    childList: true
+                });
+            }
 
             /* Save Changes */
             var facEditSaveBtn = document.getElementById('fac-edit-save');
@@ -4807,8 +4988,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     if (subDiv) subDiv.textContent = subLabel;
                                 }
                                 if (cells[2]) cells[2].textContent = email;
-                                var aobToggle = _facEditRow.querySelector('.org-borrowing-toggle');
-                                if (aobToggle) aobToggle.checked = aob === '1';
 
                                 closeFacModal('fac-edit-modal');
                                 if (typeof showToast === 'function') showToast('Faculty account updated successfully.');
@@ -4834,68 +5013,73 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Delete modal: confirm (placeholder) */
+            /* Delete modal: confirm */
             var facDelConf = document.getElementById('fac-delete-confirm');
             if (facDelConf) {
                 facDelConf.addEventListener('click', function() {
-                    closeFacModal('fac-delete-modal');
-                    if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
-                });
-            }
+                    _clearFacDeleteAlert();
+                    if (!_facEditRow) return;
 
-            /* Generate Code modal: open */
-            function _genCode() {
-                var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-                var c = '';
-                for (var i = 0; i < 4; i++) c += chars[Math.floor(Math.random() * chars.length)];
-                return 'PUP-' + c;
-            }
+                    var rowToRemove = _facEditRow;
+                    var facultyId = rowToRemove.dataset.facultyId || '';
+                    var savedLabel = facDelConf.innerHTML;
+                    facDelConf.disabled = true;
+                    facDelConf.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deleting...';
 
-            var facGenBtn = document.getElementById('fac-gen-code-btn');
-            if (facGenBtn) {
-                facGenBtn.addEventListener('click', function() {
-                    document.getElementById('fac-code-value').textContent = _genCode();
-                    openFacModal('fac-code-modal');
-                });
-            }
-
-            /* Gen Code modal: close */
-            ['fac-code-close', 'fac-code-close-btn'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.addEventListener('click', function() {
-                    closeFacModal('fac-code-modal');
-                });
-            });
-
-            /* Gen Code modal: regenerate */
-            var facRegen = document.getElementById('fac-code-regen-btn');
-            if (facRegen) {
-                facRegen.addEventListener('click', function() {
-                    document.getElementById('fac-code-value').textContent = _genCode();
-                });
-            }
-
-            /* Gen Code modal: copy */
-            var facCopy = document.getElementById('fac-code-copy-btn');
-            if (facCopy) {
-                facCopy.addEventListener('click', function() {
-                    var val = document.getElementById('fac-code-value').textContent;
-                    navigator.clipboard.writeText(val).then(function() {
-                        if (typeof showToast === 'function') showToast('Code copied to clipboard.', 't-success');
-                    }).catch(function() {
-                        var ta = document.createElement('textarea');
-                        ta.value = val;
-                        document.body.appendChild(ta);
-                        ta.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(ta);
-                        if (typeof showToast === 'function') showToast('Code copied.', 't-success');
+                    var csrfEl = document.querySelector('input[name="csrf_token"]');
+                    var body = new URLSearchParams({
+                        csrf_token: csrfEl ? csrfEl.value : '',
+                        faculty_id: facultyId
                     });
+
+                    fetch('equipment-booking/api/delete-faculty-account.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: body.toString()
+                        })
+                        .then(function(res) {
+                            return res.json().catch(function() {
+                                return {
+                                    status: 'error',
+                                    message: 'Unexpected response from the server.'
+                                };
+                            });
+                        })
+                        .then(function(data) {
+                            if (data.status === 'success') {
+                                rowToRemove.remove();
+                                _facEditRow = null;
+
+                                /* Table is now empty -> show the empty state again */
+                                if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {
+                                    var tr = document.createElement('tr');
+                                    tr.id = 'fac-empty-row';
+                                    tr.innerHTML = '<td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">' +
+                                        '<span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>' +
+                                        'No faculty accounts yet.</td>';
+                                    _facTbody.appendChild(tr);
+                                }
+
+                                closeFacModal('fac-delete-modal');
+                                if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
+                            } else {
+                                _showFacDeleteAlert(data.message || data.error || 'Could not delete this account.');
+                            }
+                        })
+                        .catch(function() {
+                            _showFacDeleteAlert('Network error. Please try again.');
+                        })
+                        .finally(function() {
+                            facDelConf.disabled = false;
+                            facDelConf.innerHTML = savedLabel;
+                        });
                 });
             }
 
             /* Backdrop click to close */
-            ['fac-edit-modal', 'fac-delete-modal', 'fac-code-modal'].forEach(function(id) {
+            ['fac-edit-modal', 'fac-delete-modal'].forEach(function(id) {
                 var bd = document.getElementById(id);
                 if (bd) bd.addEventListener('click', function(e) {
                     if (e.target === bd) closeFacModal(id);

@@ -106,28 +106,8 @@
         //    (localStorage profile keys are intentionally skipped here so stale cached
         //     values do not override the fresh server-rendered data in the HTML.)
 
-        // 8. Notification read state
-        const readIdxArr = LS.getJ('notifRead');
-        if (readIdxArr && readIdxArr.length) {
-            const items = document.querySelectorAll('.notif-item, .notif-card');
-            let unread = 0;
-            items.forEach((item, i) => {
-                if (readIdxArr.includes(i)) {
-                    item.classList.remove('unread');
-                    const dot = item.querySelector('.unread-dot');
-                    if (dot) dot.style.display = 'none';
-                } else if (item.classList.contains('unread')) {
-                    unread++;
-                }
-            });
-            const uc = document.getElementById('unreadCount');
-            if (uc) uc.textContent = unread + ' unread';
-            if (unread === 0) document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
-            else document.querySelectorAll('.notif-badge').forEach(b => {
-                b.style.display = '';
-                b.textContent = unread;
-            });
-        }
+        // 8. Notification read state — now stored server-side per faculty
+        //    (tbl_faculty_notif_state); nothing to restore from localStorage.
     }
 
     /* ── DOM-only helpers (no save, used by restore + public fns) ── */
@@ -248,31 +228,20 @@
         _restoreNav(e.state);
     });
 
-    /* ── Profile Dropdown ──────────────────────────────────────────────── */
-    function openDropdown() {
-        const dd = document.getElementById('profileDropdown');
-        const btn = document.getElementById('avatarBtn');
-        if (dd) dd.classList.add('open');
-        if (btn) btn.setAttribute('aria-expanded', 'true');
-    }
-
-    function closeDropdown() {
-        const dd = document.getElementById('profileDropdown');
-        const btn = document.getElementById('avatarBtn');
-        if (dd) dd.classList.remove('open');
-        if (btn) btn.setAttribute('aria-expanded', 'false');
-    }
-
-    function toggleDropdown() {
-        const dd = document.getElementById('profileDropdown');
-        if (dd && dd.classList.contains('open')) closeDropdown();
-        else openDropdown();
+    /* ── Account tab (sidebar footer): expands / collapses inline ─────────
+       The submenu opens downward inside the sidebar, directly under the
+       avatar tab and above Log Out (which always stays at the very bottom). */
+    function setAccountMenuOpen(open) {
+        const toggle = document.getElementById('navAccountToggle');
+        const menu = document.getElementById('navAccountMenu');
+        if (!toggle || !menu) return;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menu.classList.toggle('open', open);
     }
 
     /* ── Overlays ──────────────────────────────────────────────────────── */
 
     function _openOverlayDOM(id) {
-        closeDropdown();
         const el = document.getElementById(id);
         if (!el) return;
         el.classList.add('active');
@@ -285,6 +254,9 @@
         if (id === 'settingsOverlay') {
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
+            // Settings lives inside the account menu, so mark the account toggle as the current item too
+            const acctToggle = document.getElementById('navAccountToggle');
+            if (acctToggle) acctToggle.classList.add('active');
         }
     }
 
@@ -556,99 +528,491 @@
         if (sec) sec.classList.add('hidden');
     }
 
-    /* ── Notifications ─────────────────────────────────────────────────── */
-    /* ── Notifications: filter + pagination ───────────────────────────
-       Front-end only for now (no backend yet) — but built the same way
-       the equipment catalog is: never render more than one page's worth
-       of cards at a time, so this doesn't get slow once real
-       notifications replace the sample ones.
+    /* ── Notifications (live, server-driven) ───────────────────────────
+       The feed is built in PHP from this faculty member's own rows
+       (equipment-booking/core/faculty-notif-functions.php) and embedded
+       as window.FNOTIF_DATA. Read/deleted state is persisted per faculty
+       via equipment-booking/api/faculty-notif.php. UI updates are
+       optimistic; refreshNotifs() re-syncs with the server (on open, on a
+       timer, and whenever an action fails).
+
+       Card interactions:
+         click card      → expand details + mark as read
+         trash icon /    → delete that one notification
+         Delete button
+       Footer (Mark all as read · Select · Delete all):
+         Select          → checkboxes (shift-click = range), then bulk
+                           Read / Unread / Delete selected
+         Delete all      → only appears once Select is on; deletes
+                           everything in the current filter
     ─────────────────────────────────────────────────────────────────── */
     const NOTIF_PER_PAGE = 5;
+    const NOTIF_API = 'equipment-booking/api/faculty-notif.php';
+    const NOTIF_GROUP_LABELS = {
+        overdue: 'Overdue — Immediate action needed',
+        today: 'Today',
+        yesterday: 'Yesterday',
+        week: 'Earlier this week',
+        earlier: 'Earlier'
+    };
+    const NOTIF_CAT_LABELS = { overdue: 'overdue', borrow: 'borrow', room: 'room', system: 'system' };
+
     let notifCurrentPage = 1;
     let notifActiveCat = 'all';
+    let notifItems = (window.FNOTIF_DATA && Array.isArray(window.FNOTIF_DATA.notifications))
+        ? window.FNOTIF_DATA.notifications.slice() : [];
+    let notifSelectMode = false;
+    let notifPendingConfirm = null;   // { keys: [...], text: '...' } while the delete strip is open
+    let notifLastAnchor = null;       // last clicked key, for shift-click range select
+    let notifBusy = 0;                // in-flight mutations (polling pauses while > 0)
+    const notifExpanded = new Set();
+    const notifSelected = new Set();
+
+    function nEl(tag, cls, text) {
+        const el = document.createElement(tag);
+        if (cls) el.className = cls;
+        if (text !== undefined && text !== null) el.textContent = text;
+        return el;
+    }
+    function nIcon(name) { return nEl('span', 'material-symbols-outlined', name); }
+    function nFind(key) { return notifItems.find(n => n.key === key); }
+    function nPlural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    /* Server escapes every dynamic value already; this is defence in depth —
+       only text and <strong> survive, anything else is unwrapped. */
+    function nSetRichText(el, html) {
+        const doc = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html');
+        (function walk(src, dst) {
+            src.childNodes.forEach(node => {
+                if (node.nodeType === 3) {
+                    dst.appendChild(document.createTextNode(node.nodeValue));
+                } else if (node.nodeType === 1 && node.tagName === 'STRONG') {
+                    const s = document.createElement('strong');
+                    walk(node, s);
+                    dst.appendChild(s);
+                } else if (node.nodeType === 1) {
+                    walk(node, dst);
+                }
+            });
+        })(doc.body, el);
+    }
 
     function getMatchingNotifs(cat) {
-        return Array.from(document.querySelectorAll('.notif-card')).filter(item => {
+        return notifItems.filter(n => {
             if (cat === 'all') return true;
-            if (cat === 'unread') return item.classList.contains('unread');
-            return item.dataset.cat === cat;
+            if (cat === 'unread') return !n.is_read;
+            return n.cat === cat;
         });
     }
 
-    function renderNotifPage() {
-        const matches = getMatchingNotifs(notifActiveCat);
-        const total = matches.length;
-        const totalPages = Math.max(1, Math.ceil(total / NOTIF_PER_PAGE));
-        if (notifCurrentPage > totalPages) notifCurrentPage = totalPages;
-        if (notifCurrentPage < 1) notifCurrentPage = 1;
+    /* ── Server calls ─────────────────────────────────────────────── */
+    function notifRequest(action, keys) {
+        const fd = new FormData();
+        fd.append('csrf_token', getCsrfToken());
+        fd.append('action', action);
+        (keys || []).forEach(k => fd.append('keys[]', k));
+        notifBusy++;
+        return fetch(NOTIF_API, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(r => r.json().catch(() => ({})).then(j => {
+                if (!r.ok || j.status !== 'success') throw new Error(j.message || j.error || 'Request failed');
+                return j;
+            }))
+            .finally(() => { notifBusy--; });
+    }
 
-        // Hide every card, then reveal only this page's slice of the matches
-        document.querySelectorAll('.notif-card').forEach(el => { el.style.display = 'none'; });
-        const start = (notifCurrentPage - 1) * NOTIF_PER_PAGE;
-        matches.slice(start, start + NOTIF_PER_PAGE).forEach(el => { el.style.display = ''; });
+    function refreshNotifs() {
+        if (notifBusy > 0) return Promise.resolve();
+        return fetch(NOTIF_API + '?action=list', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error('list failed')))
+            .then(j => {
+                if (!j || j.status !== 'success' || !Array.isArray(j.notifications)) return;
+                if (notifBusy > 0) return;   // an action started while this was in flight — its result is newer
+                notifItems = j.notifications;
+                const live = new Set(notifItems.map(n => n.key));
+                Array.from(notifExpanded).forEach(k => { if (!live.has(k)) notifExpanded.delete(k); });
+                Array.from(notifSelected).forEach(k => { if (!live.has(k)) notifSelected.delete(k); });
+                renderNotifPage();
+            })
+            .catch(() => { /* offline / session expired — keep what we have */ });
+    }
 
-        // Section labels ("Overdue", "Today"...) only show if something
-        // under them survived the filter + page slice
-        document.querySelectorAll('.notif-section-label').forEach(label => {
-            let next = label.nextElementSibling;
-            let hasVisible = false;
-            while (next && !next.classList.contains('notif-section-label')) {
-                if (!next.classList.contains('fnotif-empty') && next.style.display !== 'none') hasVisible = true;
-                next = next.nextElementSibling;
+    /* ── Mutations (optimistic) ───────────────────────────────────── */
+    function setNotifsRead(keys, read) {
+        const changed = keys.filter(k => { const n = nFind(k); return n && n.is_read !== read; });
+        if (!changed.length) return Promise.resolve(true);
+        changed.forEach(k => { nFind(k).is_read = read; });
+        renderNotifPage();
+        return notifRequest(read ? 'mark_read' : 'mark_unread', changed)
+            .then(() => true)
+            .catch(() => {
+                showToast('Could not update notifications. Please try again.');
+                refreshNotifs();
+                return false;
+            });
+    }
+
+    function deleteNotifs(keys) {
+        const gone = new Set(keys.filter(k => nFind(k)));
+        if (!gone.size) return Promise.resolve(true);
+        notifItems = notifItems.filter(n => !gone.has(n.key));
+        gone.forEach(k => { notifExpanded.delete(k); notifSelected.delete(k); });
+        renderNotifPage();
+        return notifRequest('delete', Array.from(gone))
+            .then(() => {
+                showToast(gone.size === 1 ? 'Notification deleted.' : nPlural(gone.size, 'notification') + ' deleted.');
+                return true;
+            })
+            .catch(() => {
+                showToast('Could not delete. Please try again.');
+                refreshNotifs();
+                return false;
+            });
+    }
+
+    function markAllRead() {
+        const keys = notifItems.filter(n => !n.is_read).map(n => n.key);
+        if (!keys.length) { showToast('You\u2019re all caught up.'); return; }
+        setNotifsRead(keys, true).then(ok => { if (ok) showToast('All notifications marked as read.'); });
+    }
+
+    /* ── Expand / select ──────────────────────────────────────────── */
+    function toggleNotifExpand(key) {
+        if (notifExpanded.has(key)) notifExpanded.delete(key); else notifExpanded.add(key);
+        const n = nFind(key);
+        if (n && !n.is_read) { setNotifsRead([key], true); return; }   // re-renders
+        renderNotifPage();
+    }
+
+    function toggleNotifSelect(key, range) {
+        if (range && notifLastAnchor) {
+            const list = getMatchingNotifs(notifActiveCat);
+            const a = list.findIndex(n => n.key === notifLastAnchor);
+            const b = list.findIndex(n => n.key === key);
+            if (a > -1 && b > -1) {
+                for (let i = Math.min(a, b); i <= Math.max(a, b); i++) notifSelected.add(list[i].key);
+                renderNotifPage();
+                return;
             }
-            label.style.display = hasVisible ? '' : 'none';
+        }
+        if (notifSelected.has(key)) notifSelected.delete(key); else notifSelected.add(key);
+        notifLastAnchor = key;
+        renderNotifPage();
+    }
+
+    function enterNotifSelectMode() {
+        notifSelectMode = true;
+        cancelNotifConfirm(true);
+        renderNotifPage();
+    }
+    function exitNotifSelectMode() {
+        notifSelectMode = false;
+        notifSelected.clear();
+        notifLastAnchor = null;
+        cancelNotifConfirm(true);
+        renderNotifPage();
+    }
+    function toggleNotifSelectAll() {
+        const list = getMatchingNotifs(notifActiveCat);
+        const allSel = list.length > 0 && list.every(n => notifSelected.has(n.key));
+        list.forEach(n => { if (allSel) notifSelected.delete(n.key); else notifSelected.add(n.key); });
+        renderNotifPage();
+    }
+
+    /* ── Bulk delete confirmation strip ───────────────────────────── */
+    function askNotifDelete(keys, text) {
+        if (!keys.length) return;
+        notifPendingConfirm = { keys: keys.slice(), text: text };
+        renderNotifPage();
+    }
+    function cancelNotifConfirm(silent) {
+        if (!notifPendingConfirm) return;
+        notifPendingConfirm = null;
+        if (!silent) renderNotifPage();
+    }
+    function confirmNotifDelete() {
+        if (!notifPendingConfirm) return;
+        const keys = notifPendingConfirm.keys;
+        notifPendingConfirm = null;
+        deleteNotifs(keys);
+    }
+    function resetNotifTransient() {
+        notifSelectMode = false;
+        notifSelected.clear();
+        notifLastAnchor = null;
+        notifPendingConfirm = null;
+    }
+
+    /* ── Navigate from an expanded card to the relevant screen ────── */
+    function goToNotifLink(n) {
+        const l = n && n.link;
+        if (!l || !l.tab) return;
+        closeNotifModal();
+        // Only the lending tab records its sub-section in the history state
+        // (that's all _restoreNav understands); rooms sub-tabs are switched directly.
+        switchTab(l.tab, l.tab === 'lending' ? (l.sub || null) : null);
+        if (l.tab === 'lending' && l.sub) switchLendingSub(l.sub);
+        if (l.tab === 'rooms' && l.sub) switchRoomsSub(l.sub);
+    }
+
+    /* ── Rendering ────────────────────────────────────────────────── */
+    function buildNotifCard(n) {
+        const expanded = notifExpanded.has(n.key) && !notifSelectMode;
+        const selected = notifSelected.has(n.key);
+        const card = nEl('div', 'notif-card' + (n.is_read ? '' : ' unread') + (n.urgent ? ' notif-card-overdue' : '')
+            + (expanded ? ' is-expanded' : '') + (selected ? ' is-selected' : ''));
+        card.dataset.key = n.key;
+        card.dataset.cat = n.cat;
+        card.tabIndex = 0;
+        if (notifSelectMode) {
+            card.setAttribute('role', 'checkbox');
+            card.setAttribute('aria-checked', selected ? 'true' : 'false');
+        }
+
+        const chk = nEl('span', 'fnotif-check');
+        chk.setAttribute('aria-hidden', 'true');
+        chk.appendChild(nIcon('check'));
+        card.appendChild(chk);
+
+        const ic = nEl('div', 'notif-card-icon ' + (n.icon_class || 'ni-alert'));
+        ic.appendChild(nIcon(n.icon || 'notifications'));
+        card.appendChild(ic);
+
+        const body = nEl('div', 'notif-card-body');
+        const titleRow = nEl('div', 'fnotif-title-row');
+        if (!n.is_read) titleRow.appendChild(nEl('span', 'unread-dot'));
+        titleRow.appendChild(nEl('div', 'notif-card-title', n.title));
+        body.appendChild(titleRow);
+        const sub = nEl('div', 'notif-card-sub');
+        nSetRichText(sub, n.body);
+        body.appendChild(sub);
+
+        const det = nEl('div', 'fnotif-detail');
+        const dl = nEl('dl', 'fnotif-dl');
+        (n.detail || []).forEach(d => {
+            const row = nEl('div', 'fnotif-dl-row');
+            row.appendChild(nEl('dt', null, d.label));
+            row.appendChild(nEl('dd', d.danger ? 'is-danger' : null, String(d.value)));
+            dl.appendChild(row);
         });
+        // Short notices (e.g. the static System ones) have no detail rows — just show the actions
+        if ((n.detail || []).length) det.appendChild(dl); else det.classList.add('is-plain');
 
-        // "Nothing here" state when a filter matches no cards at all
-        const empty = document.getElementById('notifEmptyState');
-        if (empty) empty.style.display = total === 0 ? '' : 'none';
+        const acts = nEl('div', 'fnotif-actions');
+        if (n.link && n.link.tab) {
+            const v = nEl('button', 'btn-save-acc fnotif-act-btn');
+            v.type = 'button';
+            v.dataset.nact = 'view';
+            v.appendChild(nIcon('open_in_new'));
+            v.appendChild(document.createTextNode(' ' + (n.link.label || 'View')));
+            acts.appendChild(v);
+        }
+        const tr = nEl('button', 'btn-cancel-acc fnotif-act-btn');
+        tr.type = 'button';
+        tr.dataset.nact = 'toggle-read';
+        tr.appendChild(nIcon(n.is_read ? 'mark_email_unread' : 'drafts'));
+        tr.appendChild(document.createTextNode(n.is_read ? ' Mark as unread' : ' Mark as read'));
+        acts.appendChild(tr);
+        const del = nEl('button', 'btn-cancel-acc fnotif-act-btn fnotif-act-danger');
+        del.type = 'button';
+        del.dataset.nact = 'delete';
+        del.appendChild(nIcon('delete'));
+        del.appendChild(document.createTextNode(' Delete'));
+        acts.appendChild(del);
+        det.appendChild(acts);
+        body.appendChild(det);
+        card.appendChild(body);
 
-        // Pagination bar — hidden entirely when everything fits on one page
+        const meta = nEl('div', 'notif-card-meta');
+        meta.appendChild(nEl('span', 'notif-time', n.time_label || ''));
+        const row = nEl('div', 'fnotif-meta-row');
+        const dbtn = nEl('button', 'fnotif-icon-btn fnotif-del');
+        dbtn.type = 'button';
+        dbtn.dataset.nact = 'delete';
+        dbtn.setAttribute('aria-label', 'Delete notification');
+        dbtn.appendChild(nIcon('delete'));
+        row.appendChild(dbtn);
+        const ex = nEl('button', 'fnotif-icon-btn fnotif-expand');
+        ex.type = 'button';
+        ex.dataset.nact = 'expand';
+        ex.setAttribute('aria-label', expanded ? 'Collapse details' : 'Show details');
+        ex.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        ex.appendChild(nIcon('expand_more'));
+        row.appendChild(ex);
+        meta.appendChild(row);
+        card.appendChild(meta);
+        return card;
+    }
+
+    function renderNotifPager(total, totalPages, start) {
         const pager = document.getElementById('notifPagination');
         if (pager) pager.style.display = totalPages > 1 ? '' : 'none';
         if (totalPages <= 1) return;
 
         const info = document.getElementById('notifPageInfo');
         if (info) {
-            info.textContent = 'Showing ' + (start + 1) + '–' +
+            info.textContent = 'Showing ' + (start + 1) + '\u2013' +
                 Math.min(start + NOTIF_PER_PAGE, total) + ' of ' + total;
         }
-
         const prev = document.getElementById('notifPrevBtn');
         const next = document.getElementById('notifNextBtn');
         if (prev) prev.disabled = notifCurrentPage === 1;
         if (next) next.disabled = notifCurrentPage === totalPages;
 
         const nums = document.getElementById('notifPageNumbers');
-        if (nums) {
-            nums.innerHTML = '';
-            const pages = [];
-            if (totalPages <= 7) {
-                for (let i = 1; i <= totalPages; i++) pages.push(i);
-            } else {
-                pages.push(1);
-                let lo = Math.max(2, notifCurrentPage - 1);
-                let hi = Math.min(totalPages - 1, notifCurrentPage + 1);
-                if (lo > 2) pages.push('…');
-                for (let i = lo; i <= hi; i++) pages.push(i);
-                if (hi < totalPages - 1) pages.push('…');
-                pages.push(totalPages);
-            }
-            pages.forEach(p => {
-                if (p === '…') {
-                    const s = document.createElement('span');
-                    s.className = 'fnotif-pg-ellipsis';
-                    s.textContent = '…';
-                    nums.appendChild(s);
-                    return;
-                }
-                const b = document.createElement('button');
-                b.className = 'fnotif-pg-num' + (p === notifCurrentPage ? ' active' : '');
-                b.textContent = p;
-                b.addEventListener('click', () => goToNotifPage(p));
-                nums.appendChild(b);
-            });
+        if (!nums) return;
+        nums.innerHTML = '';
+        const pages = [];
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            pages.push(1);
+            const lo = Math.max(2, notifCurrentPage - 1);
+            const hi = Math.min(totalPages - 1, notifCurrentPage + 1);
+            if (lo > 2) pages.push('\u2026');
+            for (let i = lo; i <= hi; i++) pages.push(i);
+            if (hi < totalPages - 1) pages.push('\u2026');
+            pages.push(totalPages);
         }
+        pages.forEach(p => {
+            if (p === '\u2026') {
+                nums.appendChild(nEl('span', 'fnotif-pg-ellipsis', '\u2026'));
+                return;
+            }
+            const b = nEl('button', 'fnotif-pg-num' + (p === notifCurrentPage ? ' active' : ''), String(p));
+            b.addEventListener('click', () => goToNotifPage(p));
+            nums.appendChild(b);
+        });
+    }
+
+    /* Everything outside the list that depends on the data: badge, counts,
+       pills, toolbar state, confirm strip, empty state. */
+    function updateNotifChrome(matches) {
+        const unread = notifItems.filter(n => !n.is_read).length;
+
+        const uc = document.getElementById('unreadCount');
+        if (uc) uc.textContent = unread + ' unread';
+        const up = document.getElementById('unreadPlural');
+        if (up) up.textContent = unread === 1 ? '' : 's';
+
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+            badge.textContent = unread > 99 ? '99+' : String(unread);
+            badge.hidden = unread <= 0;
+        }
+        const navDot = document.getElementById('navNotifDot');
+        if (navDot) navDot.hidden = unread <= 0;
+        const unreadLabel = unread > 0 ? ' \u2014 ' + unread + ' unread' : '';
+        const bell = document.querySelector('.side-nav-subitem[data-action="open-notif-modal"]');
+        if (bell) bell.setAttribute('aria-label', 'Open notifications' + unreadLabel);
+        const acctToggleEl = document.getElementById('navAccountToggle');
+        if (acctToggleEl) acctToggleEl.setAttribute('aria-label', 'Account menu' + unreadLabel);
+
+        const markAll = document.querySelector('#notifModal [data-action="mark-all-read"]');
+        if (markAll) markAll.disabled = unread === 0;
+
+        // Pill counts: per-category, plus All / Unread
+        document.querySelectorAll('#notifModal .fnotif-pill-count[data-pill]').forEach(p => {
+            const k = p.dataset.pill;
+            const c = k === 'all' ? notifItems.length
+                : k === 'unread' ? unread
+                    : notifItems.filter(n => n.cat === k).length;
+            p.textContent = c;
+            p.hidden = c === 0;
+        });
+
+        // Footer: Select toggles select mode; Delete all + the selection bar only exist while selecting
+        const selectBtn = document.getElementById('notifSelectBtn');
+        if (selectBtn) {
+            selectBtn.disabled = !notifSelectMode && notifItems.length === 0;
+            selectBtn.setAttribute('aria-pressed', notifSelectMode ? 'true' : 'false');
+            const lbl = document.getElementById('notifSelectLbl');
+            if (lbl) lbl.textContent = notifSelectMode ? 'Done' : 'Select';
+            const ic = selectBtn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = notifSelectMode ? 'close' : 'checklist';
+        }
+        const delAll = document.getElementById('notifDeleteAllBtn');
+        if (delAll) {
+            delAll.hidden = !notifSelectMode;
+            delAll.disabled = matches.length === 0;
+            const lbl = delAll.lastChild;
+            if (lbl && lbl.nodeType === 3) lbl.nodeValue = ' Delete all' + (notifActiveCat === 'all' ? '' : ' (' + matches.length + ')');
+        }
+        const selBar = document.getElementById('notifSelBar');
+        if (selBar) selBar.hidden = !notifSelectMode;
+
+        const selCount = matches.filter(n => notifSelected.has(n.key)).length;
+        const selCountEl = document.getElementById('notifSelCount');
+        if (selCountEl) selCountEl.textContent = selCount + ' selected';
+        const selAll = document.getElementById('notifSelectAll');
+        if (selAll) {
+            selAll.checked = matches.length > 0 && selCount === matches.length;
+            selAll.indeterminate = selCount > 0 && selCount < matches.length;
+            selAll.disabled = matches.length === 0;
+        }
+        document.querySelectorAll('#notifSelBar [data-needs-sel]').forEach(b => { b.disabled = selCount === 0; });
+
+        // Confirm strip
+        const conf = document.getElementById('notifConfirm');
+        if (conf) {
+            conf.hidden = !notifPendingConfirm;
+            const ct = document.getElementById('notifConfirmText');
+            if (ct && notifPendingConfirm) ct.textContent = notifPendingConfirm.text;
+        }
+
+        // Empty state
+        const empty = document.getElementById('notifEmptyState');
+        if (empty) {
+            empty.style.display = matches.length === 0 ? '' : 'none';
+            const et = document.getElementById('notifEmptyText');
+            if (et) {
+                et.textContent = notifItems.length === 0 ? 'No notifications yet.'
+                    : notifActiveCat === 'unread' ? 'You\u2019re all caught up \u2014 nothing unread.'
+                        : 'Nothing here right now.';
+            }
+        }
+    }
+
+    function renderNotifPage() {
+        const list = document.getElementById('notifList');
+        if (!list) return;
+
+        if (notifSelectMode && notifItems.length === 0) { notifSelectMode = false; notifSelected.clear(); }
+        const matches = getMatchingNotifs(notifActiveCat);
+        const total = matches.length;
+        const totalPages = Math.max(1, Math.ceil(total / NOTIF_PER_PAGE));
+        if (notifCurrentPage > totalPages) notifCurrentPage = totalPages;
+        if (notifCurrentPage < 1) notifCurrentPage = 1;
+        const start = (notifCurrentPage - 1) * NOTIF_PER_PAGE;
+
+        const scroller = document.querySelector('#notifModal .fnotif-body');
+        const keepScroll = scroller ? scroller.scrollTop : 0;
+        const focusKey = (document.activeElement && document.activeElement.closest)
+            ? (document.activeElement.closest('.notif-card') || {}).dataset : null;
+        const focusedKey = focusKey ? focusKey.key : null;
+
+        list.textContent = '';
+        list.classList.toggle('is-selecting', notifSelectMode);
+        let lastGroup = null;
+        matches.slice(start, start + NOTIF_PER_PAGE).forEach(n => {
+            if (n.group !== lastGroup) {
+                lastGroup = n.group;
+                const isOver = n.group === 'overdue';
+                const lab = nEl('div', 'notif-section-label' + (isOver ? ' notif-section-overdue' : ''));
+                if (isOver) lab.appendChild(nIcon('warning'));
+                lab.appendChild(document.createTextNode(NOTIF_GROUP_LABELS[n.group] || 'Earlier'));
+                list.appendChild(lab);
+            }
+            list.appendChild(buildNotifCard(n));
+        });
+
+        if (scroller) scroller.scrollTop = keepScroll;
+        if (focusedKey) {
+            const again = list.querySelector('.notif-card[data-key="' + focusedKey + '"]');
+            if (again && document.getElementById('notifModal').style.display === 'flex') again.focus({ preventScroll: true });
+        }
+
+        updateNotifChrome(matches);
+        renderNotifPager(total, totalPages, start);
     }
 
     function goToNotifPage(page) {
@@ -664,38 +1028,89 @@
         if (btn) btn.classList.add('active');
         notifActiveCat = cat;
         notifCurrentPage = 1;
+        // A selection / pending delete must never silently follow you to a different tab.
+        notifSelected.clear();
+        notifLastAnchor = null;
+        notifPendingConfirm = null;
         renderNotifPage();
     }
 
-    function markAllRead() {
-        const readArr = [];
-        document.querySelectorAll('.notif-item, .notif-card').forEach((item, i) => {
-            item.classList.remove('unread');
-            const dot = item.querySelector('.unread-dot');
-            if (dot) dot.style.display = 'none';
-            readArr.push(i);
+    /* ── Event wiring ─────────────────────────────────────────────── */
+    function handleNotifCardAction(act, key) {
+        const n = nFind(key);
+        if (!n) return;
+        if (act === 'expand') toggleNotifExpand(key);
+        else if (act === 'delete') deleteNotifs([key]);
+        else if (act === 'toggle-read') setNotifsRead([key], !n.is_read);
+        else if (act === 'view') {
+            if (!n.is_read) setNotifsRead([key], true);
+            goToNotifLink(n);
+        }
+    }
+
+    const notifListEl = document.getElementById('notifList');
+    if (notifListEl) {
+        notifListEl.addEventListener('click', function (e) {
+            const card = e.target.closest('.notif-card');
+            if (!card) return;
+            const actBtn = e.target.closest('[data-nact]');
+            if (actBtn && !notifSelectMode) {
+                e.stopPropagation();
+                handleNotifCardAction(actBtn.dataset.nact, card.dataset.key);
+                return;
+            }
+            if (notifSelectMode) toggleNotifSelect(card.dataset.key, e.shiftKey);
+            else toggleNotifExpand(card.dataset.key);
         });
-        const uc = document.getElementById('unreadCount');
-        if (uc) uc.textContent = '0 unread';
-
-        // Clear every unread indicator: legacy badges, the avatar badge,
-        // and the count pill in the avatar dropdown.
-        document.querySelectorAll('.notif-badge').forEach(b => b.style.display = 'none');
-        const avBadge = document.getElementById('notifBadge');
-        if (avBadge) { avBadge.textContent = '0'; avBadge.style.display = 'none'; }
-        const ddCount = document.getElementById('notifDdCount');
-        if (ddCount) { ddCount.textContent = '0'; ddCount.style.display = 'none'; }
-        const avBtn = document.getElementById('avatarBtn');
-        if (avBtn) avBtn.setAttribute('aria-label', 'Account menu');
-
-        LS.setJ('notifRead', readArr);
-
-        // Re-render the current filter/page so it reflects the change
-        // (the Unread tab in particular may now have nothing left to show)
-        renderNotifPage();
-
-        showToast('All notifications marked as read.');
+        notifListEl.addEventListener('keydown', function (e) {
+            if ((e.key !== 'Enter' && e.key !== ' ') || !e.target.classList.contains('notif-card')) return;
+            e.preventDefault();
+            if (notifSelectMode) toggleNotifSelect(e.target.dataset.key, e.shiftKey);
+            else toggleNotifExpand(e.target.dataset.key);
+        });
+        // Don't start a text-selection when shift-clicking a range
+        notifListEl.addEventListener('mousedown', function (e) {
+            if (e.shiftKey && notifSelectMode) e.preventDefault();
+        });
     }
+
+    const notifModalRoot = document.getElementById('notifModal');
+    if (notifModalRoot) {
+        notifModalRoot.addEventListener('click', function (e) {
+            const b = e.target.closest('[data-nbar]');
+            if (!b || b.disabled) return;
+            const matches = getMatchingNotifs(notifActiveCat);
+            const selKeys = matches.filter(n => notifSelected.has(n.key)).map(n => n.key);
+            switch (b.dataset.nbar) {
+                case 'select': if (notifSelectMode) exitNotifSelectMode(); else enterNotifSelectMode(); break;
+                case 'mark-read': setNotifsRead(selKeys, true).then(ok => { if (ok) showToast(nPlural(selKeys.length, 'notification') + ' marked as read.'); }); break;
+                case 'mark-unread': setNotifsRead(selKeys, false).then(ok => { if (ok) showToast(nPlural(selKeys.length, 'notification') + ' marked as unread.'); }); break;
+                case 'delete-selected':
+                    askNotifDelete(selKeys, 'Delete ' + (selKeys.length === 1 ? 'the selected notification' : selKeys.length + ' selected notifications') + '? This can\u2019t be undone.');
+                    break;
+                case 'delete-all': {
+                    const keys = matches.map(n => n.key);
+                    const scope = notifActiveCat === 'all' ? ''
+                        : notifActiveCat === 'unread' ? ' unread'
+                            : ' ' + (NOTIF_CAT_LABELS[notifActiveCat] || notifActiveCat);
+                    askNotifDelete(keys, 'Delete all ' + (keys.length === 1 ? '1' + scope + ' notification' : keys.length + scope + ' notifications') + '? This can\u2019t be undone.');
+                    break;
+                }
+                case 'confirm-cancel': cancelNotifConfirm(); break;
+                case 'confirm-ok': confirmNotifDelete(); break;
+            }
+        });
+        const selAllBox = document.getElementById('notifSelectAll');
+        if (selAllBox) selAllBox.addEventListener('change', toggleNotifSelectAll);
+    }
+
+    // Keep the bell/badge honest while the page stays open
+    setInterval(function () {
+        if (document.visibilityState === 'visible' && !notifPendingConfirm) refreshNotifs();
+    }, 60000);
+
+    // First paint from the server-embedded feed (badge, pills, counts)
+    renderNotifPage();
 
     /* ── Settings: Theme ───────────────────────────────────────────────── */
     function applyTheme(theme) {
@@ -893,14 +1308,14 @@
 
                     // Update header name display
                     if (data.fullname) {
-                        document.querySelectorAll('.dd-name, .u-name, .acc-hero-info h2').forEach(el => {
+                        document.querySelectorAll('.side-nav-user-name, .u-name, .acc-hero-info h2').forEach(el => {
                             el.textContent = data.fullname;
                         });
                         // Update initials
                         const parts = data.fullname.trim().split(' ');
                         let ini = parts[0].charAt(0).toUpperCase();
                         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
-                        document.querySelectorAll('.avatar-btn, .dd-avatar, .acc-avatar-large').forEach(el => {
+                        document.querySelectorAll('.avatar-btn, .side-nav-avatar, .acc-avatar-large').forEach(el => {
                             // Replace only text nodes (preserve child elements like .cam-btn)
                             const textNode = [...el.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
                             if (textNode) textNode.textContent = ini;
@@ -1187,7 +1602,7 @@
 
     function updateAvatarsToInitials() {
         const fullnameEl = document.querySelector('.acc-hero-info h2');
-        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.dd-name')?.textContent || '');
+        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.side-nav-user-name')?.textContent || '');
         const parts = fullname.trim().split(' ').filter(Boolean);
         let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
@@ -1195,7 +1610,7 @@
         // Strip any existing image, fallback span, or stray initials text,
         // then prepend fresh initials as a text node — this preserves other
         // element children (e.g. the notification badge) untouched.
-        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+        document.querySelectorAll('.side-nav-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE) n.remove();
                 if (n.classList && (n.classList.contains('avatar-img') || n.classList.contains('avatar-initials-fallback'))) n.remove();
@@ -1208,12 +1623,12 @@
         // Figure out the initials once, so we have something to fall back to
         // if this image URL also fails to load (e.g. stale/broken file).
         const fullnameEl = document.querySelector('.acc-hero-info h2');
-        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.dd-name')?.textContent || '');
+        const fullname = fullnameEl ? fullnameEl.textContent : (document.querySelector('.side-nav-user-name')?.textContent || '');
         const parts = fullname.trim().split(' ').filter(Boolean);
         let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
 
-        document.querySelectorAll('#avatarBtn, .dd-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+        document.querySelectorAll('.side-nav-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
             // Remove text nodes and any existing image/fallback
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE && n.textContent.trim()) n.remove();
@@ -1418,11 +1833,9 @@
             showOverdueToast();
         }
         _prevOverdueCount = overdueCount;
-        // Update notification badges
-        const baseUnread = 3 + overdueCount;
-        document.querySelectorAll('.notif-badge').forEach(b => {
-            if (overdueCount > 0) { b.style.display = ''; b.textContent = baseUnread; }
-        });
+        // The bell badge is driven by the real notification feed now — pull
+        // a fresh copy whenever the overdue count changes.
+        if (_prevOverdueCount !== null && _prevOverdueCount !== overdueCount) refreshNotifs();
     }
 
     /* ── Borrow Form Init ──────────────────────────────────────────────── */
@@ -1685,7 +2098,6 @@
                     break;
                 }
                 case 'logout':
-                    closeDropdown();
                     if (window.PSLogout) window.PSLogout.open(el);
                     else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
@@ -1695,37 +2107,34 @@
         }
     });
 
-    /* ── Avatar button ────────────────────────────────────────────────── */
-    const avatarBtn = document.getElementById('avatarBtn');
-    if (avatarBtn) {
-        avatarBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            toggleDropdown();
+    /* ── Account tab wiring ───────────────────────────────────────────── */
+    const navAccountToggle = document.getElementById('navAccountToggle');
+    if (navAccountToggle) {
+        navAccountToggle.addEventListener('click', function () {
+            setAccountMenuOpen(navAccountToggle.getAttribute('aria-expanded') !== 'true');
         });
     }
 
-    /* ── Close dropdown on outside click ─────────────────────────────── */
-    document.addEventListener('click', function (e) {
-        if (!e.target.closest('#avatarWrap')) closeDropdown();
-    });
-
     /* ── Notifications modal ──────────────────────────────────────────
-       The bell now lives on the avatar: the dropdown's "Notifications"
-       item opens this modal.
+       Opened from the "Notifications" item inside the sidebar's account menu.
     ─────────────────────────────────────────────────────────────────── */
     function openNotifModal() {
         const modal = document.getElementById('notifModal');
         if (!modal) return;
-        closeDropdown();
+        closeMobileNav();             // collapse the phone drawer if it is open
+        resetNotifTransient();
         filterNotifs('all');          // always open on the All tab
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
+        refreshNotifs();              // pull anything new since the page loaded
     }
 
     function closeNotifModal() {
         const modal = document.getElementById('notifModal');
         if (modal) modal.style.display = 'none';
         document.body.style.overflow = '';
+        resetNotifTransient();
+        renderNotifPage();
     }
 
     // Backdrop click + Esc to dismiss
@@ -1762,7 +2171,11 @@
     document.addEventListener('keydown', function (e) {
         if (e.key !== 'Escape') return;
         const m = document.getElementById('notifModal');
-        if (m && m.style.display === 'flex') closeNotifModal();
+        if (m && m.style.display === 'flex') {
+            if (notifPendingConfirm) { cancelNotifConfirm(); return; }
+            if (notifSelectMode) { exitNotifSelectMode(); return; }
+            closeNotifModal();
+        }
     });
 
     /* ── Mobile menu toggle ──────────────────────────────────────────── */
@@ -1788,9 +2201,10 @@
     const navBackdrop = document.getElementById('navBackdrop');
     if (navBackdrop) navBackdrop.addEventListener('click', closeMobileNav);
 
-    /* ── Desktop sidebar collapse (icon-rail): the logo doubles as the
-       toggle. Separate from the mobile drawer above; preference persists
-       via localStorage. ── */
+    /* ── Sidebar toggle (#sidebarCollapseBtn, right side of the brand row).
+       Desktop: collapses / expands the icon-rail and remembers the choice.
+       Phones: the same button closes the slide-in drawer. Hidden on tablets,
+       where the sidebar is always an icon rail. ── */
     const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
     function setSidebarCollapsed(collapsed) {
         document.body.classList.toggle('sidebar-collapsed', collapsed);
@@ -1802,6 +2216,7 @@
     }
     if (sidebarCollapseBtn) {
         sidebarCollapseBtn.addEventListener('click', function () {
+            if (window.innerWidth <= 768) { closeMobileNav(); return; }
             setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
         });
         if (LS.get('sidebarCollapsed') === '1') setSidebarCollapsed(true);
@@ -1934,7 +2349,11 @@
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
     /* ── Global dashboard search ─────────────────────────────────────── */
-    const globalSearch = document.getElementById('globalSearch');
+    // DORMANT: global search is switched off for now (its markup was removed
+    // together with the top bar). To bring it back: restore the markup in
+    // faculty-dashboard.php and set this flag to true.
+    const GLOBAL_SEARCH_ENABLED = false;
+    const globalSearch = GLOBAL_SEARCH_ENABLED ? document.getElementById('globalSearch') : null;
     const globalSearchSelector = [
         '#panel-lending .item-node',
         '#panel-lending #requestsTbody tr',
@@ -1955,8 +2374,8 @@
 
     if (globalSearch) globalSearch.addEventListener('input', filterGlobalDashboard);
 
-    const globalSearchWrap = document.getElementById('globalSearchWrap');
-    const globalSearchToggle = document.getElementById('globalSearchToggle');
+    const globalSearchWrap = GLOBAL_SEARCH_ENABLED ? document.getElementById('globalSearchWrap') : null;
+    const globalSearchToggle = GLOBAL_SEARCH_ENABLED ? document.getElementById('globalSearchToggle') : null;
     if (globalSearchWrap && globalSearchToggle && globalSearch) {
         globalSearchToggle.addEventListener('click', function () {
             const expanded = globalSearchWrap.classList.toggle('expanded');
@@ -2712,7 +3131,7 @@
                             showToast(data.msg, 'success');
                             // Update all avatar displays
                             const newPicUrl = window.SERVER_BASE_URL + data.profile_picture + '?t=' + Date.now();
-                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn, .top-bar-avatar').forEach(el => {
+                            document.querySelectorAll('#profileAvatarLarge, .side-nav-avatar, .avatar-btn').forEach(el => {
                                 el.innerHTML = `<img src="${newPicUrl}" alt="Profile" class="avatar-img">`;
                             });
                             updateCompletionProgress();
@@ -2747,13 +3166,13 @@
                         if (data.success) {
                             showToast(data.msg, 'success');
                             // Get initials from the page
-                            const fullname = document.querySelector('.dd-name')?.textContent || 'U';
+                            const fullname = document.querySelector('.side-nav-user-name')?.textContent || 'U';
                             const parts = fullname.trim().split(' ');
                             let initials = parts[0].charAt(0).toUpperCase();
                             if (parts.length > 1) initials += parts[parts.length - 1].charAt(0).toUpperCase();
 
                             // Update all avatar displays to show initials
-                            document.querySelectorAll('#profileAvatarLarge, .dd-avatar, .avatar-btn').forEach(el => {
+                            document.querySelectorAll('#profileAvatarLarge, .side-nav-avatar, .avatar-btn').forEach(el => {
                                 el.innerHTML = initials;
                             });
 
@@ -2837,18 +3256,23 @@
     }
 
     function _updateFacultyStatCards(data) {
+        const total = data.length;
         const counts = {
-            'Active Borrowings': data.filter(r => r.status === 'Approved').length,
-            'Pending Requests': data.filter(r => r.status === 'Waiting').length,
-            'Total Requests': data.length,
+            approved: data.filter(r => r.status === 'Approved').length,
+            waiting: data.filter(r => r.status === 'Waiting').length,
+            overdue: data.filter(r => r.status === 'Overdue').length,
+            total: total,
         };
-        document.querySelectorAll('.stat-card').forEach(card => {
-            const label = (card.querySelector('.stat-card-label') || {}).textContent?.trim();
-            const val = card.querySelector('.stat-card-value');
-            if (!val || !(label in counts)) return;
-            if (val.textContent.trim() !== String(counts[label])) {
-                val.textContent = counts[label];
-            }
+        document.querySelectorAll('.stat-tile[data-stat]').forEach(tile => {
+            const key = tile.dataset.stat;
+            if (!(key in counts)) return;
+            const n = counts[key];
+            const val = tile.querySelector('.stat-tile-value');
+            if (val && val.textContent.trim() !== String(n)) val.textContent = n;
+            const pct = key === 'total' ? 100 : (total > 0 ? Math.round(n / total * 100) : 0);
+            tile.style.setProperty('--pct', pct + '%');
+            const pctEl = tile.querySelector('[data-stat-pct]');
+            if (pctEl) pctEl.textContent = pct;
         });
     }
 

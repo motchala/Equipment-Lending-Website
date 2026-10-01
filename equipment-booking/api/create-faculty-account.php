@@ -23,10 +23,16 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 // ── Local JSON helper ─────────────────────────────────────────────────────────
-function send_json($code, $status, $message) {
+function send_json($code, $status, $message)
+{
     http_response_code($code);
     echo json_encode(['status' => $status, 'message' => $message]);
     exit;
+}
+
+// ── Super Admin only (the Faculty tab is hidden from plain Admins; enforce it here too)
+if (!admin_is_super_admin($conn)) {
+    send_json(403, 'error', 'Only a Super Admin can create faculty accounts.');
 }
 
 // ── Input collection ──────────────────────────────────────────────────────────
@@ -128,12 +134,33 @@ $seq_result = $seq_stmt->get_result();
 $seq_row = $seq_result->fetch_assoc();
 $seq_stmt->close();
 
-if ($seq_row === null) {
-    $seq = 1;
-} else {
+$max_seq = 0;
+if ($seq_row !== null) {
     $parts = explode('-', $seq_row['faculty_id']);
-    $seq = intval($parts[1]) + 1;
+    $max_seq = intval($parts[1]);
 }
+
+// A deleted account's id must never be handed out again. Borrow / reservation /
+// code history keeps the old faculty_id as plain text, so reusing it would
+// silently attach someone else's history to the new person. Count the ids
+// still present in those tables when picking the next number.
+foreach (['tbl_requests', 'tbl_room_reservations', 'tbl_faculty_codes'] as $hist_table) {
+    $hist_stmt = $conn->prepare("SELECT faculty_id FROM {$hist_table} WHERE faculty_id LIKE ? ORDER BY faculty_id DESC LIMIT 1");
+    if (!$hist_stmt) {
+        $conn->rollback();
+        error_log('[create-faculty-account] history seq lookup prepare failed (' . $hist_table . '): ' . $conn->error);
+        send_json(500, 'error', 'Could not create account. Please try again.');
+    }
+    $hist_stmt->bind_param('s', $pattern);
+    $hist_stmt->execute();
+    $hist_row = $hist_stmt->get_result()->fetch_assoc();
+    $hist_stmt->close();
+    if ($hist_row !== null) {
+        $hist_parts = explode('-', $hist_row['faculty_id']);
+        $max_seq = max($max_seq, intval($hist_parts[1] ?? 0));
+    }
+}
+$seq = $max_seq + 1;
 
 $faculty_id = $year . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT) . '-BN-0';
 
@@ -147,6 +174,9 @@ if ($middle_name === '') {
 // ── Password & role ──────────────────────────────────────────────────────────
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
 $role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
+if ($is_org_adviser !== 1) {
+    $allow_org_borrowing = 0; // org borrowing only applies to org advisers
+}
 $backup_val = ($backup_email === '') ? null : $backup_email;
 
 // ── Insert ───────────────────────────────────────────────────────────────────

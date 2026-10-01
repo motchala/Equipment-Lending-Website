@@ -127,6 +127,10 @@
         // Highlight the specific element that was clicked, or fall back to first match
         const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
+        // Settings lives inside the account menu, so mark the account toggle as the
+        // current item too (it stays visually quiet while the menu is open).
+        const acctToggle = document.getElementById('navAccountToggle');
+        if (acctToggle) acctToggle.classList.toggle('active', tabName === 'settings');
         _closeMobileSidebar();
     }
 
@@ -174,17 +178,15 @@
         if (formWrap) { formWrap.classList.remove('edit-mode'); formWrap.classList.add('hidden'); }
     }
 
-    /* ── Profile dropdown ────────────────────────────────────── */
-    function openDropdown() {
-        document.getElementById('profileDropdown').classList.add('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'true');
-    }
-    function closeDropdown() {
-        document.getElementById('profileDropdown').classList.remove('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'false');
-    }
-    function toggleDropdown() {
-        document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
+    /* ── Account menu (sidebar footer) ───────────────────────────
+       The avatar + name tab expands Scan Return / Notifications /
+       Settings inline, directly under itself and above Log Out. */
+    function setAccountMenuOpen(open) {
+        const toggle = document.getElementById('navAccountToggle');
+        const menu = document.getElementById('navAccountMenu');
+        if (!toggle || !menu) return;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menu.classList.toggle('open', open);
     }
 
     /* ── Account / Help sub-tabs (nested inside the Settings tab) ── */
@@ -260,6 +262,11 @@
         if (uc) uc.textContent = count + ' unread';
         const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
         if (markAllBtn) markAllBtn.disabled = (count === 0);
+        const navDot = document.getElementById('navNotifDot');
+        if (navDot) navDot.hidden = count <= 0;
+        const unreadLabel = count > 0 ? ' \u2014 ' + count + ' unread' : '';
+        const acctToggleEl = document.getElementById('navAccountToggle');
+        if (acctToggleEl) acctToggleEl.setAttribute('aria-label', 'Account menu' + unreadLabel);
         document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
             const prev = parseInt(b.textContent, 10) || 0;
             if (count === 0) {
@@ -813,16 +820,14 @@
                     if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
 
                     // Reflect the change everywhere else the admin's name/initials
-                    // appear on this page (header, dropdown, hero, greeting) without
+                    // appear on this page (sidebar, hero, greeting) without
                     // requiring a reload.
-                    document.querySelectorAll('.u-name, .dd-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
+                    document.querySelectorAll('.u-name, .dd-name, .nav-account-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
                     const greetEl = document.getElementById('greetName');
                     if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
                     const initials = _computeInitials(data.admin_name);
                     if (initials) {
-                        const avatarBtn = document.getElementById('avatarBtn');
-                        if (avatarBtn) avatarBtn.textContent = initials;
-                        document.querySelectorAll('.dd-avatar').forEach(el => { el.textContent = initials; });
+                        document.querySelectorAll('.nav-account-avatar, .dd-avatar').forEach(el => { el.textContent = initials; });
                     }
 
                     // The database is now the source of truth for these fields —
@@ -939,7 +944,7 @@
                 case 'open-notif-modal':
                     filterNotifs('all');
                     psOpenModal('notifOverlay');
-                    closeDropdown();
+                    _closeMobileSidebar();
                     break;
 
                 case 'open-change-pass': {
@@ -1087,7 +1092,7 @@
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
                     e.preventDefault();
-                    closeDropdown();
+                    _closeMobileSidebar();
                     if (window.PSLogout) window.PSLogout.open(el);
                     else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
@@ -1343,10 +1348,13 @@
         });
     });
 
-    /* ── Avatar button ───────────────────────────────────────── */
-    const avatarBtn = document.getElementById('avatarBtn');
-    if (avatarBtn) avatarBtn.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
-    document.addEventListener('click', e => { if (!e.target.closest('.header-right')) closeDropdown(); });
+    /* ── Account tab (sidebar footer): expands / collapses inline ── */
+    const navAccountToggle = document.getElementById('navAccountToggle');
+    if (navAccountToggle) {
+        navAccountToggle.addEventListener('click', function () {
+            setAccountMenuOpen(navAccountToggle.getAttribute('aria-expanded') !== 'true');
+        });
+    }
 
     /* ── Sidebar nav items ────────────────────────────────────── */
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
@@ -1373,8 +1381,8 @@
         if (e.key === 'Escape') _closeMobileSidebar();
     });
 
-    /* ── Desktop sidebar collapse (icon-rail): logo icon box doubles
-       as the toggle. Independent of the mobile drawer above — this
+    /* ── Desktop sidebar collapse (icon-rail): the toggle in the sidebar's
+       brand row. Independent of the mobile drawer above — this
        only resizes the always-inline desktop sidebar; #app-main
        (flex:1) naturally expands into the freed width. Preference
        persists across reloads via localStorage. ── */
@@ -1389,6 +1397,8 @@
     }
     if (sidebarCollapseBtn) {
         sidebarCollapseBtn.addEventListener('click', function () {
+            if (window.innerWidth <= 768) { _closeMobileSidebar(); return; }   // phones: close the drawer
+            if (window.innerWidth <= 1024) return;                             // tablets: always an icon rail
             _setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
         });
         // Restore the person's last preference on load.
@@ -1434,34 +1444,6 @@
         btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
     });
 
-    /* ── Header dropdown → Settings tab shortcuts ────────────── */
-    const ddAccountBtn = document.getElementById('dd-account-btn');
-    if (ddAccountBtn) {
-        ddAccountBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-account');
-        });
-    }
-    const ddSettingsBtn = document.getElementById('dd-settings-btn');
-    if (ddSettingsBtn) {
-        ddSettingsBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-prefs');
-        });
-    }
-
-    /* ── Manage Admins — dropdown shortcut ───────────────────── */
-    const ddManageAdminsBtn = document.getElementById('dd-manage-admins-btn');
-    if (ddManageAdminsBtn) {
-        ddManageAdminsBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-admins');
-        });
-    }
-
     /* ── Manage Admins — Add Admin form ──────────────────────────
        Mirrors the pattern used by the Add Faculty form exactly:
        fetch + JSON, inline alert on error, showToast on success,
@@ -1471,17 +1453,9 @@
         const alertEl = document.getElementById('adm-form-alert');
         if (!submitBtn) return; // form not rendered (slot limit reached)
 
-        /* Password visibility toggles — same data-target pattern as faculty */
-        document.querySelectorAll('#sett-admins .fac-pw-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const input = document.getElementById(this.dataset.target);
-                if (!input) return;
-                const isText = input.type === 'text';
-                input.type = isText ? 'password' : 'text';
-                const icon = this.querySelector('.material-symbols-outlined');
-                if (icon) icon.textContent = isText ? 'visibility' : 'visibility_off';
-            });
-        });
+        /* Password eye buttons (#adm-password / #adm-confirm) are handled by the shared
+           ".fac-pw-toggle" handler near the top of this file — do not bind them again here,
+           two handlers on one button toggle twice and the field never changes. */
 
         function setAlert(msg, isError) {
             if (!alertEl) return;
@@ -1545,36 +1519,16 @@
                             const el = document.getElementById(id);
                             if (el) el.value = '';
                         });
+                        admResetPwEyes(document.getElementById('adm-form-card'));
                         const roleEl = document.getElementById('adm-role');
                         if (roleEl) roleEl.value = 'Admin';
 
                         showToast('✅ ' + data.message);
                         setAlert(data.message, false);
 
-                        /* Update the slot counter live */
-                        const remaining = typeof data.accounts_remaining === 'number'
-                            ? data.accounts_remaining : null;
-                        if (remaining !== null) {
-                            const slotEl = document.getElementById('adm-slots-remaining');
-                            if (slotEl) slotEl.textContent = remaining;
-
-                            /* Update the dropdown badge */
-                            const ddBadge = document.querySelector('#dd-manage-admins-btn .adm-dd-slot-badge');
-                            if (ddBadge) {
-                                if (remaining > 0) {
-                                    ddBadge.textContent = remaining + ' slot' + (remaining !== 1 ? 's' : '') + ' left';
-                                } else {
-                                    ddBadge.remove();
-                                }
-                            }
-
-                            /* Hide the form when the last slot is used */
-                            if (remaining === 0) {
-                                const card = document.getElementById('adm-form-card');
-                                if (card) card.remove();
-                                const banner = document.querySelector('.adm-slot-banner');
-                                if (banner) banner.classList.add('adm-slot-full');
-                            }
+                        /* Update the slot counter / form visibility live */
+                        if (typeof data.accounts_remaining === 'number') {
+                            admUpdateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                         }
 
                         /* Append the new row to the accounts table immediately */
@@ -1584,16 +1538,7 @@
                             const placeholder = tbody.querySelector('td[colspan]');
                             if (placeholder) placeholder.closest('tr').remove();
 
-                            const roleClass = role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin';
-                            const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                            const tr = document.createElement('tr');
-                            tr.className = 'adm-account-row';
-                            tr.innerHTML =
-                                '<td class="td-fw">' + fullName.replace(/</g, '&lt;') + '</td>' +
-                                '<td>' + email.replace(/</g, '&lt;') + '</td>' +
-                                '<td><span class="adm-role-badge ' + roleClass + '">' + role.replace(/</g, '&lt;') + '</span></td>' +
-                                '<td class="td-sm">' + today + '</td>';
-                            tbody.appendChild(tr);
+                            tbody.appendChild(admBuildRow(data.id, fullName, email, role));
                         }
                     } else {
                         setAlert(data.message || 'Something went wrong. Please try again.', true);
@@ -1606,6 +1551,412 @@
                 });
         });
     })();
+
+    /* ▼ MANAGE-ADMINS-BEGIN ─────────────────────────────────────────────────
+       Settings → Manage Admins → Current Admins (Super Admin only).
+       Edit login details · make dormant · reactivate · delete, plus the
+       shared helpers the Add Admin form above uses (seat counter, row builder).
+       Talks to api/manage-admin-account.php; the server re-checks every rule. */
+
+    const ADM_API = 'equipment-booking/api/manage-admin-account.php';
+    const ADM_MAX_DAYS = 30;
+
+    function admEl(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    /* Hide every password field inside `root` again and put the eye buttons back to
+       their initial icon (same markup open-change-pass uses), so a revealed password
+       never stays on screen the next time the form / dialog is shown. */
+    function admResetPwEyes(root) {
+        if (!root) return;
+        root.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
+            (btn.dataset.target || '').split(',').forEach(function (id) {
+                const inp = document.getElementById(id.trim());
+                if (inp) inp.type = 'password';
+            });
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px">visibility</span>';
+        });
+    }
+
+    function admIcon(name) {
+        const s = admEl('span', 'material-symbols-outlined', name);
+        s.setAttribute('aria-hidden', 'true');
+        return s;
+    }
+
+    /* "Oct 7" — day shown in the Status pill (campus timezone) */
+    function admShortDate(ts) {
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+    }
+
+    /* "Oct 7, 2026, 3:00 PM" */
+    function admLongDate(ts) {
+        return new Date(ts * 1000).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila'
+        });
+    }
+
+    /* Seat counter, banner, and Add-form / "maximum reached" card */
+    function admUpdateSeats(count, remaining) {
+        const text = document.getElementById('adm-slot-text');
+        if (text) {
+            text.textContent = '';
+            text.appendChild(admEl('strong', '', count + ' of 5'));
+            text.appendChild(document.createTextNode(' admin accounts in use — '));
+            if (remaining > 0) {
+                text.appendChild(admEl('span', '', String(remaining))).id = 'adm-slots-remaining';
+                text.appendChild(document.createTextNode(' slot' + (remaining !== 1 ? 's' : '') + ' remaining'));
+            } else {
+                text.appendChild(document.createTextNode('limit reached'));
+            }
+        }
+        const banner = document.querySelector('.adm-slot-banner');
+        if (banner) banner.classList.toggle('adm-slot-full', remaining <= 0);
+        const form = document.getElementById('adm-form-card');
+        if (form) form.hidden = remaining <= 0;
+        const max = document.getElementById('adm-max-card');
+        if (max) max.hidden = remaining > 0;
+    }
+
+    function admStatusCell(dormantUntil) {
+        const td = admEl('td', 'adm-td-status');
+        if (dormantUntil) {
+            const pill = admEl('span', 'adm-status adm-status--dormant');
+            pill.title = 'Dormant until ' + admLongDate(dormantUntil);
+            pill.appendChild(admIcon('bedtime'));
+            pill.appendChild(document.createTextNode('Dormant until ' + admShortDate(dormantUntil)));
+            td.appendChild(pill);
+        } else {
+            td.appendChild(admEl('span', 'adm-status adm-status--active', 'Active'));
+        }
+        return td;
+    }
+
+    function admActButton(action, icon, label, extra) {
+        const b = admEl('button', 'adm-act' + (extra ? ' ' + extra : ''));
+        b.type = 'button';
+        b.setAttribute('data-adm-action', action);
+        b.title = label;
+        b.setAttribute('aria-label', label);
+        b.appendChild(admIcon(icon));
+        return b;
+    }
+
+    function admActionsCell(manageable, dormant) {
+        const td = admEl('td', 'adm-td-actions');
+        if (!manageable) {
+            const dash = admEl('span', 'adm-protected', '—');
+            dash.title = 'Super Admin accounts are protected';
+            td.appendChild(dash);
+            return td;
+        }
+        const wrap = admEl('div', 'adm-actions');
+        wrap.appendChild(admActButton('edit', 'edit', 'Edit login details'));
+        wrap.appendChild(dormant
+            ? admActButton('reactivate', 'play_circle', 'Reactivate account')
+            : admActButton('dormant', 'bedtime', 'Make dormant'));
+        wrap.appendChild(admActButton('delete', 'delete', 'Delete account', 'adm-act--danger'));
+        td.appendChild(wrap);
+        return td;
+    }
+
+    /* A brand-new row (Add Admin form) — same cells as the PHP-rendered rows */
+    function admBuildRow(id, fullName, email, role) {
+        const tr = admEl('tr', 'adm-account-row');
+        tr.setAttribute('data-id', String(id || ''));
+        tr.setAttribute('data-name', fullName);
+        tr.setAttribute('data-email', email);
+        tr.appendChild(admEl('td', 'td-fw', fullName));
+        tr.appendChild(admEl('td', 'adm-td-email', email));
+        const roleTd = admEl('td');
+        roleTd.appendChild(admEl('span', 'adm-role-badge ' + (role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin'), role));
+        tr.appendChild(roleTd);
+        tr.appendChild(admStatusCell(null));
+        tr.appendChild(admEl('td', 'td-sm', new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
+        tr.appendChild(admActionsCell(role === 'Admin' && !!id, false));
+        return tr;
+    }
+
+    (function initManageAdmins() {
+        const tbody = document.getElementById('admAccountsTbody');
+        const editModal = document.getElementById('admEditModal');
+        if (!tbody || !editModal) return; // not a Super Admin — nothing rendered
+
+        const dormantModal = document.getElementById('admDormantModal');
+        const deleteModal = document.getElementById('admDeleteModal');
+        let currentRow = null;
+        let busy = false;
+
+        /* ── modal plumbing ───────────────────────────────────── */
+        function openModal(m) { m.classList.add('ps-modal-open'); }
+        function closeModal(m) { m.classList.remove('ps-modal-open'); currentRow = null; busy = false; }
+
+        function showAlert(id, msg) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'alert-banner alert-error';
+        }
+        function clearAlert(id) {
+            const el = document.getElementById(id);
+            if (el) { el.textContent = ''; el.className = 'alert-banner hidden'; }
+        }
+        function resetPasswordFields(ids, modal) {
+            ids.forEach(function (i) {
+                const f = document.getElementById(i);
+                if (!f) return;
+                f.value = '';
+                f.type = 'password';
+            });
+            admResetPwEyes(modal);
+        }
+
+        document.querySelectorAll('[data-adm-close]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                closeModal(document.getElementById(b.getAttribute('data-adm-close')));
+            });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            [editModal, dormantModal, deleteModal].forEach(function (m) {
+                if (m && m.classList.contains('ps-modal-open')) closeModal(m);
+            });
+        });
+
+        /* Password show/hide in these dialogs is handled by the shared ".fac-pw-toggle"
+           handler (it supports comma-separated targets), so nothing to bind here. */
+
+        /* ── one POST helper for every action ─────────────────── */
+        function call(fields) {
+            const fd = new FormData();
+            Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
+            fd.append('csrf_token', getCsrfToken());
+            return fetch(ADM_API, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (res) {
+                    return res.json().catch(function () { return {}; }).then(function (j) {
+                        return { ok: res.ok, data: j };
+                    });
+                });
+        }
+        function msgOf(r) {
+            return (r.data && (r.data.message || r.data.error)) || 'Something went wrong. Please try again.';
+        }
+        function setBusy(btn, on, html) {
+            btn.disabled = on;
+            if (html !== undefined) btn.innerHTML = html;
+        }
+
+        /* ── row helpers ──────────────────────────────────────── */
+        function setRowDormant(tr, until) {
+            const oldStatus = tr.querySelector('.adm-td-status');
+            const oldActions = tr.querySelector('.adm-td-actions');
+            oldStatus.replaceWith(admStatusCell(until || null));
+            oldActions.replaceWith(admActionsCell(true, !!until));
+        }
+
+        /* ── click delegation on the table ────────────────────── */
+        tbody.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-adm-action]');
+            if (!btn || busy) return;
+            const tr = btn.closest('tr.adm-account-row');
+            if (!tr) return;
+            currentRow = tr;
+            const action = btn.getAttribute('data-adm-action');
+
+            if (action === 'edit') openEdit(tr);
+            else if (action === 'dormant') openDormant(tr);
+            else if (action === 'delete') openDelete(tr);
+            else if (action === 'reactivate') doReactivate(tr, btn);
+        });
+
+        /* ── EDIT ─────────────────────────────────────────────── */
+        function openEdit(tr) {
+            clearAlert('adm-edit-alert');
+            document.getElementById('adm-edit-name').value = tr.getAttribute('data-name') || '';
+            document.getElementById('adm-edit-email').value = tr.getAttribute('data-email') || '';
+            resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth'], editModal);
+            openModal(editModal);
+            currentRow = tr;
+            document.getElementById('adm-edit-name').focus();
+        }
+
+        document.getElementById('adm-edit-save').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const name = document.getElementById('adm-edit-name').value.trim();
+            const email = document.getElementById('adm-edit-email').value.trim().toLowerCase();
+            const pw = document.getElementById('adm-edit-pw').value;
+            const pw2 = document.getElementById('adm-edit-pw2').value;
+            const reauth = document.getElementById('adm-edit-reauth').value;
+
+            clearAlert('adm-edit-alert');
+            if (!name) return showAlert('adm-edit-alert', 'Full name is required.');
+            if (!/^[^\s@]+@admin\.edu$/i.test(email)) return showAlert('adm-edit-alert', 'Admin emails must end in @admin.edu.');
+            if (pw && pw.length < 8) return showAlert('adm-edit-alert', 'New password must be at least 8 characters.');
+            if (pw !== pw2) return showAlert('adm-edit-alert', 'New passwords do not match.');
+            if (!reauth) return showAlert('adm-edit-alert', 'Enter your own password to confirm.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
+            call({
+                action: 'update', id: tr.getAttribute('data-id'),
+                full_name: name, email: email,
+                new_password: pw, confirm_password: pw2, current_password: reauth
+            }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') {
+                    document.getElementById('adm-edit-reauth').value = '';
+                    return showAlert('adm-edit-alert', msgOf(r));
+                }
+                tr.setAttribute('data-name', r.data.full_name);
+                tr.setAttribute('data-email', r.data.email);
+                const nameCell = tr.querySelector('td.td-fw');
+                nameCell.firstChild.textContent = r.data.full_name + ' ';
+                tr.querySelector('.adm-td-email').textContent = r.data.email;
+                closeModal(editModal);
+                showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-edit-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+
+        /* ── DORMANT ──────────────────────────────────────────── */
+        const customWrap = document.getElementById('adm-custom-days');
+        const customInput = document.getElementById('adm-dormant-custom');
+        const untilText = document.getElementById('adm-dormant-until-text');
+
+        function selectedDays() {
+            const chosen = document.querySelector('input[name="adm-dormant-days"]:checked');
+            if (!chosen) return null;
+            const raw = chosen.value === 'custom' ? customInput.value.trim() : chosen.value;
+            if (!/^\d+$/.test(raw)) return null;
+            const n = parseInt(raw, 10);
+            return (n >= 1 && n <= ADM_MAX_DAYS) ? n : null;
+        }
+
+        function refreshUntil() {
+            const chosen = document.querySelector('input[name="adm-dormant-days"]:checked');
+            customWrap.hidden = !(chosen && chosen.value === 'custom');
+            const n = selectedDays();
+            untilText.textContent = n
+                ? 'Dormant until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
+                : 'Pick 1 to ' + ADM_MAX_DAYS + ' days (maximum ' + ADM_MAX_DAYS + ').';
+        }
+
+        document.querySelectorAll('input[name="adm-dormant-days"]').forEach(function (r) {
+            r.addEventListener('change', function () {
+                refreshUntil();
+                if (r.value === 'custom' && r.checked) customInput.focus();
+            });
+        });
+        customInput.addEventListener('input', refreshUntil);
+
+        function openDormant(tr) {
+            clearAlert('adm-dormant-alert');
+            document.getElementById('adm-dormant-name').textContent = tr.getAttribute('data-name') || 'This admin';
+            const def = document.querySelector('input[name="adm-dormant-days"][value="7"]');
+            if (def) def.checked = true;
+            customInput.value = '';
+            refreshUntil();
+            openModal(dormantModal);
+            currentRow = tr;
+        }
+
+        document.getElementById('adm-dormant-save').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const days = selectedDays();
+            clearAlert('adm-dormant-alert');
+            if (!days) return showAlert('adm-dormant-alert', 'Choose between 1 and ' + ADM_MAX_DAYS + ' days.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
+            call({ action: 'dormant', id: tr.getAttribute('data-id'), days: days }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') return showAlert('adm-dormant-alert', msgOf(r));
+                setRowDormant(tr, r.data.dormant_until);
+                closeModal(dormantModal);
+                showToast(r.data.message, 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-dormant-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+
+        /* ── REACTIVATE (reversible, so no confirmation dialog) ── */
+        function doReactivate(tr, btn) {
+            busy = true;
+            btn.disabled = true;
+            call({ action: 'reactivate', id: tr.getAttribute('data-id') }).then(function (r) {
+                busy = false;
+                if (!r.ok || r.data.status !== 'success') {
+                    btn.disabled = false;
+                    return showToast(msgOf(r), 'error');
+                }
+                setRowDormant(tr, null);
+                showToast('Account reactivated.', 'success');
+            }).catch(function () {
+                busy = false;
+                btn.disabled = false;
+                showToast('Network error — please try again.', 'error');
+            });
+        }
+
+        /* ── DELETE ───────────────────────────────────────────── */
+        function openDelete(tr) {
+            clearAlert('adm-delete-alert');
+            document.getElementById('adm-delete-name').textContent = tr.getAttribute('data-name') || 'this admin';
+            resetPasswordFields(['adm-delete-reauth'], deleteModal);
+            openModal(deleteModal);
+            currentRow = tr;
+            document.getElementById('adm-delete-reauth').focus();
+        }
+
+        document.getElementById('adm-delete-confirm').addEventListener('click', function () {
+            if (busy || !currentRow) return;
+            const btn = this;
+            const tr = currentRow;
+            const reauth = document.getElementById('adm-delete-reauth').value;
+            clearAlert('adm-delete-alert');
+            if (!reauth) return showAlert('adm-delete-alert', 'Enter your own password to confirm.');
+
+            busy = true;
+            const orig = btn.innerHTML;
+            setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Deleting…');
+            call({ action: 'delete', id: tr.getAttribute('data-id'), current_password: reauth }).then(function (r) {
+                busy = false;
+                setBusy(btn, false, orig);
+                if (!r.ok || r.data.status !== 'success') {
+                    document.getElementById('adm-delete-reauth').value = '';
+                    return showAlert('adm-delete-alert', msgOf(r));
+                }
+                tr.remove();
+                if (typeof r.data.accounts_count === 'number') {
+                    admUpdateSeats(r.data.accounts_count, r.data.accounts_remaining);
+                }
+                closeModal(deleteModal);
+                showToast('Admin account deleted. A seat is free for a new admin.', 'success');
+            }).catch(function () {
+                busy = false;
+                setBusy(btn, false, orig);
+                showAlert('adm-delete-alert', 'Network error — please check your connection and try again.');
+            });
+        });
+    })();
+    /* ▲ MANAGE-ADMINS-END ───────────────────────────────────────────────── */
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
@@ -2646,7 +2997,7 @@
         }
 
         openBtn.addEventListener('click', function () {
-            closeDropdown();
+            _closeMobileSidebar();
             startScanner();
         });
         closeBtn.addEventListener('click', stopScanner);

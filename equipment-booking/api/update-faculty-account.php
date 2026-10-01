@@ -28,6 +28,11 @@ function send_json($code, $status, $message)
     exit;
 }
 
+// ── Super Admin only (the Faculty tab is hidden from plain Admins; enforce it here too)
+if (!admin_is_super_admin($conn)) {
+    send_json(403, 'error', 'Only a Super Admin can edit faculty accounts.');
+}
+
 // ── Input collection ──────────────────────────────────────────────────────────
 $faculty_id     = trim($_POST['faculty_id'] ?? '');
 $pupsync_email  = strtolower(trim($_POST['pupsync_email'] ?? ''));
@@ -36,6 +41,9 @@ $first_name     = trim($_POST['first_name'] ?? '');
 $last_name      = trim($_POST['last_name'] ?? '');
 $is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
 $allow_org_borrowing = (($_POST['allow_org_borrowing'] ?? '0') === '1') ? 1 : 0;
+if ($is_org_adviser !== 1) {
+    $allow_org_borrowing = 0; // org borrowing only applies to org advisers
+}
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
 // ── Validation: faculty_id ────────────────────────────────────────────────────
