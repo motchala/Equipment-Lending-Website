@@ -7895,11 +7895,18 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin: 0 0 0 26px;
-    padding: 4px 0 2px 8px;
-    border-left: 1px solid var(--nav-line, rgba(255, 255, 255, 0.12));
+    /* Flush with the other sidebar items: no indent and no tree line, so the
+       two buttons don't read as children of the avatar button. */
+    margin: 0;
+    padding: 0;
     visibility: hidden;
     transition: visibility 0s linear 0.26s;
+}
+
+/* Spacing under the avatar button lives on the first item (a margin is clipped when
+   the menu is closed, so the closed height stays exactly 0). */
+.side-nav-submenu-inner> :first-child {
+    margin-top: 2px;
 }
 
 .side-nav-submenu.open .side-nav-submenu-inner {
