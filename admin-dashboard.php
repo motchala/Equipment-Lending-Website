@@ -191,67 +191,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     ============================================================ -->
             <div class="tab-panel active" id="panel-dashboard">
 
-                <!-- Overdue alert banner -->
-                <?php if ($stat_overdue > 0): ?>
-                    <div class="ps-alert ps-alert--danger" id="overdue-alert">
-                        <span class="material-symbols-outlined">warning</span>
-                        <span><strong>Overdue Alert:</strong> <?php echo $stat_overdue; ?> item(s) are currently overdue and need immediate attention.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="overdue-alert">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                <?php endif; ?>
-
-                <!-- URL-param flash alerts -->
-                <?php if (isset($_GET['added'])): ?>
-                    <div class="ps-alert ps-alert--success" id="added-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Success!</strong> Item added to inventory.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="added-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['updated'])): ?>
-                    <div class="ps-alert ps-alert--success" id="updated-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Updated!</strong> Item has been updated successfully.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="updated-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['room_added'])): ?>
-                    <div class="ps-alert ps-alert--success" id="room-added-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Room added!</strong> The room has been added to the registry.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-added-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['room_updated'])): ?>
-                    <div class="ps-alert ps-alert--success" id="room-updated-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Room updated!</strong> Changes saved successfully.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-updated-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['room_archived'])): ?>
-                    <div class="ps-alert ps-alert--success" id="room-archived-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Room archived.</strong> It has been removed from the active registry.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-archived-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['room_restored'])): ?>
-                    <div class="ps-alert ps-alert--success" id="room-restored-alert">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        <span><strong>Room restored.</strong> It is now back in the active registry.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-restored-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
-                <?php if (isset($_GET['room_error'])): ?>
-                    <div class="ps-alert ps-alert--danger" id="room-error-alert">
-                        <span class="material-symbols-outlined">warning</span>
-                        <span><strong>Error:</strong> Could not save room. Please check required fields and try again.</span>
-                        <button class="ps-alert__close" data-action="dismiss-alert" data-target="room-error-alert"><span class="material-symbols-outlined">close</span></button>
-                    </div>
-                <?php endif; ?>
+                <!-- Overdue + flash messages (item/room saved, archived, restored, error) are now shown as
+                     toasts: see #toast-queue near the bottom of this file and initToastQueue() in
+                     admin-dashboard.js. -->
 
                 <!-- Page header row -->
                 <div class="ps-page-header-row">
@@ -4009,6 +3951,56 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     <!-- Toast -->
     <div id="app-toast"></div>
+
+    <?php
+    // Toast queue: messages the server wants shown once this page has loaded, in order.
+    //   • After a real sign-in (landing-page.php arms the flag): a welcome line, then an overdue alert
+    //     if anything is overdue. Refreshing / switching tabs finds no flag, so nothing repeats.
+    //   • After a room save / archive / restore redirect (?room_added=1 …): that confirmation or error.
+    //     (Equipment added/updated/error already toast through fixInventoryTab() further down.)
+    $toast_queue = [];
+
+    $show_login_toast = !empty($_SESSION['admin_login_toast']);
+    unset($_SESSION['admin_login_toast']);
+    if ($show_login_toast) {
+        $lt_first = explode(' ', trim((string)$admin_name))[0] ?? '';
+        $lt_msg   = 'Welcome back' . ($lt_first !== '' ? ', ' . $lt_first : '') . '.';
+        $lt_n     = (int)$notif_unread;
+        if ($lt_n > 0) {
+            $lt_msg .= ' You have ' . $lt_n . ' unread notification' . ($lt_n === 1 ? '' : 's') . '.';
+        }
+        $toast_queue[] = $lt_msg;
+
+        $ov_n = (int)$stat_overdue;
+        if ($ov_n > 0) {
+            $toast_queue[] = 'Overdue alert: ' . $ov_n . ($ov_n === 1 ? ' item is' : ' items are')
+                . ' currently overdue and need immediate attention.';
+        }
+    }
+
+    $flash_toasts = [
+        'room_added'    => 'Room added to the registry.',
+        'room_updated'  => 'Room updated. Changes saved.',
+        'room_archived' => 'Room archived. It has been removed from the active registry.',
+        'room_restored' => 'Room restored. It is now back in the active registry.',
+        'room_error'    => 'Error: Could not save room. Please check required fields and try again.',
+    ];
+    $flash_strip = [];
+    foreach ($flash_toasts as $flash_key => $flash_msg) {
+        if (isset($_GET[$flash_key])) {
+            $toast_queue[] = $flash_msg;
+            $flash_strip[] = $flash_key;
+        }
+    }
+
+    if ($toast_queue):
+    ?>
+        <div id="toast-queue" hidden data-strip="<?php echo htmlspecialchars(implode(',', $flash_strip), ENT_QUOTES); ?>">
+            <?php foreach ($toast_queue as $tq_msg): ?>
+                <span data-msg="<?php echo htmlspecialchars($tq_msg, ENT_QUOTES); ?>"></span>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
 
     <div class="modal-overlay" id="changePassModal" style="display: none; 

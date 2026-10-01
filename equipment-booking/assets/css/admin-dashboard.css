@@ -3785,29 +3785,51 @@ input[type="range"] {
 }
 
 /* ── TOAST ────────────────────────────────────────────────────── */
+/* Same placement and motion as the faculty snackbar (bottom-centre, fades up),
+   but deliberately plain: a neutral surface with readable text and no accent
+   colour. Used for every admin toast, including the post-login welcome. */
 #app-toast {
     position: fixed;
-    bottom: 1.5rem;
     left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: var(--text-dark);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 0.85rem;
+    bottom: 28px;
+    z-index: 10000;
+    max-width: min(480px, calc(100vw - 32px));
+    padding: 12px 20px;
+    background: #2b2b30;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1.45;
+    text-align: center;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12);
     opacity: 0;
     visibility: hidden;
-    z-index: 10000;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    transform: translate(-50%, 12px);
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+    pointer-events: none;
 }
 
 #app-toast.show {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(0);
+    transform: translate(-50%, 0);
+    transition-delay: 0s;
+}
+
+/* Dark theme: a light toast so it stands out from the dark page */
+[data-theme="dark"] #app-toast {
+    background: #ececf1;
+    color: #1b1b24;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="high-contrast"] #app-toast {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #ffffff;
+    box-shadow: none;
 }
 
 /* ── BORROW HISTORY TOGGLE ────────────────────────────────────── */
