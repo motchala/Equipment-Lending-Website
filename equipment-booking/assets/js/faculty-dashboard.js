@@ -228,27 +228,13 @@
         _restoreNav(e.state);
     });
 
-    /* ── Account flyout (sidebar footer) ────────────────────────────────
-       Pops up and to the right of the sidebar, bottom-aligned with the
-       toggle. Position is set through CSS variables so the flyout can sit
-       outside the sidebar's box (phones ignore them and open upward inside
-       the drawer instead). */
-    function positionAccountMenu() {
-        const toggle = document.getElementById('navAccountToggle');
-        const menu = document.getElementById('navAccountMenu');
-        const nav = document.getElementById('sideNav');
-        if (!toggle || !menu || !nav) return;
-        const t = toggle.getBoundingClientRect();
-        const n = nav.getBoundingClientRect();
-        menu.style.setProperty('--flyout-left', Math.round(n.right + 8) + 'px');
-        menu.style.setProperty('--flyout-bottom', Math.max(8, Math.round(window.innerHeight - t.bottom)) + 'px');
-    }
-
+    /* ── Account tab (sidebar footer): expands / collapses inline ─────────
+       The submenu opens downward inside the sidebar, directly under the
+       avatar tab and above Log Out (which always stays at the very bottom). */
     function setAccountMenuOpen(open) {
         const toggle = document.getElementById('navAccountToggle');
         const menu = document.getElementById('navAccountMenu');
         if (!toggle || !menu) return;
-        if (open) positionAccountMenu();
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
         menu.classList.toggle('open', open);
     }
@@ -256,7 +242,6 @@
     /* ── Overlays ──────────────────────────────────────────────────────── */
 
     function _openOverlayDOM(id) {
-        setAccountMenuOpen(false);
         const el = document.getElementById(id);
         if (!el) return;
         el.classList.add('active');
@@ -269,7 +254,7 @@
         if (id === 'settingsOverlay') {
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
-            // Settings now lives inside the flyout, so mark the account toggle as the current item
+            // Settings lives inside the account menu, so mark the account toggle as the current item too
             const acctToggle = document.getElementById('navAccountToggle');
             if (acctToggle) acctToggle.classList.add('active');
         }
@@ -2107,34 +2092,20 @@
         }
     });
 
-    /* ── Account flyout wiring ────────────────────────────────────────── */
+    /* ── Account tab wiring ───────────────────────────────────────────── */
     const navAccountToggle = document.getElementById('navAccountToggle');
     if (navAccountToggle) {
         navAccountToggle.addEventListener('click', function () {
             setAccountMenuOpen(navAccountToggle.getAttribute('aria-expanded') !== 'true');
         });
-        // Click anywhere outside the group closes it
-        document.addEventListener('click', function (e) {
-            if (!e.target.closest('#navAccountGroup')) setAccountMenuOpen(false);
-        });
-        // Esc closes it and hands focus back to the toggle
-        document.addEventListener('keydown', function (e) {
-            if (e.key !== 'Escape') return;
-            if (navAccountToggle.getAttribute('aria-expanded') === 'true') {
-                setAccountMenuOpen(false);
-                navAccountToggle.focus();
-            }
-        });
-        window.addEventListener('resize', function () { setAccountMenuOpen(false); });
     }
 
     /* ── Notifications modal ──────────────────────────────────────────
-       Opened from the "Notifications" item inside the sidebar's Admin group.
+       Opened from the "Notifications" item inside the sidebar's account menu.
     ─────────────────────────────────────────────────────────────────── */
     function openNotifModal() {
         const modal = document.getElementById('notifModal');
         if (!modal) return;
-        setAccountMenuOpen(false);
         closeMobileNav();             // collapse the phone drawer if it is open
         resetNotifTransient();
         filterNotifs('all');          // always open on the All tab
@@ -2202,7 +2173,6 @@
     }
 
     function closeMobileNav() {
-        setAccountMenuOpen(false);
         const nav = document.getElementById('sideNav');
         const backdrop = document.getElementById('navBackdrop');
         if (nav) nav.classList.remove('open');
@@ -2216,13 +2186,13 @@
     const navBackdrop = document.getElementById('navBackdrop');
     if (navBackdrop) navBackdrop.addEventListener('click', closeMobileNav);
 
-    /* ── Desktop sidebar collapse (icon-rail): the logo doubles as the
-       toggle. Separate from the mobile drawer above; preference persists
-       via localStorage. ── */
+    /* ── Sidebar toggle (#sidebarCollapseBtn, right side of the brand row).
+       Desktop: collapses / expands the icon-rail and remembers the choice.
+       Phones: the same button closes the slide-in drawer. Hidden on tablets,
+       where the sidebar is always an icon rail. ── */
     const sidebarCollapseBtn = document.getElementById('sidebarCollapseBtn');
     function setSidebarCollapsed(collapsed) {
         document.body.classList.toggle('sidebar-collapsed', collapsed);
-        setAccountMenuOpen(false);
         if (sidebarCollapseBtn) {
             sidebarCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
             sidebarCollapseBtn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
@@ -2231,6 +2201,7 @@
     }
     if (sidebarCollapseBtn) {
         sidebarCollapseBtn.addEventListener('click', function () {
+            if (window.innerWidth <= 768) { closeMobileNav(); return; }
             setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
         });
         if (LS.get('sidebarCollapsed') === '1') setSidebarCollapsed(true);
@@ -3270,18 +3241,23 @@
     }
 
     function _updateFacultyStatCards(data) {
+        const total = data.length;
         const counts = {
-            'Active Borrowings': data.filter(r => r.status === 'Approved').length,
-            'Pending Requests': data.filter(r => r.status === 'Waiting').length,
-            'Total Requests': data.length,
+            approved: data.filter(r => r.status === 'Approved').length,
+            waiting: data.filter(r => r.status === 'Waiting').length,
+            overdue: data.filter(r => r.status === 'Overdue').length,
+            total: total,
         };
-        document.querySelectorAll('.stat-card').forEach(card => {
-            const label = (card.querySelector('.stat-card-label') || {}).textContent?.trim();
-            const val = card.querySelector('.stat-card-value');
-            if (!val || !(label in counts)) return;
-            if (val.textContent.trim() !== String(counts[label])) {
-                val.textContent = counts[label];
-            }
+        document.querySelectorAll('.stat-tile[data-stat]').forEach(tile => {
+            const key = tile.dataset.stat;
+            if (!(key in counts)) return;
+            const n = counts[key];
+            const val = tile.querySelector('.stat-tile-value');
+            if (val && val.textContent.trim() !== String(n)) val.textContent = n;
+            const pct = key === 'total' ? 100 : (total > 0 ? Math.round(n / total * 100) : 0);
+            tile.style.setProperty('--pct', pct + '%');
+            const pctEl = tile.querySelector('[data-stat-pct]');
+            if (pctEl) pctEl.textContent = pct;
         });
     }
 

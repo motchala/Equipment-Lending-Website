@@ -50,3 +50,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // credentials changed by a Super Admin. No-op for visitors/faculty/students.
 require_once __DIR__ . '/admin-auth.php';
 admin_session_guard();
+
+// ── Faculty session re-validation ───────────────────────────────────────
+// Ends faculty sessions whose account was deleted by a Super Admin.
+// No-op for visitors/students/admins.
+faculty_session_guard();

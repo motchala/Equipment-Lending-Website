@@ -127,6 +127,10 @@
         // Highlight the specific element that was clicked, or fall back to first match
         const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
+        // Settings lives inside the account menu, so mark the account toggle as the
+        // current item too (it stays visually quiet while the menu is open).
+        const acctToggle = document.getElementById('navAccountToggle');
+        if (acctToggle) acctToggle.classList.toggle('active', tabName === 'settings');
         _closeMobileSidebar();
     }
 
@@ -174,17 +178,15 @@
         if (formWrap) { formWrap.classList.remove('edit-mode'); formWrap.classList.add('hidden'); }
     }
 
-    /* ── Profile dropdown ────────────────────────────────────── */
-    function openDropdown() {
-        document.getElementById('profileDropdown').classList.add('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'true');
-    }
-    function closeDropdown() {
-        document.getElementById('profileDropdown').classList.remove('open');
-        document.getElementById('avatarBtn').setAttribute('aria-expanded', 'false');
-    }
-    function toggleDropdown() {
-        document.getElementById('profileDropdown').classList.contains('open') ? closeDropdown() : openDropdown();
+    /* ── Account menu (sidebar footer) ───────────────────────────
+       The avatar + name tab expands Scan Return / Notifications /
+       Settings inline, directly under itself and above Log Out. */
+    function setAccountMenuOpen(open) {
+        const toggle = document.getElementById('navAccountToggle');
+        const menu = document.getElementById('navAccountMenu');
+        if (!toggle || !menu) return;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        menu.classList.toggle('open', open);
     }
 
     /* ── Account / Help sub-tabs (nested inside the Settings tab) ── */
@@ -260,6 +262,11 @@
         if (uc) uc.textContent = count + ' unread';
         const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
         if (markAllBtn) markAllBtn.disabled = (count === 0);
+        const navDot = document.getElementById('navNotifDot');
+        if (navDot) navDot.hidden = count <= 0;
+        const unreadLabel = count > 0 ? ' \u2014 ' + count + ' unread' : '';
+        const acctToggleEl = document.getElementById('navAccountToggle');
+        if (acctToggleEl) acctToggleEl.setAttribute('aria-label', 'Account menu' + unreadLabel);
         document.querySelectorAll('.notif-btn-badge,.notif-badge').forEach(b => {
             const prev = parseInt(b.textContent, 10) || 0;
             if (count === 0) {
@@ -813,16 +820,14 @@
                     if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
 
                     // Reflect the change everywhere else the admin's name/initials
-                    // appear on this page (header, dropdown, hero, greeting) without
+                    // appear on this page (sidebar, hero, greeting) without
                     // requiring a reload.
-                    document.querySelectorAll('.u-name, .dd-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
+                    document.querySelectorAll('.u-name, .dd-name, .nav-account-name, .ov-hero-name').forEach(el => { el.textContent = data.admin_name; });
                     const greetEl = document.getElementById('greetName');
                     if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
                     const initials = _computeInitials(data.admin_name);
                     if (initials) {
-                        const avatarBtn = document.getElementById('avatarBtn');
-                        if (avatarBtn) avatarBtn.textContent = initials;
-                        document.querySelectorAll('.dd-avatar').forEach(el => { el.textContent = initials; });
+                        document.querySelectorAll('.nav-account-avatar, .dd-avatar').forEach(el => { el.textContent = initials; });
                     }
 
                     // The database is now the source of truth for these fields —
@@ -939,7 +944,7 @@
                 case 'open-notif-modal':
                     filterNotifs('all');
                     psOpenModal('notifOverlay');
-                    closeDropdown();
+                    _closeMobileSidebar();
                     break;
 
                 case 'open-change-pass': {
@@ -1087,7 +1092,7 @@
                     showToast(el.dataset.msg || ''); break;
                 case 'logout':
                     e.preventDefault();
-                    closeDropdown();
+                    _closeMobileSidebar();
                     if (window.PSLogout) window.PSLogout.open(el);
                     else if (confirm('Confirm Logout?')) window.location.href = 'api/logout.php'; // fallback only if logout-modal.js failed to load
                     break;
@@ -1343,10 +1348,13 @@
         });
     });
 
-    /* ── Avatar button ───────────────────────────────────────── */
-    const avatarBtn = document.getElementById('avatarBtn');
-    if (avatarBtn) avatarBtn.addEventListener('click', e => { e.stopPropagation(); toggleDropdown(); });
-    document.addEventListener('click', e => { if (!e.target.closest('.header-right')) closeDropdown(); });
+    /* ── Account tab (sidebar footer): expands / collapses inline ── */
+    const navAccountToggle = document.getElementById('navAccountToggle');
+    if (navAccountToggle) {
+        navAccountToggle.addEventListener('click', function () {
+            setAccountMenuOpen(navAccountToggle.getAttribute('aria-expanded') !== 'true');
+        });
+    }
 
     /* ── Sidebar nav items ────────────────────────────────────── */
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
@@ -1373,8 +1381,8 @@
         if (e.key === 'Escape') _closeMobileSidebar();
     });
 
-    /* ── Desktop sidebar collapse (icon-rail): logo icon box doubles
-       as the toggle. Independent of the mobile drawer above — this
+    /* ── Desktop sidebar collapse (icon-rail): the toggle in the sidebar's
+       brand row. Independent of the mobile drawer above — this
        only resizes the always-inline desktop sidebar; #app-main
        (flex:1) naturally expands into the freed width. Preference
        persists across reloads via localStorage. ── */
@@ -1389,6 +1397,8 @@
     }
     if (sidebarCollapseBtn) {
         sidebarCollapseBtn.addEventListener('click', function () {
+            if (window.innerWidth <= 768) { _closeMobileSidebar(); return; }   // phones: close the drawer
+            if (window.innerWidth <= 1024) return;                             // tablets: always an icon rail
             _setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
         });
         // Restore the person's last preference on load.
@@ -1433,34 +1443,6 @@
     document.querySelectorAll('#settMainTabs .rq-sub-tab').forEach(btn => {
         btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
     });
-
-    /* ── Header dropdown → Settings tab shortcuts ────────────── */
-    const ddAccountBtn = document.getElementById('dd-account-btn');
-    if (ddAccountBtn) {
-        ddAccountBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-account');
-        });
-    }
-    const ddSettingsBtn = document.getElementById('dd-settings-btn');
-    if (ddSettingsBtn) {
-        ddSettingsBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-prefs');
-        });
-    }
-
-    /* ── Manage Admins — dropdown shortcut ───────────────────── */
-    const ddManageAdminsBtn = document.getElementById('dd-manage-admins-btn');
-    if (ddManageAdminsBtn) {
-        ddManageAdminsBtn.addEventListener('click', function () {
-            closeDropdown();
-            _switchTabDOM('settings');
-            switchSettMainTab('sett-admins');
-        });
-    }
 
     /* ── Manage Admins — Add Admin form ──────────────────────────
        Mirrors the pattern used by the Add Faculty form exactly:
@@ -3019,7 +3001,7 @@
         }
 
         openBtn.addEventListener('click', function () {
-            closeDropdown();
+            _closeMobileSidebar();
             startScanner();
         });
         closeBtn.addEventListener('click', stopScanner);

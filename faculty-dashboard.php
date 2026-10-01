@@ -1601,9 +1601,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 ================================================================ -->
     <nav class="side-nav" id="sideNav">
         <div class="side-nav-brand">
-            <button type="button" class="side-nav-logo" id="sidebarCollapseBtn"
-                title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
-                aria-controls="sideNav">
+            <!-- Logo is a plain mark now (no longer the collapse button) -->
+            <div class="side-nav-logo" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"
                     aria-hidden="true">
@@ -1611,11 +1610,22 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <polyline points="2 17 12 22 22 17" />
                     <polyline points="2 12 12 17 22 12" />
                 </svg>
-            </button>
+            </div>
             <div class="side-nav-brand-text">
                 <span class="side-nav-title"><strong>PUP</strong><span class="snt-light">SYNC</span></span>
                 <span class="side-nav-sub">Faculty Portal</span>
             </div>
+            <!-- Sidebar toggle: desktop = collapse / expand, phones = close the drawer -->
+            <button type="button" class="side-nav-toggle" id="sidebarCollapseBtn"
+                title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded="true"
+                aria-controls="sideNav">
+                <svg class="sn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <rect x="3" y="4" width="18" height="16" rx="3.5" />
+                    <path d="M9.5 4v16" />
+                    <rect class="sn-fill" x="4.6" y="5.6" width="3.3" height="12.8" rx="1.4" fill="currentColor" stroke="none" />
+                </svg>
+            </button>
         </div>
 
         <div class="side-nav-links">
@@ -1638,32 +1648,34 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-footer">
-            <!-- Account group: the toggle shows the avatar + faculty name. Clicking it opens a
-                 flyout that pops up and to the right of the sidebar (Settings + Notifications). -->
+            <!-- Account group: the toggle shows the avatar + faculty name. Clicking it expands
+                 Settings + Notifications inline, directly under the toggle and above Log Out. -->
             <div class="side-nav-group" id="navAccountGroup">
                 <button type="button" class="side-nav-item side-nav-group-toggle" id="navAccountToggle"
-                    aria-haspopup="menu" aria-expanded="false" aria-controls="navAccountMenu"
+                    aria-expanded="false" aria-controls="navAccountMenu"
                     aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
                     <span class="side-nav-avatar"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></span>
                     <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
                     <b class="side-nav-notif-dot" id="navNotifDot" aria-hidden="true"
                         <?php if ($notif_count <= 0) echo 'hidden'; ?>></b>
-                    <span class="material-symbols-outlined side-nav-chevron" aria-hidden="true">chevron_right</span>
+                    <span class="material-symbols-outlined side-nav-chevron" aria-hidden="true">expand_more</span>
                 </button>
-                <div class="side-nav-flyout" id="navAccountMenu" role="menu" aria-label="Account">
-                    <a class="side-nav-item side-nav-subitem" id="nav-settings" role="menuitem" data-action="open-overlay"
-                        data-target="settingsOverlay" href="#">
-                        <span class="material-symbols-outlined">settings</span>
-                        <span>Settings</span>
-                    </a>
-                    <button type="button" class="side-nav-item side-nav-subitem" id="nav-notifications" role="menuitem"
-                        data-action="open-notif-modal"
-                        aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                        <span class="material-symbols-outlined">notifications</span>
-                        <span>Notifications</span>
-                        <b class="side-nav-badge" id="notifBadge"
-                            <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
-                    </button>
+                <div class="side-nav-submenu" id="navAccountMenu" role="group" aria-label="Account">
+                    <div class="side-nav-submenu-inner">
+                        <a class="side-nav-item side-nav-subitem" id="nav-settings" data-action="open-overlay"
+                            data-target="settingsOverlay" href="#">
+                            <span class="material-symbols-outlined">settings</span>
+                            <span>Settings</span>
+                        </a>
+                        <button type="button" class="side-nav-item side-nav-subitem" id="nav-notifications"
+                            data-action="open-notif-modal"
+                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <span>Notifications</span>
+                            <b class="side-nav-badge" id="notifBadge"
+                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
@@ -1682,7 +1694,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         <!-- Top bar removed. Only the mobile menu button remains (shown at <=768px)
              so the sidebar drawer can still be opened on phones. -->
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open navigation">
-            <span class="material-symbols-outlined">menu</span>
+            <svg class="sn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <rect x="3" y="4" width="18" height="16" rx="3.5" />
+                <path d="M9.5 4v16" />
+                <rect class="sn-fill" x="4.6" y="5.6" width="3.3" height="12.8" rx="1.4" fill="currentColor" stroke="none" />
+            </svg>
         </button>
 
         <?php
@@ -1751,30 +1768,65 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <!-- LEFT col: stats bar + bento buttons -->
                     <div class="dash-top-left">
 
-                        <!-- Stats Bar -->
-                        <div class="dashboard-stats-col dash-stats-row-layout">
-                            <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Approved">
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">devices</span></div>
-                                <div class="stat-card-label">Active Borrowings:</div>
-                                <div class="stat-card-value"><?php echo $stat_approved; ?></div>
-                            </div>
-                            <div class="stat-card stat-card-clickable" data-action="filter-requests" data-status="Waiting">
-                                <div class="stat-card-icon"><span class="material-symbols-outlined">pending</span></div>
-                                <div class="stat-card-label">Pending Requests:</div>
-                                <div class="stat-card-value"><?php echo $stat_waiting; ?></div>
-                            </div>
+                        <!-- Stat tiles -->
+                        <?php
+                        $pct_of = function ($n) use ($stat_total) {
+                            return $stat_total > 0 ? (int) round($n / $stat_total * 100) : 0;
+                        };
+                        $pct_active  = $pct_of($stat_approved);
+                        $pct_waiting = $pct_of($stat_waiting);
+                        $pct_overdue = $pct_of($stat_overdue);
+                        ?>
+                        <div class="dash-stats" id="dashStats">
+                            <button type="button" class="stat-tile stat-tile--active" data-stat="approved"
+                                data-action="filter-requests" data-status="Approved" style="--pct: <?php echo $pct_active; ?>%;">
+                                <span class="stat-tile-top">
+                                    <span class="stat-tile-icon"><span class="material-symbols-outlined">devices</span></span>
+                                    <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
+                                </span>
+                                <span class="stat-tile-value"><?php echo $stat_approved; ?></span>
+                                <span class="stat-tile-label">Active Borrowings</span>
+                                <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
+                                <span class="stat-tile-foot"><b data-stat-pct><?php echo $pct_active; ?></b>% of all requests</span>
+                                <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">devices</span>
+                            </button>
+
+                            <button type="button" class="stat-tile stat-tile--pending" data-stat="waiting"
+                                data-action="filter-requests" data-status="Waiting" style="--pct: <?php echo $pct_waiting; ?>%;">
+                                <span class="stat-tile-top">
+                                    <span class="stat-tile-icon"><span class="material-symbols-outlined">hourglass_top</span></span>
+                                    <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
+                                </span>
+                                <span class="stat-tile-value"><?php echo $stat_waiting; ?></span>
+                                <span class="stat-tile-label">Pending Requests</span>
+                                <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
+                                <span class="stat-tile-foot"><b data-stat-pct><?php echo $pct_waiting; ?></b>% of all requests</span>
+                                <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">hourglass_top</span>
+                            </button>
+
                             <?php if ($stat_overdue > 0): ?>
-                                <div class="stat-card stat-card-overdue stat-card-clickable" data-action="filter-requests" data-status="Overdue">
-                                    <div class="stat-card-icon"><span class="material-symbols-outlined">alarm</span></div>
-                                    <div class="stat-card-label">Overdue:</div>
-                                    <div class="stat-card-value" id="statOverdueVal" style="background:#fee2e2;color:#dc2626;"><?php echo $stat_overdue; ?></div>
-                                    <div class="stat-card-action-tag">Action Required</div>
-                                </div>
+                                <button type="button" class="stat-tile stat-tile--overdue" data-stat="overdue"
+                                    data-action="filter-requests" data-status="Overdue" style="--pct: <?php echo $pct_overdue; ?>%;">
+                                    <span class="stat-tile-top">
+                                        <span class="stat-tile-icon"><span class="material-symbols-outlined">alarm</span></span>
+                                        <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
+                                    </span>
+                                    <span class="stat-tile-value" id="statOverdueVal"><?php echo $stat_overdue; ?></span>
+                                    <span class="stat-tile-label">Overdue</span>
+                                    <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
+                                    <span class="stat-tile-foot"><span class="stat-tile-pulse" aria-hidden="true"></span>Action required</span>
+                                    <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">alarm</span>
+                                </button>
                             <?php else: ?>
-                                <div class="stat-card">
-                                    <div class="stat-card-icon"><span class="material-symbols-outlined">receipt_long</span></div>
-                                    <div class="stat-card-label">Total Requests:</div>
-                                    <div class="stat-card-value"><?php echo $stat_total; ?></div>
+                                <div class="stat-tile stat-tile--total" data-stat="total" style="--pct: 100%;">
+                                    <span class="stat-tile-top">
+                                        <span class="stat-tile-icon"><span class="material-symbols-outlined">receipt_long</span></span>
+                                    </span>
+                                    <span class="stat-tile-value"><?php echo $stat_total; ?></span>
+                                    <span class="stat-tile-label">Total Requests</span>
+                                    <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
+                                    <span class="stat-tile-foot">All-time requests</span>
+                                    <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">receipt_long</span>
                                 </div>
                             <?php endif; ?>
                         </div>

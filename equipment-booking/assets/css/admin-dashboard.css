@@ -72,6 +72,36 @@
     --building-color-4: #cc99ff;
 }
 
+/* ── Sidebar tokens ───────────────────────────────────────────────
+   Same dark-maroon surface, text and gold-hover values the Faculty
+   portal's sidebar uses, so both portals read as one product. */
+:root {
+    --nav-bg-top: #4a0909;
+    --nav-bg-bottom: #330505;
+    --nav-text: rgba(255, 255, 255, 0.86);
+    --nav-text-dim: rgba(255, 255, 255, 0.64);
+    --nav-line: rgba(255, 255, 255, 0.12);
+    --nav-hover-bg: #dcb862;
+    --nav-on-hover: #2b0000;
+    --nav-active-bg: rgba(255, 255, 255, 0.12);
+    --brand-h: 64px;
+}
+
+[data-theme="dark"] {
+    --nav-bg-top: #330606;
+    --nav-bg-bottom: #210303;
+}
+
+[data-theme="high-contrast"] {
+    --nav-bg-top: #3d0000;
+    --nav-bg-bottom: #3d0000;
+    --nav-text: #ffffff;
+    --nav-text-dim: #ffffff;
+    --nav-line: rgba(255, 255, 255, 0.6);
+    --nav-hover-bg: #ffd83a;
+    --nav-active-bg: rgba(255, 255, 255, 0.22);
+}
+
 /* ── Reset ────────────────────────────────────────────────────── */
 *,
 *::before,
@@ -118,7 +148,10 @@ main#app-main,
 :root {
     --sidebar-w: 240px;
     --sidebar-w-collapsed: 76px;
-    --header-h: 62px;
+    /* The top bar was removed (the sidebar is the only app chrome), so nothing
+       is reserved above the page any more. Kept as a variable because
+       .app-body and the mobile drawer still do their maths with it. */
+    --header-h: 0px;
 }
 
 /* ── BODY / HTML ──────────────────────────────────────────────── */
@@ -162,18 +195,20 @@ header.app-header {
     height: 100%;
 }
 
-/* Hamburger button — opens/closes the off-canvas sidebar on mobile.
-   Hidden on desktop, where the sidebar is always visible. */
+/* Hamburger button — opens the off-canvas sidebar drawer on phones.
+   There is no top bar to hold it, so on phones it floats at the top-left
+   (see the <=768px block). Hidden on tablet/desktop, where the sidebar is
+   always visible. */
 .sidebar-toggle-btn {
     display: none;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
-    margin-left: 0.75rem;
-    background: transparent;
-    border: none;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
     color: var(--text-dark);
     cursor: pointer;
     flex-shrink: 0;
@@ -796,80 +831,181 @@ header.app-header {
 }
 
 /* ── SIDEBAR ──────────────────────────────────────────────────── */
+/* Structure: .sidebar-brand (logo + title + collapse toggle)
+              .sidebar-links (main tabs, scrolls if it has to)
+              .sidebar-footer (account group, then Log Out pinned last) */
 nav.sidebar {
     width: var(--sidebar-w);
-    background: linear-gradient(180deg, var(--sidebar-red-1) 0%, var(--sidebar-red-2) 100%);
-    border-right: 1px solid rgba(0, 0, 0, 0.15);
+    background: linear-gradient(180deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%);
+    border-right: 1px solid rgba(0, 0, 0, 0.4);
+    box-shadow: 6px 0 24px rgba(20, 0, 0, 0.3);
+    color: var(--nav-text);
     display: flex;
     flex-direction: column;
-    padding: 1rem 0.75rem;
+    padding: 0;
     flex-shrink: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
+    position: relative;
+    z-index: 2;
     transition: width 0.22s ease;
 }
 
-/* ── Collapsed (icon-rail) sidebar — toggled by clicking the logo
-   icon box (#sidebarCollapseBtn); #app-main naturally fills the
-   freed width since it's flex:1 in .app-body. Desktop-oriented;
-   harmless if ever triggered on the off-canvas mobile layout. ── */
-body.sidebar-collapsed nav.sidebar {
-    width: var(--sidebar-w-collapsed);
+/* ── Brand row: [logo] [PUPSYNC / Admin Portal] ........ [toggle] ── */
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: var(--brand-h);
+    padding: 0 12px 0 20px;
+    border-bottom: 1px solid var(--nav-line);
+    flex-shrink: 0;
 }
 
-body.sidebar-collapsed .header-logo {
-    width: var(--sidebar-w-collapsed);
+/* The logo keeps its own maroon; a light ring + faint halo separates it
+   from the darker sidebar without recolouring it. */
+.sidebar-logo {
+    width: 34px;
+    height: 34px;
+    background: #800000;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.42), 0 0 0 5px rgba(255, 255, 255, 0.07);
 }
 
-body.sidebar-collapsed .logo-text,
-body.sidebar-collapsed .nav-group-label,
-body.sidebar-collapsed .nav-item span:not(.material-symbols-outlined),
-body.sidebar-collapsed .nav-badge {
-    display: none;
+.sidebar-logo svg {
+    width: 18px;
+    height: 18px;
+    stroke: #ffffff;
 }
 
-body.sidebar-collapsed .nav-item {
-    justify-content: center;
-    padding: 0.6rem;
+.sidebar-brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
 }
 
-.nav-group-label {
-    font-size: 9.5px;
+.sidebar-title {
+    font-size: 17px;
+    white-space: nowrap;
+    color: #ffffff;
+}
+
+.sidebar-title strong {
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: rgba(255, 255, 255, 0.55);
-    padding: 0 0.6rem;
-    margin: 1rem 0 0.4rem;
+    color: #ffffff;
 }
 
-.nav-group-label:first-child {
-    margin-top: 0.2rem;
+.sidebar-title .snt-light {
+    font-weight: 500;
+    color: var(--nav-text-dim);
 }
 
+.sidebar-sub {
+    font-size: 11.5px;
+    color: var(--nav-text-dim);
+    white-space: nowrap;
+}
+
+/* Sidebar toggle (the "sidebar" glyph): collapse / expand on desktop,
+   close the drawer on phones. */
+.sidebar-toggle {
+    margin-left: auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: var(--nav-text);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.94);
+}
+
+.sn-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+/* Expanded = left panel filled; collapsed rail = outline only */
+.sn-icon .sn-fill {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+/* ── Main tab list ─────────────────────────────────────────────── */
+.sidebar-links {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 12px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.sidebar-links::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-links::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 6px;
+}
+
+/* ── Items (tabs, account toggle, submenu items, Log Out) ──────── */
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
     cursor: pointer;
-    color: #ffffff;
+    color: var(--nav-text);
     font-weight: 500;
-    transition: all 0.15s;
     text-decoration: none;
-    margin-bottom: 2px;
     position: relative;
     font-size: 13px;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease;
 }
 
-.nav-item:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: #ffffff;
+/* <button> items (account toggle, Scan Return, Notifications) look like the <a> ones */
+button.nav-item {
+    width: 100%;
+    background: none;
+    border: 0;
+    text-align: left;
+    font-family: inherit;
 }
 
+.nav-item .material-symbols-outlined {
+    font-size: 20px;
+    flex-shrink: 0;
+    color: inherit;
+}
+
+/* Current screen: a plain, quiet highlight. */
 .nav-item.active {
-    background: rgba(255, 255, 255, 0.16);
+    background: var(--nav-active-bg);
     color: #ffffff;
     font-weight: 600;
 }
@@ -878,10 +1014,18 @@ body.sidebar-collapsed .nav-item {
     font-variation-settings: 'FILL' 1;
 }
 
-.nav-item .material-symbols-outlined {
-    font-size: 20px;
-    flex-shrink: 0;
-    color: #ffffff;
+/* Hover: the one place gold appears (declared after .active so hovering
+   the current tab still responds). */
+.nav-item:hover {
+    background: var(--nav-hover-bg);
+    color: var(--nav-on-hover);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transform: translateX(2px);
+}
+
+.nav-item:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
 }
 
 .nav-badge {
@@ -895,14 +1039,211 @@ body.sidebar-collapsed .nav-item {
     box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.5);
 }
 
-.nav-divider {
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-    margin: 0.5rem 0.6rem;
+/* ── Footer: account group, then Log Out at the very bottom ────── */
+.sidebar-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px 12px;
+    border-top: 1px solid var(--nav-line);
 }
 
-.sidebar-bottom {
-    margin-top: auto;
+/* Log Out: soft rose on maroon, same gold hover as the tabs */
+.nav-item.nav-signout {
+    color: #f2b8b8;
+}
+
+.nav-item.nav-signout:hover {
+    background: var(--nav-hover-bg);
+    color: var(--nav-on-hover);
+}
+
+/* ── Account group ─────────────────────────────────────────────── */
+.nav-account {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.nav-account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.26);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* On the gold hover the avatar flips to dark maroon so it stays visible */
+.nav-item:hover .nav-account-avatar {
+    background: #4a0909;
+    color: #ffffff;
+    box-shadow: 0 0 0 1.5px rgba(43, 0, 0, 0.3);
+}
+
+/* Admin name: one line, truncated with an ellipsis */
+.nav-account-name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-account-chevron {
+    margin-left: auto;
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+}
+
+.nav-account-toggle[aria-expanded="true"] .nav-account-chevron {
+    transform: rotate(180deg);
+}
+
+/* Unread dot on the toggle, so notifications are never fully hidden */
+.nav-account-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #e5484d;
+    box-shadow: 0 0 0 2px var(--nav-bg-bottom);
+    flex-shrink: 0;
+}
+
+.nav-account-dot[hidden],
+.nav-account-toggle[aria-expanded="true"] .nav-account-dot {
+    display: none;
+}
+
+/* While expanded, the submenu shows the current item, so the toggle stays quiet */
+.nav-account-toggle.active[aria-expanded="true"]:not(:hover) {
+    background: transparent;
+    font-weight: 500;
+}
+
+/* ── Account submenu: expands inline, directly under the toggle ──
+   Height animates via grid rows (0fr -> 1fr). Closed items are
+   visibility:hidden so they can't be tabbed to. */
+.nav-submenu {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-submenu.open {
+    grid-template-rows: 1fr;
+}
+
+.nav-submenu-inner {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0 0 0 26px;
+    padding: 4px 0 2px 8px;
+    border-left: 1px solid var(--nav-line);
+    visibility: hidden;
+    transition: visibility 0s linear 0.26s;
+}
+
+.nav-submenu.open .nav-submenu-inner {
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+/* Hover inside the submenu stays flat so the clipped container never crops it */
+.nav-subitem:hover {
+    box-shadow: none;
+    transform: none;
+}
+
+/* ── Collapsed icon-rail (desktop only) ────────────────────────────
+   Toggled by #sidebarCollapseBtn. Scoped to >=1025px on purpose: on
+   tablets the rail is automatic (see the responsive stylesheet) and on
+   phones the sidebar is a full-width drawer, so a saved "collapsed"
+   preference must never shrink that drawer. #app-main fills the freed
+   width since it's flex:1 in .app-body. */
+@media (min-width: 1025px) {
+    body.sidebar-collapsed nav.sidebar {
+        width: var(--sidebar-w-collapsed);
+    }
+
+    body.sidebar-collapsed .sidebar-brand {
+        justify-content: center;
+        padding: 0;
+    }
+
+    body.sidebar-collapsed .sidebar-logo,
+    body.sidebar-collapsed .sidebar-brand-text {
+        display: none;
+    }
+
+    body.sidebar-collapsed .sidebar-toggle {
+        margin-left: 0;
+    }
+
+    body.sidebar-collapsed .sn-icon .sn-fill {
+        opacity: 0;
+    }
+
+    body.sidebar-collapsed .nav-item .nav-label,
+    body.sidebar-collapsed .nav-item .nav-account-chevron,
+    body.sidebar-collapsed .nav-account-toggle .nav-account-dot,
+    body.sidebar-collapsed .nav-item .nav-badge {
+        display: none;
+    }
+
+    body.sidebar-collapsed .nav-item {
+        justify-content: center;
+        padding: 0.6rem;
+    }
+
+    body.sidebar-collapsed .nav-item:hover {
+        transform: none;
+    }
+
+    /* Unread dot sits on the avatar corner; the Notifications badge on its icon */
+    body.sidebar-collapsed .nav-account-toggle .nav-account-dot:not([hidden]) {
+        display: block;
+        position: absolute;
+        top: 6px;
+        right: 16px;
+    }
+
+    body.sidebar-collapsed .nav-submenu-inner {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    body.sidebar-collapsed .nav-subitem .nav-badge {
+        position: absolute;
+        top: 2px;
+        right: 10px;
+        margin: 0;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 9px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    body.sidebar-collapsed .nav-subitem .nav-badge:not([style*="none"]) {
+        display: block;
+    }
 }
 
 /* ── MAIN CONTENT ─────────────────────────────────────────────── */
@@ -4574,12 +4915,19 @@ input[type="range"] {
         align-items: center;
     }
 
-    /* Show the hamburger; the sidebar itself becomes an off-canvas drawer
-       below (see the "Sidebar — off-canvas drawer" rules further down). */
+    /* The top bar is gone, so the hamburger floats at the top-left and opens
+       the off-canvas sidebar drawer (see "Sidebar — off-canvas drawer" below).
+       It hides while the drawer is open — the drawer has its own close toggle. */
     .sidebar-toggle-btn {
         display: flex;
-        margin-left: 0;
-        margin-right: 0.5rem;
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 300;
+    }
+
+    body.sidebar-open .sidebar-toggle-btn {
+        display: none;
     }
 
     /* No longer needs to match the (now hidden) sidebar's width — let it
@@ -4592,14 +4940,6 @@ input[type="range"] {
 
     .logo-text {
         display: none;
-    }
-
-    /* The logo/collapse toggle is a desktop-only affordance — on mobile
-       the hamburger already handles showing/hiding the sidebar via the
-       off-canvas drawer, so disable double-duty here to avoid the two
-       mechanisms fighting over the same nav.sidebar width. */
-    #sidebarCollapseBtn {
-        pointer-events: none;
     }
 
     /* Search drops to its own full-width row beneath the top row
@@ -4631,9 +4971,9 @@ input[type="range"] {
         border-radius: 50%;
     }
 
-    /* Main padding */
+    /* Main padding — the top clears the floating menu button */
     main#app-main {
-        padding: 0 1rem 2rem;
+        padding: 56px 1rem 2rem;
     }
 
     /* Stats */
@@ -4740,8 +5080,10 @@ input[type="range"] {
         gap: 10px !important;
     }
 
-    /* Scan QR button full width on mobile */
-    #openQrScannerBtn {
+    /* Scan QR button full width on mobile. Scoped to the Pending Approval row:
+       #openQrScannerBtn is now the sidebar's account-menu item, which must
+       keep the same left-aligned layout as its siblings. */
+    #lending-waiting #openQrScannerBtn {
         width: 100% !important;
         justify-content: center !important;
     }
@@ -4933,14 +5275,17 @@ input[type="range"] {
         top: var(--header-h);
         left: 0;
         bottom: 0;
+        width: min(280px, 86vw);
         z-index: 400;
         transform: translateX(-100%);
-        transition: transform 0.25s ease;
-        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.15);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        box-shadow: none;
+        /* a closed drawer must not leak a shadow onto the screen edge */
     }
 
     body.sidebar-open nav.sidebar {
         transform: translateX(0);
+        box-shadow: 2px 0 16px rgba(0, 0, 0, 0.35);
     }
 
     body.sidebar-open .sidebar-backdrop {

@@ -9483,7 +9483,7 @@ body {
 }
 
 /* ── 6. Sidebar collapse (icon-rail) ───────────────────────────────────
-   Clicking the logo (#sidebarCollapseBtn) toggles body.sidebar-collapsed.
+   The sidebar toggle (#sidebarCollapseBtn) toggles body.sidebar-collapsed.
    .side-nav is position:fixed and .main-wrapper's margin-left tracks its
    width manually, so both are overridden here (!important to beat the
    redesign layer). Desktop only: at <=1024px the sidebar is already
@@ -9507,9 +9507,11 @@ body {
     }
 }
 
-@media (max-width: 1024px) {
+/* Tablets are always an icon rail, so there is nothing to toggle.
+   (On phones the same button closes the drawer, so it stays visible.) */
+@media (min-width: 769px) and (max-width: 1024px) {
     #sidebarCollapseBtn {
-        pointer-events: none;
+        display: none;
     }
 }
 
@@ -10712,7 +10714,7 @@ body {
 }
 
 .side-nav-group-toggle[aria-expanded="true"] .side-nav-chevron {
-    transform: translateX(3px);
+    transform: rotate(180deg);
 }
 
 /* Unread dot on the toggle, so notifications are never fully hidden */
@@ -10730,62 +10732,39 @@ body {
     display: none;
 }
 
-/* ── Flyout: opens UP and to the RIGHT, outside the sidebar's box ──
-   position:fixed lets it escape the sidebar (which clips on tablet).
-   JS sets --flyout-left / --flyout-bottom from the toggle's position. */
-.side-nav-flyout {
-    position: fixed;
-    left: var(--flyout-left, calc(var(--sidebar-w) + 8px));
-    bottom: var(--flyout-bottom, 16px);
-    min-width: 220px;
-    padding: 6px;
+/* ── Account submenu: expands inline, directly under the avatar tab ──
+   Height animates via grid rows (0fr -> 1fr). Closed items are
+   visibility:hidden so they cannot be tabbed to. */
+.side-nav-submenu {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.side-nav-submenu.open {
+    grid-template-rows: 1fr;
+}
+
+.side-nav-submenu-inner {
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    z-index: 260;
-    opacity: 0;
+    margin: 0 0 0 26px;
+    padding: 4px 0 2px 8px;
+    border-left: 1px solid var(--nav-line, rgba(255, 255, 255, 0.12));
     visibility: hidden;
-    pointer-events: none;
-    transform: translateX(-8px) scale(0.96);
-    transform-origin: bottom left;
-    transition: opacity 0.16s ease,
-        transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-        visibility 0s linear 0.2s;
+    transition: visibility 0s linear 0.26s;
 }
 
-.side-nav-flyout.open {
-    opacity: 1;
+.side-nav-submenu.open .side-nav-submenu-inner {
     visibility: visible;
-    pointer-events: auto;
-    transform: none;
     transition-delay: 0s;
 }
 
-/* Small notch pointing back at the toggle */
-.side-nav-flyout::before {
-    content: '';
-    position: absolute;
-    left: -6px;
-    bottom: 17px;
-    width: 10px;
-    height: 10px;
-    background: var(--color-surface);
-    border-left: 1px solid var(--color-outline-variant);
-    border-bottom: 1px solid var(--color-outline-variant);
-    transform: rotate(45deg);
-}
-
-/* Items keep labels + left alignment even when the sidebar is an icon rail */
-.side-nav .side-nav-flyout .side-nav-item {
-    justify-content: flex-start;
-}
-
-body .side-nav .side-nav-flyout .side-nav-item span:not(.material-symbols-outlined) {
-    display: inline;
+.side-nav-subitem {
+    position: relative;
 }
 
 .side-nav-badge {
@@ -10865,24 +10844,633 @@ body .side-nav .side-nav-flyout .side-nav-item span:not(.material-symbols-outlin
     .app-main {
         padding-top: var(--chrome-top) !important;
     }
+}
 
-    /* The drawer already covers most of the screen, so the flyout opens
-       upward inside it instead of out to the right. */
-    .side-nav-flyout {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: calc(100% + 8px);
-        min-width: 0;
-        transform: translateY(8px) scale(0.98);
-        transform-origin: bottom center;
+
+/* ================================================================
+   SIDEBAR — DARK MAROON THEME (muted gold hover only)
+   ----------------------------------------------------------------
+   Everything in the sidebar (brand, tabs, account tab, submenu) is
+   restyled for a dark maroon surface. All rules are prefixed `body
+   .side-nav` so they win over the earlier light-theme sidebar rules.
+   Colour is kept to: maroon surface, white text, and one muted gold
+   used ONLY for the hover state.
+================================================================ */
+:root {
+    --nav-bg-top: #4a0909;
+    --nav-bg-bottom: #330505;
+    --nav-text: rgba(255, 255, 255, 0.86);
+    --nav-text-dim: rgba(255, 255, 255, 0.64);
+    --nav-line: rgba(255, 255, 255, 0.12);
+    --nav-hover-bg: #dcb862;
+    --nav-on-hover: #2b0000;
+    --nav-active-bg: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] {
+    --nav-bg-top: #330606;
+    --nav-bg-bottom: #210303;
+}
+
+[data-theme="high-contrast"] {
+    --nav-bg-top: #3d0000;
+    --nav-bg-bottom: #3d0000;
+    --nav-text: #ffffff;
+    --nav-text-dim: #ffffff;
+    --nav-line: rgba(255, 255, 255, 0.6);
+    --nav-hover-bg: #ffd83a;
+    --nav-active-bg: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Surface ─────────────────────────────────────────────────────── */
+body .side-nav {
+    background: linear-gradient(180deg, var(--nav-bg-top) 0%, var(--nav-bg-bottom) 100%) !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 6px 0 24px rgba(20, 0, 0, 0.3) !important;
+    color: var(--nav-text);
+}
+
+/* ── Brand row: [logo] [PUPSYNC / Faculty Portal] ........ [toggle] ─ */
+body .side-nav .side-nav-brand {
+    background: transparent !important;
+    border-bottom: 1px solid var(--nav-line) !important;
+    box-shadow: none !important;
+    padding: 0 12px 0 20px !important;
+    gap: 12px !important;
+}
+
+/* The logo keeps its own maroon. A light ring + faint halo around it
+   separates it from the darker sidebar without recolouring the logo. */
+body .side-nav .side-nav-logo {
+    width: 34px !important;
+    height: 34px !important;
+    background: #800000 !important;
+    border-radius: 10px !important;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.42), 0 0 0 5px rgba(255, 255, 255, 0.07);
+    pointer-events: none;
+}
+
+body .side-nav .side-nav-logo svg {
+    width: 18px;
+    height: 18px;
+    stroke: #ffffff;
+}
+
+body .side-nav .side-nav-title strong {
+    color: #ffffff !important;
+}
+
+body .side-nav .side-nav-title .snt-light {
+    color: var(--nav-text-dim) !important;
+}
+
+body .side-nav .side-nav-sub {
+    color: var(--nav-text-dim) !important;
+}
+
+/* ── Sidebar toggle (modern "sidebar" glyph) ─────────────────────── */
+.side-nav-toggle {
+    margin-left: auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: var(--nav-text);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+        transform 0.18s ease;
+}
+
+.side-nav-toggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.28);
+}
+
+.side-nav-toggle:active {
+    transform: scale(0.94);
+}
+
+.side-nav-toggle:focus-visible,
+body .side-nav .side-nav-item:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.sn-icon {
+    width: 20px;
+    height: 20px;
+    display: block;
+}
+
+/* Expanded = left panel filled; collapsed rail = outline only */
+.sn-icon .sn-fill {
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────── */
+body .side-nav .side-nav-item {
+    position: relative;
+    color: var(--nav-text) !important;
+    border-radius: 10px !important;
+    transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease,
+        box-shadow 0.16s ease;
+}
+
+body .side-nav .side-nav-item .material-symbols-outlined {
+    color: inherit !important;
+}
+
+/* Current screen: a plain, quiet highlight. No accent colour, no marker. */
+body .side-nav .side-nav-item.active {
+    background: var(--nav-active-bg) !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    box-shadow: none;
+}
+
+/* Hover: the one place gold appears. Muted gold fill, dark text.
+   Declared after .active so hovering the current tab still responds. */
+body .side-nav .side-nav-item:hover {
+    background: var(--nav-hover-bg) !important;
+    color: var(--nav-on-hover) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+    transform: translateX(2px);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+body .side-nav .side-nav-footer {
+    border-top: 1px solid var(--nav-line) !important;
+}
+
+/* Log Out: soft rose on maroon, same hover as the tabs */
+body .side-nav .side-nav-footer .side-nav-item.side-nav-signout {
+    color: #f2b8b8 !important;
+}
+
+body .side-nav .side-nav-footer .side-nav-item.side-nav-signout .material-symbols-outlined {
+    color: inherit !important;
+}
+
+body .side-nav .side-nav-footer .side-nav-item.side-nav-signout:hover {
+    background: var(--nav-hover-bg) !important;
+    color: var(--nav-on-hover) !important;
+}
+
+/* ── Account tab ─────────────────────────────────────────────────── */
+body .side-nav .side-nav-avatar {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.26);
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+/* On the gold hover the avatar flips to dark maroon so it stays visible */
+body .side-nav .side-nav-item:hover .side-nav-avatar {
+    background: #4a0909;
+    color: #ffffff;
+    box-shadow: 0 0 0 1.5px rgba(43, 0, 0, 0.3);
+}
+
+body .side-nav .side-nav-user-name {
+    color: inherit;
+}
+
+body .side-nav .side-nav-chevron {
+    opacity: 0.7;
+}
+
+body .side-nav .side-nav-notif-dot {
+    background: #e5484d;
+    box-shadow: 0 0 0 2px var(--nav-bg-bottom);
+}
+
+/* ── Account submenu ─────────────────────────────────────────────── */
+/* Hover inside the submenu stays flat so the clipped container never crops it */
+body .side-nav .side-nav-submenu .side-nav-item:hover {
+    box-shadow: none;
+    transform: none;
+}
+
+/* While expanded, the submenu shows the current item, so the toggle itself stays quiet */
+body .side-nav .side-nav-group-toggle.active[aria-expanded="true"]:not(:hover) {
+    background: transparent !important;
+    font-weight: 500 !important;
+}
+
+body .side-nav .side-nav-badge {
+    background: #e5484d;
+    color: #ffffff;
+}
+
+/* ── Scrollbar on the tab list ───────────────────────────────────── */
+body .side-nav .side-nav-links {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+body .side-nav .side-nav-links::-webkit-scrollbar {
+    width: 6px;
+}
+
+body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 6px;
+}
+
+/* ── Collapsed icon-rail (desktop): toggle only, centred ─────────── */
+@media (min-width: 1025px) {
+    body.sidebar-collapsed .side-nav .side-nav-brand {
+        justify-content: center;
+        padding: 0 !important;
     }
 
-    .side-nav-flyout.open {
+    body.sidebar-collapsed .side-nav .side-nav-logo {
+        display: none !important;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-toggle {
+        margin-left: 0;
+    }
+
+    body.sidebar-collapsed .sn-icon .sn-fill {
+        opacity: 0;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-item:hover {
         transform: none;
     }
 
-    .side-nav-flyout::before {
+    /* Submenu in the icon rail: icons only, no indent, badge pinned to the icon */
+    body.sidebar-collapsed .side-nav .side-nav-submenu-inner {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-subitem .side-nav-badge {
+        position: absolute;
+        top: 2px;
+        right: 10px;
+        margin: 0;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 0.6rem;
+        line-height: 16px;
+    }
+}
+
+/* ── Tablet icon-rail: centred logo, no slide on hover ───────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+    body .side-nav .side-nav-brand {
+        justify-content: center;
+        padding: 0 !important;
+    }
+
+    body .side-nav .side-nav-item:hover {
+        transform: none;
+    }
+
+    body .side-nav .side-nav-submenu-inner {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    body .side-nav .side-nav-subitem .side-nav-badge {
+        position: absolute;
+        top: 2px;
+        right: 10px;
+        margin: 0;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 0.6rem;
+        line-height: 16px;
+    }
+}
+
+/* ── Phones: menu button matches the maroon palette ──────────────── */
+@media (max-width: 768px) {
+    body .mobile-menu-btn {
+        background: #800000;
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 14px rgba(40, 0, 0, 0.35);
+    }
+
+    body .mobile-menu-btn:hover,
+    body .mobile-menu-btn:active {
+        background: #6b0000;
+        color: #ffffff;
+    }
+
+    body .mobile-menu-btn .sn-icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    body .side-nav .side-nav-brand {
+        padding: 0 12px 0 20px !important;
+    }
+}
+
+
+/* ================================================================
+   DASHBOARD HOME — gold action buttons + refined stat tiles
+================================================================ */
+
+/* Borrow Equipment / Reserve Room: the sidebar's muted gold is now the
+   button colour itself, with dark-maroon text and icon. */
+#panel-home .dash-bento-btn {
+    background: var(--nav-hover-bg);
+    color: var(--nav-on-hover);
+    box-shadow: 0 1px 2px rgba(43, 0, 0, 0.12);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+#panel-home .dash-bento-btn:hover {
+    background: color-mix(in srgb, var(--nav-hover-bg) 88%, #2b0000);
+    box-shadow: 0 10px 24px rgba(43, 0, 0, 0.25);
+    transform: translateY(-3px);
+}
+
+#panel-home .dash-bento-icon {
+    background: rgba(43, 0, 0, 0.12);
+}
+
+#panel-home .dash-bento-icon .material-symbols-outlined,
+#panel-home .dash-bento-label {
+    color: var(--nav-on-hover);
+}
+
+/* ── Stat tiles (Active Borrowings / Pending Requests / Overdue) ──── */
+#panel-home .dash-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.stat-tile {
+    --sc: #800000;
+    --sc-soft: rgba(128, 0, 0, 0.1);
+    --sc-ink: #800000;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    margin: 0;
+    padding: 16px 18px 14px;
+    font: inherit;
+    text-align: left;
+    color: var(--color-on-surface);
+    background:
+        radial-gradient(120% 90% at 100% 100%, var(--sc-soft) 0%, transparent 62%),
+        var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* thin status strip along the top edge */
+.stat-tile::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--sc);
+}
+
+.stat-tile:hover {
+    transform: translateY(-3px);
+    border-color: var(--sc);
+    box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--sc) 60%, transparent);
+}
+
+.stat-tile:focus-visible {
+    outline: 2px solid var(--sc);
+    outline-offset: 2px;
+}
+
+.stat-tile--pending {
+    --sc: #d4ae55;
+    --sc-soft: rgba(220, 184, 98, 0.22);
+    --sc-ink: #8a6a12;
+}
+
+.stat-tile--overdue {
+    --sc: #c62828;
+    --sc-soft: rgba(198, 40, 40, 0.1);
+    --sc-ink: #c62828;
+}
+
+.stat-tile--total {
+    --sc: #64748b;
+    --sc-soft: rgba(100, 116, 139, 0.12);
+    --sc-ink: #475569;
+    cursor: default;
+}
+
+.stat-tile--total:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: var(--color-outline-variant);
+}
+
+[data-theme="dark"] .stat-tile {
+    --sc: #e57373;
+    --sc-soft: rgba(229, 115, 115, 0.16);
+    --sc-ink: #ff9e9e;
+}
+
+[data-theme="dark"] .stat-tile--pending {
+    --sc: #dcb862;
+    --sc-soft: rgba(220, 184, 98, 0.16);
+    --sc-ink: #e7c77a;
+}
+
+[data-theme="dark"] .stat-tile--overdue {
+    --sc: #ef5350;
+    --sc-soft: rgba(239, 83, 80, 0.16);
+    --sc-ink: #ff8a80;
+}
+
+[data-theme="dark"] .stat-tile--total {
+    --sc: #94a3b8;
+    --sc-soft: rgba(148, 163, 184, 0.14);
+    --sc-ink: #cbd5e1;
+}
+
+.stat-tile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.stat-tile-icon {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    background: var(--sc-soft);
+    color: var(--sc-ink);
+}
+
+.stat-tile-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* corner arrow: hints the tile is clickable, nudges out on hover */
+.stat-tile .stat-tile-go {
+    font-size: 18px;
+    color: var(--color-secondary);
+    opacity: 0.4;
+    transition: transform 0.2s ease, opacity 0.2s ease, color 0.2s ease;
+}
+
+.stat-tile:hover .stat-tile-go {
+    opacity: 1;
+    color: var(--sc-ink);
+    transform: translate(2px, -2px);
+}
+
+.stat-tile-value {
+    margin-top: 14px;
+    font-family: 'Syne', var(--font-display);
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--color-on-surface);
+}
+
+.stat-tile-label {
+    margin-top: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: var(--color-secondary);
+}
+
+/* share-of-all-requests meter */
+.stat-tile-meter {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin-top: 14px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sc) 16%, transparent);
+}
+
+.stat-tile-meter i {
+    display: block;
+    height: 100%;
+    width: var(--pct, 0%);
+    border-radius: inherit;
+    background: var(--sc);
+    transition: width 0.5s ease;
+    animation: stat-tile-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.stat-tile-foot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.74rem;
+    color: var(--color-secondary);
+}
+
+.stat-tile-foot b {
+    font-weight: 700;
+    color: var(--color-on-surface);
+}
+
+.stat-tile-pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sc);
+    animation: stat-tile-pulse 1.8s ease-out infinite;
+}
+
+/* oversized faint icon in the corner */
+.stat-tile .stat-tile-wm {
+    position: absolute;
+    right: -8px;
+    bottom: -16px;
+    z-index: -1;
+    font-size: 96px;
+    line-height: 1;
+    color: var(--sc);
+    opacity: 0.08;
+    pointer-events: none;
+    font-variation-settings: 'FILL' 1, 'wght' 400;
+}
+
+@keyframes stat-tile-grow {
+    from {
+        width: 0;
+    }
+}
+
+@keyframes stat-tile-pulse {
+    0% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc) 55%, transparent);
+    }
+
+    70%,
+    100% {
+        box-shadow: 0 0 0 7px transparent;
+    }
+}
+
+@media (max-width: 640px) {
+    #panel-home .dash-stats {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(156px, 1fr);
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+
+    #panel-home .dash-stats::-webkit-scrollbar {
         display: none;
+    }
+
+    .stat-tile {
+        scroll-snap-align: start;
+    }
+
+    .stat-tile-value {
+        font-size: 2.1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .stat-tile,
+    .stat-tile-meter i,
+    .stat-tile-pulse,
+    #panel-home .dash-bento-btn {
+        animation: none;
+        transition: none;
     }
 }

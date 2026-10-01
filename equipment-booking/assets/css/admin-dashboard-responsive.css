@@ -44,31 +44,38 @@ table {
    § 2  TABLET (769–1024px) — icon-rail sidebar
    Below 1024px, a fixed 240px sidebar starts crowding real content
    (an iPad in portrait is ~820px wide). Reuse the same icon-rail
-   look the desktop "collapse" button already produces, but make it
-   the automatic default for this range — screen real estate is too
-   tight here for the collapse toggle to be a per-user preference.
-   (The toggle itself already goes inert below 768px; extend that
-   the same "desktop-only affordance" up through 1024px.)
+   look the desktop "collapse" button produces, but make it the
+   automatic default for this range — screen real estate is too
+   tight here for the collapse toggle to be a per-user preference,
+   so the toggle is hidden (on phones it stays: there it closes the
+   drawer).
 ================================================================ */
-@media (max-width: 1024px) {
-    #sidebarCollapseBtn {
-        pointer-events: none;
-    }
-}
-
 @media (min-width: 769px) and (max-width: 1024px) {
+    #sidebarCollapseBtn {
+        display: none;
+    }
+
     nav.sidebar {
         width: var(--sidebar-w-collapsed);
     }
 
-    .header-logo {
-        width: var(--sidebar-w-collapsed);
+    /* Brand row: just the logo, centred */
+    .sidebar-brand {
+        justify-content: center;
+        padding: 0;
     }
 
-    .logo-text,
-    .nav-group-label,
-    .nav-item span:not(.material-symbols-outlined),
-    .nav-badge {
+    .sidebar-brand-text {
+        display: none;
+    }
+
+    /* Tabs, account toggle and submenu items: icons / avatar only.
+       (The doubled selectors outrank the icon font's own display:inline-block,
+       so this holds whatever order the stylesheets load in.) */
+    .nav-item .nav-label,
+    .nav-item .nav-account-chevron,
+    .nav-account-toggle .nav-account-dot,
+    .nav-item .nav-badge {
         display: none;
     }
 
@@ -77,8 +84,44 @@ table {
         padding: 0.6rem;
     }
 
+    .nav-item:hover {
+        transform: none;
+    }
+
+    /* Unread dot sits on the avatar corner; the Notifications badge on its icon */
+    .nav-account-toggle .nav-account-dot:not([hidden]) {
+        display: block;
+        position: absolute;
+        top: 6px;
+        right: 16px;
+    }
+
+    .nav-submenu-inner {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .nav-subitem .nav-badge {
+        position: absolute;
+        top: 2px;
+        right: 10px;
+        margin: 0;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        font-size: 9px;
+        line-height: 16px;
+        text-align: center;
+    }
+
+    .nav-subitem .nav-badge:not([style*="none"]) {
+        display: block;
+    }
+
+    /* No top bar now, so give the page its own breathing room at the top */
     main#app-main {
-        padding: 0 1.5rem 2rem;
+        padding: 1.5rem 1.5rem 2rem;
     }
 }
 
@@ -557,8 +600,7 @@ table {
 @media (max-width: 1024px) {
 
     .nav-item,
-    .avatar-btn,
-    .notif-btn,
+    .sidebar-toggle,
     .sidebar-toggle-btn,
     .ps-btn--sm,
     .qr-scan-btn,
@@ -566,8 +608,7 @@ table {
         min-height: 44px;
     }
 
-    .avatar-btn,
-    .notif-btn,
+    .sidebar-toggle,
     .sidebar-toggle-btn {
         min-width: 44px;
     }

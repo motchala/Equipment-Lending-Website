@@ -156,10 +156,10 @@
         closeTimer = setTimeout(function () { root.hidden = true; }, 240);
 
         // Return focus to where the user was (the trigger may have been
-        // inside a dropdown that has since closed — fall back to the avatar)
+        // inside a dropdown that has since closed — fall back to the account tab)
         var target = lastFocus;
         if (!target || !document.contains(target) || target.offsetParent === null) {
-            target = document.getElementById('avatarBtn');
+            target = document.getElementById('navAccountToggle') || document.getElementById('avatarBtn');
         }
         if (target && typeof target.focus === 'function') target.focus();
         lastFocus = null;

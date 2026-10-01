@@ -83,8 +83,13 @@ function admin_session_end(string $message): void
 {
     foreach (
         [
-            'admin', 'admin_name', 'admin_email', 'admin_role',
-            'admin_last_login', 'admin_last_pw_change', 'login_time',
+            'admin',
+            'admin_name',
+            'admin_email',
+            'admin_role',
+            'admin_last_login',
+            'admin_last_pw_change',
+            'login_time',
         ] as $k
     ) {
         unset($_SESSION[$k]);
@@ -139,4 +144,83 @@ function admin_session_guard(): void
 
     // Keep the role in the session in step with the database (fail closed).
     $_SESSION['admin_role'] = ($row['role'] === 'Super Admin') ? 'Super Admin' : 'Admin';
+}
+
+/**
+ * Is the logged-in admin a Super Admin *right now*? Read fresh from the
+ * database rather than trusting the session, so a demoted or deleted
+ * account loses Super Admin powers immediately. Used by the endpoints
+ * behind the Super-Admin-only Faculty tab.
+ */
+function admin_is_super_admin(mysqli $conn): bool
+{
+    $email = (string)($_SESSION['admin_email'] ?? '');
+    if (($_SESSION['admin'] ?? null) !== true || $email === '') {
+        return false;
+    }
+
+    $role = null;
+    if ($stmt = $conn->prepare('SELECT role FROM tbl_accounts WHERE email = ? LIMIT 1')) {
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $row = ($res && $res->num_rows === 1) ? $res->fetch_assoc() : null;
+        $stmt->close();
+        $role = $row['role'] ?? null;
+    }
+    return $role === 'Super Admin';
+}
+
+/** Remove the faculty identity from the current session (keeps the session itself). */
+function faculty_session_end(string $message): void
+{
+    foreach (['faculty_id', 'faculty_name', 'faculty_email'] as $k) {
+        unset($_SESSION[$k]);
+    }
+    // login_time is shared with admin sessions - only clear it when no admin is logged in.
+    if (($_SESSION['admin'] ?? null) !== true) {
+        unset($_SESSION['login_time']);
+    }
+    $_SESSION['flash_login_error'] = $message;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
+}
+
+/**
+ * Re-check the logged-in faculty member against the database.
+ * If a Super Admin deleted the account while this person was still logged
+ * in, end the session so the portal and its API endpoints stop working
+ * for them (every faculty page/endpoint already treats a missing
+ * $_SESSION['faculty_id'] as "logged out").
+ *
+ * Fails open when the lookup itself errors, so a database hiccup can't
+ * log every faculty member out - only a definite "no such account" does.
+ */
+function faculty_session_guard(): void
+{
+    $faculty_id = (string)($_SESSION['faculty_id'] ?? '');
+    if ($faculty_id === '') {
+        return; // not a faculty session (visitor, student, admin)
+    }
+
+    require_once __DIR__ . '/db.php';
+    $conn = getDB();
+
+    $stmt = $conn->prepare('SELECT 1 FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    if (!$stmt) {
+        return;
+    }
+    $stmt->bind_param('s', $faculty_id);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return;
+    }
+    $stmt->store_result();
+    $exists = $stmt->num_rows > 0;
+    $stmt->close();
+
+    if (!$exists) {
+        faculty_session_end('This faculty account is no longer available. Please contact your administrator.');
+    }
 }
