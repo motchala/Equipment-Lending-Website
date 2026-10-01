@@ -1,13 +1,12 @@
 /* ================================================================
    PUPSYNC — FACILITIES TAB  (fcty-facilities.css)
-   Browse Facilities:  Campus → Building → Rooms → Room dialog
+   Browse Facilities:  Buildings A · B · C → Rooms → Dialogs
 
    Principles
-   · One icon set (Material Symbols Outlined), one style (outlined,
-     weight 400) and three sizes: 18 (inline/buttons), 20 (default),
-     24 (feature tiles).
+   · One icon set (Material Symbols Outlined, outlined, weight 400)
+     in three sizes: 18 (inline/buttons), 20 (default), 24 (tiles).
    · 4-pt spacing scale: 4 · 8 · 12 · 16 · 24 · 32.
-   · Every colour comes from the dashboard tokens, so light, dark and
+   · Colours come from the dashboard tokens, so light, dark and
      high-contrast themes work without per-theme overrides.
    · Dialogs (.fcty-overlay) are moved to <body> by the JS so they are
      never clipped by the animated .tab-panel ancestor.
@@ -56,10 +55,13 @@
 }
 
 #rooms-browse .fcty-crumbs .material-symbols-outlined,
+#rooms-browse .fcty-room-seats .material-symbols-outlined,
 .fcty-overlay .fcty-btn .material-symbols-outlined,
 .fcty-overlay .fcty-alert .material-symbols-outlined,
-#rooms-browse .fcty-meta .material-symbols-outlined,
-.fcty-overlay .fcty-fact .material-symbols-outlined {
+.fcty-overlay .fcty-fact .material-symbols-outlined,
+.fcty-overlay .fcty-ticket .material-symbols-outlined,
+.fcty-overlay .fcty-tl-note .material-symbols-outlined,
+.fcty-overlay .fcty-link-btn .material-symbols-outlined {
     font-size: 18px;
 }
 
@@ -70,8 +72,7 @@
 
 /* ── Shared building blocks ─────────────────────────────────── */
 #rooms-browse .fcty-view {
-    animation: fctyRise .28s ease-out both;
-    max-width: 1120px;
+    animation: fctyRise .3s ease-out both;
 }
 
 @keyframes fctyRise {
@@ -100,34 +101,17 @@
 .fcty-go {
     display: inline-grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 1px solid var(--fcty-line);
-    color: var(--fcty-muted);
     flex-shrink: 0;
-    transition: background .2s, color .2s, border-color .2s, transform .2s;
-}
-
-.fcty-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px 12px;
-    margin: 0;
-    font-size: .8125rem;
-    color: var(--fcty-muted);
-}
-
-.fcty-meta>span {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    transition: background .25s, color .25s, transform .25s;
 }
 
 .fcty-pill {
     display: inline-flex;
     align-items: center;
+    gap: 8px;
     padding: 4px 12px;
     border-radius: 9999px;
     background: var(--fcty-soft);
@@ -165,137 +149,48 @@
     background: var(--fcty-static);
 }
 
+.fcty-tag {
+    display: inline-block;
+    margin-left: 0;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, .2);
+    font-family: var(--font-sans, 'Inter', sans-serif);
+    font-size: .6875rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
 /* Focus ring, everywhere */
 #rooms-browse a:focus-visible,
 #rooms-browse button:focus-visible,
+#rooms-browse .fcty-toggle input:focus-visible+.fcty-toggle-track,
 .fcty-overlay button:focus-visible,
 .fcty-overlay input:focus-visible,
+.fcty-overlay select:focus-visible,
 .fcty-overlay textarea:focus-visible {
     outline: 2px solid var(--color-primary, #800000);
     outline-offset: 2px;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   STEP 1 — CAMPUS
-═══════════════════════════════════════════════════════════════ */
-#rooms-browse .fcty-campus-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 24px;
-}
-
-#rooms-browse .fcty-campus-card {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: 16px;
-    background: var(--fcty-card);
-    border: 1px solid var(--fcty-line);
-    box-shadow: var(--shadow-sm);
-    color: inherit;
-    text-decoration: none;
-    transition: box-shadow .25s, transform .25s, border-color .25s;
-}
-
-#rooms-browse .fcty-campus-media {
-    aspect-ratio: 16 / 9;
-    background-color: var(--fcty-soft);
-    background-size: cover;
-    background-position: center;
-    transition: transform .5s cubic-bezier(.4, 0, .2, 1);
-}
-
-#rooms-browse .fcty-campus-clip {
-    overflow: hidden;
-}
-
-#rooms-browse .fcty-campus-body {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    position: relative;
-    background: var(--fcty-card);
-}
-
-#rooms-browse .fcty-campus-text {
-    flex: 1;
-    min-width: 0;
-}
-
-#rooms-browse .fcty-campus-name {
-    margin: 0 0 4px;
-    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
-    font-size: 1.125rem;
-    font-weight: 700;
-    letter-spacing: -.01em;
-    color: var(--fcty-ink);
-}
-
-#rooms-browse .fcty-campus-card:hover,
-#rooms-browse .fcty-building-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--fcty-brand) 40%, var(--fcty-line));
-}
-
-#rooms-browse .fcty-campus-card:hover .fcty-campus-media,
-#rooms-browse .fcty-building-card:hover .fcty-building-media {
-    transform: scale(1.04);
-}
-
-#rooms-browse .fcty-campus-card:hover .fcty-go,
-#rooms-browse .fcty-building-card:hover .fcty-go {
-    background: var(--fcty-brand);
-    border-color: var(--fcty-brand);
-    color: var(--color-on-primary, #fff);
-    transform: translateX(2px);
-}
-
-/* Load error */
-#rooms-browse .fcty-load-error {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    padding: 12px 16px;
-    border-radius: 12px;
-    background: var(--color-error-container, #fde8e6);
-    color: var(--color-error, #c0392b);
-    font-size: .875rem;
-    font-weight: 500;
-}
-
-#rooms-browse .fcty-load-error[hidden] {
-    display: none;
-}
-
-#rooms-browse .fcty-load-error button {
-    margin-left: auto;
-    padding: 4px 12px;
-    border-radius: 8px;
-    border: 1px solid currentColor;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-size: .8125rem;
-    font-weight: 600;
-    cursor: pointer;
+#rooms-browse .fcty-panel:focus-visible,
+#rooms-browse .fcty-hero button:focus-visible {
+    outline-color: #fff;
+    outline-offset: -4px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PAGE HEAD (steps 2 & 3)
+   PAGE HEAD / BREADCRUMB
 ═══════════════════════════════════════════════════════════════ */
-#rooms-browse .fcty-head {
-    margin-bottom: 24px;
-}
-
 #rooms-browse .fcty-crumbs {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     font-size: .8125rem;
     font-weight: 500;
     color: var(--fcty-muted);
@@ -331,132 +226,412 @@
 #rooms-browse .fcty-title {
     margin: 0;
     font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
-    letter-spacing: -.02em;
+    letter-spacing: -.01em;
     line-height: 1.2;
     color: var(--fcty-ink);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   STEP 2 — BUILDINGS
-═══════════════════════════════════════════════════════════════ */
-#rooms-browse .fcty-building-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
+#rooms-browse .fcty-landing-head {
+    margin-bottom: 16px;
 }
 
-#rooms-browse .fcty-building-card {
+#rooms-browse .fcty-pill.is-live::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--fcty-available);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcty-available) 60%, transparent);
+    animation: fctyPulse 2s ease-out infinite;
+}
+
+@keyframes fctyPulse {
+    0% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--fcty-available) 55%, transparent);
+    }
+
+    70%,
+    100% {
+        box-shadow: 0 0 0 7px transparent;
+    }
+}
+
+/* Load error */
+#rooms-browse .fcty-load-error {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--color-error-container, #fde8e6);
+    color: var(--color-error, #c0392b);
+    font-size: .875rem;
+    font-weight: 500;
+}
+
+#rooms-browse .fcty-load-error[hidden] {
+    display: none;
+}
+
+#rooms-browse .fcty-load-error button {
+    margin-left: auto;
+    padding: 4px 12px;
+    border-radius: 8px;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STEP 1 — THREE BUILDING PANELS
+   Equal columns; the hovered / focused one widens and reveals its
+   floors. Collapses to a simple stack on touch devices and phones.
+═══════════════════════════════════════════════════════════════ */
+#rooms-browse .fcty-panels {
+    display: flex;
+    gap: 16px;
+    height: clamp(400px, 60vh, 540px);
+}
+
+#rooms-browse .fcty-panel {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
     padding: 0;
+    border: 0;
+    border-radius: 20px;
     overflow: hidden;
+    isolation: isolate;
     text-align: left;
     font: inherit;
-    color: inherit;
+    color: #fff;
+    background: linear-gradient(160deg, #6b1515, #2b0d0d);
     cursor: pointer;
-    border-radius: 16px;
-    background: var(--fcty-card);
-    border: 1px solid var(--fcty-line);
     box-shadow: var(--shadow-sm);
-    transition: box-shadow .25s, transform .25s, border-color .25s;
+    transition: flex-grow .6s cubic-bezier(.22, 1, .36, 1), box-shadow .3s;
 }
 
-#rooms-browse .fcty-building-clip {
-    position: relative;
-    overflow: hidden;
-    aspect-ratio: 3 / 2;
-    background: var(--fcty-soft);
+#rooms-browse .fcty-panels:hover .fcty-panel:not(.is-skeleton) {
+    flex-grow: .78;
 }
 
-#rooms-browse .fcty-building-media {
+#rooms-browse .fcty-panels .fcty-panel:not(.is-skeleton):hover,
+#rooms-browse .fcty-panels .fcty-panel:not(.is-skeleton):focus-visible {
+    flex-grow: 1.7;
+    box-shadow: var(--shadow-lg);
+}
+
+#rooms-browse .fcty-panel-img {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    display: block;
-    transition: transform .5s cubic-bezier(.4, 0, .2, 1);
+    transform: scale(1.02);
+    transition: transform .9s cubic-bezier(.22, 1, .36, 1);
 }
 
-#rooms-browse .fcty-building-fallback {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    place-items: center;
-    color: color-mix(in srgb, var(--fcty-brand) 45%, transparent);
+#rooms-browse .fcty-panel:hover .fcty-panel-img {
+    transform: scale(1.08);
 }
 
-#rooms-browse .fcty-building-fallback .material-symbols-outlined {
-    font-size: 48px;
-}
-
-#rooms-browse .fcty-wing {
+#rooms-browse .fcty-panel-shade {
     position: absolute;
-    top: 12px;
-    left: 12px;
-    padding: 4px 12px;
-    border-radius: 9999px;
-    background: rgba(255, 255, 255, .92);
-    color: #3a1a1a;
-    font-size: .6875rem;
-    font-weight: 700;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-    backdrop-filter: blur(6px);
+    inset: 0;
+    z-index: -1;
+    background:
+        linear-gradient(to bottom, rgba(24, 4, 4, .45) 0%, transparent 32%),
+        linear-gradient(to top, rgba(24, 4, 4, .92) 0%, rgba(24, 4, 4, .45) 42%, rgba(24, 4, 4, .05) 100%);
 }
 
-#rooms-browse .fcty-building-body {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-}
-
-#rooms-browse .fcty-building-text {
-    flex: 1;
-    min-width: 0;
-}
-
-#rooms-browse .fcty-building-name {
-    margin: 0 0 4px;
+#rooms-browse .fcty-panel-letter {
+    position: absolute;
+    top: 8px;
+    left: 24px;
     font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--fcty-ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 104px;
+    font-weight: 800;
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 1.5px rgba(255, 255, 255, .6);
+    transition: color .5s, -webkit-text-stroke-color .5s;
+    pointer-events: none;
+}
+
+#rooms-browse .fcty-panel:hover .fcty-panel-letter {
+    color: rgba(255, 255, 255, .14);
+    -webkit-text-stroke-color: rgba(255, 255, 255, .85);
+}
+
+#rooms-browse .fcty-panel-live {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, .16);
+    border: 1px solid rgba(255, 255, 255, .28);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-size: .75rem;
+    font-weight: 600;
     white-space: nowrap;
 }
 
-/* Empty state */
-#rooms-browse .fcty-empty {
-    grid-column: 1 / -1;
+#rooms-browse .fcty-panel-live .fcty-dot {
+    background: #4ade80;
+}
+
+#rooms-browse .fcty-panel-info {
+    position: absolute;
+    inset: auto 0 0 0;
     display: flex;
     flex-direction: column;
+    gap: 4px;
+    padding: 24px 84px 24px 24px;
+}
+
+#rooms-browse .fcty-panel-name,
+#rooms-browse .fcty-hero-title {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    padding: 48px 24px;
-    border: 1px dashed var(--fcty-line);
-    border-radius: 16px;
-    text-align: center;
-    color: var(--fcty-muted);
+    gap: 4px 8px;
+}
+
+#rooms-browse .fcty-panel-name {
+    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    line-height: 1.2;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, .35);
+}
+
+#rooms-browse .fcty-panel-meta {
     font-size: .875rem;
+    color: rgba(255, 255, 255, .82);
 }
 
-#rooms-browse .fcty-empty .material-symbols-outlined {
-    font-size: 32px;
-    opacity: .7;
+#rooms-browse .fcty-panel-reveal {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows .5s cubic-bezier(.22, 1, .36, 1), opacity .4s, margin .5s;
 }
 
-#rooms-browse .fcty-empty strong {
-    color: var(--fcty-ink);
-    font-size: 1rem;
+#rooms-browse .fcty-panel:hover .fcty-panel-reveal,
+#rooms-browse .fcty-panel:focus-visible .fcty-panel-reveal {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    margin-top: 12px;
+}
+
+#rooms-browse .fcty-panel-floors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#rooms-browse .fcty-panel-floors span {
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, .16);
+    border: 1px solid rgba(255, 255, 255, .22);
+    font-size: .75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcty-panel .fcty-go {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    background: rgba(255, 255, 255, .18);
+    border: 1px solid rgba(255, 255, 255, .35);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #fff;
+}
+
+#rooms-browse .fcty-panel:hover .fcty-go {
+    background: #fff;
+    color: #570000;
+    transform: translateX(2px);
+}
+
+/* Skeleton */
+#rooms-browse .fcty-panel.is-skeleton {
+    cursor: default;
+    background: linear-gradient(100deg, var(--fcty-soft) 30%, color-mix(in srgb, var(--fcty-soft) 55%, var(--fcty-card)) 50%, var(--fcty-soft) 70%);
+    background-size: 220% 100%;
+    animation: fctyShimmer 1.4s linear infinite;
+    box-shadow: none;
+}
+
+@keyframes fctyShimmer {
+    from {
+        background-position: 120% 0;
+    }
+
+    to {
+        background-position: -120% 0;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   STEP 3 — ROOMS
+   STEP 2 — ROOMS
 ═══════════════════════════════════════════════════════════════ */
+#rooms-browse .fcty-hero {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    min-height: 176px;
+    margin-bottom: 24px;
+    border-radius: 20px;
+    overflow: hidden;
+    color: #fff;
+    background: linear-gradient(160deg, #6b1515, #2b0d0d);
+    box-shadow: var(--shadow-sm);
+}
+
+#rooms-browse .fcty-hero-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+#rooms-browse .fcty-hero-shade {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, rgba(24, 4, 4, .92) 0%, rgba(24, 4, 4, .62) 55%, rgba(24, 4, 4, .3) 100%);
+}
+
+#rooms-browse .fcty-hero-row {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    padding: 24px;
+}
+
+#rooms-browse .fcty-hero-title {
+    margin: 0 0 4px;
+    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.2;
+    color: #fff;
+}
+
+#rooms-browse .fcty-hero-sub {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    font-size: .875rem;
+    color: rgba(255, 255, 255, .82);
+}
+
+#rooms-browse .fcty-hero-sub .fcty-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-weight: 600;
+}
+
+#rooms-browse .fcty-hero-sub .fcty-dot {
+    background: #4ade80;
+}
+
+/* Building switcher (A · B · C) */
+#rooms-browse .fcty-switcher {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .14);
+    border: 1px solid rgba(255, 255, 255, .22);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+#rooms-browse .fcty-switcher::-webkit-scrollbar {
+    display: none;
+}
+
+#rooms-browse .fcty-sw-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 6px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, .88);
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .2s, color .2s;
+}
+
+#rooms-browse .fcty-sw-btn:hover {
+    background: rgba(255, 255, 255, .14);
+}
+
+#rooms-browse .fcty-sw-letter {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, .2);
+    font-weight: 800;
+    font-size: .75rem;
+}
+
+#rooms-browse .fcty-sw-btn[aria-selected="true"] {
+    background: #fff;
+    color: #570000;
+}
+
+#rooms-browse .fcty-sw-btn[aria-selected="true"] .fcty-sw-letter {
+    background: #570000;
+    color: #fff;
+}
+
+/* Toolbar */
 #rooms-browse .fcty-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 16px;
     margin-bottom: 16px;
 }
 
@@ -508,16 +683,67 @@
     opacity: .7;
 }
 
+/* Toggle */
+#rooms-browse .fcty-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--fcty-ink);
+    cursor: pointer;
+    user-select: none;
+}
+
+#rooms-browse .fcty-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#rooms-browse .fcty-toggle-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--fcty-line);
+    transition: background .2s;
+}
+
+#rooms-browse .fcty-toggle-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+    transition: transform .2s;
+}
+
+#rooms-browse .fcty-toggle input:checked+.fcty-toggle-track {
+    background: var(--fcty-brand);
+}
+
+#rooms-browse .fcty-toggle input:checked+.fcty-toggle-track::after {
+    transform: translateX(16px);
+}
+
+/* Room cards */
 #rooms-browse .fcty-room-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
     gap: 12px;
 }
 
 #rooms-browse .fcty-room {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 92px;
     padding: 16px;
     text-align: left;
     font: inherit;
@@ -526,13 +752,14 @@
     border-radius: 12px;
     background: var(--fcty-card);
     border: 1px solid var(--fcty-line);
+    box-shadow: inset 3px 0 0 var(--fcty-available);
     transition: border-color .2s, box-shadow .2s, transform .2s;
 }
 
 #rooms-browse .fcty-room:hover {
+    transform: translateY(-2px);
     border-color: color-mix(in srgb, var(--fcty-brand) 45%, var(--fcty-line));
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
+    box-shadow: inset 3px 0 0 var(--fcty-available), var(--shadow-md);
 }
 
 #rooms-browse .fcty-room-name {
@@ -543,7 +770,15 @@
     overflow-wrap: anywhere;
 }
 
-#rooms-browse .fcty-room-status {
+#rooms-browse .fcty-room-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#rooms-browse .fcty-room-status,
+#rooms-browse .fcty-room-seats {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -552,32 +787,78 @@
     color: var(--fcty-muted);
 }
 
+#rooms-browse .fcty-room-seats {
+    gap: 4px;
+    font-weight: 500;
+}
+
+#rooms-browse .fcty-room.status-booked {
+    box-shadow: inset 3px 0 0 var(--fcty-booked);
+}
+
+#rooms-browse .fcty-room.status-booked:hover {
+    box-shadow: inset 3px 0 0 var(--fcty-booked), var(--shadow-md);
+}
+
 #rooms-browse .fcty-room.status-booked .fcty-dot {
     background: var(--fcty-booked);
+}
+
+#rooms-browse .fcty-room.status-maintenance {
+    box-shadow: inset 3px 0 0 var(--fcty-maintenance);
+}
+
+#rooms-browse .fcty-room.status-maintenance:hover {
+    box-shadow: inset 3px 0 0 var(--fcty-maintenance), var(--shadow-md);
 }
 
 #rooms-browse .fcty-room.status-maintenance .fcty-dot {
     background: var(--fcty-maintenance);
 }
 
-#rooms-browse .fcty-room.status-static .fcty-dot {
-    background: var(--fcty-static);
-}
-
 #rooms-browse .fcty-room.status-static {
     cursor: not-allowed;
     background: var(--fcty-soft);
     border-style: dashed;
+    box-shadow: none;
 }
 
 #rooms-browse .fcty-room.status-static:hover {
     transform: none;
-    box-shadow: none;
     border-color: var(--fcty-line);
+}
+
+#rooms-browse .fcty-room.status-static .fcty-dot {
+    background: var(--fcty-static);
 }
 
 #rooms-browse .fcty-room.status-static .fcty-room-name {
     color: var(--fcty-muted);
+}
+
+/* Empty state */
+#rooms-browse .fcty-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 24px;
+    border: 1px dashed var(--fcty-line);
+    border-radius: 16px;
+    text-align: center;
+    color: var(--fcty-muted);
+    font-size: .875rem;
+}
+
+#rooms-browse .fcty-empty .material-symbols-outlined {
+    font-size: 32px;
+    opacity: .7;
+}
+
+#rooms-browse .fcty-empty strong {
+    color: var(--fcty-ink);
+    font-size: 1rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -622,7 +903,7 @@
     background: var(--color-surface, #fff8f7);
     color: var(--fcty-ink);
     box-shadow: var(--shadow-lg);
-    animation: fctyPop .22s cubic-bezier(.16, 1, .3, 1) both;
+    animation: fctyPop .24s cubic-bezier(.16, 1, .3, 1) both;
 }
 
 @keyframes fctyPop {
@@ -721,7 +1002,7 @@
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
-    transition: background .18s, border-color .18s, color .18s, opacity .18s;
+    transition: background .18s, border-color .18s, color .18s, opacity .18s, transform .18s;
 }
 
 .fcty-btn-primary {
@@ -731,6 +1012,10 @@
 
 .fcty-btn-primary:hover:not(:disabled) {
     background: color-mix(in srgb, var(--fcty-brand) 85%, #000);
+}
+
+.fcty-btn-primary:active:not(:disabled) {
+    transform: scale(.98);
 }
 
 .fcty-btn-ghost {
@@ -754,6 +1039,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 16px;
+}
+
+.fcty-facts [hidden] {
+    display: none;
 }
 
 .fcty-status {
@@ -937,7 +1226,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* Form */
+/* ── Form controls ──────────────────────────────────────────── */
 .fcty-form {
     display: flex;
     flex-direction: column;
@@ -1002,6 +1291,138 @@ textarea.fcty-input {
     color: var(--fcty-muted);
 }
 
+.fcty-count {
+    align-self: flex-end;
+    font-size: .75rem;
+    color: var(--fcty-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Chips */
+.fcty-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.fcty-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 9999px;
+    border: 1px solid var(--fcty-line);
+    background: var(--fcty-card);
+    color: var(--fcty-ink);
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .18s, border-color .18s, color .18s;
+}
+
+.fcty-chip:hover:not(:disabled) {
+    border-color: var(--fcty-brand);
+}
+
+.fcty-chip[aria-pressed="true"] {
+    background: var(--fcty-brand);
+    border-color: var(--fcty-brand);
+    color: var(--color-on-primary, #fff);
+}
+
+.fcty-chip:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.fcty-chips .fcty-input {
+    width: auto;
+    min-height: 34px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    font-size: .8125rem;
+    font-weight: 600;
+}
+
+/* Stepper */
+.fcty-stepper {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    border: 1px solid var(--fcty-line);
+    border-radius: 10px;
+    background: var(--fcty-card);
+    overflow: hidden;
+}
+
+.fcty-stepper button {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    background: transparent;
+    color: var(--fcty-ink);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+}
+
+.fcty-stepper button:hover:not(:disabled) {
+    background: var(--fcty-soft);
+}
+
+.fcty-stepper button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.fcty-stepper input {
+    width: 56px;
+    height: 40px;
+    border: 0;
+    border-left: 1px solid var(--fcty-line);
+    border-right: 1px solid var(--fcty-line);
+    background: transparent;
+    color: var(--fcty-ink);
+    font: inherit;
+    font-weight: 700;
+    text-align: center;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.fcty-stepper input::-webkit-outer-spin-button,
+.fcty-stepper input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.fcty-stepper input:focus {
+    outline: none;
+    background: var(--fcty-soft);
+}
+
+.fcty-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-primary, #800000);
+    font: inherit;
+    font-size: .8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.fcty-link-btn:hover {
+    text-decoration: underline;
+}
+
 /* Alerts */
 .fcty-alert {
     display: flex;
@@ -1049,25 +1470,491 @@ textarea.fcty-input {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   RESERVATION — two-pane booking experience
+   Left: live summary + day timeline.  Right: guided form.
+═══════════════════════════════════════════════════════════════ */
+.fcty-dialog-wide {
+    max-width: 920px;
+    max-height: min(700px, 100%);
+}
+
+.fcty-res {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 324px 1fr;
+}
+
+/* Left pane */
+.fcty-res-side {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 24px;
+    overflow-y: auto;
+    color: #fff;
+    background: linear-gradient(160deg, var(--fcty-brand) 0%, color-mix(in srgb, var(--fcty-brand) 45%, #000) 100%);
+}
+
+.fcty-res-side::before {
+    content: '';
+    position: absolute;
+    top: -80px;
+    right: -80px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, .18), transparent 70%);
+    pointer-events: none;
+}
+
+.fcty-res-side>* {
+    position: relative;
+}
+
+.fcty-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .72);
+}
+
+.fcty-res-room {
+    margin: 4px 0 4px;
+    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
+    font-size: 1.625rem;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+
+.fcty-res-where {
+    margin: 0;
+    font-size: .875rem;
+    color: rgba(255, 255, 255, .82);
+}
+
+.fcty-seats {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, .16);
+    border: 1px solid rgba(255, 255, 255, .24);
+    font-size: .75rem;
+    font-weight: 600;
+}
+
+.fcty-seats .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* Ticket (live booking summary) */
+.fcty-ticket {
+    margin: 0;
+    padding: 0 16px;
+    list-style: none;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .1);
+    border: 1px solid rgba(255, 255, 255, .18);
+}
+
+.fcty-ticket li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+}
+
+.fcty-ticket li+li {
+    border-top: 1px dashed rgba(255, 255, 255, .25);
+}
+
+.fcty-ticket .material-symbols-outlined {
+    opacity: .8;
+}
+
+.fcty-ticket small {
+    display: block;
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .65);
+}
+
+.fcty-ticket strong {
+    display: block;
+    font-size: .9375rem;
+    font-weight: 600;
+}
+
+/* Day timeline */
+.fcty-tl {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fcty-tl-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: .75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .78);
+}
+
+.fcty-tl-track {
+    position: relative;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .12);
+    overflow: hidden;
+}
+
+.fcty-tl-block {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .38) 0 4px, rgba(255, 255, 255, .16) 4px 8px);
+}
+
+.fcty-tl-pick {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .3);
+    transition: left .28s cubic-bezier(.22, 1, .36, 1), width .28s cubic-bezier(.22, 1, .36, 1), background .2s;
+}
+
+.fcty-tl-pick.is-clash {
+    background: #ffb4a8;
+    box-shadow: 0 0 0 3px rgba(255, 180, 168, .35);
+}
+
+.fcty-tl-ticks {
+    position: relative;
+    height: 14px;
+}
+
+.fcty-tl-ticks span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: .6875rem;
+    color: rgba(255, 255, 255, .65);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fcty-tl-ticks span:first-child {
+    transform: none;
+}
+
+.fcty-tl-ticks span:last-child {
+    transform: translateX(-100%);
+}
+
+.fcty-tl-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: #bbf7d0;
+}
+
+.fcty-tl-note.is-clash {
+    color: #ffd1c9;
+}
+
+.fcty-tl-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: .75rem;
+    color: rgba(255, 255, 255, .78);
+}
+
+.fcty-tl-list li {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fcty-tl-list b {
+    font-weight: 600;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Right pane */
+.fcty-res-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--color-surface, #fff8f7);
+}
+
+.fcty-res-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px 8px;
+}
+
+.fcty-res-heading {
+    margin: 0;
+    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--fcty-ink);
+}
+
+.fcty-res-scroll {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 8px 24px 24px;
+    overflow-y: auto;
+}
+
+.fcty-res-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--fcty-line);
+    background: var(--color-surface, #fff8f7);
+}
+
+.fcty-step {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.fcty-step-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .875rem;
+    font-weight: 700;
+    color: var(--fcty-ink);
+}
+
+.fcty-step-num {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--fcty-brand);
+    color: var(--color-on-primary, #fff);
+    font-size: .6875rem;
+    font-weight: 700;
+}
+
+.fcty-sublabel {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
+}
+
+.fcty-sub {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Success screen */
+.fcty-done {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 32px 24px;
+    text-align: center;
+}
+
+.fcty-done-badge {
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--color-success-container, #dcfce7);
+    color: var(--color-success, #166534);
+    animation: fctyBadge .5s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+
+.fcty-done-badge .material-symbols-outlined {
+    font-size: 36px;
+}
+
+.fcty-done-badge.is-wait {
+    background: color-mix(in srgb, var(--fcty-maintenance) 16%, transparent);
+    color: var(--fcty-maintenance);
+}
+
+@keyframes fctyBadge {
+    from {
+        transform: scale(.4);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+}
+
+.fcty-done h4 {
+    margin: 8px 0 0;
+    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: var(--fcty-ink);
+}
+
+.fcty-done p {
+    margin: 0;
+    max-width: 340px;
+    font-size: .875rem;
+    color: var(--fcty-muted);
+}
+
+.fcty-done-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RESPONSIVE
 ═══════════════════════════════════════════════════════════════ */
-@media (max-width: 720px) {
-    #rooms-browse .fcty-campus-grid {
-        grid-template-columns: 1fr;
+@media (max-width: 900px) {
+    #rooms-browse .fcty-panel-letter {
+        font-size: 80px;
+    }
+}
+
+/* Touch devices can't hover — keep panels static */
+@media (hover: none) {
+
+    #rooms-browse .fcty-panels:hover .fcty-panel:not(.is-skeleton),
+    #rooms-browse .fcty-panels .fcty-panel:not(.is-skeleton):hover {
+        flex-grow: 1;
+    }
+
+    #rooms-browse .fcty-panel-reveal {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    #rooms-browse .fcty-panels {
+        flex-direction: column;
+        height: auto;
         gap: 16px;
     }
 
-    #rooms-browse .fcty-building-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
+    #rooms-browse .fcty-panel {
+        flex: none;
+        height: 208px;
     }
 
-    #rooms-browse .fcty-title {
+    #rooms-browse .fcty-panel-reveal {
+        display: none;
+    }
+
+    #rooms-browse .fcty-panel-letter {
+        font-size: 72px;
+        top: 4px;
+    }
+
+    #rooms-browse .fcty-panel-name {
         font-size: 1.25rem;
+    }
+
+    #rooms-browse .fcty-hero {
+        min-height: 0;
+    }
+
+    #rooms-browse .fcty-hero-row {
+        padding: 20px 16px;
+    }
+
+    #rooms-browse .fcty-hero-title {
+        font-size: 1.375rem;
     }
 
     #rooms-browse .fcty-room-grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Reservation: single column, whole dialog scrolls */
+    .fcty-dialog-wide {
+        max-height: 94%;
+    }
+
+    .fcty-res {
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+    }
+
+    .fcty-res-side {
+        flex: none;
+        gap: 16px;
+        padding: 20px 16px;
+        overflow: visible;
+    }
+
+    .fcty-res-main {
+        flex: none;
+        overflow: visible;
+    }
+
+    .fcty-res-scroll {
+        overflow: visible;
+        padding: 8px 16px 24px;
+    }
+
+    .fcty-res-top {
+        padding: 16px 16px 8px;
+    }
+
+    .fcty-res-foot {
+        position: sticky;
+        bottom: 0;
+        padding: 12px 16px;
+    }
+
+    .fcty-res-foot .fcty-btn-primary {
+        flex: 1;
     }
 }
 
@@ -1087,6 +1974,10 @@ textarea.fcty-input {
         grid-template-columns: 1fr;
     }
 
+    .fcty-res .fcty-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
     .fcty-slot {
         grid-template-columns: 1fr;
         gap: 4px;
@@ -1100,6 +1991,7 @@ textarea.fcty-input {
 @media (prefers-reduced-motion: reduce) {
 
     #rooms-browse *,
+    #rooms-browse *::before,
     .fcty-overlay,
     .fcty-overlay * {
         animation: none !important;

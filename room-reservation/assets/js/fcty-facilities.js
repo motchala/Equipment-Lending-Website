@@ -1,12 +1,12 @@
 /* ================================================================
    PUPSYNC — FACILITIES TAB  (fcty-facilities.js)
-   Browse Facilities:  Campus → Building → Rooms → Room dialog
-                                                  → Reserve / Report
+   Browse Facilities:  Buildings A · B · C → Rooms → Room dialog
+                                                     → Reserve / Report
 
    Companion to fcty-facilities.php + fcty-facilities.css.
-   Data:  room-reservation/api/get-facilities.php      (campus tree)
+   Data:  room-reservation/api/get-facilities.php      (building tree)
           room-reservation/api/get-room-schedule.php   (week schedule)
-          room-reservation/api/poll-room-status.php    (live chip status)
+          room-reservation/api/poll-room-status.php    (live status)
           room-reservation/api/check-room-availability.php
           room-reservation/api/submit-faculty-reserve.php
           room-reservation/api/join-waitlist.php
@@ -16,15 +16,25 @@
 (function () {
     'use strict';
 
-    /* ── State ──────────────────────────────────────────────── */
-    var CAMPUS_DATA = {};      /* campus_key  → { label, buildings:[…] }       */
-    var BUILDINGS = {};        /* building_id → { name, campusKey, floors:[…] } */
-    var ROOM_INDEX = {};       /* room_id     → room object (live-updated)      */
-    var LIVE_STATUS = {};      /* room_id     → latest polled status (incl. Booked) */
+    /* ── Display names ──────────────────────────────────────────
+       The three PUP buildings, in display order. Names are applied
+       here (UI only) so the database and admin side stay untouched. */
+    var BUILDING_LABELS = {
+        'main-building-a': 'Building A (Old)',
+        'main-building-b': 'Building B (New)',
+        'cite-main': 'Building C (CITE)'
+    };
+    var BUILDING_ORDER = ['main-building-a', 'main-building-b', 'cite-main'];
 
-    var activeCampusKey = null;
+    /* ── State ──────────────────────────────────────────────── */
+    var BUILDING_LIST = [];    /* ordered building entries                      */
+    var BUILDINGS = {};        /* building key → entry                          */
+    var ROOM_INDEX = {};       /* room_id → room object (live-updated)          */
+    var LIVE_STATUS = {};      /* room_id → latest polled status (incl. Booked) */
+
     var activeBuildingId = null;
     var activeFloorIdx = 0;
+    var onlyFree = false;
     var currentRoom = null;    /* { room, name, location } for the open dialog  */
 
     var loaded = false;
@@ -38,7 +48,6 @@
     var DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     var WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];   /* Mon → Sun */
 
-    /* status → card class + label */
     var STATUS_UI = {
         'Available': { cls: 'status-available', text: 'Available' },
         'Booked': { cls: 'status-booked', text: 'In use' },
@@ -46,10 +55,12 @@
         'Not Bookable': { cls: 'status-static', text: 'Not bookable' }
     };
 
+    var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
+    var ISSUE_TYPES = ['Air conditioning', 'Projector / AV', 'Furniture', 'Lighting', 'Cleanliness', 'Other'];
+
     /* ── DOM refs (resolved in init) ────────────────────────── */
     var $ = function (id) { return document.getElementById(id); };
-    var campusView, buildingView, roomsView;
-    var buildingGrid, floorTabs, roomGrid;
+    var buildingsView, roomsView, panelsEl, floorTabs, roomGrid, switcherEl;
     var roomOverlay, formOverlay;
 
     /* ── Helpers ────────────────────────────────────────────── */
@@ -57,6 +68,12 @@
         return String(str === null || str === undefined ? '' : str)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function decodeHtml(str) {
+        var t = document.createElement('textarea');
+        t.innerHTML = str;
+        return t.value;
     }
 
     function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
@@ -75,25 +92,52 @@
         return '<span class="material-symbols-outlined" aria-hidden="true">' + name + '</span>';
     }
 
+    /* Dates are handled in local time (toISOString would shift the day in UTC+8) */
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function parseYmd(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+    function mondayOf(d) { return addDays(d, -((d.getDay() + 6) % 7)); }
+    function longDate(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+
     function timeToMin(t) {
         var p = String(t).split(':');
         return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
     }
 
+    function minToHHMM(m) { return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+
     function minToLabel(mins) {
         var h = Math.floor(mins / 60), m = mins % 60;
         var h12 = h % 12 === 0 ? 12 : h % 12;
-        return h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + (h >= 12 ? 'PM' : 'AM');
+        return h12 + ':' + pad(m) + ' ' + (h >= 12 ? 'PM' : 'AM');
     }
 
     function timeRange(start, end) {
         return minToLabel(timeToMin(start)) + ' \u2013 ' + minToLabel(timeToMin(end));
     }
 
+    function durLabel(mins) {
+        var h = Math.floor(mins / 60), m = mins % 60;
+        if (!h) return m + ' min';
+        return h + ' hr' + (m ? ' ' + m + ' min' : '');
+    }
+
     function sortByStart(list) {
         return (list || []).slice().sort(function (a, b) {
             return timeToMin(a.start) - timeToMin(b.start);
         });
+    }
+
+    function uiFor(status) { return STATUS_UI[status] || STATUS_UI.Available; }
+    function displayStatus(room) { return LIVE_STATUS[room.room_id] || room.status; }
+
+    function freeCount(b) {
+        var n = 0;
+        b.floors.forEach(function (f) {
+            f.rooms.forEach(function (r) { if (displayStatus(r) === 'Available') n++; });
+        });
+        return n;
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -117,23 +161,33 @@
         xhr.send();
     }
 
+    /* Flatten campuses → one ordered list of buildings */
     function ingest(campuses) {
-        CAMPUS_DATA = {}; BUILDINGS = {}; ROOM_INDEX = {}; LIVE_STATUS = {};
+        BUILDING_LIST = []; BUILDINGS = {}; ROOM_INDEX = {}; LIVE_STATUS = {};
+        var seq = 0;
         campuses.forEach(function (c) {
-            CAMPUS_DATA[c.key] = { label: c.label, buildings: [] };
             c.buildings.forEach(function (b) {
-                var roomCount = 0;
+                var rooms = 0;
                 b.floor_data.forEach(function (f) {
-                    f.rooms.forEach(function (r) { ROOM_INDEX[r.room_id] = r; roomCount++; });
+                    f.rooms.forEach(function (r) { ROOM_INDEX[r.room_id] = r; rooms++; });
                 });
+
+                var name = BUILDING_LABELS[b.id] || b.name;
+                var m = /^(.*?)\s*\((.+)\)\s*$/.exec(name);
+                var base = m ? m[1] : name;
+                var letter = (/Building\s+([A-Za-z])/.exec(base) || [null, base.charAt(0)])[1].toUpperCase();
+                var rank = BUILDING_ORDER.indexOf(b.id);
+
                 var entry = {
-                    id: b.id, name: b.name, wing: b.wing, image: b.image,
-                    rooms: roomCount, floors: b.floor_data, campusKey: c.key
+                    id: b.id, name: name, base: base, tag: m ? m[2] : '', letter: letter,
+                    image: b.image, rooms: rooms, floors: b.floor_data,
+                    _rank: rank === -1 ? 100 + (seq++) : rank
                 };
-                CAMPUS_DATA[c.key].buildings.push(entry);
+                BUILDING_LIST.push(entry);
                 BUILDINGS[b.id] = entry;
             });
         });
+        BUILDING_LIST.sort(function (a, b) { return a._rank - b._rank; });
     }
 
     function start() {
@@ -144,108 +198,94 @@
         if (err) err.hidden = true;
         loadFacilities(function (ok) {
             loading = false;
-            if (!ok) { if (err) err.hidden = false; return; }
+            if (!ok) {
+                panelsEl.innerHTML = '';
+                if (err) err.hidden = false;
+                return;
+            }
             loaded = true;
-            renderCampusStats();
+            renderPanels();
             startPolling();
         });
     }
 
     /* ══════════════════════════════════════════════════════════
-       VIEW 1 — CAMPUS
+       STEP 1 — THREE BUILDING PANELS
     ══════════════════════════════════════════════════════════ */
-    function renderCampusStats() {
-        document.querySelectorAll('[data-fcty-campus-stats]').forEach(function (el) {
-            var c = CAMPUS_DATA[el.dataset.fctyCampusStats];
-            if (!c) return;
-            var rooms = c.buildings.reduce(function (n, b) { return n + b.rooms; }, 0);
-            el.innerHTML = '<span>' + plural(c.buildings.length, 'building') + '</span>' +
-                '<span>' + plural(rooms, 'room') + '</span>';
+    function panelHTML(b) {
+        var free = freeCount(b);
+        return '<button type="button" class="fcty-panel" data-building-id="' + esc(b.id) + '" ' +
+            'aria-label="' + esc(b.name) + ', ' + plural(b.rooms, 'room') + '">' +
+            (b.image ? '<img class="fcty-panel-img" src="' + esc(b.image) + '" alt="">' : '') +
+            '<span class="fcty-panel-shade"></span>' +
+            '<span class="fcty-panel-letter" aria-hidden="true">' + esc(b.letter) + '</span>' +
+            '<span class="fcty-panel-live"><span class="fcty-dot"></span><span data-live-count>' + free + ' free now</span></span>' +
+            '<span class="fcty-panel-info">' +
+            '<span class="fcty-panel-name">' + esc(b.base) + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
+            '<span class="fcty-panel-meta">' + plural(b.rooms, 'room') + ' \u00b7 ' + plural(b.floors.length, 'floor') + '</span>' +
+            '<span class="fcty-panel-reveal"><span class="fcty-panel-floors">' +
+            b.floors.map(function (f) { return '<span>' + esc(f.label) + '</span>'; }).join('') +
+            '</span></span>' +
+            '</span>' +
+            '<span class="fcty-go" aria-hidden="true">' + icon('arrow_forward') + '</span>' +
+            '</button>';
+    }
+
+    function renderPanels() {
+        if (!BUILDING_LIST.length) {
+            panelsEl.innerHTML = '<div class="fcty-empty" style="flex:1">' + icon('construction') +
+                '<strong>No buildings yet</strong><span>Facilities are still being set up.</span></div>';
+            $('fcty-landing-summary').textContent = '';
+            return;
+        }
+        panelsEl.innerHTML = BUILDING_LIST.map(panelHTML).join('');
+        panelsEl.querySelectorAll('img.fcty-panel-img').forEach(function (img) {
+            img.addEventListener('error', function () { img.remove(); });
         });
+        updateLiveCounts();
+    }
+
+    function updateLiveCounts() {
+        var total = 0;
+        BUILDING_LIST.forEach(function (b) {
+            var n = freeCount(b);
+            total += n;
+            var el = panelsEl.querySelector('[data-building-id="' + b.id + '"] [data-live-count]');
+            if (el) el.textContent = n + ' free now';
+        });
+        if (BUILDING_LIST.length) {
+            $('fcty-landing-summary').textContent = plural(total, 'room') + ' free now';
+        }
+        if (activeBuildingId && roomsView.style.display !== 'none') renderHeroSummary();
     }
 
     function hideAllViews() {
-        campusView.style.display = 'none';
-        buildingView.style.display = 'none';
+        buildingsView.style.display = 'none';
         roomsView.style.display = 'none';
     }
 
-    function showCampusView() {
+    function showBuildingsView() {
         hideAllViews();
-        campusView.style.display = '';
-        activeCampusKey = null;
+        buildingsView.style.display = '';
         activeBuildingId = null;
     }
 
     /* ══════════════════════════════════════════════════════════
-       VIEW 2 — BUILDINGS
+       STEP 2 — ROOMS
     ══════════════════════════════════════════════════════════ */
-    function buildingCardHTML(b) {
-        var media = b.image
-            ? '<img class="fcty-building-media" src="' + esc(b.image) + '" alt="" loading="lazy">'
-            : '<div class="fcty-building-fallback">' + icon('domain') + '</div>';
-        return '<button type="button" class="fcty-building-card" data-building-id="' + esc(b.id) + '">' +
-            '<div class="fcty-building-clip">' + media +
-            (b.wing ? '<span class="fcty-wing">' + esc(b.wing) + '</span>' : '') +
-            '</div>' +
-            '<div class="fcty-building-body">' +
-            '<div class="fcty-building-text">' +
-            '<h3 class="fcty-building-name">' + esc(b.name) + '</h3>' +
-            '<p class="fcty-meta"><span>' + plural(b.rooms, 'room') + '</span><span>' +
-            plural(b.floors.length, 'floor') + '</span></p>' +
-            '</div>' +
-            '<span class="fcty-go" aria-hidden="true">' + icon('arrow_forward') + '</span>' +
-            '</div></button>';
-    }
-
-    function showBuildingView(campusKey) {
-        var campus = CAMPUS_DATA[campusKey];
-        if (!campus) { start(); return; }
-        activeCampusKey = campusKey;
-        activeBuildingId = null;
-
-        $('fcty-breadcrumb-campus').textContent = campus.label;
-        $('fcty-building-title').textContent = 'Select a building';
-        $('fcty-building-count').textContent = plural(campus.buildings.length, 'building');
-
-        if (!campus.buildings.length) {
-            buildingGrid.innerHTML = '<div class="fcty-empty">' + icon('construction') +
-                '<strong>Buildings coming soon</strong>' +
-                '<span>' + esc(campus.label) + ' is still being set up.</span></div>';
-        } else {
-            buildingGrid.innerHTML = campus.buildings.map(buildingCardHTML).join('');
-            /* Fallback when a photo fails to load (inline handlers are blocked by CSP) */
-            buildingGrid.querySelectorAll('img.fcty-building-media').forEach(function (img) {
-                img.addEventListener('error', function () {
-                    var f = document.createElement('div');
-                    f.className = 'fcty-building-fallback';
-                    f.innerHTML = icon('domain');
-                    img.replaceWith(f);
-                });
-            });
-        }
-
-        hideAllViews();
-        buildingView.style.display = '';
-    }
-
-    /* ══════════════════════════════════════════════════════════
-       VIEW 3 — ROOMS
-    ══════════════════════════════════════════════════════════ */
-    function uiFor(status) { return STATUS_UI[status] || STATUS_UI.Available; }
-
-    function displayStatus(room) { return LIVE_STATUS[room.room_id] || room.status; }
-
     function roomCardHTML(room) {
         var shown = displayStatus(room);
         var ui = uiFor(shown);
         var locked = shown === 'Not Bookable';
+        var seats = room.seating_capacity !== null && room.seating_capacity !== undefined
+            ? '<span class="fcty-room-seats">' + icon('chair') + room.seating_capacity + '</span>' : '';
         return '<button type="button" class="fcty-room ' + ui.cls + '" data-room-id="' + room.room_id + '"' +
             (locked ? ' disabled aria-disabled="true"' : '') + '>' +
             '<span class="fcty-room-name">' + esc(room.name) + '</span>' +
+            '<span class="fcty-room-foot">' +
             '<span class="fcty-room-status"><span class="fcty-dot"></span>' +
-            '<span class="fcty-room-status-text">' + ui.text + '</span></span>' +
-            '</button>';
+            '<span class="fcty-room-status-text">' + ui.text + '</span></span>' + seats +
+            '</span></button>';
     }
 
     function renderFloor(idx) {
@@ -259,21 +299,47 @@
         });
 
         var floor = b.floors[idx];
-        roomGrid.innerHTML = floor && floor.rooms.length
-            ? floor.rooms.map(roomCardHTML).join('')
-            : '<div class="fcty-empty">' + icon('meeting_room') + '<strong>No rooms on this floor</strong></div>';
+        var rooms = floor ? floor.rooms.filter(function (r) {
+            return !onlyFree || displayStatus(r) === 'Available';
+        }) : [];
+
+        if (rooms.length) {
+            roomGrid.innerHTML = rooms.map(roomCardHTML).join('');
+        } else {
+            roomGrid.innerHTML = '<div class="fcty-empty">' + icon('meeting_room') +
+                '<strong>' + (onlyFree ? 'Nothing available on this floor' : 'No rooms on this floor') + '</strong>' +
+                (onlyFree ? '<span>Try another floor or turn off the filter.</span>' : '') + '</div>';
+        }
+    }
+
+    function renderHeroSummary() {
+        var b = BUILDINGS[activeBuildingId];
+        if (!b) return;
+        $('fcty-rooms-summary').innerHTML =
+            '<span>' + plural(b.rooms, 'room') + '</span>' +
+            '<span>' + plural(b.floors.length, 'floor') + '</span>' +
+            '<span class="fcty-live"><span class="fcty-dot"></span>' + freeCount(b) + ' free now</span>';
+    }
+
+    function renderSwitcher() {
+        switcherEl.innerHTML = BUILDING_LIST.map(function (b) {
+            return '<button type="button" class="fcty-sw-btn" role="tab" data-building-id="' + esc(b.id) + '" ' +
+                'aria-label="' + esc(b.name) + '" aria-selected="' + (b.id === activeBuildingId ? 'true' : 'false') + '">' +
+                '<span class="fcty-sw-letter">' + esc(b.letter) + '</span>' +
+                '<span>' + esc(b.tag || b.base) + '</span></button>';
+        }).join('');
     }
 
     function showRoomsView(buildingId) {
         var b = BUILDINGS[buildingId];
         if (!b) return;
         activeBuildingId = buildingId;
-        activeCampusKey = b.campusKey;
 
-        $('fcty-rooms-back-campus').textContent = CAMPUS_DATA[b.campusKey].label;
         $('fcty-rooms-breadcrumb-building').textContent = b.name;
-        $('fcty-rooms-hero-title').textContent = b.name;
-        $('fcty-rooms-summary').textContent = plural(b.rooms, 'room') + ' \u00b7 ' + plural(b.floors.length, 'floor');
+        $('fcty-rooms-hero-title').innerHTML = esc(b.base) + (b.tag ? '<em class="fcty-tag">' + esc(b.tag) + '</em>' : '');
+        $('fcty-hero-img').style.backgroundImage = b.image ? 'url("' + encodeURI(b.image) + '")' : 'none';
+        renderHeroSummary();
+        renderSwitcher();
 
         floorTabs.style.display = b.floors.length > 1 ? '' : 'none';
         floorTabs.innerHTML = b.floors.map(function (f, i) {
@@ -282,8 +348,11 @@
                 '<span class="fcty-floor-count">' + f.rooms.length + '</span></button>';
         }).join('');
 
+        /* Open on the first floor that actually has something to book */
         var first = 0;
-        b.floors.forEach(function (f, i) { if (f.expanded && first === 0) first = i; });
+        for (var i = 0; i < b.floors.length; i++) {
+            if (b.floors[i].rooms.some(function (r) { return displayStatus(r) !== 'Not Bookable'; })) { first = i; break; }
+        }
         renderFloor(first);
 
         hideAllViews();
@@ -316,10 +385,14 @@
                     /* "Booked" is a right-now display state, never stored as the admin status */
                     if (room && st !== 'Booked') room.status = st;
                 });
-                roomGrid.querySelectorAll('.fcty-room[data-room-id]').forEach(function (card) {
-                    var st = statuses[card.dataset.roomId];
-                    if (st) applyStatus(card, st);
-                });
+                if (activeBuildingId && roomsView.style.display !== 'none') {
+                    if (onlyFree) renderFloor(activeFloorIdx);
+                    else roomGrid.querySelectorAll('.fcty-room[data-room-id]').forEach(function (card) {
+                        var st = statuses[card.dataset.roomId];
+                        if (st) applyStatus(card, st);
+                    });
+                }
+                updateLiveCounts();
             })
             .catch(function () { /* polling must never break the UI */ });
     }
@@ -384,8 +457,7 @@
        ROOM DETAILS DIALOG
     ══════════════════════════════════════════════════════════ */
     function setStatusBadge(kind, text) {
-        var badge = $('fcty-modal-availability');
-        badge.className = 'fcty-status' + (kind ? ' is-' + kind : '');
+        $('fcty-modal-availability').className = 'fcty-status' + (kind ? ' is-' + kind : '');
         $('fcty-modal-availability-text').textContent = text;
     }
 
@@ -437,6 +509,21 @@
         });
     }
 
+    /* "Free until 2:00 PM" / "Busy until 10:30 AM" */
+    function availabilityHint(daySchedule) {
+        var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+        if (m < SCHOOL_START_MIN) return 'Opens at ' + minToLabel(SCHOOL_START_MIN);
+        if (m >= SCHOOL_END_MIN) return 'Closed for today';
+        var list = sortByStart(daySchedule), i;
+        for (i = 0; i < list.length; i++) {
+            if (m >= timeToMin(list[i].start) && m < timeToMin(list[i].end)) return 'Busy until ' + minToLabel(timeToMin(list[i].end));
+        }
+        for (i = 0; i < list.length; i++) {
+            if (timeToMin(list[i].start) > m) return 'Free until ' + minToLabel(timeToMin(list[i].start));
+        }
+        return 'Free until ' + minToLabel(SCHOOL_END_MIN);
+    }
+
     function openRoomModal(room, locationLabel) {
         currentRoom = { room: room, name: room.name, location: locationLabel };
 
@@ -444,6 +531,7 @@
         $('fcty-modal-location').textContent = locationLabel;
         $('fcty-modal-capacity').textContent = room.seating_capacity !== null && room.seating_capacity !== undefined
             ? room.seating_capacity : '\u2014';
+        $('fcty-modal-hint').hidden = true;
 
         var blocked = room.status === 'Maintenance' || room.status === 'Not Bookable';
         if (room.status === 'Maintenance') setStatusBadge('maintenance', 'Maintenance');
@@ -463,30 +551,43 @@
         closeOverlay(formOverlay, true);
         openOverlay(roomOverlay);
 
-        fetch(apiBase() + 'room-reservation/api/get-room-schedule.php?room_id=' + encodeURIComponent(room.room_id), {
-            credentials: 'same-origin'
-        })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
+        fetchWeek(room.room_id, ymd(mondayOf(today)))
+            .then(function (week) {
                 if (!currentRoom || currentRoom.room !== room) return;   /* dialog moved on */
-                if (data.error) { $('fcty-modal-daily-list').innerHTML = note('Couldn\u2019t load the schedule.'); return; }
-                var todays = data.week[DAY_KEYS[today.getDay()]] || [];
+                var todays = week[DAY_KEYS[today.getDay()]] || [];
                 $('fcty-modal-daily-list').innerHTML = dailyHTML(todays);
-                $('fcty-modal-weekly-grid').innerHTML = weeklyHTML(data.week);
+                $('fcty-modal-weekly-grid').innerHTML = weeklyHTML(week);
                 if (!blocked) {
                     if (freeNow(todays)) setStatusBadge('', 'Available');
                     else setStatusBadge('booked', 'In use now');
+                    $('fcty-modal-hint-text').textContent = availabilityHint(todays);
+                    $('fcty-modal-hint').hidden = false;
                 }
             })
             .catch(function () {
                 if (!currentRoom || currentRoom.room !== room) return;
-                $('fcty-modal-daily-list').innerHTML = note('Schedule unavailable right now.');
+                $('fcty-modal-daily-list').innerHTML = note('Couldn\u2019t load the schedule right now.');
                 if (!blocked) setStatusBadge('', 'Available');
             });
     }
 
+    /* Week schedule with a tiny per-room cache (cleared whenever a booking is made) */
+    var weekCache = {};
+    function fetchWeek(roomId, weekStart) {
+        var key = roomId + '|' + weekStart;
+        if (weekCache[key]) return Promise.resolve(weekCache[key]);
+        return fetch(apiBase() + 'room-reservation/api/get-room-schedule.php?room_id=' + encodeURIComponent(roomId) +
+            '&week_start=' + encodeURIComponent(weekStart), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.error || !data.week) throw new Error(data.error || 'no data');
+                weekCache[key] = data.week;
+                return data.week;
+            });
+    }
+
     /* ══════════════════════════════════════════════════════════
-       RESERVE / REPORT  (shared dialog shell)
+       SHARED DIALOG SHELL + ALERT HELPERS
     ══════════════════════════════════════════════════════════ */
     function dialogShell(iconName, title, roomName, bodyHTML, footHTML) {
         formOverlay.innerHTML =
@@ -519,129 +620,424 @@
         el.hidden = false;
     }
 
-    /* ── Reserve ─────────────────────────────────────────────── */
+    function chipRow(id, labels) {
+        return '<div class="fcty-chips" id="' + id + '">' + labels.map(function (l) {
+            return '<button type="button" class="fcty-chip" aria-pressed="false" data-val="' + esc(l) + '">' + esc(l) + '</button>';
+        }).join('') + '</div>';
+    }
+
+    function setPressed(container, test) {
+        container.querySelectorAll('.fcty-chip').forEach(function (c) {
+            c.setAttribute('aria-pressed', test(c) ? 'true' : 'false');
+        });
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       RESERVE — two-pane booking experience
+       Left: live summary + day timeline.  Right: guided form.
+    ══════════════════════════════════════════════════════════ */
+    function timeOptions(from, to, selected) {
+        var html = '';
+        for (var m = from; m <= to; m += 30) {
+            html += '<option value="' + minToHHMM(m) + '"' + (m === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+        }
+        return html;
+    }
+
     function openReservationForm(room) {
-        var today = new Date().toISOString().split('T')[0];
+        var now = new Date();
+        var nowMin = now.getHours() * 60 + now.getMinutes();
+
+        /* Smart defaults: next half-hour today, or 8 AM tomorrow if it's too late */
+        var st = { date: ymd(now), start: 0, end: 0, purpose: '', attendees: 1 };
+        if (nowMin >= SCHOOL_END_MIN - 60) {
+            st.date = ymd(addDays(now, 1)); st.start = SCHOOL_START_MIN + 60;
+        } else {
+            st.start = Math.max(SCHOOL_START_MIN, Math.ceil((nowMin + 1) / 30) * 30);
+        }
+        st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
+
+        var todayStr = ymd(now);
+        var seats = room.seating_capacity !== null && room.seating_capacity !== undefined ? room.seating_capacity : null;
+        var weekData = null;          /* schedule for the week of st.date */
+        var serverClash = false;
         var availTimer = null, availCtl = null;
 
-        dialogShell('event_available', 'Reserve room', room.name,
-            '<div class="fcty-form">' +
-            alertHTML('fcty-res-msg', 'error') +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-date">Date</label>' +
-            '<input type="date" id="fcty-res-date" class="fcty-input" min="' + today + '" value="' + today + '"></div>' +
-            '<div class="fcty-row">' +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-start">From</label>' +
-            '<input type="time" id="fcty-res-start" class="fcty-input" min="07:00" max="20:00" value="08:00"></div>' +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-end">To</label>' +
-            '<input type="time" id="fcty-res-end" class="fcty-input" min="07:00" max="20:00" value="10:00"></div>' +
+        formOverlay.innerHTML =
+            '<div class="fcty-dialog fcty-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="fcty-form-title">' +
+            '<div class="fcty-res">' +
+
+            /* ── Left: summary + timeline ── */
+            '<aside class="fcty-res-side">' +
+            '<div>' +
+            '<span class="fcty-kicker">' + icon('event_available') + 'Reserve a room</span>' +
+            '<h3 class="fcty-res-room">' + esc(room.name) + '</h3>' +
+            '<p class="fcty-res-where">' + esc(currentRoom ? currentRoom.location : '') + '</p>' +
+            (seats !== null ? '<span class="fcty-seats">' + icon('chair') + plural(seats, 'seat') + '</span>' : '') +
             '</div>' +
+            '<ul class="fcty-ticket" aria-live="polite">' +
+            '<li>' + icon('event') + '<div><small>Date</small><strong id="fcty-tk-date"></strong></div></li>' +
+            '<li>' + icon('schedule') + '<div><small>Time</small><strong id="fcty-tk-time"></strong></div></li>' +
+            '<li>' + icon('timer') + '<div><small>Duration</small><strong id="fcty-tk-dur"></strong></div></li>' +
+            '</ul>' +
+            '<div class="fcty-tl">' +
+            '<div class="fcty-tl-head"><span>Room schedule</span><span id="fcty-tl-day"></span></div>' +
+            '<div class="fcty-tl-track" id="fcty-tl-track"><div class="fcty-tl-pick" id="fcty-tl-pick"></div></div>' +
+            '<div class="fcty-tl-ticks" aria-hidden="true">' +
+            [[7, '7 AM'], [10, '10 AM'], [13, '1 PM'], [16, '4 PM'], [20, '8 PM']].map(function (t) {
+                return '<span style="left:' + ((t[0] * 60 - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100) + '%">' + t[1] + '</span>';
+            }).join('') +
+            '</div>' +
+            '<div class="fcty-tl-note" id="fcty-tl-note"></div>' +
+            '<ul class="fcty-tl-list" id="fcty-tl-list"></ul>' +
+            '</div>' +
+            '</aside>' +
+
+            /* ── Right: form ── */
+            '<section class="fcty-res-main" id="fcty-res-main">' +
+            '<div class="fcty-res-top"><h4 class="fcty-res-heading" id="fcty-form-title">Plan your booking</h4>' +
+            '<button type="button" class="fcty-icon-btn" id="fcty-form-close" aria-label="Close">' + icon('close') + '</button></div>' +
+            '<div class="fcty-res-scroll">' +
+            alertHTML('fcty-res-msg', 'error') +
+
+            '<div class="fcty-step"><div class="fcty-step-head"><span class="fcty-step-num">1</span>When</div>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">Date</span>' +
+            '<div class="fcty-chips" id="fcty-date-chips">' +
+            '<button type="button" class="fcty-chip" aria-pressed="false" data-day="0">Today</button>' +
+            '<button type="button" class="fcty-chip" aria-pressed="false" data-day="1">Tomorrow</button>' +
+            '<input type="date" id="fcty-res-date" class="fcty-input" aria-label="Pick a date" min="' + todayStr + '" value="' + st.date + '">' +
+            '</div></div>' +
+            '<div class="fcty-row">' +
+            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-start">From</label>' +
+            '<select id="fcty-res-start" class="fcty-input"></select></div>' +
+            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-end">To</label>' +
+            '<select id="fcty-res-end" class="fcty-input"></select></div>' +
+            '</div>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">Quick duration</span>' +
+            '<div class="fcty-chips" id="fcty-dur-chips">' +
+            [30, 60, 90, 120, 180].map(function (m) {
+                return '<button type="button" class="fcty-chip" aria-pressed="false" data-min="' + m + '">' + durLabel(m) + '</button>';
+            }).join('') +
+            '</div></div>' +
             alertHTML('fcty-res-avail', 'warn') +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-purpose">Purpose</label>' +
-            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Lecture, lab session, meeting\u2026" maxlength="200"></div>' +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-attendees">Attendees</label>' +
-            '<input type="number" id="fcty-res-attendees" class="fcty-input" min="1" value="1"></div>' +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-res-notes">Notes <small>(optional)</small></label>' +
-            '<textarea id="fcty-res-notes" class="fcty-input" rows="2"></textarea></div>' +
-            '</div>',
+            '</div>' +
+
+            '<div class="fcty-step"><div class="fcty-step-head"><span class="fcty-step-num">2</span>Details</div>' +
+            '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-purpose">Purpose</label>' +
+            chipRow('fcty-purpose-chips', PURPOSES) +
+            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or describe it in your own words\u2026" maxlength="200"></div>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">Attendees</span>' +
+            '<div class="fcty-stepper">' +
+            '<button type="button" id="fcty-att-minus" aria-label="Fewer attendees">' + icon('remove') + '</button>' +
+            '<input type="number" id="fcty-res-attendees" min="1" value="1" aria-label="Number of attendees">' +
+            '<button type="button" id="fcty-att-plus" aria-label="More attendees">' + icon('add') + '</button>' +
+            '</div>' +
+            '<p class="fcty-hint" id="fcty-seat-hint"></p></div>' +
+            '<button type="button" class="fcty-link-btn" id="fcty-note-toggle">' + icon('add') + 'Add a note</button>' +
+            '<textarea id="fcty-res-notes" class="fcty-input" rows="2" placeholder="Anything the admin should know?" hidden></textarea>' +
+            '</div>' +
+
+            '</div>' +
+            '<footer class="fcty-res-foot">' +
             '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-res-back">' + icon('arrow_back') + 'Back</button>' +
-            '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-res-submit">' + icon('event_available') + 'Confirm</button>'
-        );
+            '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-res-submit">' + icon('event_available') + 'Confirm reservation</button>' +
+            '</footer>' +
+            '</section>' +
+            '</div></div>';
 
         closeOverlay(roomOverlay, true);
-        openOverlay(formOverlay, '#fcty-res-date');
+        openOverlay(formOverlay, '#fcty-date-chips .fcty-chip');
+        $('fcty-form-close').addEventListener('click', function () { closeOverlay(formOverlay); });
 
-        var msg = $('fcty-res-msg'), avail = $('fcty-res-avail'), submit = $('fcty-res-submit');
-        var confirmHTML = icon('event_available') + 'Confirm';
+        var elDate = $('fcty-res-date'), elStart = $('fcty-res-start'), elEnd = $('fcty-res-end');
+        var elMsg = $('fcty-res-msg'), elAvail = $('fcty-res-avail'), btnSubmit = $('fcty-res-submit');
+        var elAtt = $('fcty-res-attendees'), elPurpose = $('fcty-res-purpose');
+        var confirmHTML = icon('event_available') + 'Confirm reservation';
 
-        function runAvailCheck() {
-            var date = $('fcty-res-date').value, s = $('fcty-res-start').value, e = $('fcty-res-end').value;
-            if (!date || !s || !e || e <= s) { avail.hidden = true; return; }
-            if (availCtl) availCtl.abort();
-            availCtl = new AbortController();
-            setAlert(avail, 'info', 'schedule', 'Checking availability\u2026');
-            fetch(apiBase() + 'room-reservation/api/check-room-availability.php?room_id=' + room.room_id +
-                '&reservation_date=' + encodeURIComponent(date) +
-                '&start_time=' + encodeURIComponent(s) + '&end_time=' + encodeURIComponent(e), {
-                credentials: 'same-origin', signal: availCtl.signal
-            })
-                .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
-                .then(function (d) {
-                    if (d.conflict) setAlert(avail, 'warn', 'warning', 'That time is already reserved. Try a different slot.');
-                    else avail.hidden = true;
+        /* ── Derived helpers ── */
+        function dayBookings() {
+            if (!weekData) return [];
+            return sortByStart(weekData[DAY_KEYS[parseYmd(st.date).getDay()]] || []);
+        }
+
+        function clashes() {
+            return dayBookings().filter(function (b) {
+                return st.start < timeToMin(b.end) && st.end > timeToMin(b.start);
+            });
+        }
+
+        function pct(min) {
+            var c = Math.min(SCHOOL_END_MIN, Math.max(SCHOOL_START_MIN, min));
+            return (c - SCHOOL_START_MIN) / (SCHOOL_END_MIN - SCHOOL_START_MIN) * 100;
+        }
+
+        /* ── Rendering ── */
+        function syncControls() {
+            /* Start / end selects (end must be after start) */
+            elStart.innerHTML = timeOptions(SCHOOL_START_MIN, SCHOOL_END_MIN - 30, st.start);
+            if (st.end <= st.start) st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
+            elEnd.innerHTML = timeOptions(st.start + 30, SCHOOL_END_MIN, st.end);
+
+            /* Date chips */
+            var dateChips = $('fcty-date-chips');
+            setPressed(dateChips, function (c) { return c.dataset.day !== undefined && st.date === ymd(addDays(now, +c.dataset.day)); });
+
+            /* Duration chips */
+            var dur = st.end - st.start;
+            setPressed($('fcty-dur-chips'), function (c) { return +c.dataset.min === dur; });
+            $('fcty-dur-chips').querySelectorAll('.fcty-chip').forEach(function (c) {
+                c.disabled = st.start + (+c.dataset.min) > SCHOOL_END_MIN;
+            });
+
+            /* Purpose chips */
+            setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
+
+            /* Attendees */
+            elAtt.value = st.attendees;
+            $('fcty-att-minus').disabled = st.attendees <= 1;
+            var hint = $('fcty-seat-hint');
+            if (seats !== null && st.attendees > seats) {
+                hint.textContent = 'That\u2019s more than the ' + seats + ' seats in this room.';
+                hint.style.color = 'var(--fcty-maintenance)';
+            } else {
+                hint.textContent = seats !== null ? 'This room seats ' + seats + '.' : '';
+                hint.style.color = '';
+            }
+        }
+
+        function renderSummary() {
+            var d = parseYmd(st.date);
+            $('fcty-tk-date').textContent = longDate(d);
+            $('fcty-tk-time').textContent = minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end);
+            $('fcty-tk-dur').textContent = durLabel(st.end - st.start);
+            $('fcty-tl-day').textContent = DAY_NAMES[d.getDay()];
+
+            /* Timeline */
+            var track = $('fcty-tl-track');
+            track.querySelectorAll('.fcty-tl-block').forEach(function (n) { n.remove(); });
+            var bookings = dayBookings();
+            bookings.forEach(function (b) {
+                var s = pct(timeToMin(b.start)), e = pct(timeToMin(b.end));
+                var block = document.createElement('div');
+                block.className = 'fcty-tl-block';
+                block.style.left = s + '%';
+                block.style.width = Math.max(0, e - s) + '%';
+                block.title = timeRange(b.start, b.end) + ' \u00b7 ' + decodeHtml(b.label);
+                track.insertBefore(block, $('fcty-tl-pick'));
+            });
+
+            var clash = clashes();
+            var pick = $('fcty-tl-pick');
+            pick.style.left = pct(st.start) + '%';
+            pick.style.width = Math.max(0, pct(st.end) - pct(st.start)) + '%';
+            pick.classList.toggle('is-clash', clash.length > 0);
+
+            var noteEl = $('fcty-tl-note');
+            if (!weekData) {
+                noteEl.className = 'fcty-tl-note';
+                noteEl.innerHTML = icon('schedule') + 'Checking the schedule\u2026';
+            } else if (clash.length) {
+                noteEl.className = 'fcty-tl-note is-clash';
+                noteEl.innerHTML = icon('warning') + 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. You can still request it and join the waitlist.';
+            } else {
+                noteEl.className = 'fcty-tl-note';
+                noteEl.innerHTML = icon('check_circle') + 'This time is free.';
+            }
+
+            var list = $('fcty-tl-list');
+            list.innerHTML = bookings.slice(0, 3).map(function (b) {
+                return '<li><b>' + timeRange(b.start, b.end) + '</b> \u00b7 ' + b.label + '</li>';
+            }).join('') + (bookings.length > 3 ? '<li>+' + (bookings.length - 3) + ' more</li>' : '');
+
+            /* Server-side conflict notice (only if the local check didn't already flag it) */
+            if (serverClash && !clash.length) {
+                setAlert(elAvail, 'warn', 'warning', 'Another reservation overlaps this time. Try a different slot.');
+            } else {
+                elAvail.hidden = true;
+            }
+        }
+
+        function refresh() { syncControls(); renderSummary(); }
+
+        function loadWeek() {
+            weekData = null;
+            renderSummary();
+            var wk = ymd(mondayOf(parseYmd(st.date)));
+            fetchWeek(room.room_id, wk)
+                .then(function (w) {
+                    if (ymd(mondayOf(parseYmd(st.date))) !== wk) return;   /* date changed meanwhile */
+                    weekData = w;
+                    renderSummary();
                 })
-                .catch(function (err) {
-                    if (err && err.name === 'AbortError') return;
-                    setAlert(avail, 'info', 'info', 'Couldn\u2019t verify availability. Please double-check your time.');
+                .catch(function () {
+                    weekData = {};
+                    renderSummary();
                 });
         }
 
-        ['fcty-res-date', 'fcty-res-start', 'fcty-res-end'].forEach(function (id) {
-            $(id).addEventListener('change', function () {
-                clearTimeout(availTimer);
-                availTimer = setTimeout(runAvailCheck, 400);
-            });
-        });
+        function serverCheck() {
+            if (availCtl) availCtl.abort();
+            availCtl = new AbortController();
+            fetch(apiBase() + 'room-reservation/api/check-room-availability.php?room_id=' + room.room_id +
+                '&reservation_date=' + encodeURIComponent(st.date) +
+                '&start_time=' + encodeURIComponent(minToHHMM(st.start)) +
+                '&end_time=' + encodeURIComponent(minToHHMM(st.end)), {
+                credentials: 'same-origin', signal: availCtl.signal
+            })
+                .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+                .then(function (d) { serverClash = !!d.conflict; renderSummary(); })
+                .catch(function (err) { if (!err || err.name !== 'AbortError') { serverClash = false; } });
+        }
 
+        function changed(dateChanged) {
+            serverClash = false;
+            elMsg.hidden = true;
+            if (dateChanged) { refresh(); loadWeek(); } else refresh();
+            clearTimeout(availTimer);
+            availTimer = setTimeout(serverCheck, 450);
+        }
+
+        /* ── Wiring ── */
+        $('fcty-date-chips').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-chip');
+            if (!c) return;
+            st.date = ymd(addDays(now, +c.dataset.day));
+            elDate.value = st.date;
+            changed(true);
+        });
+        elDate.addEventListener('change', function () {
+            if (!elDate.value) return;
+            st.date = elDate.value < todayStr ? todayStr : elDate.value;
+            elDate.value = st.date;
+            changed(true);
+        });
+        elStart.addEventListener('change', function () {
+            var keep = st.end - st.start;
+            st.start = timeToMin(elStart.value);
+            st.end = Math.min(SCHOOL_END_MIN, st.start + Math.max(30, keep));
+            changed(false);
+        });
+        elEnd.addEventListener('change', function () { st.end = timeToMin(elEnd.value); changed(false); });
+        $('fcty-dur-chips').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-chip');
+            if (!c || c.disabled) return;
+            st.end = Math.min(SCHOOL_END_MIN, st.start + (+c.dataset.min));
+            changed(false);
+        });
+        $('fcty-purpose-chips').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-chip');
+            if (!c) return;
+            st.purpose = c.dataset.val;
+            elPurpose.value = st.purpose;
+            elMsg.hidden = true;
+            syncControls();
+        });
+        elPurpose.addEventListener('input', function () {
+            st.purpose = elPurpose.value;
+            setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
+        });
+        function setAttendees(n) {
+            st.attendees = Math.max(1, Math.min(999, n || 1));
+            syncControls();
+        }
+        $('fcty-att-minus').addEventListener('click', function () { setAttendees(st.attendees - 1); });
+        $('fcty-att-plus').addEventListener('click', function () { setAttendees(st.attendees + 1); });
+        elAtt.addEventListener('input', function () {
+            st.attendees = Math.max(1, parseInt(elAtt.value, 10) || 1);
+            var hint = $('fcty-seat-hint');
+            var over = seats !== null && st.attendees > seats;
+            hint.textContent = over ? 'That\u2019s more than the ' + seats + ' seats in this room.' : (seats !== null ? 'This room seats ' + seats + '.' : '');
+            hint.style.color = over ? 'var(--fcty-maintenance)' : '';
+            $('fcty-att-minus').disabled = st.attendees <= 1;
+        });
+        $('fcty-note-toggle').addEventListener('click', function () {
+            var ta = $('fcty-res-notes');
+            ta.hidden = !ta.hidden;
+            this.innerHTML = ta.hidden ? icon('add') + 'Add a note' : icon('remove') + 'Hide note';
+            if (!ta.hidden) ta.focus();
+        });
         $('fcty-res-back').addEventListener('click', backToRoom);
 
-        submit.addEventListener('click', function () {
-            var date = $('fcty-res-date').value.trim();
-            var s = $('fcty-res-start').value.trim();
-            var e = $('fcty-res-end').value.trim();
-            var purpose = $('fcty-res-purpose').value.trim();
-            var attendees = parseInt($('fcty-res-attendees').value || '1', 10);
-            var notes = $('fcty-res-notes').value.trim();
+        btnSubmit.addEventListener('click', function () {
+            function fail(t) { setAlert(elMsg, 'error', 'error', esc(t)); elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+            var purpose = elPurpose.value.trim();
+            if (!purpose) return fail('Add a purpose \u2014 pick one above or type your own.');
+            if (st.end <= st.start) return fail('End time must be after the start time.');
 
-            function fail(t) { setAlert(msg, 'error', 'error', esc(t)); }
-            if (!date) return fail('Please pick a date.');
-            if (!s || !e) return fail('Please set a start and end time.');
-            if (e <= s) return fail('End time must be after the start time.');
-            if (!purpose) return fail('Please add a purpose.');
-
-            submit.disabled = true;
-            submit.textContent = 'Submitting\u2026';
+            btnSubmit.disabled = true;
+            btnSubmit.textContent = 'Submitting\u2026';
 
             fetch(apiBase() + 'room-reservation/api/submit-faculty-reserve.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    room_id: room.room_id, reservation_date: date, start_time: s, end_time: e,
-                    purpose: purpose, attendees: attendees, notes: notes,
+                    room_id: room.room_id, reservation_date: st.date,
+                    start_time: minToHHMM(st.start), end_time: minToHHMM(st.end),
+                    purpose: purpose, attendees: st.attendees,
+                    notes: $('fcty-res-notes').value.trim(),
                     submitted_as: 'personal', csrf_token: csrf()
                 })
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    submit.disabled = false;
-                    submit.innerHTML = confirmHTML;
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = confirmHTML;
                     if (data.error) { fail(data.error); return; }
 
-                    var approved = data.status === 'Approved';
-                    var html = '<strong>' + esc(data.status) + '</strong> \u00b7 ' + esc(data.room_name || room.name) +
-                        (data.reason ? '<br>' + esc(data.reason) : '');
-                    if (!approved) html += '<br><button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-waitlist">' +
-                        icon('notifications') + 'Notify me if it opens up</button>';
-                    setAlert(msg, approved ? 'success' : 'error', approved ? 'check_circle' : 'cancel', html);
-
-                    var wl = $('fcty-waitlist');
-                    if (wl) wl.addEventListener('click', function () { joinWaitlist(wl, room, date, s, e); });
-
+                    weekCache = {};
                     document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
 
-                    if (approved) {
-                        ['fcty-res-date', 'fcty-res-start', 'fcty-res-end', 'fcty-res-purpose',
-                            'fcty-res-attendees', 'fcty-res-notes'].forEach(function (id) { $(id).disabled = true; });
-                        submit.style.display = 'none';
-                        avail.hidden = true;
+                    if (data.status === 'Declined') {
+                        setAlert(elMsg, 'error', 'cancel',
+                            '<strong>Not approved</strong>' + (data.reason ? '<br>' + esc(data.reason) : '') +
+                            '<br><button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-waitlist">' +
+                            icon('notifications') + 'Notify me if it opens up</button>');
+                        var wl = $('fcty-waitlist');
+                        if (wl) wl.addEventListener('click', function () {
+                            joinWaitlist(wl, room, st.date, minToHHMM(st.start), minToHHMM(st.end));
+                        });
+                        elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        loadWeek();
+                        return;
                     }
+                    showDone(data);
                 })
                 .catch(function () {
-                    submit.disabled = false;
-                    submit.innerHTML = confirmHTML;
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = confirmHTML;
                     fail('Network error. Please try again.');
                 });
         });
+
+        function showDone(data) {
+            var approved = data.status === 'Approved';
+            $('fcty-tl-pick').classList.remove('is-clash');
+            $('fcty-tl-note').className = 'fcty-tl-note';
+            $('fcty-tl-note').innerHTML = approved ? icon('check_circle') + 'Booked for you.' : icon('hourglass_top') + 'Waiting for approval.';
+            $('fcty-res-main').innerHTML =
+                '<div class="fcty-done">' +
+                '<div class="fcty-done-badge' + (approved ? '' : ' is-wait') + '">' + icon(approved ? 'check_circle' : 'hourglass_top') + '</div>' +
+                '<h4>' + (approved ? 'You\u2019re all set' : 'Request received') + '</h4>' +
+                '<p>' + esc(data.room_name || room.name) + ' \u00b7 ' + longDate(parseYmd(st.date)) + '<br>' +
+                minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
+                (data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
+                '<div class="fcty-done-actions">' +
+                '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-done-history">' + icon('receipt_long') + 'My reservations</button>' +
+                '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-done-close">Done</button>' +
+                '</div></div>';
+            $('fcty-done-close').addEventListener('click', function () { closeOverlay(formOverlay); });
+            $('fcty-done-history').addEventListener('click', function () {
+                closeOverlay(formOverlay);
+                var tab = document.querySelector('[data-rooms-nav="history"]');
+                if (tab) tab.click();
+            });
+            $('fcty-done-close').focus();
+        }
+
+        refresh();
+        loadWeek();
+        serverCheck();
     }
 
     function joinWaitlist(btn, room, date, s, e) {
@@ -664,14 +1060,19 @@
             .catch(function () { btn.disabled = false; btn.innerHTML = label; });
     }
 
-    /* ── Report issue ────────────────────────────────────────── */
+    /* ══════════════════════════════════════════════════════════
+       REPORT AN ISSUE
+    ══════════════════════════════════════════════════════════ */
     function openReportIssueForm(room) {
+        var type = '';
         dialogShell('flag', 'Report an issue', room.name,
             '<div class="fcty-form">' +
             alertHTML('fcty-issue-msg', 'error') +
-            '<div class="fcty-field"><label class="fcty-label" for="fcty-issue-desc">What\u2019s wrong?</label>' +
-            '<textarea id="fcty-issue-desc" class="fcty-input" rows="4" maxlength="1000" ' +
-            'placeholder="e.g. Air conditioning not working, broken chairs\u2026"></textarea></div>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">What kind of problem?</span>' + chipRow('fcty-issue-types', ISSUE_TYPES) + '</div>' +
+            '<div class="fcty-field"><label class="fcty-label" for="fcty-issue-desc">Tell us more</label>' +
+            '<textarea id="fcty-issue-desc" class="fcty-input" rows="4" maxlength="950" ' +
+            'placeholder="e.g. The projector won\u2019t turn on\u2026"></textarea>' +
+            '<span class="fcty-count" id="fcty-issue-count">0 / 950</span></div>' +
             '<p class="fcty-hint">The admin will review your report. The room stays open for booking until they act.</p>' +
             '</div>',
             '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-issue-back">' + icon('arrow_back') + 'Back</button>' +
@@ -679,15 +1080,22 @@
         );
 
         closeOverlay(roomOverlay, true);
-        openOverlay(formOverlay, '#fcty-issue-desc');
+        openOverlay(formOverlay, '#fcty-issue-types .fcty-chip');
 
-        var msg = $('fcty-issue-msg'), submit = $('fcty-issue-submit');
+        var msg = $('fcty-issue-msg'), submit = $('fcty-issue-submit'), ta = $('fcty-issue-desc');
         var sendHTML = icon('send') + 'Send report';
 
         $('fcty-issue-back').addEventListener('click', backToRoom);
+        $('fcty-issue-types').addEventListener('click', function (e) {
+            var c = e.target.closest('.fcty-chip');
+            if (!c) return;
+            type = type === c.dataset.val ? '' : c.dataset.val;   /* tap again to clear */
+            setPressed($('fcty-issue-types'), function (x) { return x.dataset.val === type; });
+        });
+        ta.addEventListener('input', function () { $('fcty-issue-count').textContent = ta.value.length + ' / 950'; });
 
         submit.addEventListener('click', function () {
-            var desc = $('fcty-issue-desc').value.trim();
+            var desc = ta.value.trim();
             if (desc.length < 10) {
                 setAlert(msg, 'error', 'error', 'Please describe the issue in at least 10 characters.');
                 return;
@@ -699,7 +1107,11 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ room_id: room.room_id, description: desc, csrf_token: csrf() })
+                body: JSON.stringify({
+                    room_id: room.room_id,
+                    description: (type ? '[' + type + '] ' : '') + desc,
+                    csrf_token: csrf()
+                })
             })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
@@ -707,7 +1119,7 @@
                     submit.innerHTML = sendHTML;
                     if (d.error) { setAlert(msg, 'error', 'error', esc(d.error)); return; }
                     setAlert(msg, 'success', 'check_circle', 'Report sent. The admin will review it shortly.');
-                    $('fcty-issue-desc').disabled = true;
+                    ta.disabled = true;
                     submit.style.display = 'none';
                 })
                 .catch(function () {
@@ -722,14 +1134,14 @@
        INIT
     ══════════════════════════════════════════════════════════ */
     function init() {
-        campusView = $('fcty-campus-view');
-        if (!campusView) return;   /* not on the faculty dashboard */
+        buildingsView = $('fcty-buildings-view');
+        if (!buildingsView) return;   /* not on the faculty dashboard */
 
-        buildingView = $('fcty-building-view');
         roomsView = $('fcty-rooms-view');
-        buildingGrid = $('fcty-building-grid');
+        panelsEl = $('fcty-panels');
         floorTabs = $('fcty-floor-tabs');
         roomGrid = $('fcty-rooms-floors');
+        switcherEl = $('fcty-switcher');
         roomOverlay = $('fcty-room-modal');
         formOverlay = $('fcty-reservation-panel');
 
@@ -740,27 +1152,21 @@
         /* Public hook used by faculty-dashboard.js on first visit to the tab */
         window.PUPSyncFacilities = { start: start };
 
-        /* Campus → buildings */
-        campusView.addEventListener('click', function (e) {
-            var card = e.target.closest('[data-fcty-campus]');
-            if (!card) return;
-            e.preventDefault();
-            showBuildingView(card.dataset.fctyCampus);
-        });
-        $('fcty-load-retry').addEventListener('click', start);
-
-        /* Breadcrumbs */
-        $('fcty-breadcrumb-back').addEventListener('click', function (e) { e.preventDefault(); showCampusView(); });
-        $('fcty-rooms-back-facilities').addEventListener('click', function (e) { e.preventDefault(); showCampusView(); });
-        $('fcty-rooms-back-campus').addEventListener('click', function (e) {
-            e.preventDefault();
-            if (activeCampusKey) showBuildingView(activeCampusKey); else showCampusView();
-        });
-
         /* Buildings → rooms */
-        buildingGrid.addEventListener('click', function (e) {
-            var card = e.target.closest('.fcty-building-card');
-            if (card) showRoomsView(card.dataset.buildingId);
+        panelsEl.addEventListener('click', function (e) {
+            var p = e.target.closest('.fcty-panel[data-building-id]');
+            if (p) showRoomsView(p.dataset.buildingId);
+        });
+        $('fcty-load-retry').addEventListener('click', function () {
+            panelsEl.innerHTML = '<div class="fcty-panel is-skeleton"></div><div class="fcty-panel is-skeleton"></div><div class="fcty-panel is-skeleton"></div>';
+            start();
+        });
+
+        /* Breadcrumb + building switcher */
+        $('fcty-rooms-back-facilities').addEventListener('click', function (e) { e.preventDefault(); showBuildingsView(); });
+        switcherEl.addEventListener('click', function (e) {
+            var b = e.target.closest('.fcty-sw-btn');
+            if (b && b.dataset.buildingId !== activeBuildingId) showRoomsView(b.dataset.buildingId);
         });
 
         /* Floors */
@@ -774,6 +1180,10 @@
             var next = (activeFloorIdx + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
             renderFloor(next);
             tabs[next].focus();
+        });
+        $('fcty-only-free').addEventListener('change', function () {
+            onlyFree = this.checked;
+            renderFloor(activeFloorIdx);
         });
 
         /* Rooms → details */
@@ -812,7 +1222,7 @@
                 closeOverlay(formOverlay, true);
                 activeOverlay = null;
                 document.body.style.overflow = '';
-                showCampusView();
+                showBuildingsView();
             }).observe(panel, { attributes: true, attributeFilter: ['class'] });
         }
     }
