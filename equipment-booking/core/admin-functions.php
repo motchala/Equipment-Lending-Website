@@ -18,7 +18,10 @@ require_once __DIR__ . '/../../config/session.php';
 // Ensure server uses local timezone for displaying login timestamps
 date_default_timezone_set('Asia/Manila');
 if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
-    header("Location: ../../landing-page.php");
+    // Relative to admin-dashboard.php (same folder as landing-page.php). The old
+    // "../../landing-page.php" climbed out of the project folder and landed on
+    // whatever page sat above it (e.g. an old landing page in the web root).
+    header("Location: landing-page.php");
     exit();
 }
 

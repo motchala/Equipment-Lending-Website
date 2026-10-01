@@ -1453,17 +1453,9 @@
         const alertEl = document.getElementById('adm-form-alert');
         if (!submitBtn) return; // form not rendered (slot limit reached)
 
-        /* Password visibility toggles — same data-target pattern as faculty */
-        document.querySelectorAll('#sett-admins .fac-pw-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const input = document.getElementById(this.dataset.target);
-                if (!input) return;
-                const isText = input.type === 'text';
-                input.type = isText ? 'password' : 'text';
-                const icon = this.querySelector('.material-symbols-outlined');
-                if (icon) icon.textContent = isText ? 'visibility' : 'visibility_off';
-            });
-        });
+        /* Password eye buttons (#adm-password / #adm-confirm) are handled by the shared
+           ".fac-pw-toggle" handler near the top of this file — do not bind them again here,
+           two handlers on one button toggle twice and the field never changes. */
 
         function setAlert(msg, isError) {
             if (!alertEl) return;
@@ -1527,6 +1519,7 @@
                             const el = document.getElementById(id);
                             if (el) el.value = '';
                         });
+                        admResetPwEyes(document.getElementById('adm-form-card'));
                         const roleEl = document.getElementById('adm-role');
                         if (roleEl) roleEl.value = 'Admin';
 
@@ -1573,6 +1566,20 @@
         if (cls) n.className = cls;
         if (text !== undefined) n.textContent = text;
         return n;
+    }
+
+    /* Hide every password field inside `root` again and put the eye buttons back to
+       their initial icon (same markup open-change-pass uses), so a revealed password
+       never stays on screen the next time the form / dialog is shown. */
+    function admResetPwEyes(root) {
+        if (!root) return;
+        root.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
+            (btn.dataset.target || '').split(',').forEach(function (id) {
+                const inp = document.getElementById(id.trim());
+                if (inp) inp.type = 'password';
+            });
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:17px">visibility</span>';
+        });
     }
 
     function admIcon(name) {
@@ -1698,15 +1705,14 @@
             const el = document.getElementById(id);
             if (el) { el.textContent = ''; el.className = 'alert-banner hidden'; }
         }
-        function resetPasswordFields(ids) {
+        function resetPasswordFields(ids, modal) {
             ids.forEach(function (i) {
                 const f = document.getElementById(i);
                 if (!f) return;
                 f.value = '';
                 f.type = 'password';
             });
-            document.querySelectorAll('.adm-reauth .fac-pw-toggle .material-symbols-outlined, #admEditModal .fac-pw-toggle .material-symbols-outlined')
-                .forEach(function (ic) { ic.textContent = 'visibility'; });
+            admResetPwEyes(modal);
         }
 
         document.querySelectorAll('[data-adm-close]').forEach(function (b) {
@@ -1721,18 +1727,8 @@
             });
         });
 
-        /* Password show/hide (modals only — the Add form binds its own) */
-        document.querySelectorAll('#admEditModal .fac-pw-toggle, #admDeleteModal .fac-pw-toggle').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const ids = (btn.getAttribute('data-target') || '').split(',');
-                const first = document.getElementById(ids[0]);
-                if (!first) return;
-                const show = first.type === 'password';
-                ids.forEach(function (i) { const f = document.getElementById(i); if (f) f.type = show ? 'text' : 'password'; });
-                const ic = btn.querySelector('.material-symbols-outlined');
-                if (ic) ic.textContent = show ? 'visibility_off' : 'visibility';
-            });
-        });
+        /* Password show/hide in these dialogs is handled by the shared ".fac-pw-toggle"
+           handler (it supports comma-separated targets), so nothing to bind here. */
 
         /* ── one POST helper for every action ─────────────────── */
         function call(fields) {
@@ -1782,7 +1778,7 @@
             clearAlert('adm-edit-alert');
             document.getElementById('adm-edit-name').value = tr.getAttribute('data-name') || '';
             document.getElementById('adm-edit-email').value = tr.getAttribute('data-email') || '';
-            resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth']);
+            resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth'], editModal);
             openModal(editModal);
             currentRow = tr;
             document.getElementById('adm-edit-name').focus();
@@ -1923,7 +1919,7 @@
         function openDelete(tr) {
             clearAlert('adm-delete-alert');
             document.getElementById('adm-delete-name').textContent = tr.getAttribute('data-name') || 'this admin';
-            resetPasswordFields(['adm-delete-reauth']);
+            resetPasswordFields(['adm-delete-reauth'], deleteModal);
             openModal(deleteModal);
             currentRow = tr;
             document.getElementById('adm-delete-reauth').focus();
