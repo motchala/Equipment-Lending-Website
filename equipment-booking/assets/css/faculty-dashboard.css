@@ -5820,8 +5820,8 @@ body {
 
 /* ── 4. Notifications modal ───────────────────────────────────────────── */
 .fnotif-backdrop {
-    align-items: flex-start;
-    padding-top: 6vh;
+    align-items: center;
+    padding: 20px;
     overflow-y: auto;
 }
 
@@ -5836,8 +5836,8 @@ body {
     /* Fixed height — does NOT grow/shrink with how many notifications are
        showing. Only the viewport size changes it. The list inside scrolls
        (or paginates) to fit; short lists just leave empty space below. */
-    height: min(78vh, 680px);
-    min-height: 420px;
+    height: min(86vh, 740px);
+    min-height: 460px;
     overflow: hidden;
     animation: modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -5847,7 +5847,12 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 20px 22px 16px;
+    padding: 20px 22px 14px;
+}
+
+.fnotif-head-text {
+    flex: 1;
+    min-width: 0;
 }
 
 .fnotif-head-icon {
@@ -5871,10 +5876,10 @@ body {
     font-weight: 700;
     color: var(--color-on-surface);
     margin: 0;
-    flex: 1;
 }
 
 .fnotif-close {
+    margin-left: auto;
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -5897,19 +5902,9 @@ body {
     font-size: 19px;
 }
 
-.fnotif-subhead {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 0 22px 2px;
-}
-
 .fnotif-count-text {
-    margin: 0;
-    font-size: 0.85rem;
+    margin: 2px 0 0;
+    font-size: 0.8rem;
     color: var(--color-on-surface-variant);
 }
 
@@ -5918,37 +5913,27 @@ body {
     font-weight: 700;
 }
 
-.fnotif-markall-btn {
-    padding: 8px 16px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--color-outline-variant);
-    background: var(--color-surface-lowest);
-    color: var(--color-on-surface-variant);
-    font-family: var(--font-sans);
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition), border-color var(--transition);
-}
-
-.fnotif-markall-btn:hover {
-    background: var(--color-surface-container);
-    color: var(--color-on-surface);
-}
-
 .fnotif-tabs {
     flex-shrink: 0;
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 14px 22px 14px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px 22px 14px;
+}
+
+.fnotif-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .fnotif-tabs .notif-tab {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 9px 18px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 7px 14px;
     border-radius: var(--radius-full);
     border: 1px solid var(--color-outline-variant);
     background: var(--color-surface-lowest);
@@ -6005,6 +5990,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    margin-top: 0;
 }
 
 .fnotif-body .notif-section-label {
@@ -6051,9 +6037,16 @@ body {
     font-size: 0.86rem;
 }
 
-/* ── 4c. Notifications: expand, select, delete ────────────────────────── */
+/* ── 4c. Notifications: cards, footer, select mode ─────────────────────── */
+.fnotif-box [hidden] {
+    display: none !important;
+}
+
+/* Cards */
 .fnotif-body .notif-card {
     position: relative;
+    padding: 14px 16px;
+    gap: 12px;
     cursor: pointer;
     transition: box-shadow var(--transition), border-color var(--transition), background var(--transition);
 }
@@ -6063,16 +6056,61 @@ body {
     outline-offset: 2px;
 }
 
-/* Read cards recede slightly; unread keep the tinted surface + dot */
-.fnotif-body .notif-card:not(.unread) .notif-card-title {
+.fnotif-body .notif-card-icon {
+    width: 38px;
+    height: 38px;
+}
+
+.fnotif-body .notif-card-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.fnotif-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+}
+
+.fnotif-title-row .notif-card-title {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.notif-card:not(.unread) .notif-card-title {
     font-weight: 600;
 }
 
-.fnotif-meta-row {
-    display: flex;
-    align-items: center;
+.fnotif-body .unread-dot {
+    flex-shrink: 0;
+}
+
+/* Collapsed: two lines of preview. Expanded: the full text. */
+.fnotif-body .notif-card-sub {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.notif-card.is-expanded .notif-card-sub {
+    display: block;
+    overflow: visible;
+}
+
+.notif-card.is-expanded .fnotif-title-row .notif-card-title {
+    white-space: normal;
+}
+
+.fnotif-body .notif-card-meta {
     gap: 4px;
-    min-height: 26px;
+    min-width: 62px;
+    align-items: flex-end;
 }
 
 .fnotif-icon-btn {
@@ -6086,11 +6124,11 @@ body {
     place-items: center;
     cursor: pointer;
     padding: 0;
-    transition: background var(--transition), color var(--transition), transform var(--transition);
+    transition: background var(--transition), color var(--transition);
 }
 
 .fnotif-icon-btn .material-symbols-outlined {
-    font-size: 18px;
+    font-size: 20px;
 }
 
 .fnotif-icon-btn:hover {
@@ -6098,29 +6136,32 @@ body {
     color: var(--color-on-surface);
 }
 
-.fnotif-del:hover {
-    background: var(--color-error-container);
-    color: var(--color-error);
+.fnotif-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }
 
-/* Trash icon appears on hover/focus (always visible on touch) */
+/* Trash icon: revealed on hover / focus / when expanded (always visible on touch).
+   It keeps its space so nothing shifts when it appears. */
 .fnotif-del {
     opacity: 0;
-    width: 0;
-    overflow: hidden;
 }
 
 .notif-card:hover .fnotif-del,
 .notif-card:focus-within .fnotif-del,
 .notif-card.is-expanded .fnotif-del {
     opacity: 1;
-    width: 26px;
+}
+
+.fnotif-del:hover {
+    background: var(--color-error-container);
+    color: var(--color-error);
 }
 
 @media (hover: none) {
     .fnotif-del {
         opacity: 1;
-        width: 26px;
     }
 }
 
@@ -6132,12 +6173,14 @@ body {
     transform: rotate(180deg);
 }
 
-/* Expanded details */
+/* Expanded details: an inset panel */
 .fnotif-detail {
     display: none;
     margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed var(--color-outline-variant);
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
     cursor: default;
 }
 
@@ -6158,18 +6201,35 @@ body {
     }
 }
 
+.fnotif-detail.is-plain {
+    padding: 0;
+    background: none;
+    border: 0;
+}
+
+.fnotif-detail.is-plain .fnotif-actions {
+    margin-top: 10px;
+    padding-top: 0;
+    border-top: 0;
+}
+
 .fnotif-dl {
     margin: 0;
     display: grid;
-    gap: 6px;
+    gap: 8px;
 }
 
 .fnotif-dl-row {
     display: grid;
-    grid-template-columns: minmax(96px, 34%) 1fr;
+    grid-template-columns: minmax(96px, 32%) 1fr;
     gap: 10px;
     font-size: 0.78rem;
     line-height: 1.45;
+}
+
+.fnotif-dl-row+.fnotif-dl-row {
+    padding-top: 8px;
+    border-top: 1px solid var(--color-surface-high);
 }
 
 .fnotif-dl-row dt {
@@ -6193,127 +6253,103 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-surface-high);
 }
 
 .fnotif-act-btn {
+    /* colours, radius and weight come from .btn-save-acc / .btn-cancel-acc */
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px 13px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--color-outline-variant);
-    background: var(--color-surface-lowest);
-    color: var(--color-on-surface-variant);
-    font-family: var(--font-sans);
-    font-size: 0.76rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition), border-color var(--transition);
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 0.78rem;
 }
 
 .fnotif-act-btn .material-symbols-outlined {
     font-size: 16px;
 }
 
-.fnotif-act-btn:hover {
-    background: var(--color-surface-container);
-    color: var(--color-on-surface);
-}
-
-.fnotif-act-primary {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #ffffff;
-}
-
-.fnotif-act-primary:hover {
-    background: var(--color-primary);
-    color: #ffffff;
-    filter: brightness(1.12);
-}
-
-.fnotif-act-danger:hover {
-    background: var(--color-error-container);
-    border-color: var(--color-error);
+.fnotif-act-btn.fnotif-act-danger {
     color: var(--color-error);
 }
 
-/* Toolbar: Select / Delete all  ⇄  bulk actions */
-.fnotif-toolbar {
-    flex-shrink: 0;
-    padding: 0 22px 12px;
+.fnotif-act-btn.fnotif-act-danger:hover {
+    background: var(--color-error-container);
+    border-color: var(--color-error);
 }
 
-.fnotif-toolbar-normal,
-.fnotif-toolbar-select {
+/* Footer: Mark all as read · Select · Delete all */
+.fnotif-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 22px;
+    border-top: 1px solid var(--color-outline-variant);
+    background: var(--color-surface-lowest);
+}
+
+.fnotif-footer-main {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
-.fnotif-toolbar-normal[hidden],
-.fnotif-toolbar-select[hidden],
-.fnotif-confirm[hidden] {
-    display: none;
+.fnotif-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
 }
 
-.fnotif-toolbar-normal {
-    justify-content: flex-end;
-}
-
-.fnotif-tool-btn {
+.fnotif-foot-btn {
+    /* colours, radius and weight come from .btn-save-acc / .btn-cancel-acc */
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    padding: 7px 13px;
-    border-radius: var(--radius-full);
-    border: 1px solid var(--color-outline-variant);
-    background: var(--color-surface-lowest);
-    color: var(--color-on-surface-variant);
-    font-family: var(--font-sans);
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition), border-color var(--transition);
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    white-space: nowrap;
 }
 
-.fnotif-tool-btn .material-symbols-outlined {
-    font-size: 17px;
+.fnotif-foot-btn .material-symbols-outlined {
+    font-size: 18px;
 }
 
-.fnotif-tool-btn:hover:not(:disabled) {
-    background: var(--color-surface-container);
-    color: var(--color-on-surface);
-}
-
-.fnotif-tool-btn:disabled,
-.fnotif-markall-btn:disabled {
+.fnotif-foot-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+    pointer-events: none;
 }
 
-.fnotif-tool-danger {
+.fnotif-foot-btn.fnotif-foot-danger {
     color: var(--color-error);
 }
 
-.fnotif-tool-danger:hover:not(:disabled) {
+.fnotif-foot-btn.fnotif-foot-danger:hover:not(:disabled) {
     background: var(--color-error-container);
     border-color: var(--color-error);
-    color: var(--color-error);
 }
 
-.fnotif-tool-solid-danger {
+.fnotif-foot-btn.fnotif-foot-solid-danger {
     background: var(--color-error);
-    border-color: var(--color-error);
     color: #ffffff;
 }
 
-.fnotif-tool-solid-danger:hover:not(:disabled) {
-    background: var(--color-error);
-    color: #ffffff;
-    filter: brightness(1.1);
+/* Selection bar — only while selecting */
+.fnotif-selbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-container);
 }
 
 .fnotif-selall {
@@ -6345,16 +6381,24 @@ body {
     gap: 6px;
 }
 
+.fnotif-selbar .fnotif-foot-btn {
+    padding: 6px 12px;
+    font-size: 0.76rem;
+}
+
+/* Close button: the system-wide .modal-close-btn, just kept from shrinking */
+.fnotif-head .modal-close-btn {
+    flex-shrink: 0;
+}
+
 /* Inline delete confirmation */
 .fnotif-confirm {
-    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
-    margin: 0 22px 12px;
     padding: 10px 14px;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
     background: var(--color-error-container);
     border: 1px solid var(--color-error);
     color: var(--color-on-surface);
@@ -6372,12 +6416,12 @@ body {
     font-weight: 600;
 }
 
-/* Selection mode: checkbox replaces nothing — it slides in on the left */
+/* Select mode: a checkbox slides in on the left of each card */
 .fnotif-check {
     display: none;
     width: 20px;
     height: 20px;
-    margin-top: 10px;
+    margin-top: 9px;
     border-radius: 6px;
     border: 2px solid var(--color-outline);
     background: var(--color-surface-lowest);
@@ -6417,24 +6461,74 @@ body {
 }
 
 @media (max-width: 600px) {
-    .fnotif-toolbar {
-        padding-left: 16px;
-        padding-right: 16px;
+
+    /* Phones: keep the footer to two short rows so the list keeps its room */
+    .fnotif-footer {
+        padding: 10px 16px;
+        gap: 8px;
     }
 
-    .fnotif-confirm {
-        margin-left: 16px;
-        margin-right: 16px;
+    .fnotif-footer-main {
+        flex-wrap: nowrap;
+        gap: 5px;
+    }
+
+    .fnotif-footer-main .fnotif-foot-btn {
+        padding: 8px 9px;
+        gap: 5px;
+        font-size: 0.76rem;
+    }
+
+    .fnotif-footer-main .fnotif-foot-btn .material-symbols-outlined {
+        font-size: 17px;
+    }
+
+    .fnotif-footer-right {
+        flex-wrap: nowrap;
+        gap: 5px;
+    }
+
+    .fnotif-selbar {
+        gap: 6px 12px;
+        padding: 8px 10px;
+    }
+
+    .fnotif-sel-count {
+        margin-right: 0;
+    }
+
+    .fnotif-sel-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+    }
+
+    .fnotif-sel-actions .fnotif-foot-btn {
+        flex: 1;
+        padding: 6px 8px;
+    }
+
+    .fnotif-sel-word {
+        display: none;
     }
 
     .fnotif-dl-row {
         grid-template-columns: 1fr;
         gap: 0;
     }
+}
 
-    .fnotif-sel-count {
-        margin-right: 0;
-        width: 100%;
+/* Small phones (<=400px): drop the glyphs on the two long footer labels so the row fits */
+@media (max-width: 400px) {
+
+    .fnotif-footer-main [data-action="mark-all-read"] .material-symbols-outlined,
+    #notifDeleteAllBtn .material-symbols-outlined {
+        display: none;
+    }
+}
+
+@media (max-width: 340px) {
+    .fnotif-footer-main {
+        flex-wrap: wrap;
     }
 }
 
@@ -6459,7 +6553,6 @@ body {
     }
 
     .fnotif-head,
-    .fnotif-subhead,
     .fnotif-tabs,
     .fnotif-body {
         padding-left: 16px;
@@ -6564,13 +6657,12 @@ body {
 
 @media (max-width: 600px) {
     .fnotif-pagination {
-        padding: 10px 16px;
-        justify-content: center;
+        padding: 8px 16px;
+        justify-content: space-between;
     }
 
     .fnotif-pg-info {
-        width: 100%;
-        text-align: center;
+        text-align: left;
     }
 
     .fnotif-pg-controls {

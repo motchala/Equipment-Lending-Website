@@ -522,14 +522,14 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <!-- Font Awesome (kept for existing icon references in JS) -->
     <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
 
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard.css'); ?>">
 
     <!-- NOTE: faculty-code-card.css intentionally not loaded — it was a stale
          snapshot of this same stylesheet (predating several redesigns) that
          was silently overriding current styles because it loaded last. -->
 
     <!-- Responsive System -->
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
 
     <!-- Dashboard Redesign v3 — Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
@@ -3640,25 +3640,26 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="fnotif-head-icon">
                     <span class="material-symbols-outlined">notifications</span>
                 </div>
-                <h3 class="fnotif-head-title" id="notifModalTitle">Notifications</h3>
-                <button class="fnotif-close" data-action="close-notif-modal" aria-label="Close">
+                <div class="fnotif-head-text">
+                    <h3 class="fnotif-head-title" id="notifModalTitle">Notifications</h3>
+                    <p class="fnotif-count-text">
+                        You have <strong id="unreadCount"><?php echo (int)$notif_count; ?> unread</strong>
+                        notification<span id="unreadPlural"><?php echo $notif_count !== 1 ? 's' : ''; ?></span>.
+                    </p>
+                </div>
+                <button class="modal-close-btn" data-action="close-notif-modal" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
 
-            <!-- Unread count + mark all read -->
-            <div class="fnotif-subhead">
-                <p class="fnotif-count-text">
-                    You have <strong id="unreadCount"><?php echo (int)$notif_count; ?> unread</strong>
-                    notification<span id="unreadPlural"><?php echo $notif_count !== 1 ? 's' : ''; ?></span>.
-                </p>
-                <button class="fnotif-markall-btn" data-action="mark-all-read">Mark all as read</button>
-            </div>
-
             <!-- Filter pills (counts are filled in live by faculty-dashboard.js) -->
             <div class="fnotif-tabs">
-                <button class="notif-tab active" data-notif-filter="all">All</button>
-                <button class="notif-tab" data-notif-filter="unread">Unread</button>
+                <button class="notif-tab active" data-notif-filter="all">
+                    All <span class="fnotif-pill-count" data-pill="all" hidden>0</span>
+                </button>
+                <button class="notif-tab" data-notif-filter="unread">
+                    Unread <span class="fnotif-pill-count" data-pill="unread" hidden>0</span>
+                </button>
                 <button class="notif-tab" data-notif-filter="overdue">
                     Overdue <span class="fnotif-pill-count" data-pill="overdue" hidden>0</span>
                 </button>
@@ -3671,45 +3672,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <button class="notif-tab" data-notif-filter="system">
                     System <span class="fnotif-pill-count" data-pill="system" hidden>0</span>
                 </button>
-            </div>
-
-            <!-- Toolbar: Select / Delete all  ⇄  bulk actions while selecting -->
-            <div class="fnotif-toolbar" id="notifToolbar">
-                <div class="fnotif-toolbar-normal" id="notifToolbarNormal">
-                    <button type="button" class="fnotif-tool-btn" id="notifSelectBtn" data-nbar="select">
-                        <span class="material-symbols-outlined">checklist</span> Select
-                    </button>
-                    <button type="button" class="fnotif-tool-btn fnotif-tool-danger" id="notifDeleteAllBtn" data-nbar="delete-all">
-                        <span class="material-symbols-outlined">delete_sweep</span> Delete all
-                    </button>
-                </div>
-                <div class="fnotif-toolbar-select" id="notifToolbarSelect" hidden>
-                    <label class="fnotif-selall">
-                        <input type="checkbox" id="notifSelectAll">
-                        <span>Select all</span>
-                    </label>
-                    <span class="fnotif-sel-count" id="notifSelCount" aria-live="polite">0 selected</span>
-                    <div class="fnotif-sel-actions">
-                        <button type="button" class="fnotif-tool-btn" data-nbar="mark-read" data-needs-sel>
-                            <span class="material-symbols-outlined">drafts</span> Read
-                        </button>
-                        <button type="button" class="fnotif-tool-btn" data-nbar="mark-unread" data-needs-sel>
-                            <span class="material-symbols-outlined">mark_email_unread</span> Unread
-                        </button>
-                        <button type="button" class="fnotif-tool-btn fnotif-tool-danger" data-nbar="delete-selected" data-needs-sel>
-                            <span class="material-symbols-outlined">delete</span> Delete
-                        </button>
-                        <button type="button" class="fnotif-tool-btn" data-nbar="done">Done</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Inline confirmation for bulk deletes -->
-            <div class="fnotif-confirm" id="notifConfirm" role="alertdialog" aria-live="assertive" hidden>
-                <span class="material-symbols-outlined">warning</span>
-                <span class="fnotif-confirm-text" id="notifConfirmText"></span>
-                <button type="button" class="fnotif-tool-btn" data-nbar="confirm-cancel">Cancel</button>
-                <button type="button" class="fnotif-tool-btn fnotif-tool-solid-danger" data-nbar="confirm-ok">Delete</button>
             </div>
 
             <!-- Scrollable list — cards are rendered by faculty-dashboard.js -->
@@ -3738,6 +3700,51 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     </button>
                 </div>
             </div>
+            <!-- Footer — Mark all as read · Select · Delete all (Delete all only shows in select mode) -->
+            <div class="fnotif-footer" id="notifFooter">
+
+                <!-- Inline confirmation for bulk deletes -->
+                <div class="fnotif-confirm" id="notifConfirm" role="alertdialog" aria-live="assertive" hidden>
+                    <span class="material-symbols-outlined">warning</span>
+                    <span class="fnotif-confirm-text" id="notifConfirmText"></span>
+                    <button type="button" class="btn-cancel-acc fnotif-foot-btn" data-nbar="confirm-cancel">Cancel</button>
+                    <button type="button" class="btn-save-acc fnotif-foot-btn fnotif-foot-solid-danger" data-nbar="confirm-ok">Delete</button>
+                </div>
+
+                <!-- Selection bar — only while selecting -->
+                <div class="fnotif-selbar" id="notifSelBar" hidden>
+                    <label class="fnotif-selall">
+                        <input type="checkbox" id="notifSelectAll">
+                        <span>Select all</span>
+                    </label>
+                    <span class="fnotif-sel-count" id="notifSelCount" aria-live="polite">0 selected</span>
+                    <div class="fnotif-sel-actions">
+                        <button type="button" class="btn-cancel-acc fnotif-foot-btn" data-nbar="mark-read" data-needs-sel>
+                            <span class="material-symbols-outlined">drafts</span> Read
+                        </button>
+                        <button type="button" class="btn-cancel-acc fnotif-foot-btn" data-nbar="mark-unread" data-needs-sel>
+                            <span class="material-symbols-outlined">mark_email_unread</span> Unread
+                        </button>
+                        <button type="button" class="btn-cancel-acc fnotif-foot-btn fnotif-foot-danger" data-nbar="delete-selected" data-needs-sel>
+                            <span class="material-symbols-outlined">delete</span> Delete<span class="fnotif-sel-word"> selected</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="fnotif-footer-main">
+                    <button type="button" class="btn-cancel-acc fnotif-foot-btn" data-action="mark-all-read">
+                        <span class="material-symbols-outlined">done_all</span> Mark all as read
+                    </button>
+                    <div class="fnotif-footer-right">
+                        <button type="button" class="btn-cancel-acc fnotif-foot-btn fnotif-foot-danger" id="notifDeleteAllBtn" data-nbar="delete-all" hidden>
+                            <span class="material-symbols-outlined">delete_sweep</span> Delete all
+                        </button>
+                        <button type="button" class="btn-save-acc fnotif-foot-btn" id="notifSelectBtn" data-nbar="select" aria-pressed="false">
+                            <span class="material-symbols-outlined">checklist</span> <span id="notifSelectLbl">Select</span>
+                        </button>
+                    </div>
+                </div>
+            </div><!-- /fnotif-footer -->
         </div><!-- /fnotif-box -->
     </div><!-- /notifModal -->
 
@@ -4358,7 +4365,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <div class="nav-backdrop" id="navBackdrop"></div>
 
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
-    <script src="equipment-booking/assets/js/faculty-dashboard.js"></script>
+    <script src="equipment-booking/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
 </body>
 

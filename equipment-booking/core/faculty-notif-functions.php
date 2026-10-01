@@ -1,4 +1,5 @@
 <?php
+
 /**
  * faculty-notif-functions.php
  *
@@ -21,6 +22,7 @@
  *   tbl_room_issues         → issue received / resolved / dismissed
  *   tbl_users               → recent password change
  *   tbl_login_attempts      → failed sign-in attempts on the account
+ *   fnotif_static_notices() → fixed System notices every faculty account gets
  *
  * Every source is optional: if a table/column hasn't been migrated yet, or a
  * query fails, that one source is skipped (and logged) instead of taking the
@@ -169,7 +171,8 @@ if (!function_exists('fnotif_set_state_many')) {
         try {
             foreach ($keys as $key) {
                 if ($isRead !== null && $isDeleted !== null) {
-                    $r = (int)$isRead; $d = (int)$isDeleted;
+                    $r = (int)$isRead;
+                    $d = (int)$isDeleted;
                     $stmt->bind_param('ssii', $facultyId, $key, $r, $d);
                 } elseif ($isRead !== null) {
                     $r = (int)$isRead;
@@ -238,6 +241,43 @@ if (!function_exists('fnotif_rule_label')) {
     }
 }
 
+if (!function_exists('fnotif_static_notices')) {
+    /**
+     * Static System notices — the same for every faculty account.
+     *
+     * Nothing is stored or "sent": they're part of the feed that's computed for
+     * whoever is logged in, so a faculty member created yesterday and one who's
+     * been here for years both get them. Only their read/deleted state is saved
+     * per faculty (tbl_faculty_notif_state, key "sysnotice-<id>").
+     *
+     * To edit the wording: change it here (read/deleted state is kept).
+     * To push a NEW notice to everyone: add another entry with the next id.
+     * Keep 'body' short — it has to fit one small notification card.
+     * Plain text only (it's escaped when rendered).
+     */
+    function fnotif_static_notices(): array
+    {
+        return [
+            [
+                'id'         => 1,
+                'title'      => 'Welcome to PUPSync',
+                'body'       => 'Request updates, due-date reminders, room bookings and admin notices will show up here.',
+                'icon'       => 'waving_hand',
+                'icon_class' => 'ni-success',
+                'published'  => '2026-10-01 08:00:00',
+            ],
+            [
+                'id'         => 2,
+                'title'      => 'About the Faculty Portal',
+                'body'       => 'Borrow equipment, reserve rooms, and track your requests and returns in one place.',
+                'icon'       => 'info',
+                'icon_class' => 'ni-alert',
+                'published'  => '2026-10-01 08:00:00',
+            ],
+        ];
+    }
+}
+
 if (!function_exists('fnotif_build_list')) {
     /**
      * Builds the full live feed for one faculty member, merged with their
@@ -278,9 +318,9 @@ if (!function_exists('fnotif_build_list')) {
             $n['detail']     = array_values(array_filter($n['detail'] ?? []));
             $n['link']       = $n['link'] ?? null;
             $n['group']      = $n['urgent'] ? 'overdue'
-                             : ($ts >= $todayTs ? 'today'
-                             : ($ts >= $todayTs - 86400 ? 'yesterday'
-                             : ($ts >= $todayTs - 6 * 86400 ? 'week' : 'earlier')));
+                : ($ts >= $todayTs ? 'today'
+                    : ($ts >= $todayTs - 86400 ? 'yesterday'
+                        : ($ts >= $todayTs - 6 * 86400 ? 'week' : 'earlier')));
             $st = $state[$n['key']] ?? null;
             $n['is_read']    = $st['is_read']    ?? false;
             $n['is_deleted'] = $st['is_deleted'] ?? false;
@@ -314,7 +354,7 @@ if (!function_exists('fnotif_build_list')) {
                 $equip   = (string)$r['equipment_name'];
                 $reqTs   = strtotime($r['request_date']) ?: $now;
                 $decidedTs = (!empty($r['log_at']) && in_array($r['log_decision'] ?? '', ['Approved', 'Declined'], true))
-                           ? (strtotime($r['log_at']) ?: $reqTs) : $reqTs;
+                    ? (strtotime($r['log_at']) ?: $reqTs) : $reqTs;
                 $borrowStr = date('M j, Y', strtotime($r['borrow_date']));
                 $returnStr = date('M j, Y', strtotime($r['return_date']));
                 $override  = !empty($r['log_override_by']);
@@ -330,7 +370,10 @@ if (!function_exists('fnotif_build_list')) {
                 switch ($status) {
                     case 'Waiting':
                         $add([
-                            'key' => 'reqpending-' . $id, 'cat' => 'borrow', 'icon' => 'hourglass_top', 'icon_class' => 'ni-alert',
+                            'key' => 'reqpending-' . $id,
+                            'cat' => 'borrow',
+                            'icon' => 'hourglass_top',
+                            'icon_class' => 'ni-alert',
                             'title' => 'Request Submitted: ' . $equip,
                             'body'  => 'Your request for <strong>' . $e($equip) . '</strong> is awaiting admin approval.',
                             'ts'    => $reqTs,
@@ -344,11 +387,14 @@ if (!function_exists('fnotif_build_list')) {
 
                     case 'Approved':
                         $add([
-                            'key' => 'reqapproved-' . $id, 'cat' => 'borrow', 'icon' => 'check_circle', 'icon_class' => 'ni-success',
+                            'key' => 'reqapproved-' . $id,
+                            'cat' => 'borrow',
+                            'icon' => 'check_circle',
+                            'icon_class' => 'ni-success',
                             'title' => 'Borrow Request Approved: ' . $equip,
                             'body'  => 'Your request for <strong>' . $e($equip) . '</strong> was approved. Borrow on <strong>'
-                                        . $e(date('M j', strtotime($r['borrow_date']))) . '</strong>, return by <strong>'
-                                        . $e(date('M j', strtotime($r['return_date']))) . '</strong>.',
+                                . $e(date('M j', strtotime($r['borrow_date']))) . '</strong>, return by <strong>'
+                                . $e(date('M j', strtotime($r['return_date']))) . '</strong>.',
                             'ts'    => $decidedTs,
                             'detail' => array_merge([$d('Status', 'Approved')], $common, [
                                 $submittedBy,
@@ -365,10 +411,13 @@ if (!function_exists('fnotif_build_list')) {
                         if ($daysLeft >= 0 && $daysLeft <= 2) {
                             $when = $daysLeft === 0 ? 'today' : ($daysLeft === 1 ? 'tomorrow' : 'in 2 days');
                             $add([
-                                'key' => 'duesoon-' . $id, 'cat' => 'borrow', 'icon' => 'alarm', 'icon_class' => 'ni-warn',
+                                'key' => 'duesoon-' . $id,
+                                'cat' => 'borrow',
+                                'icon' => 'alarm',
+                                'icon_class' => 'ni-warn',
                                 'title' => 'Return Reminder: ' . $equip,
                                 'body'  => '<strong>' . $e($equip) . '</strong> is due <strong>' . $when . '</strong> (' . $e(date('M j', strtotime($r['return_date'])))
-                                            . '). Please return it on time to avoid penalties.',
+                                    . '). Please return it on time to avoid penalties.',
                                 'ts'    => $todayTs,
                                 'time_label' => $daysLeft === 0 ? 'Due today' : ($daysLeft === 1 ? 'Due tomorrow' : 'Due ' . date('M j', strtotime($r['return_date']))),
                                 'detail' => [
@@ -386,10 +435,13 @@ if (!function_exists('fnotif_build_list')) {
                         if ($decidedTs < $windowTs) break;
                         $reason = trim((string)($r['reason'] ?? '')) !== '' ? trim($r['reason']) : trim((string)($r['log_reason'] ?? ''));
                         $add([
-                            'key' => 'reqdeclined-' . $id, 'cat' => 'borrow', 'icon' => 'cancel', 'icon_class' => 'ni-overdue',
+                            'key' => 'reqdeclined-' . $id,
+                            'cat' => 'borrow',
+                            'icon' => 'cancel',
+                            'icon_class' => 'ni-overdue',
                             'title' => 'Borrow Request Declined: ' . $equip,
                             'body'  => 'Your request for <strong>' . $e($equip) . '</strong> was declined.'
-                                        . ($reason !== '' ? ' Reason: ' . $e(fnotif_clip($reason, 120)) : ''),
+                                . ($reason !== '' ? ' Reason: ' . $e(fnotif_clip($reason, 120)) : ''),
                             'ts'    => $decidedTs,
                             'detail' => array_merge([$d('Status', 'Declined')], $common, [
                                 $d('Reason', $reason, true),
@@ -407,7 +459,10 @@ if (!function_exists('fnotif_build_list')) {
                         $daysLate = max(0, (int)floor(($now - $dueTs) / 86400));
                         $lateStr  = $daysLate . ' day' . ($daysLate !== 1 ? 's' : '');
                         $add([
-                            'key' => 'overdue-' . $id, 'cat' => 'overdue', 'icon' => 'schedule', 'icon_class' => 'ni-overdue',
+                            'key' => 'overdue-' . $id,
+                            'cat' => 'overdue',
+                            'icon' => 'schedule',
+                            'icon_class' => 'ni-overdue',
                             'urgent' => true,
                             'title' => 'Overdue: ' . $equip,
                             'body'  => 'You have not returned <strong>' . $e($equip) . '</strong>. ' . $lateStr . ' overdue.',
@@ -427,11 +482,14 @@ if (!function_exists('fnotif_build_list')) {
 
                     case 'Returned':
                         $retTs = !empty($r['returned_at']) ? strtotime($r['returned_at'])
-                               : (!empty($r['log_at']) ? strtotime($r['log_at']) : strtotime($r['return_date']));
+                            : (!empty($r['log_at']) ? strtotime($r['log_at']) : strtotime($r['return_date']));
                         if ($retTs < $windowTs) break;
                         $onTime = $retTs <= strtotime($r['return_date'] . ' 23:59:59');
                         $add([
-                            'key' => 'returned-' . $id, 'cat' => 'borrow', 'icon' => 'task_alt', 'icon_class' => 'ni-success',
+                            'key' => 'returned-' . $id,
+                            'cat' => 'borrow',
+                            'icon' => 'task_alt',
+                            'icon_class' => 'ni-success',
                             'title' => 'Return Confirmed: ' . $equip,
                             'body'  => '<strong>' . $e($equip) . '</strong> was returned on ' . $e(date('M j, g:i A', $retTs)) . '. Thank you!',
                             'ts'    => $retTs,
@@ -454,9 +512,11 @@ if (!function_exists('fnotif_build_list')) {
 
         /* ── 2. Room reservations ─────────────────────────────────────── */
         try {
-            if (fnotif_table_exists($conn, 'tbl_room_reservations')
+            if (
+                fnotif_table_exists($conn, 'tbl_room_reservations')
                 && fnotif_table_exists($conn, 'tbl_rooms')
-                && fnotif_table_exists($conn, 'tbl_buildings')) {
+                && fnotif_table_exists($conn, 'tbl_buildings')
+            ) {
 
                 $hasCancelled = fnotif_col_exists($conn, 'tbl_room_reservations', 'cancelled_at');
                 $hasRoomLog   = fnotif_table_exists($conn, 'tbl_room_arbitration_log');
@@ -465,14 +525,14 @@ if (!function_exists('fnotif_build_list')) {
                                rr.status, rr.reason, rr.request_date, rr.submitted_as, rr.submitted_by_name,
                                r.room_name, b.name AS building_name,
                                COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label"
-                     . ($hasCancelled ? ", rr.cancelled_at" : ", NULL AS cancelled_at")
-                     . ($hasRoomLog   ? ", rl.rule_applied AS log_rule" : ", NULL AS log_rule")
-                     . " FROM tbl_room_reservations rr
+                    . ($hasCancelled ? ", rr.cancelled_at" : ", NULL AS cancelled_at")
+                    . ($hasRoomLog   ? ", rl.rule_applied AS log_rule" : ", NULL AS log_rule")
+                    . " FROM tbl_room_reservations rr
                          JOIN tbl_rooms     r ON r.room_id     = rr.room_id
                          JOIN tbl_buildings b ON b.building_id = r.building_id"
-                     . ($hasRoomLog ? " LEFT JOIN tbl_room_arbitration_log rl
+                    . ($hasRoomLog ? " LEFT JOIN tbl_room_arbitration_log rl
                                  ON rl.id = (SELECT MAX(x.id) FROM tbl_room_arbitration_log x WHERE x.reservation_id = rr.id)" : "")
-                     . " WHERE rr.faculty_id = ?
+                    . " WHERE rr.faculty_id = ?
                         ORDER BY rr.request_date DESC LIMIT 200";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param('s', $facultyId);
@@ -501,7 +561,10 @@ if (!function_exists('fnotif_build_list')) {
                         $upcoming = $endTs >= $now;
                         if ($upcoming || $reqTs >= $windowTs) {
                             $add([
-                                'key' => 'roomapproved-' . $id, 'cat' => 'room', 'icon' => 'meeting_room', 'icon_class' => 'ni-success',
+                                'key' => 'roomapproved-' . $id,
+                                'cat' => 'room',
+                                'icon' => 'meeting_room',
+                                'icon_class' => 'ni-success',
                                 'title' => 'Room Reserved: ' . $room,
                                 'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on <strong>' . $e($slot) . '</strong> is confirmed.',
                                 'ts'    => $reqTs,
@@ -519,10 +582,13 @@ if (!function_exists('fnotif_build_list')) {
                         if (($dayDiff === 0 && $endTs >= $now) || $dayDiff === 1) {
                             $isToday = $dayDiff === 0;
                             $add([
-                                'key' => 'roomsoon-' . $id, 'cat' => 'room', 'icon' => 'event_upcoming', 'icon_class' => 'ni-warn',
+                                'key' => 'roomsoon-' . $id,
+                                'cat' => 'room',
+                                'icon' => 'event_upcoming',
+                                'icon_class' => 'ni-warn',
                                 'title' => 'Reservation ' . ($isToday ? 'Today' : 'Tomorrow') . ': ' . $room,
                                 'body'  => 'You have <strong>' . $e($room) . '</strong> reserved <strong>' . ($isToday ? 'today' : 'tomorrow')
-                                            . '</strong> from ' . $e($timeStr) . '.',
+                                    . '</strong> from ' . $e($timeStr) . '.',
                                 'ts'    => $todayTs,
                                 'time_label' => $isToday ? 'Today' : 'Tomorrow',
                                 'detail' => $common,
@@ -533,10 +599,13 @@ if (!function_exists('fnotif_build_list')) {
                         if ($reqTs < $windowTs) continue;
                         $reason = trim((string)($r['reason'] ?? ''));
                         $add([
-                            'key' => 'roomdeclined-' . $id, 'cat' => 'room', 'icon' => 'event_busy', 'icon_class' => 'ni-overdue',
+                            'key' => 'roomdeclined-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'event_busy',
+                            'icon_class' => 'ni-overdue',
                             'title' => 'Reservation Declined: ' . $room,
                             'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on ' . $e($slot) . ' was declined.'
-                                        . ($reason !== '' ? ' Reason: ' . $e(fnotif_clip($reason, 120)) : ''),
+                                . ($reason !== '' ? ' Reason: ' . $e(fnotif_clip($reason, 120)) : ''),
                             'ts'    => $reqTs,
                             'detail' => array_merge([$d('Status', 'Declined')], $common, [
                                 $d('Reason', $reason, true),
@@ -549,7 +618,10 @@ if (!function_exists('fnotif_build_list')) {
                         $cTs = !empty($r['cancelled_at']) ? (strtotime($r['cancelled_at']) ?: $reqTs) : $reqTs;
                         if ($cTs < $windowTs) continue;
                         $add([
-                            'key' => 'roomcancelled-' . $id, 'cat' => 'room', 'icon' => 'event_busy', 'icon_class' => 'ni-alert',
+                            'key' => 'roomcancelled-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'event_busy',
+                            'icon_class' => 'ni-alert',
                             'title' => 'Reservation Cancelled: ' . $room,
                             'body'  => 'Your reservation for <strong>' . $e($room) . '</strong> on ' . $e($slot) . ' was cancelled.',
                             'ts'    => $cTs,
@@ -569,10 +641,12 @@ if (!function_exists('fnotif_build_list')) {
 
         /* ── 3. Room waitlist ─────────────────────────────────────────── */
         try {
-            if (fnotif_table_exists($conn, 'tbl_room_waitlist')
+            if (
+                fnotif_table_exists($conn, 'tbl_room_waitlist')
                 && fnotif_table_exists($conn, 'tbl_room_reservations')
                 && fnotif_table_exists($conn, 'tbl_rooms')
-                && fnotif_table_exists($conn, 'tbl_buildings')) {
+                && fnotif_table_exists($conn, 'tbl_buildings')
+            ) {
 
                 $nowTime = date('H:i:s', $now);
                 $stmt = $conn->prepare(
@@ -608,7 +682,10 @@ if (!function_exists('fnotif_build_list')) {
                     ];
                     if ((int)$r['taken'] === 0) {
                         $add([
-                            'key' => 'waitavail-' . $id, 'cat' => 'room', 'icon' => 'event_available', 'icon_class' => 'ni-success',
+                            'key' => 'waitavail-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'event_available',
+                            'icon_class' => 'ni-success',
                             'title' => 'Slot Now Available: ' . $room,
                             'body'  => 'The <strong>' . $e($slot) . '</strong> slot you waitlisted for <strong>' . $e($room) . '</strong> is open. Book it before someone else does.',
                             'ts'    => $todayTs,
@@ -618,7 +695,10 @@ if (!function_exists('fnotif_build_list')) {
                         ]);
                     } else {
                         $add([
-                            'key' => 'waitlist-' . $id, 'cat' => 'room', 'icon' => 'hourglass_top', 'icon_class' => 'ni-alert',
+                            'key' => 'waitlist-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'hourglass_top',
+                            'icon_class' => 'ni-alert',
                             'title' => 'On Waitlist: ' . $room,
                             'body'  => 'You\'re on the waitlist for <strong>' . $e($room) . '</strong> on ' . $e($slot) . '. You\'ll be emailed if the slot opens up.',
                             'ts'    => $joinTs,
@@ -635,9 +715,11 @@ if (!function_exists('fnotif_build_list')) {
 
         /* ── 4. Room issues this faculty member reported ──────────────── */
         try {
-            if (fnotif_table_exists($conn, 'tbl_room_issues')
+            if (
+                fnotif_table_exists($conn, 'tbl_room_issues')
                 && fnotif_table_exists($conn, 'tbl_rooms')
-                && fnotif_table_exists($conn, 'tbl_buildings')) {
+                && fnotif_table_exists($conn, 'tbl_buildings')
+            ) {
 
                 $stmt = $conn->prepare(
                     "SELECT ri.id, ri.description, ri.status, ri.admin_notes, ri.created_at, ri.resolved_at,
@@ -666,7 +748,10 @@ if (!function_exists('fnotif_build_list')) {
                     ];
                     if ($status === 'Open') {
                         $add([
-                            'key' => 'issueopen-' . $id, 'cat' => 'room', 'icon' => 'report_problem', 'icon_class' => 'ni-alert',
+                            'key' => 'issueopen-' . $id,
+                            'cat' => 'room',
+                            'icon' => 'report_problem',
+                            'icon_class' => 'ni-alert',
                             'title' => 'Issue Report Received: ' . $room,
                             'body'  => 'Your report is with the admin team — “' . $e($snip) . '”',
                             'ts'    => $crTs,
@@ -679,11 +764,13 @@ if (!function_exists('fnotif_build_list')) {
                         $isRes = $status === 'Resolved';
                         $note  = trim((string)($r['admin_notes'] ?? ''));
                         $add([
-                            'key' => ($isRes ? 'issueresolved-' : 'issuedismissed-') . $id, 'cat' => 'room',
-                            'icon' => $isRes ? 'build_circle' : 'report_off', 'icon_class' => $isRes ? 'ni-success' : 'ni-alert',
+                            'key' => ($isRes ? 'issueresolved-' : 'issuedismissed-') . $id,
+                            'cat' => 'room',
+                            'icon' => $isRes ? 'build_circle' : 'report_off',
+                            'icon_class' => $isRes ? 'ni-success' : 'ni-alert',
                             'title' => ($isRes ? 'Issue Resolved: ' : 'Issue Report Closed: ') . $room,
                             'body'  => 'Your report about <strong>' . $e($room) . '</strong> was ' . ($isRes ? 'resolved' : 'reviewed and closed') . '.'
-                                        . ($note !== '' ? ' Admin note: ' . $e(fnotif_clip($note, 120)) : ''),
+                                . ($note !== '' ? ' Admin note: ' . $e(fnotif_clip($note, 120)) : ''),
                             'ts'    => $doneTs,
                             'detail' => array_merge([$d('Status', $isRes ? 'Resolved' : 'Dismissed')], $common, [
                                 $d('Admin Note', $note),
@@ -712,7 +799,10 @@ if (!function_exists('fnotif_build_list')) {
                     $pwTs = strtotime($u['last_password_change']);
                     if ($pwTs && $pwTs >= $now - 14 * 86400) {
                         $add([
-                            'key' => 'passchange-' . $pwTs, 'cat' => 'system', 'icon' => 'lock_reset', 'icon_class' => 'ni-alert',
+                            'key' => 'passchange-' . $pwTs,
+                            'cat' => 'system',
+                            'icon' => 'lock_reset',
+                            'icon_class' => 'ni-alert',
                             'title' => 'Password Changed',
                             'body'  => 'Your account password was changed. If this wasn\'t you, contact the administrator right away.',
                             'ts'    => $pwTs,
@@ -738,11 +828,14 @@ if (!function_exists('fnotif_build_list')) {
                         $lastTs = strtotime($la['last_at']);
                         $locked = !empty($la['locked_until']) && strtotime($la['locked_until']) > $now;
                         $add([
-                            'key' => 'failedlogin-' . $lastTs, 'cat' => 'system', 'icon' => 'gpp_maybe', 'icon_class' => 'ni-warn',
+                            'key' => 'failedlogin-' . $lastTs,
+                            'cat' => 'system',
+                            'icon' => 'gpp_maybe',
+                            'icon_class' => 'ni-warn',
                             'title' => 'Failed Sign-in Attempts',
                             'body'  => '<strong>' . $n . '</strong> failed sign-in attempt' . ($n !== 1 ? 's were' : ' was')
-                                        . ' recorded on your account, most recently ' . $e(date('M j, g:i A', $lastTs))
-                                        . '. If this wasn\'t you, consider changing your password.',
+                                . ' recorded on your account, most recently ' . $e(date('M j, g:i A', $lastTs))
+                                . '. If this wasn\'t you, consider changing your password.',
                             'ts'    => $lastTs,
                             'detail' => [
                                 $d('Failed Attempts', $n, $n >= 5),
@@ -755,6 +848,26 @@ if (!function_exists('fnotif_build_list')) {
             }
         } catch (Throwable $ex) {
             error_log('[PUPSync] fnotif account source failed: ' . $ex->getMessage());
+        }
+
+        /* ── 6. Static System notices (everyone, new and old accounts) ── */
+        try {
+            foreach (fnotif_static_notices() as $sn) {
+                $add([
+                    'key'        => 'sysnotice-' . (int)$sn['id'],
+                    'cat'        => 'system',
+                    'icon'       => $sn['icon'],
+                    'icon_class' => $sn['icon_class'],
+                    'title'      => $sn['title'],
+                    'body'       => $e($sn['body']),
+                    'ts'         => strtotime($sn['published']) ?: $now,
+                    'time_label' => 'Notice',
+                    'detail'     => [],
+                    'link'       => null,
+                ]);
+            }
+        } catch (Throwable $ex) {
+            error_log('[PUPSync] fnotif static notices failed: ' . $ex->getMessage());
         }
 
         if (!$includeDeleted) {

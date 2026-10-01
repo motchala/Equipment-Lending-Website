@@ -538,10 +538,13 @@
 
        Card interactions:
          click card      → expand details + mark as read
-         trash icon      → delete that one notification
+         trash icon /    → delete that one notification
+         Delete button
+       Footer (Mark all as read · Select · Delete all):
          Select          → checkboxes (shift-click = range), then bulk
-                           Read / Unread / Delete
-         Delete all      → deletes everything in the current filter
+                           Read / Unread / Delete selected
+         Delete all      → only appears once Select is on; deletes
+                           everything in the current filter
     ─────────────────────────────────────────────────────────────────── */
     const NOTIF_PER_PAGE = 5;
     const NOTIF_API = 'equipment-booking/api/faculty-notif.php';
@@ -775,7 +778,10 @@
         card.appendChild(ic);
 
         const body = nEl('div', 'notif-card-body');
-        body.appendChild(nEl('div', 'notif-card-title', n.title));
+        const titleRow = nEl('div', 'fnotif-title-row');
+        if (!n.is_read) titleRow.appendChild(nEl('span', 'unread-dot'));
+        titleRow.appendChild(nEl('div', 'notif-card-title', n.title));
+        body.appendChild(titleRow);
         const sub = nEl('div', 'notif-card-sub');
         nSetRichText(sub, n.body);
         body.appendChild(sub);
@@ -788,24 +794,25 @@
             row.appendChild(nEl('dd', d.danger ? 'is-danger' : null, String(d.value)));
             dl.appendChild(row);
         });
-        det.appendChild(dl);
+        // Short notices (e.g. the static System ones) have no detail rows — just show the actions
+        if ((n.detail || []).length) det.appendChild(dl); else det.classList.add('is-plain');
 
         const acts = nEl('div', 'fnotif-actions');
         if (n.link && n.link.tab) {
-            const v = nEl('button', 'fnotif-act-btn fnotif-act-primary');
+            const v = nEl('button', 'btn-save-acc fnotif-act-btn');
             v.type = 'button';
             v.dataset.nact = 'view';
             v.appendChild(nIcon('open_in_new'));
             v.appendChild(document.createTextNode(' ' + (n.link.label || 'View')));
             acts.appendChild(v);
         }
-        const tr = nEl('button', 'fnotif-act-btn');
+        const tr = nEl('button', 'btn-cancel-acc fnotif-act-btn');
         tr.type = 'button';
         tr.dataset.nact = 'toggle-read';
         tr.appendChild(nIcon(n.is_read ? 'mark_email_unread' : 'drafts'));
         tr.appendChild(document.createTextNode(n.is_read ? ' Mark as unread' : ' Mark as read'));
         acts.appendChild(tr);
-        const del = nEl('button', 'fnotif-act-btn fnotif-act-danger');
+        const del = nEl('button', 'btn-cancel-acc fnotif-act-btn fnotif-act-danger');
         del.type = 'button';
         del.dataset.nact = 'delete';
         del.appendChild(nIcon('delete'));
@@ -818,7 +825,12 @@
         const meta = nEl('div', 'notif-card-meta');
         meta.appendChild(nEl('span', 'notif-time', n.time_label || ''));
         const row = nEl('div', 'fnotif-meta-row');
-        if (!n.is_read) row.appendChild(nEl('div', 'unread-dot'));
+        const dbtn = nEl('button', 'fnotif-icon-btn fnotif-del');
+        dbtn.type = 'button';
+        dbtn.dataset.nact = 'delete';
+        dbtn.setAttribute('aria-label', 'Delete notification');
+        dbtn.appendChild(nIcon('delete'));
+        row.appendChild(dbtn);
         const ex = nEl('button', 'fnotif-icon-btn fnotif-expand');
         ex.type = 'button';
         ex.dataset.nact = 'expand';
@@ -826,12 +838,6 @@
         ex.setAttribute('aria-expanded', expanded ? 'true' : 'false');
         ex.appendChild(nIcon('expand_more'));
         row.appendChild(ex);
-        const dbtn = nEl('button', 'fnotif-icon-btn fnotif-del');
-        dbtn.type = 'button';
-        dbtn.dataset.nact = 'delete';
-        dbtn.setAttribute('aria-label', 'Delete notification');
-        dbtn.appendChild(nIcon('delete'));
-        row.appendChild(dbtn);
         meta.appendChild(row);
         card.appendChild(meta);
         return card;
@@ -904,26 +910,35 @@
         const markAll = document.querySelector('#notifModal [data-action="mark-all-read"]');
         if (markAll) markAll.disabled = unread === 0;
 
+        // Pill counts: per-category, plus All / Unread
         document.querySelectorAll('#notifModal .fnotif-pill-count[data-pill]').forEach(p => {
-            const c = notifItems.filter(n => n.cat === p.dataset.pill).length;
+            const k = p.dataset.pill;
+            const c = k === 'all' ? notifItems.length
+                : k === 'unread' ? unread
+                    : notifItems.filter(n => n.cat === k).length;
             p.textContent = c;
             p.hidden = c === 0;
         });
 
-        // Toolbar
-        const normal = document.getElementById('notifToolbarNormal');
-        const selBar = document.getElementById('notifToolbarSelect');
-        if (normal) normal.hidden = notifSelectMode;
-        if (selBar) selBar.hidden = !notifSelectMode;
-
+        // Footer: Select toggles select mode; Delete all + the selection bar only exist while selecting
         const selectBtn = document.getElementById('notifSelectBtn');
-        if (selectBtn) selectBtn.disabled = matches.length === 0;
+        if (selectBtn) {
+            selectBtn.disabled = !notifSelectMode && notifItems.length === 0;
+            selectBtn.setAttribute('aria-pressed', notifSelectMode ? 'true' : 'false');
+            const lbl = document.getElementById('notifSelectLbl');
+            if (lbl) lbl.textContent = notifSelectMode ? 'Done' : 'Select';
+            const ic = selectBtn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = notifSelectMode ? 'close' : 'checklist';
+        }
         const delAll = document.getElementById('notifDeleteAllBtn');
         if (delAll) {
+            delAll.hidden = !notifSelectMode;
             delAll.disabled = matches.length === 0;
             const lbl = delAll.lastChild;
             if (lbl && lbl.nodeType === 3) lbl.nodeValue = ' Delete all' + (notifActiveCat === 'all' ? '' : ' (' + matches.length + ')');
         }
+        const selBar = document.getElementById('notifSelBar');
+        if (selBar) selBar.hidden = !notifSelectMode;
 
         const selCount = matches.filter(n => notifSelected.has(n.key)).length;
         const selCountEl = document.getElementById('notifSelCount');
@@ -934,7 +949,7 @@
             selAll.indeterminate = selCount > 0 && selCount < matches.length;
             selAll.disabled = matches.length === 0;
         }
-        document.querySelectorAll('#notifToolbarSelect [data-needs-sel]').forEach(b => { b.disabled = selCount === 0; });
+        document.querySelectorAll('#notifSelBar [data-needs-sel]').forEach(b => { b.disabled = selCount === 0; });
 
         // Confirm strip
         const conf = document.getElementById('notifConfirm');
@@ -961,6 +976,7 @@
         const list = document.getElementById('notifList');
         if (!list) return;
 
+        if (notifSelectMode && notifItems.length === 0) { notifSelectMode = false; notifSelected.clear(); }
         const matches = getMatchingNotifs(notifActiveCat);
         const total = matches.length;
         const totalPages = Math.max(1, Math.ceil(total / NOTIF_PER_PAGE));
@@ -1066,8 +1082,7 @@
             const matches = getMatchingNotifs(notifActiveCat);
             const selKeys = matches.filter(n => notifSelected.has(n.key)).map(n => n.key);
             switch (b.dataset.nbar) {
-                case 'select': enterNotifSelectMode(); break;
-                case 'done': exitNotifSelectMode(); break;
+                case 'select': if (notifSelectMode) exitNotifSelectMode(); else enterNotifSelectMode(); break;
                 case 'mark-read': setNotifsRead(selKeys, true).then(ok => { if (ok) showToast(nPlural(selKeys.length, 'notification') + ' marked as read.'); }); break;
                 case 'mark-unread': setNotifsRead(selKeys, false).then(ok => { if (ok) showToast(nPlural(selKeys.length, 'notification') + ' marked as unread.'); }); break;
                 case 'delete-selected':
