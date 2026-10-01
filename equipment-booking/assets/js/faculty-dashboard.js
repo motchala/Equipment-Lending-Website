@@ -3256,23 +3256,17 @@
     }
 
     function _updateFacultyStatCards(data) {
-        const total = data.length;
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
             waiting: data.filter(r => r.status === 'Waiting').length,
             overdue: data.filter(r => r.status === 'Overdue').length,
-            total: total,
+            total: data.length,
         };
         document.querySelectorAll('.stat-tile[data-stat]').forEach(tile => {
             const key = tile.dataset.stat;
             if (!(key in counts)) return;
-            const n = counts[key];
             const val = tile.querySelector('.stat-tile-value');
-            if (val && val.textContent.trim() !== String(n)) val.textContent = n;
-            const pct = key === 'total' ? 100 : (total > 0 ? Math.round(n / total * 100) : 0);
-            tile.style.setProperty('--pct', pct + '%');
-            const pctEl = tile.querySelector('[data-stat-pct]');
-            if (pctEl) pctEl.textContent = pct;
+            if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
         });
     }
 

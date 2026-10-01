@@ -19,14 +19,72 @@
 
     /* ── Toast ───────────────────────────────────────────────── */
     let toastTimer;
-    function showToast(msg) {
+    function showToast(msg, ms) {
         const t = document.getElementById('app-toast');
         if (!t) return;
         t.textContent = msg;
         t.classList.add('show');
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+        // Optional 2nd argument = how long to stay (ms). Other callers pass a
+        // label like 'success' there; those are ignored and keep the 2.8s default.
+        toastTimer = setTimeout(() => t.classList.remove('show'), typeof ms === 'number' ? ms : 2800);
     }
+    /* -- Toast queue (welcome, overdue alert, room save/archive/restore results) --
+       The server renders #toast-queue only when there is something to say:
+       once after a real sign-in, or after a room redirect (?room_added=1 …).
+       Messages are shown one after another through the normal toast, and the
+       login splash (~4s) is waited out first. */
+    (function initToastQueue() {
+        const src = document.getElementById('toast-queue');
+        if (!src) return;
+        const msgs = Array.from(src.querySelectorAll('[data-msg]'))
+            .map(function (n) { return n.getAttribute('data-msg'); })
+            .filter(Boolean);
+        const strip = (src.getAttribute('data-strip') || '').split(',').filter(Boolean);
+        src.remove();
+
+        // init() below (initView) still needs ?room_archived / ?room_restored to open the
+        // right sub-panel, so only drop the params AFTER it has run — otherwise a refresh
+        // would repeat the message. (Same timing trick as fixInventoryTab() in the PHP.)
+        function afterInit(fn) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function () { setTimeout(fn, 0); });
+            } else {
+                setTimeout(fn, 0);
+            }
+        }
+        if (strip.length) {
+            afterInit(function () {
+                const p = new URLSearchParams(window.location.search);
+                let changed = false;
+                strip.forEach(function (k) { if (p.has(k)) { p.delete(k); changed = true; } });
+                if (!changed) return;
+                const qs = p.toString();
+                window.history.replaceState(window.history.state, '',
+                    window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+            });
+        }
+
+        if (!msgs.length) return;
+        let i = 0;
+        function next() {
+            if (i >= msgs.length) return;
+            const m = msgs[i++];
+            const ms = Math.min(5000, Math.max(2800, m.length * 45)); // a couple of seconds; longer text a bit more
+            showToast(m, ms);
+            setTimeout(next, ms + 650); // let it fade out before the next one
+        }
+        let waited = 0;
+        (function whenSplashGone() {
+            if (document.getElementById('roleSplash') && waited < 7000) {
+                waited += 150;
+                setTimeout(whenSplashGone, 150);
+                return;
+            }
+            setTimeout(next, 350);
+        })();
+    })();
+
     window.showToast = showToast; // exposed globally — inline <script> blocks
     // elsewhere in admin-dashboard.php (which run outside this closure) need
     // to call this too, e.g. to report a failed upload after a redirect.
@@ -1169,11 +1227,6 @@
             '</td>' +
             '<td style="font-size:12px;color:var(--text-light)">' + _esc(data.faculty_id || '') + '</td>' +
             '<td style="font-size:12px">' + _esc(data.email) + '</td>' +
-            '<td><label class="faculty-toggle-label">' +
-            '<input type="checkbox" class="faculty-toggle-input org-borrowing-toggle"' +
-            ' data-faculty-id="' + _esc(data.faculty_id || '') + '"' +
-            (data.allow_org_borrowing === 1 ? ' checked' : '') +
-            '><span class="faculty-toggle-track"></span></label></td>' +
             '<td><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">' +
             '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
@@ -2326,16 +2379,6 @@
                 history.replaceState({ tab: 'dashboard' }, '');
             }
         }
-
-        // Auto-dismiss alerts after 5s
-        setTimeout(() => {
-            ['added-alert', 'updated-alert',
-                'room-added-alert', 'room-updated-alert',
-                'room-archived-alert', 'room-restored-alert'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.style.display = 'none';
-                });
-        }, 5000);
     }
 
     /* ── popstate: back/forward support ─────────────────────── */
@@ -3003,50 +3046,6 @@
         closeBtn.addEventListener('click', stopScanner);
         modal.addEventListener('click', e => { if (e.target === modal) stopScanner(); });
     })();
-
-    /* ── Faculty: org-borrowing toggle ───────────────────────────────── */
-    document.addEventListener('change', function (e) {
-        const toggle = e.target.closest('.org-borrowing-toggle');
-        if (!toggle) return;
-
-        const facultyId = toggle.dataset.facultyId;
-        const newValue = toggle.checked ? 1 : 0;
-        const previousChecked = !toggle.checked;   // save for revert on error
-
-        const formData = new FormData();
-        formData.append('csrf_token', getCsrfToken());
-        formData.append('faculty_id', facultyId);
-        formData.append('allow_org_borrowing', newValue);
-
-        fetch('equipment-booking/api/toggle-org-borrowing.php', {
-            method: 'POST',
-            body: formData
-        })
-            .then(function (res) {
-                return res.json().then(function (data) {
-                    return { status: res.status, data };
-                });
-            })
-            .then(function ({ status, data }) {
-                if (status === 200 && data.status === 'success') {
-                    // Update checked state to the value confirmed by the server
-                    toggle.checked = data.allow_org_borrowing === 1;
-                    showToast(
-                        data.allow_org_borrowing === 1
-                            ? 'Org borrowing enabled.'
-                            : 'Org borrowing disabled.'
-                    );
-                } else {
-                    // Revert the toggle
-                    toggle.checked = previousChecked;
-                    showToast('Error: ' + (data.message || 'Could not update permission.'));
-                }
-            })
-            .catch(function () {
-                toggle.checked = previousChecked;
-                showToast('Network error. Please try again.');
-            });
-    });
 })();
 
 /* ════════════════════════════════════════════════════════════════

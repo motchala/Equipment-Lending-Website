@@ -7808,6 +7808,17 @@ body {
     display: flex;
     flex-direction: column;
     width: 100%;
+    /* Separator above Log Out: hidden while the avatar group is collapsed.
+       Drawn as a shadow so showing it never changes the layout. */
+    padding-bottom: 0;
+    box-shadow: 0 1px 0 0 transparent;
+    transition: padding-bottom 0.26s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.26s ease;
+}
+
+/* Expanded: line appears beneath the opened items, above Log Out */
+.side-nav-group:has(> .side-nav-group-toggle[aria-expanded="true"]) {
+    padding-bottom: 7px;
+    box-shadow: 0 1px 0 0 var(--nav-line, rgba(255, 255, 255, 0.12));
 }
 
 .side-nav-group-toggle {
@@ -7895,11 +7906,18 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin: 0 0 0 26px;
-    padding: 4px 0 2px 8px;
-    border-left: 1px solid var(--nav-line, rgba(255, 255, 255, 0.12));
+    /* Flush with the other sidebar items: no indent and no tree line, so the
+       two buttons don't read as children of the avatar button. */
+    margin: 0;
+    padding: 0;
     visibility: hidden;
     transition: visibility 0s linear 0.26s;
+}
+
+/* Spacing under the avatar button lives on the first item (a margin is clipped when
+   the menu is closed, so the closed height stays exactly 0). */
+.side-nav-submenu-inner> :first-child {
+    margin-top: 2px;
 }
 
 .side-nav-submenu.open .side-nav-submenu-inner {
@@ -8226,19 +8244,40 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     border-radius: 6px;
 }
 
-/* ── Collapsed icon-rail (desktop): toggle only, centred ─────────── */
+/* ── Collapsed icon-rail (desktop) ────────────────────────────────
+   The PUPSYNC logo stays visible. Hovering it (or focusing the button
+   with the keyboard) swaps it for the expand button, which sits exactly
+   on top of it. The toggle is invisible but still clickable until then,
+   so a tap on touch screens works too. Only applies while collapsed:
+   in the expanded sidebar the logo never changes. */
 @media (min-width: 1025px) {
     body.sidebar-collapsed .side-nav .side-nav-brand {
+        position: relative;
         justify-content: center;
         padding: 0 !important;
     }
 
     body.sidebar-collapsed .side-nav .side-nav-logo {
-        display: none !important;
+        transition: opacity 0.18s ease, transform 0.18s ease;
     }
 
     body.sidebar-collapsed .side-nav .side-nav-toggle {
-        margin-left: 0;
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        opacity: 0;
+        transition: opacity 0.18s ease, background 0.18s ease, color 0.18s ease,
+            border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-toggle:hover,
+    body.sidebar-collapsed .side-nav .side-nav-toggle:focus-visible {
+        opacity: 1;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-brand:has(.side-nav-toggle:hover, .side-nav-toggle:focus-visible) .side-nav-logo {
+        opacity: 0;
+        transform: scale(0.85);
     }
 
     body.sidebar-collapsed .sn-icon .sn-fill {
@@ -8324,290 +8363,87 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     }
 }
 
-/* Borrow Equipment / Reserve Room: the sidebar's muted gold is now the
-   button colour itself, with dark-maroon text and icon. */
-#panel-home .dash-bento-btn {
-    background: var(--nav-hover-bg);
-    color: var(--nav-on-hover);
-    box-shadow: 0 1px 2px rgba(43, 0, 0, 0.12);
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
-}
-
-#panel-home .dash-bento-btn:hover {
-    background: color-mix(in srgb, var(--nav-hover-bg) 88%, #2b0000);
-    box-shadow: 0 10px 24px rgba(43, 0, 0, 0.25);
-    transform: translateY(-3px);
-}
-
-#panel-home .dash-bento-icon {
-    background: rgba(43, 0, 0, 0.12);
-}
-
-#panel-home .dash-bento-icon .material-symbols-outlined,
-#panel-home .dash-bento-label {
-    color: var(--nav-on-hover);
-}
-
-/* ── Stat tiles (Active Borrowings / Pending Requests / Overdue) ──── */
+/* ================================================================
+   DASHBOARD HOME — quiet stats card
+   One card, three cells, hairline dividers. Only an overdue count
+   gets a colour. (Borrow Equipment / Reserve Room use their original
+   maroon style again.)
+================================================================ */
 #panel-home .dash-stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 14px;
+    overflow: hidden;
 }
 
 .stat-tile {
-    --sc: #800000;
-    --sc-soft: rgba(128, 0, 0, 0.1);
-    --sc-ink: #800000;
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    width: 100%;
+    gap: 4px;
     margin: 0;
-    padding: 16px 18px 14px;
+    padding: 16px 20px;
     font: inherit;
     text-align: left;
     color: var(--color-on-surface);
-    background:
-        radial-gradient(120% 90% at 100% 100%, var(--sc-soft) 0%, transparent 62%),
-        var(--color-surface);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 16px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: background 0.15s ease;
 }
 
-/* thin status strip along the top edge */
-.stat-tile::before {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 3px;
-    background: var(--sc);
+.stat-tile+.stat-tile {
+    border-left: 1px solid var(--color-outline-variant);
 }
 
 .stat-tile:hover {
-    transform: translateY(-3px);
-    border-color: var(--sc);
-    box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--sc) 60%, transparent);
+    background: var(--color-surface-container);
 }
 
 .stat-tile:focus-visible {
-    outline: 2px solid var(--sc);
-    outline-offset: 2px;
-}
-
-.stat-tile--pending {
-    --sc: #d4ae55;
-    --sc-soft: rgba(220, 184, 98, 0.22);
-    --sc-ink: #8a6a12;
-}
-
-.stat-tile--overdue {
-    --sc: #c62828;
-    --sc-soft: rgba(198, 40, 40, 0.1);
-    --sc-ink: #c62828;
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
 }
 
 .stat-tile--total {
-    --sc: #64748b;
-    --sc-soft: rgba(100, 116, 139, 0.12);
-    --sc-ink: #475569;
     cursor: default;
 }
 
 .stat-tile--total:hover {
-    transform: none;
-    box-shadow: none;
-    border-color: var(--color-outline-variant);
-}
-
-[data-theme="dark"] .stat-tile {
-    --sc: #e57373;
-    --sc-soft: rgba(229, 115, 115, 0.16);
-    --sc-ink: #ff9e9e;
-}
-
-[data-theme="dark"] .stat-tile--pending {
-    --sc: #dcb862;
-    --sc-soft: rgba(220, 184, 98, 0.16);
-    --sc-ink: #e7c77a;
-}
-
-[data-theme="dark"] .stat-tile--overdue {
-    --sc: #ef5350;
-    --sc-soft: rgba(239, 83, 80, 0.16);
-    --sc-ink: #ff8a80;
-}
-
-[data-theme="dark"] .stat-tile--total {
-    --sc: #94a3b8;
-    --sc-soft: rgba(148, 163, 184, 0.14);
-    --sc-ink: #cbd5e1;
-}
-
-.stat-tile-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.stat-tile-icon {
-    width: 36px;
-    height: 36px;
-    display: grid;
-    place-items: center;
-    border-radius: 11px;
-    background: var(--sc-soft);
-    color: var(--sc-ink);
-}
-
-.stat-tile-icon .material-symbols-outlined {
-    font-size: 20px;
-}
-
-/* corner arrow: hints the tile is clickable, nudges out on hover */
-.stat-tile .stat-tile-go {
-    font-size: 18px;
-    color: var(--color-secondary);
-    opacity: 0.4;
-    transition: transform 0.2s ease, opacity 0.2s ease, color 0.2s ease;
-}
-
-.stat-tile:hover .stat-tile-go {
-    opacity: 1;
-    color: var(--sc-ink);
-    transform: translate(2px, -2px);
+    background: transparent;
 }
 
 .stat-tile-value {
-    margin-top: 14px;
     font-family: 'Syne', var(--font-display);
-    font-size: 2.6rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.04em;
-    color: var(--color-on-surface);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.stat-tile--overdue .stat-tile-value {
+    color: var(--color-error);
 }
 
 .stat-tile-label {
-    margin-top: 6px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.9px;
-    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 500;
     color: var(--color-secondary);
 }
 
-/* share-of-all-requests meter */
-.stat-tile-meter {
-    display: block;
-    width: 100%;
-    height: 6px;
-    margin-top: 14px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--sc) 16%, transparent);
-}
-
-.stat-tile-meter i {
-    display: block;
-    height: 100%;
-    width: var(--pct, 0%);
-    border-radius: inherit;
-    background: var(--sc);
-    transition: width 0.5s ease;
-    animation: stat-tile-grow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.stat-tile-foot {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    font-size: 0.74rem;
-    color: var(--color-secondary);
-}
-
-.stat-tile-foot b {
-    font-weight: 700;
-    color: var(--color-on-surface);
-}
-
-.stat-tile-pulse {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--sc);
-    animation: stat-tile-pulse 1.8s ease-out infinite;
-}
-
-/* oversized faint icon in the corner */
-.stat-tile .stat-tile-wm {
-    position: absolute;
-    right: -8px;
-    bottom: -16px;
-    z-index: -1;
-    font-size: 96px;
-    line-height: 1;
-    color: var(--sc);
-    opacity: 0.08;
-    pointer-events: none;
-    font-variation-settings: 'FILL' 1, 'wght' 400;
-}
-
-@keyframes stat-tile-grow {
-    from {
-        width: 0;
-    }
-}
-
-@keyframes stat-tile-pulse {
-    0% {
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--sc) 55%, transparent);
-    }
-
-    70%,
-    100% {
-        box-shadow: 0 0 0 7px transparent;
-    }
-}
-
-@media (max-width: 640px) {
-    #panel-home .dash-stats {
-        grid-template-columns: none;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(156px, 1fr);
-        overflow-x: auto;
-        padding-bottom: 4px;
-        scroll-snap-type: x mandatory;
-        scrollbar-width: none;
-    }
-
-    #panel-home .dash-stats::-webkit-scrollbar {
-        display: none;
-    }
-
+@media (max-width: 480px) {
     .stat-tile {
-        scroll-snap-align: start;
+        padding: 12px 12px;
     }
 
     .stat-tile-value {
-        font-size: 2.1rem;
+        font-size: 1.4rem;
     }
-}
 
-@media (prefers-reduced-motion: reduce) {
-
-    .stat-tile,
-    .stat-tile-meter i,
-    .stat-tile-pulse,
-    #panel-home .dash-bento-btn {
-        animation: none;
-        transition: none;
+    .stat-tile-label {
+        font-size: 0.7rem;
     }
 }

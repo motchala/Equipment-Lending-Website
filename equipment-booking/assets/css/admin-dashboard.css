@@ -891,6 +891,20 @@ button.nav-item {
     display: flex;
     flex-direction: column;
     width: 100%;
+    /* Separator above Log Out: hidden while the avatar group is collapsed.
+       Drawn as a shadow so showing it never changes the layout. */
+    padding-bottom: 0;
+    margin-bottom: 0;
+    box-shadow: 0 1px 0 0 transparent;
+    transition: padding-bottom 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+        margin-bottom 0.26s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.26s ease;
+}
+
+/* Expanded: line appears beneath the opened items, above Log Out */
+.nav-account:has(> .nav-account-toggle[aria-expanded="true"]) {
+    padding-bottom: 7px;
+    margin-bottom: 6px;
+    box-shadow: 0 1px 0 0 var(--nav-line);
 }
 
 .nav-account-avatar {
@@ -977,11 +991,18 @@ button.nav-item {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin: 0 0 0 26px;
-    padding: 4px 0 2px 8px;
-    border-left: 1px solid var(--nav-line);
+    /* Flush with the other sidebar items: no indent and no tree line, so the
+       three buttons don't read as children of the avatar button. */
+    margin: 0;
+    padding: 0;
     visibility: hidden;
     transition: visibility 0s linear 0.26s;
+}
+
+/* Spacing under the avatar button lives on the first item (a margin is clipped
+   when the menu is closed, so the closed height stays exactly 0). */
+.nav-submenu-inner> :first-child {
+    margin-top: 2px;
 }
 
 .nav-submenu.open .nav-submenu-inner {
@@ -1006,18 +1027,42 @@ button.nav-item {
         width: var(--sidebar-w-collapsed);
     }
 
+    /* The PUPSYNC logo stays visible. Hovering it (or focusing the button with
+       the keyboard) swaps it for the expand button, which sits exactly on top
+       of it. The toggle is invisible but still clickable until then, so a tap
+       on touch screens works too. Only applies while collapsed: in the
+       expanded sidebar the logo never changes. */
     body.sidebar-collapsed .sidebar-brand {
+        position: relative;
         justify-content: center;
         padding: 0;
     }
 
-    body.sidebar-collapsed .sidebar-logo,
     body.sidebar-collapsed .sidebar-brand-text {
         display: none;
     }
 
+    body.sidebar-collapsed .sidebar-logo {
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
     body.sidebar-collapsed .sidebar-toggle {
-        margin-left: 0;
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        opacity: 0;
+        transition: opacity 0.18s ease, background 0.18s ease, color 0.18s ease,
+            border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    body.sidebar-collapsed .sidebar-toggle:hover,
+    body.sidebar-collapsed .sidebar-toggle:focus-visible {
+        opacity: 1;
+    }
+
+    body.sidebar-collapsed .sidebar-brand:has(.sidebar-toggle:hover, .sidebar-toggle:focus-visible) .sidebar-logo {
+        opacity: 0;
+        transform: scale(0.85);
     }
 
     body.sidebar-collapsed .sn-icon .sn-fill {
@@ -1046,12 +1091,6 @@ button.nav-item {
         position: absolute;
         top: 6px;
         right: 16px;
-    }
-
-    body.sidebar-collapsed .nav-submenu-inner {
-        margin-left: 0;
-        padding-left: 0;
-        border-left: 0;
     }
 
     body.sidebar-collapsed .nav-subitem .nav-badge {
@@ -3785,29 +3824,51 @@ input[type="range"] {
 }
 
 /* ── TOAST ────────────────────────────────────────────────────── */
+/* Same placement and motion as the faculty snackbar (bottom-centre, fades up),
+   but deliberately plain: a neutral surface with readable text and no accent
+   colour. Used for every admin toast, including the post-login welcome. */
 #app-toast {
     position: fixed;
-    bottom: 1.5rem;
     left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: var(--text-dark);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 10px;
-    font-size: 0.85rem;
+    bottom: 28px;
+    z-index: 10000;
+    max-width: min(480px, calc(100vw - 32px));
+    padding: 12px 20px;
+    background: #2b2b30;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1.45;
+    text-align: center;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.12);
     opacity: 0;
     visibility: hidden;
-    z-index: 10000;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+    transform: translate(-50%, 12px);
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+    pointer-events: none;
 }
 
 #app-toast.show {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(0);
+    transform: translate(-50%, 0);
+    transition-delay: 0s;
+}
+
+/* Dark theme: a light toast so it stands out from the dark page */
+[data-theme="dark"] #app-toast {
+    background: #ececf1;
+    color: #1b1b24;
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="high-contrast"] #app-toast {
+    background: #ffffff;
+    color: #000000;
+    border: 2px solid #ffffff;
+    box-shadow: none;
 }
 
 /* ── BORROW HISTORY TOGGLE ────────────────────────────────────── */
@@ -7004,4 +7065,253 @@ body:has(#roomScheduleModal:not(.hidden)) {
     color: #c0392b;
     background: #fdecea;
     border: 1.5px solid #e5b8bb;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FACULTY TAB — Edit + Delete modals
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Delete modal: one message at a time ───────────────────── */
+.fac-del-lead {
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--text-dark);
+    margin: 0 0 0.6rem;
+}
+
+.fac-del-note {
+    font-size: 12px;
+    color: var(--text-light);
+    margin: 0;
+}
+
+.fac-del-checking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-light);
+    margin: 0;
+}
+
+.fac-del-checking .material-symbols-outlined {
+    font-size: 16px;
+    animation: spin 0.8s linear infinite;
+}
+
+.fac-del-warn {
+    background: #fef6e4;
+    border: 1px solid #f3dca6;
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.fac-del-warn-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #8a5a00;
+    margin-bottom: 0.35rem;
+}
+
+.fac-del-warn-title .material-symbols-outlined {
+    font-size: 17px;
+}
+
+.fac-del-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.fac-del-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.4rem 0;
+    font-size: 12.5px;
+    color: var(--text-dark);
+    border-top: 1px solid rgba(138, 90, 0, 0.15);
+}
+
+.fac-del-list li:first-child {
+    border-top: none;
+}
+
+.fac-del-count {
+    font-weight: 700;
+    min-width: 16px;
+}
+
+.fac-del-label {
+    flex: 1;
+}
+
+.fac-del-outcome {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #8a5a00;
+    background: rgba(255, 255, 255, 0.75);
+    border-radius: 999px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
+.fac-del-pw-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+}
+
+.fac-del-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin: 0.5rem 0 0;
+}
+
+/* ── Edit modal ────────────────────────────────────────────── */
+.fac-edit-id {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.fac-edit-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent-maroon);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.fac-edit-id-name {
+    font-weight: 600;
+    font-size: 14px;
+    line-height: 1.25;
+    color: var(--text-dark);
+}
+
+.fac-edit-id-meta {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.fac-edit-section {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-light);
+    margin: 0 0 0.6rem;
+}
+
+#fac-edit-modal .form-group {
+    margin-bottom: 0.8rem;
+}
+
+#fac-edit-modal .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 5px;
+}
+
+#fac-edit-modal .fac-edit-opt {
+    font-weight: 400;
+    color: var(--text-light);
+}
+
+/* Switch rows (adviser / org borrowing) */
+.fac-opt-card {
+    border: 1px solid var(--khaki-border);
+    border-radius: 12px;
+    padding: 0 0.9rem;
+    margin-top: 1.1rem;
+}
+
+.fac-opt-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0.7rem 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.fac-opt-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.fac-opt-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.fac-opt-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.fac-opt-row:hover .faculty-toggle-track {
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.fac-opt-extra {
+    border-top: 1px solid var(--khaki-border);
+    padding-top: 0.8rem;
+}
+
+.fac-opt-extra .fac-opt-row {
+    border-top: 1px solid var(--khaki-border);
+}
+
+.fac-opt-extra .form-group {
+    margin-bottom: 0.6rem;
+}
+
+/* Footer: Delete on the left, Cancel + Save on the right */
+.ps-modal-foot.fac-foot-split {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fac-foot-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ps-btn.fac-btn-delete {
+    background: transparent;
+    border-color: transparent;
+    color: var(--danger);
+}
+
+.ps-btn.fac-btn-delete:hover {
+    background: #fdecea;
+}
+
+@media (max-width: 420px) {
+    .ps-modal-foot.fac-foot-split {
+        flex-wrap: wrap;
+    }
 }

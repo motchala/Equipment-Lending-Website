@@ -194,6 +194,7 @@ if (isset($_POST['login'])) {
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
             role_splash_arm($_SESSION['admin_role']); // one-shot: splash shows once, on this hand-off only
+            $_SESSION['admin_login_toast'] = true;    // one-shot: welcome toast shows once, right after this sign-in
             header("Location: admin-dashboard.php");
             exit();
         } else {

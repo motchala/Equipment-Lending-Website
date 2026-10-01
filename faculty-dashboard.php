@@ -1768,65 +1768,28 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <!-- LEFT col: stats bar + bento buttons -->
                     <div class="dash-top-left">
 
-                        <!-- Stat tiles -->
-                        <?php
-                        $pct_of = function ($n) use ($stat_total) {
-                            return $stat_total > 0 ? (int) round($n / $stat_total * 100) : 0;
-                        };
-                        $pct_active  = $pct_of($stat_approved);
-                        $pct_waiting = $pct_of($stat_waiting);
-                        $pct_overdue = $pct_of($stat_overdue);
-                        ?>
+                        <!-- Stats -->
                         <div class="dash-stats" id="dashStats">
-                            <button type="button" class="stat-tile stat-tile--active" data-stat="approved"
-                                data-action="filter-requests" data-status="Approved" style="--pct: <?php echo $pct_active; ?>%;">
-                                <span class="stat-tile-top">
-                                    <span class="stat-tile-icon"><span class="material-symbols-outlined">devices</span></span>
-                                    <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
-                                </span>
+                            <button type="button" class="stat-tile" data-stat="approved"
+                                data-action="filter-requests" data-status="Approved">
                                 <span class="stat-tile-value"><?php echo $stat_approved; ?></span>
                                 <span class="stat-tile-label">Active Borrowings</span>
-                                <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
-                                <span class="stat-tile-foot"><b data-stat-pct><?php echo $pct_active; ?></b>% of all requests</span>
-                                <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">devices</span>
                             </button>
-
-                            <button type="button" class="stat-tile stat-tile--pending" data-stat="waiting"
-                                data-action="filter-requests" data-status="Waiting" style="--pct: <?php echo $pct_waiting; ?>%;">
-                                <span class="stat-tile-top">
-                                    <span class="stat-tile-icon"><span class="material-symbols-outlined">hourglass_top</span></span>
-                                    <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
-                                </span>
+                            <button type="button" class="stat-tile" data-stat="waiting"
+                                data-action="filter-requests" data-status="Waiting">
                                 <span class="stat-tile-value"><?php echo $stat_waiting; ?></span>
                                 <span class="stat-tile-label">Pending Requests</span>
-                                <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
-                                <span class="stat-tile-foot"><b data-stat-pct><?php echo $pct_waiting; ?></b>% of all requests</span>
-                                <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">hourglass_top</span>
                             </button>
-
                             <?php if ($stat_overdue > 0): ?>
                                 <button type="button" class="stat-tile stat-tile--overdue" data-stat="overdue"
-                                    data-action="filter-requests" data-status="Overdue" style="--pct: <?php echo $pct_overdue; ?>%;">
-                                    <span class="stat-tile-top">
-                                        <span class="stat-tile-icon"><span class="material-symbols-outlined">alarm</span></span>
-                                        <span class="stat-tile-go material-symbols-outlined" aria-hidden="true">north_east</span>
-                                    </span>
+                                    data-action="filter-requests" data-status="Overdue">
                                     <span class="stat-tile-value" id="statOverdueVal"><?php echo $stat_overdue; ?></span>
                                     <span class="stat-tile-label">Overdue</span>
-                                    <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
-                                    <span class="stat-tile-foot"><span class="stat-tile-pulse" aria-hidden="true"></span>Action required</span>
-                                    <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">alarm</span>
                                 </button>
                             <?php else: ?>
-                                <div class="stat-tile stat-tile--total" data-stat="total" style="--pct: 100%;">
-                                    <span class="stat-tile-top">
-                                        <span class="stat-tile-icon"><span class="material-symbols-outlined">receipt_long</span></span>
-                                    </span>
+                                <div class="stat-tile stat-tile--total" data-stat="total">
                                     <span class="stat-tile-value"><?php echo $stat_total; ?></span>
                                     <span class="stat-tile-label">Total Requests</span>
-                                    <span class="stat-tile-meter" aria-hidden="true"><i></i></span>
-                                    <span class="stat-tile-foot">All-time requests</span>
-                                    <span class="stat-tile-wm material-symbols-outlined" aria-hidden="true">receipt_long</span>
                                 </div>
                             <?php endif; ?>
                         </div>
