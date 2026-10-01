@@ -4612,84 +4612,93 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
-                <!-- Faculty identity banner -->
-                <div style="display:flex;align-items:center;gap:12px;background:var(--secondary-cream);border-radius:12px;padding:0.9rem;border:1px solid var(--khaki-border);margin-bottom:1.25rem">
-                    <div id="fac-edit-avatar"
-                        style="width:44px;height:44px;background:var(--accent-maroon);border-radius:50%;display:grid;place-items:center;color:white;font-weight:700;font-size:16px;flex-shrink:0">F</div>
+
+                <!-- Who is being edited -->
+                <div class="fac-edit-id">
+                    <div class="fac-edit-avatar" id="fac-edit-avatar">F</div>
                     <div>
-                        <div id="fac-edit-name-display" style="font-weight:600;font-size:13.5px">&#8212;</div>
-                        <div id="fac-edit-meta-display" style="font-size:11.5px;color:var(--text-light)">&#8212;</div>
+                        <div class="fac-edit-id-name" id="fac-edit-name-display">&#8212;</div>
+                        <div class="fac-edit-id-meta" id="fac-edit-meta-display">&#8212;</div>
                     </div>
                 </div>
 
+                <!-- Account details -->
+                <div class="fac-edit-section">Account details</div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">First Name</label>
+                        <label for="fac-edit-first">First name</label>
                         <input type="text" id="fac-edit-first" class="form-control-custom" placeholder="First">
                     </div>
                     <div class="form-group">
-                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Last Name</label>
+                        <label for="fac-edit-last">Last name</label>
                         <input type="text" id="fac-edit-last" class="form-control-custom" placeholder="Last">
                     </div>
                 </div>
-
                 <div class="form-group">
-                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">PUPSync Email</label>
+                    <label for="fac-edit-email">PUPSync email</label>
                     <input type="email" id="fac-edit-email" class="form-control-custom" placeholder="email@example.com">
                 </div>
-                <div class="form-group">
-                    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Backup Email</label>
+                <div class="form-group" style="margin-bottom:0">
+                    <label for="fac-edit-backup">Backup email <span class="fac-edit-opt">(optional)</span></label>
                     <input type="email" id="fac-edit-backup" class="form-control-custom" placeholder="backup@gmail.com">
                 </div>
 
-                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
-                    <label class="faculty-toggle-label" style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;cursor:pointer">
+                <!-- Organization: org picker + org borrowing only appear for advisers -->
+                <div class="fac-opt-card">
+                    <label class="fac-opt-row" for="fac-edit-adviser">
+                        <span class="fac-opt-text">
+                            <span class="fac-opt-title">Organization adviser</span>
+                            <span class="fac-opt-sub">Advises a student organization</span>
+                        </span>
                         <input type="checkbox" id="fac-edit-adviser" class="faculty-toggle-input">
                         <span class="faculty-toggle-track"></span>
-                        Organization Adviser
                     </label>
-                    <div class="form-group" id="fac-edit-org-group" style="margin-bottom:0;margin-top:0.65rem;display:none;">
-                        <label style="font-size:12px;font-weight:500;display:block;margin-bottom:4px">Organization</label>
-                        <?php
-                        $edit_org_opts_res = $conn->query(
-                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                        );
-                        if ($edit_org_opts_res && $edit_org_opts_res->num_rows > 0): ?>
-                            <select id="fac-edit-org" class="form-control-custom">
-                                <option value="">&#8212; Select Organization &#8212;</option>
-                                <?php while ($edit_org_row = $edit_org_opts_res->fetch_assoc()): ?>
-                                    <option value="<?= (int)$edit_org_row['id'] ?>">
-                                        <?= htmlspecialchars($edit_org_row['name']) ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
-                        <?php else: ?>
-                            <select id="fac-edit-org" class="form-control-custom" disabled>
-                                <option value="">&#8212; Organizations unavailable &#8212;</option>
-                            </select>
-                        <?php endif; ?>
+
+                    <div class="fac-opt-extra" id="fac-edit-org-group" style="display:none;">
+                        <div class="form-group">
+                            <label for="fac-edit-org">Organization</label>
+                            <?php
+                            $edit_org_opts_res = $conn->query(
+                                "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                            );
+                            if ($edit_org_opts_res && $edit_org_opts_res->num_rows > 0): ?>
+                                <select id="fac-edit-org" class="form-control-custom">
+                                    <option value="">&#8212; Select Organization &#8212;</option>
+                                    <?php while ($edit_org_row = $edit_org_opts_res->fetch_assoc()): ?>
+                                        <option value="<?= (int)$edit_org_row['id'] ?>">
+                                            <?= htmlspecialchars($edit_org_row['name']) ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            <?php else: ?>
+                                <select id="fac-edit-org" class="form-control-custom" disabled>
+                                    <option value="">&#8212; Organizations unavailable &#8212;</option>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+                        <label class="fac-opt-row" for="fac-edit-aob">
+                            <span class="fac-opt-text">
+                                <span class="fac-opt-title">Allow org borrowing</span>
+                                <span class="fac-opt-sub">Can borrow on behalf of the organization</span>
+                            </span>
+                            <input type="checkbox" id="fac-edit-aob" class="faculty-toggle-input">
+                            <span class="faculty-toggle-track"></span>
+                        </label>
                     </div>
                 </div>
 
-                <label class="faculty-toggle-label" style="font-size:13px;cursor:pointer;display:flex;align-items:center">
-                    <input type="checkbox" id="fac-edit-aob" class="faculty-toggle-input">
-                    <span class="faculty-toggle-track"></span>
-                    Org Borrowing Enabled
-                </label>
-
-                <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-top:1rem"></div>
-
-                <div style="border-top:1px solid var(--khaki-border);margin-top:1rem;padding-top:1rem">
-                    <button class="ps-btn ps-btn--danger" id="fac-edit-delete-btn" type="button">
-                        <span class="material-symbols-outlined">person_remove</span> Delete Account
+                <div id="fac-edit-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0"></div>
+            </div>
+            <div class="ps-modal-foot fac-foot-split">
+                <button class="ps-btn fac-btn-delete" id="fac-edit-delete-btn" type="button">
+                    <span class="material-symbols-outlined">person_remove</span> Delete
+                </button>
+                <div class="fac-foot-actions">
+                    <button class="ps-btn ps-btn--ghost" id="fac-edit-cancel">Cancel</button>
+                    <button class="ps-btn ps-btn--primary" id="fac-edit-save">
+                        <span class="material-symbols-outlined">save</span> Save
                     </button>
                 </div>
-            </div>
-            <div class="ps-modal-foot">
-                <button class="ps-btn ps-btn--ghost" id="fac-edit-cancel">Cancel</button>
-                <button class="ps-btn ps-btn--primary" id="fac-edit-save">
-                    <span class="material-symbols-outlined">save</span> Save Changes
-                </button>
             </div>
         </div>
     </div>
@@ -4697,6 +4706,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     <!-- ================================================================
      MODAL: DELETE FACULTY CONFIRM
+     One message at a time: "checking" -> "confirm" OR "blocked" (override).
     ================================================================ -->
     <div class="ps-modal-backdrop" id="fac-delete-modal">
         <div class="ps-modal ps-modal--sm">
@@ -4710,17 +4720,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
-                <p style="font-size:13px;margin-bottom:0.75rem">Are you sure you want to permanently delete the account of <strong id="fac-delete-name">this faculty member</strong>?</p>
-                <div class="ps-alert ps-alert--danger" style="margin:0">
-                    <span class="material-symbols-outlined">warning</span>
-                    This action cannot be undone. All associated borrowing history will be preserved.
+                <p class="fac-del-lead">Permanently delete <strong id="fac-delete-name">this faculty member</strong>?</p>
+
+                <!-- View: checking -->
+                <p class="fac-del-checking" id="fac-delete-view-checking">
+                    <span class="material-symbols-outlined">progress_activity</span> Checking account&hellip;
+                </p>
+
+                <!-- View: confirm (nothing blocking) -->
+                <p class="fac-del-note hidden" id="fac-delete-view-confirm">This can&rsquo;t be undone. Borrowing history is kept.</p>
+
+                <!-- View: blocked (open bookings) -> Super Admin may override with their password -->
+                <div class="hidden" id="fac-delete-view-blocked">
+                    <div class="fac-del-warn">
+                        <div class="fac-del-warn-title">
+                            <span class="material-symbols-outlined">warning</span> Open bookings found
+                        </div>
+                        <ul class="fac-del-list" id="fac-delete-list"></ul>
+                    </div>
+                    <label class="fac-del-pw-label" for="fac-delete-password">Enter your password to delete anyway</label>
+                    <div class="fac-pw-wrap">
+                        <input type="password" id="fac-delete-password" class="form-control-custom"
+                            maxlength="128" autocomplete="current-password" placeholder="Your password">
+                        <button type="button" class="fac-pw-toggle"
+                            data-target="fac-delete-password" aria-label="Toggle password">
+                            <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                        </button>
+                    </div>
                 </div>
-                <div id="fac-delete-alert" class="alert-banner alert-danger hidden" role="alert" style="margin-top:0.75rem"></div>
+
+                <p class="fac-del-error hidden" id="fac-delete-error" role="alert"></p>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" id="fac-delete-cancel">Cancel</button>
-                <button class="ps-btn ps-btn--danger" id="fac-delete-confirm">
-                    <span class="material-symbols-outlined">delete</span> Delete Account
+                <button class="ps-btn ps-btn--danger" id="fac-delete-confirm" disabled>
+                    <span class="material-symbols-outlined">delete</span> <span id="fac-delete-confirm-label">Delete Account</span>
                 </button>
             </div>
         </div>
@@ -4738,6 +4772,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             function closeFacModal(id) {
                 var el = document.getElementById(id);
                 if (el) el.classList.remove('ps-modal-open');
+                if (id === 'fac-delete-modal') {
+                    _facDelCheckSeq++; /* ignore any check still in flight */
+                    var pw = document.getElementById('fac-delete-password');
+                    if (pw) {
+                        pw.value = '';
+                        pw.type = 'password';
+                    }
+                }
             }
 
             /* Search filter */
@@ -4763,15 +4805,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 var sel = document.getElementById('fac-edit-org');
                 if (!chk || !grp) return;
                 grp.style.display = chk.checked ? '' : 'none';
-                if (sel && !chk.checked) sel.value = '';
 
-                /* Org borrowing only applies to org advisers: switch it off and
-                   lock it when the account isn't an adviser, so a regular
-                   faculty account can never be saved with it enabled. */
-                var aobChk = document.getElementById('fac-edit-aob');
-                if (aobChk) {
-                    if (!chk.checked) aobChk.checked = false;
-                    aobChk.disabled = !chk.checked;
+                /* The organization picker and the org-borrowing switch only
+                   exist for advisers. Hiding them also clears them, so a regular
+                   faculty account can never be saved with either one set. */
+                if (!chk.checked) {
+                    if (sel) sel.value = '';
+                    var aobChk = document.getElementById('fac-edit-aob');
+                    if (aobChk) aobChk.checked = false;
                 }
             }
 
@@ -4846,30 +4887,143 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Delete Account: hand off from the edit modal to the confirm modal */
-            function _showFacDeleteAlert(msg) {
-                var box = document.getElementById('fac-delete-alert');
+            /* ── Delete Account ──────────────────────────────────────────
+               The confirm modal shows ONE state at a time:
+                 checking -> confirm  (nothing blocking)
+                          -> blocked  (open bookings: Super Admin can override
+                                       by re-entering their own password) */
+            var _facDelView = 'checking';
+            var _facDelCheckSeq = 0;
+
+            function _facDelEl(id) {
+                return document.getElementById(id);
+            }
+
+            function _facDelClearError() {
+                var box = _facDelEl('fac-delete-error');
+                if (box) {
+                    box.classList.add('hidden');
+                    box.textContent = '';
+                }
+                /* the plain note comes back once an error is gone */
+                var note = _facDelEl('fac-delete-view-confirm');
+                if (note && _facDelView === 'confirm') note.classList.remove('hidden');
+            }
+
+            function _facDelShowError(msg) {
+                var box = _facDelEl('fac-delete-error');
                 if (!box) return;
+                /* only one message at a time: an error replaces the plain note */
+                var note = _facDelEl('fac-delete-view-confirm');
+                if (note) note.classList.add('hidden');
                 box.textContent = msg;
                 box.classList.remove('hidden');
             }
 
-            function _clearFacDeleteAlert() {
-                var box = document.getElementById('fac-delete-alert');
-                if (!box) return;
-                box.classList.add('hidden');
-                box.textContent = '';
+            function _facDelSetView(view) {
+                _facDelView = view;
+                ['checking', 'confirm', 'blocked'].forEach(function(v) {
+                    var el = _facDelEl('fac-delete-view-' + v);
+                    if (el) el.classList.toggle('hidden', v !== view);
+                });
+                var btn = _facDelEl('fac-delete-confirm');
+                var lbl = _facDelEl('fac-delete-confirm-label');
+                if (btn) btn.disabled = (view === 'checking');
+                if (lbl) lbl.textContent = (view === 'blocked') ? 'Delete Anyway' : 'Delete Account';
+                var box = _facDelEl('fac-delete-error');
+                if (box) {
+                    box.classList.add('hidden');
+                    box.textContent = '';
+                }
+                if (view === 'blocked') {
+                    var pw = _facDelEl('fac-delete-password');
+                    if (pw) {
+                        pw.value = '';
+                        setTimeout(function() {
+                            pw.focus();
+                        }, 50);
+                    }
+                }
+            }
+
+            function _facDelRenderBlocked(d) {
+                var list = _facDelEl('fac-delete-list');
+                if (!list) return;
+                list.innerHTML = '';
+                var rows = [
+                    [d.waiting, 'pending request', 'pending requests', 'Will be declined'],
+                    [d.out, 'item still borrowed', 'items still borrowed', 'Can still be returned'],
+                    [d.rooms, 'upcoming room booking', 'upcoming room bookings', 'Will be cancelled']
+                ];
+                rows.forEach(function(r) {
+                    var n = parseInt(r[0], 10) || 0;
+                    if (n < 1) return;
+                    var li = document.createElement('li');
+                    var c = document.createElement('span');
+                    c.className = 'fac-del-count';
+                    c.textContent = n;
+                    var l = document.createElement('span');
+                    l.className = 'fac-del-label';
+                    l.textContent = (n === 1) ? r[1] : r[2];
+                    var o = document.createElement('span');
+                    o.className = 'fac-del-outcome';
+                    o.textContent = r[3];
+                    li.appendChild(c);
+                    li.appendChild(l);
+                    li.appendChild(o);
+                    list.appendChild(li);
+                });
+                _facDelSetView('blocked');
+            }
+
+            function _facCsrf() {
+                var el = document.querySelector('input[name="csrf_token"]');
+                return el ? el.value : '';
             }
 
             var facEditDelBtn = document.getElementById('fac-edit-delete-btn');
             if (facEditDelBtn) {
                 facEditDelBtn.addEventListener('click', function() {
                     if (!_facEditRow) return;
-                    var nameEl = document.getElementById('fac-delete-name');
+                    var facultyId = _facEditRow.dataset.facultyId || '';
+                    var nameEl = _facDelEl('fac-delete-name');
                     if (nameEl) nameEl.textContent = _facEditRow.dataset.fullname || 'this faculty member';
-                    _clearFacDeleteAlert();
+
+                    _facDelSetView('checking');
                     closeFacModal('fac-edit-modal');
                     openFacModal('fac-delete-modal');
+
+                    /* Dry run: find out up front whether anything blocks the delete,
+                       so the right message is the first (and only) one shown. */
+                    var seq = ++_facDelCheckSeq;
+                    fetch('equipment-booking/api/delete-faculty-account.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: new URLSearchParams({
+                                csrf_token: _facCsrf(),
+                                faculty_id: facultyId,
+                                dry_run: '1'
+                            }).toString()
+                        })
+                        .then(function(res) {
+                            return res.json();
+                        })
+                        .then(function(data) {
+                            if (seq !== _facDelCheckSeq) return;
+                            if (data && data.status === 'success' && data.blocked && data.details) {
+                                _facDelRenderBlocked(data.details);
+                            } else {
+                                /* clear, or the check itself failed: the real delete
+                                   re-checks on the server and reports any problem */
+                                _facDelSetView('confirm');
+                            }
+                        })
+                        .catch(function() {
+                            if (seq !== _facDelCheckSeq) return;
+                            _facDelSetView('confirm');
+                        });
                 });
             }
 
@@ -5007,67 +5161,97 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             /* Delete modal: confirm */
             var facDelConf = document.getElementById('fac-delete-confirm');
-            if (facDelConf) {
-                facDelConf.addEventListener('click', function() {
-                    _clearFacDeleteAlert();
-                    if (!_facEditRow) return;
+            var facDelPw = document.getElementById('fac-delete-password');
 
-                    var rowToRemove = _facEditRow;
-                    var facultyId = rowToRemove.dataset.facultyId || '';
-                    var savedLabel = facDelConf.innerHTML;
-                    facDelConf.disabled = true;
-                    facDelConf.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deleting...';
+            function _facDelSubmit() {
+                if (!_facEditRow || _facDelView === 'checking') return;
 
-                    var csrfEl = document.querySelector('input[name="csrf_token"]');
-                    var body = new URLSearchParams({
-                        csrf_token: csrfEl ? csrfEl.value : '',
-                        faculty_id: facultyId
-                    });
+                var override = (_facDelView === 'blocked');
+                var password = facDelPw ? facDelPw.value : '';
+                if (override && !password) {
+                    _facDelShowError('Enter your password to continue.');
+                    if (facDelPw) facDelPw.focus();
+                    return;
+                }
+                _facDelClearError();
 
-                    fetch('equipment-booking/api/delete-faculty-account.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            },
-                            body: body.toString()
-                        })
-                        .then(function(res) {
-                            return res.json().catch(function() {
-                                return {
-                                    status: 'error',
-                                    message: 'Unexpected response from the server.'
-                                };
-                            });
-                        })
-                        .then(function(data) {
-                            if (data.status === 'success') {
-                                rowToRemove.remove();
-                                _facEditRow = null;
+                var rowToRemove = _facEditRow;
+                var params = {
+                    csrf_token: _facCsrf(),
+                    faculty_id: rowToRemove.dataset.facultyId || ''
+                };
+                if (override) {
+                    params.override = '1';
+                    params.current_password = password;
+                }
 
-                                /* Table is now empty -> show the empty state again */
-                                if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {
-                                    var tr = document.createElement('tr');
-                                    tr.id = 'fac-empty-row';
-                                    tr.innerHTML = '<td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">' +
-                                        '<span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>' +
-                                        'No faculty accounts yet.</td>';
-                                    _facTbody.appendChild(tr);
-                                }
+                var savedLabel = facDelConf.innerHTML;
+                facDelConf.disabled = true;
+                facDelConf.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deleting...';
 
-                                closeFacModal('fac-delete-modal');
-                                if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
-                            } else {
-                                _showFacDeleteAlert(data.message || data.error || 'Could not delete this account.');
-                            }
-                        })
-                        .catch(function() {
-                            _showFacDeleteAlert('Network error. Please try again.');
-                        })
-                        .finally(function() {
-                            facDelConf.disabled = false;
-                            facDelConf.innerHTML = savedLabel;
+                fetch('equipment-booking/api/delete-faculty-account.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: new URLSearchParams(params).toString()
+                    })
+                    .then(function(res) {
+                        return res.json().catch(function() {
+                            return {
+                                status: 'error',
+                                message: 'Unexpected response from the server.'
+                            };
                         });
+                    })
+                    .then(function(data) {
+                        if (data.status === 'success') {
+                            rowToRemove.remove();
+                            _facEditRow = null;
+
+                            /* Table is now empty -> show the empty state again */
+                            if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {
+                                var tr = document.createElement('tr');
+                                tr.id = 'fac-empty-row';
+                                tr.innerHTML = '<td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">' +
+                                    '<span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>' +
+                                    'No faculty accounts yet.</td>';
+                                _facTbody.appendChild(tr);
+                            }
+
+                            closeFacModal('fac-delete-modal');
+                            if (typeof showToast === 'function') showToast('Faculty account deleted.', 't-danger');
+                        } else if (data.code === 'blocked' && data.details) {
+                            /* bookings appeared since the check: switch to the override view */
+                            _facDelRenderBlocked(data.details);
+                        } else if (data.code === 'bad_password') {
+                            _facDelShowError(data.message || 'Incorrect password.');
+                            if (facDelPw) {
+                                facDelPw.focus();
+                                facDelPw.select();
+                            }
+                        } else {
+                            _facDelShowError(data.message || data.error || 'Could not delete this account.');
+                        }
+                    })
+                    .catch(function() {
+                        _facDelShowError('Network error. Please try again.');
+                    })
+                    .finally(function() {
+                        facDelConf.innerHTML = savedLabel;
+                        facDelConf.disabled = (_facDelView === 'checking');
+                    });
+            }
+
+            if (facDelConf) facDelConf.addEventListener('click', _facDelSubmit);
+            if (facDelPw) {
+                facDelPw.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        _facDelSubmit();
+                    }
                 });
+                facDelPw.addEventListener('input', _facDelClearError);
             }
 
             /* Backdrop click to close */
