@@ -944,7 +944,7 @@ body {
 .catalog-card {
     background: var(--color-surface);
     border: 1px solid var(--color-outline-variant);
-    border-top: 4px solid #570000;
+    border-top: 0;
     border-radius: var(--radius-xl);
     padding: 24px;
     box-shadow: var(--shadow-md);
@@ -3617,7 +3617,7 @@ body {
 .dash-activity-card {
     background: #ffffff;
     border: 1px solid #e5e7eb;
-    border-top: 4px solid #570000;
+    border-top: 0;
     border-radius: 14px;
     padding: 20px 22px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -5010,16 +5010,52 @@ body {
 
 /* ── Identity banner ───────────────────────────────────────────── */
 .acct-banner {
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 18px;
-    background: linear-gradient(135deg, var(--color-primary-container) 0%, color-mix(in srgb, var(--color-primary-container) 65%, black) 100%);
+    /* Deep maroon where the name / ID sit, melting into the system's gold on the right,
+       with a soft light bloom in the top-right corner. */
+    background:
+        radial-gradient(120% 150% at 100% 0%, rgba(255, 233, 160, 0.55) 0%, rgba(255, 233, 160, 0) 52%),
+        linear-gradient(100deg, #570000 0%, var(--color-primary-container) 34%, #a63d0f 62%, #d99a1e 84%, #fbbf24 100%);
     border-radius: var(--radius-lg);
     padding: 24px 28px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.18);
     margin-bottom: 20px;
+}
+
+/* Two faint concentric rings in the gold corner — decorative only */
+.acct-banner::before,
+.acct-banner::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.acct-banner::before {
+    width: 260px;
+    height: 260px;
+    right: -70px;
+    top: -120px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.acct-banner::after {
+    width: 400px;
+    height: 400px;
+    right: -150px;
+    top: -170px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.acct-banner>* {
+    position: relative;
+    z-index: 1;
 }
 
 .acct-banner-left {
@@ -5034,7 +5070,8 @@ body {
     height: 60px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.16);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18);
     color: var(--color-on-primary);
     font-size: 1.2rem;
     font-weight: 700;
@@ -5087,22 +5124,27 @@ body {
 .acct-banner-badge .material-symbols-outlined {
     font-size: 14px;
     font-variation-settings: 'FILL' 1;
+    color: #fbbf24;
 }
 
+/* The button sits on the gold end of the gradient, so it is a solid maroon pill
+   (white-on-gold would not be readable). */
 .sov-nav-item.acct-banner-edit-btn {
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: #570000;
+    border: 1px solid rgba(255, 255, 255, 0.35);
     color: var(--color-on-primary);
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(87, 0, 0, 0.35);
 }
 
 .sov-nav-item.acct-banner-edit-btn:hover {
-    background: rgba(255, 255, 255, 0.26);
+    background: #6e0606;
     color: var(--color-on-primary);
 }
 
 .sov-nav-item.acct-banner-edit-btn.active {
-    background: rgba(255, 255, 255, 0.3);
+    background: #570000;
+    border-color: #fbbf24;
     color: var(--color-on-primary);
 }
 
@@ -5191,7 +5233,7 @@ body {
 .acct-card {
     background: var(--color-surface-lowest);
     border: 1px solid var(--color-outline-variant);
-    border-top: 4px solid #570000;
+    border-top: 0;
     border-radius: var(--radius-lg);
     padding: 24px 26px;
     box-shadow: var(--shadow-sm);
@@ -5655,6 +5697,13 @@ body {
         flex-direction: column;
         align-items: stretch;
         padding: 20px;
+        background:
+            radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%),
+            linear-gradient(165deg, #570000 0%, var(--color-primary-container) 46%, #a63d0f 74%, #e0a21f 100%);
+    }
+
+    .acct-banner::after {
+        display: none;
     }
 
     .acct-banner-edit-btn {
@@ -7342,7 +7391,7 @@ body {
 .myact-ledger-card {
     background: var(--color-surface-lowest);
     border: 1px solid var(--color-outline);
-    border-top: 4px solid #570000;
+    border-top: 0;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     overflow: hidden;
@@ -7454,8 +7503,8 @@ body {
 }
 
 .myact-ledger-table thead tr {
-    background: linear-gradient(90deg, #570000 0%, #7b2d43 100%);
-    border-bottom: 3px solid #fbbf24;
+    background: linear-gradient(90deg, #cfa94f 0%, #e8cd82 50%, #cfa94f 100%);
+    border-bottom: 2px solid var(--accent-gold-deep);
 }
 
 .myact-ledger-table th {
@@ -7465,7 +7514,7 @@ body {
     font-weight: 700;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    color: #ffffff;
+    color: #3a0000;
     white-space: nowrap;
 }
 
@@ -8446,4 +8495,51 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     .stat-tile-label {
         font-size: 0.7rem;
     }
+}
+
+
+/* ================================================================
+   CURVED GOLD ACCENT — top of every card / table container
+   ----------------------------------------------------------------
+   Replaces the flat 4px maroon top border. The accent is a gold
+   gradient band that follows each card's rounded top corners and
+   fades out down the sides. The card itself keeps a plain 1px outline.
+================================================================ */
+:root {
+    --accent-gold-deep: #b8913a;
+    --accent-gold: #dcb862;
+    --accent-gold-light: #ecd48f;
+}
+
+.catalog-card,
+.dash-activity-card,
+.acct-card,
+.myact-ledger-card {
+    position: relative;
+}
+
+.catalog-card::before,
+.dash-activity-card::before,
+.acct-card::before,
+.myact-ledger-card::before {
+    content: '';
+    position: absolute;
+    border: 3px solid transparent;
+    border-bottom: 0;
+    background:
+        linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+        linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+    background-origin: border-box;
+    -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    top: 0;
+    left: -1px;
+    right: -1px;
+    height: 30px;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    z-index: 1;
 }

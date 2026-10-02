@@ -3,6 +3,9 @@
     --primary-white: #ffffff;
     --secondary-cream: #f9f7f2;
     --accent-maroon: #600302;
+    --accent-gold-deep: #b8913a;
+    --accent-gold: #dcb862;
+    --accent-gold-light: #ecd48f;
     --accent-dark: #4a0f15;
     --accent-light: #f3e5e6;
     --sidebar-red-1: #c0392b;
@@ -1456,15 +1459,14 @@ main#app-main {
 /* ── Container header accent ──────────────────────────────────────
    Every "table/list container" header across the app (Requests,
    Equipment, Rooms, Faculty, Settings info-cards, Settings Preferences
-   and Borrowing Rules cards) shares one small maroon-gradient accent
-   stripe along its top edge. This is deliberately independent of each
+   and Borrowing Rules cards) shares one curved gold-gradient accent
+   that hugs the card's rounded top corners and fades down the sides. This is deliberately independent of each
    header's background/text styling — it's the one consistent visual
    marker that says "a container starts here", so the header reads as
    clearly separated from the body below it even though the header
    itself stays light. The outer card's overflow:hidden + border-radius
-   (already shared by every card wrapper) clips this automatically to
-   match each card's rounded top corners, so no per-card radius
-   handling is needed here.
+   (already shared by every card wrapper) clips it, and the ring's own
+   top radii match that clip so the band follows the curve.
    NOTE: modal dialog headers (.ps-modal-head, .form-card-header) are a
    different UI pattern (popups, not page containers) and intentionally
    excluded, matching the header-consolidation pass earlier. */
@@ -1485,11 +1487,24 @@ main#app-main {
 .sett-card-head::before {
     content: '';
     position: absolute;
+    border: 3px solid transparent;
+    border-bottom: 0;
+    background:
+        linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+        linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+    background-origin: border-box;
+    -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent-maroon), var(--accent-dark));
+    height: min(30px, 100%);
+    /* matches the card's clipped inner corner (card radius minus its 1px border) */
+    border-top-left-radius: calc(var(--radius) - 1px);
+    border-top-right-radius: calc(var(--radius) - 1px);
 }
 
 .ps-card-header {

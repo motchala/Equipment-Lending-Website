@@ -781,7 +781,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .active-card:hover {
-            border-top-color: var(--color-primary);
+            border-top-color: var(--accent-gold-deep);
             transform: translateY(-2px);
         }
 
@@ -1136,6 +1136,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1px solid rgba(240, 224, 224, .7) !important;
+            /* Top accent is the curved gold ::before in faculty-dashboard.css */
+            border-top: 0 !important;
             border-radius: 16px !important;
             padding: 24px !important;
             box-shadow: 0 4px 24px rgba(87, 0, 0, .05) !important;
@@ -1231,16 +1233,27 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .eq-item-card::after,
         #panel-lending .item-node::after {
+            /* hover accent: same curved gold band as the cards */
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #570000, #a00000);
+            height: 30px;
+            border: 3px solid transparent;
+            border-bottom: 0;
+            border-top-left-radius: 13px;
+            border-top-right-radius: 13px;
+            background:
+                linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+                linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+            background-origin: border-box;
+            -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
             opacity: 0;
             transition: opacity .25s;
-            border-radius: 14px 14px 0 0;
             pointer-events: none;
             z-index: 2;
         }
@@ -1528,6 +1541,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         [data-theme="dark"] #panel-lending .catalog-card {
             background: rgba(35, 21, 21, .85) !important;
             border-color: var(--color-outline-variant) !important;
+            border-top-color: #570000 !important;
         }
 
         [data-theme="dark"] #panel-lending .catalog-search-wrap,
