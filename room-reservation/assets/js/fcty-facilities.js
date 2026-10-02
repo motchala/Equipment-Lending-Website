@@ -56,6 +56,11 @@
     };
 
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
+
+    /* Attendees start at 30 every time; the +/- buttons move by 10.
+       Faculty can type any exact number they prefer. */
+    var DEFAULT_ATTENDEES = 30;
+    var ATTENDEE_STEP = 10;
     var ISSUE_TYPES = ['Air conditioning', 'Projector / AV', 'Furniture', 'Lighting', 'Cleanliness', 'Other'];
 
     /* ── DOM refs (resolved in init) ────────────────────────── */
@@ -649,7 +654,7 @@
         var nowMin = now.getHours() * 60 + now.getMinutes();
 
         /* Smart defaults: next half-hour today, or 8 AM tomorrow if it's too late */
-        var st = { date: ymd(now), start: 0, end: 0, purpose: '', attendees: 1 };
+        var st = { date: ymd(now), start: 0, end: 0, purpose: '', attendees: DEFAULT_ATTENDEES };
         if (nowMin >= SCHOOL_END_MIN - 60) {
             st.date = ymd(addDays(now, 1)); st.start = SCHOOL_START_MIN + 60;
         } else {
@@ -673,7 +678,10 @@
             '<span class="fcty-kicker">' + icon('event_available') + 'Reserve a room</span>' +
             '<h3 class="fcty-res-room">' + esc(room.name) + '</h3>' +
             '<p class="fcty-res-where">' + esc(currentRoom ? currentRoom.location : '') + '</p>' +
+            '<div class="fcty-chip-row">' +
             (seats !== null ? '<span class="fcty-seats">' + icon('chair') + plural(seats, 'seat') + '</span>' : '') +
+            '<span class="fcty-seats" id="fcty-quota" hidden></span>' +
+            '</div>' +
             '</div>' +
             '<ul class="fcty-ticket" aria-live="polite">' +
             '<li>' + icon('event') + '<div><small>Date</small><strong id="fcty-tk-date"></strong></div></li>' +
@@ -699,6 +707,7 @@
             '<button type="button" class="fcty-icon-btn" id="fcty-form-close" aria-label="Close">' + icon('close') + '</button></div>' +
             '<div class="fcty-res-scroll">' +
             alertHTML('fcty-res-msg', 'error') +
+            alertHTML('fcty-res-limit', 'warn') +
 
             '<div class="fcty-step"><div class="fcty-step-head"><span class="fcty-step-num">1</span>When</div>' +
             '<div class="fcty-sub"><span class="fcty-sublabel">Date</span>' +
@@ -728,13 +737,21 @@
             '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or describe it in your own words\u2026" maxlength="200"></div>' +
             '<div class="fcty-sub"><span class="fcty-sublabel">Attendees</span>' +
             '<div class="fcty-stepper">' +
-            '<button type="button" id="fcty-att-minus" aria-label="Fewer attendees">' + icon('remove') + '</button>' +
-            '<input type="number" id="fcty-res-attendees" min="1" value="1" aria-label="Number of attendees">' +
-            '<button type="button" id="fcty-att-plus" aria-label="More attendees">' + icon('add') + '</button>' +
+            '<button type="button" id="fcty-att-minus" aria-label="10 fewer attendees" title="Remove 10">' + icon('remove') + '</button>' +
+            '<input type="number" id="fcty-res-attendees" min="1" value="' + DEFAULT_ATTENDEES + '" aria-label="Number of attendees">' +
+            '<button type="button" id="fcty-att-plus" aria-label="10 more attendees" title="Add 10">' + icon('add') + '</button>' +
             '</div>' +
             '<p class="fcty-hint" id="fcty-seat-hint"></p></div>' +
             '<button type="button" class="fcty-link-btn" id="fcty-note-toggle">' + icon('add') + 'Add a note</button>' +
             '<textarea id="fcty-res-notes" class="fcty-input" rows="2" placeholder="Anything the admin should know?" hidden></textarea>' +
+            '<div class="fcty-sub" id="fcty-doc-block" hidden>' +
+            '<span class="fcty-sublabel">Supporting letter <small>(optional)</small></span>' +
+            '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
+            '<span><strong>Drop a file or browse</strong><small>JPG, PNG or PDF \u00b7 up to 5 MB</small></span></label>' +
+            '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
+            '<div class="fcty-file" id="fcty-file" hidden></div>' +
+            '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
+            '</div>' +
             '</div>' +
 
             '</div>' +
@@ -753,6 +770,98 @@
         var elMsg = $('fcty-res-msg'), elAvail = $('fcty-res-avail'), btnSubmit = $('fcty-res-submit');
         var elAtt = $('fcty-res-attendees'), elPurpose = $('fcty-res-purpose');
         var confirmHTML = icon('event_available') + 'Confirm reservation';
+
+        /* ── Room limit (max 2 active reservations per account) ── */
+        var quota = null;
+        function isFull() { return !!quota && quota.remaining <= 0; }
+
+        function renderQuota() {
+            if (!quota) return;
+            var chip = $('fcty-quota'), lim = $('fcty-res-limit'), docBlock = $('fcty-doc-block');
+            if (chip) {
+                chip.innerHTML = icon('meeting_room') + quota.active + ' of ' + quota.max + ' rooms reserved';
+                chip.hidden = false;
+            }
+            if (docBlock) docBlock.hidden = !quota.is_adviser;
+            if (!lim) return;
+
+            if (!isFull()) { lim.hidden = true; btnSubmit.disabled = false; btnSubmit.title = ''; return; }
+
+            btnSubmit.disabled = true;
+            btnSubmit.title = 'Room limit reached';
+            setAlert(lim, 'warn', 'warning',
+                '<strong>Room limit reached</strong><br>You already have ' + quota.max +
+                ' active room reservations. Cancel one or wait until it ends to reserve another room.' +
+                '<ul class="fcty-limit-list">' + (quota.reservations || []).map(function (r) {
+                    return '<li>' + esc(r.room_name) + ' \u00b7 ' + longDate(parseYmd(r.date)) + ' \u00b7 ' +
+                        minToLabel(timeToMin(r.start)) + ' \u2013 ' + minToLabel(timeToMin(r.end)) + '</li>';
+                }).join('') + '</ul>' +
+                '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-lim-history">' +
+                icon('receipt_long') + 'My reservations</button>');
+            var h = $('fcty-lim-history');
+            if (h) h.addEventListener('click', function () {
+                closeOverlay(formOverlay);
+                var tab = document.querySelector('[data-rooms-nav="history"]');
+                if (tab) tab.click();
+            });
+        }
+
+        function loadQuota() {
+            return fetch(apiBase() + 'room-reservation/api/get-room-quota.php', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (q) { if (q && !q.error) { quota = q; renderQuota(); } })
+                .catch(function () { /* informational only — the server enforces the limit */ });
+        }
+
+        /* ── Optional supporting letter (Organization Advisers) ── */
+        var docFile = null;
+        var DOC_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+        var DOC_MAX = 5 * 1024 * 1024;
+        var DOC_HINT = 'Optional. Attached letters are kept with your request and may be used to prioritise it.';
+        var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint');
+
+        function fileKind(f) {
+            var n = (f.name || '').toLowerCase();
+            if (f.type) return f.type;
+            if (/\.pdf$/.test(n)) return 'application/pdf';
+            if (/\.png$/.test(n)) return 'image/png';
+            if (/\.jpe?g$/.test(n)) return 'image/jpeg';
+            return '';
+        }
+        function fmtSize(b) { return b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+        function docMessage(text) {
+            elDocHint.textContent = text || DOC_HINT;
+            elDocHint.classList.toggle('is-over', !!text);
+        }
+        function setDoc(f) {
+            if (!f) {
+                docFile = null; elDoc.value = '';
+                elFile.hidden = true; elDrop.hidden = false; docMessage('');
+                return;
+            }
+            var kind = fileKind(f);
+            if (DOC_TYPES.indexOf(kind) === -1) { elDoc.value = ''; docMessage('Please choose a JPG, PNG or PDF file.'); return; }
+            if (f.size > DOC_MAX) { elDoc.value = ''; docMessage('That file is ' + fmtSize(f.size) + '. The limit is 5 MB.'); return; }
+            docFile = f; docMessage('');
+            elFile.innerHTML = icon(kind === 'application/pdf' ? 'picture_as_pdf' : 'image') +
+                '<span class="fcty-file-name">' + esc(f.name) + '</span>' +
+                '<span class="fcty-file-size">' + fmtSize(f.size) + '</span>' +
+                '<button type="button" class="fcty-icon-btn" id="fcty-file-remove" aria-label="Remove file">' + icon('close') + '</button>';
+            elFile.hidden = false; elDrop.hidden = true;
+            $('fcty-file-remove').addEventListener('click', function () { setDoc(null); });
+        }
+        docMessage('');
+        elDoc.addEventListener('change', function () { setDoc(elDoc.files && elDoc.files[0] ? elDoc.files[0] : null); });
+        ['dragenter', 'dragover'].forEach(function (ev) {
+            elDrop.addEventListener(ev, function (e) { e.preventDefault(); elDrop.classList.add('is-drag'); });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+            elDrop.addEventListener(ev, function (e) { e.preventDefault(); elDrop.classList.remove('is-drag'); });
+        });
+        elDrop.addEventListener('drop', function (e) {
+            var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) setDoc(f);
+        });
 
         /* ── Derived helpers ── */
         function dayBookings() {
@@ -940,8 +1049,8 @@
             st.attendees = Math.max(1, Math.min(999, n || 1));
             syncControls();
         }
-        $('fcty-att-minus').addEventListener('click', function () { setAttendees(st.attendees - 1); });
-        $('fcty-att-plus').addEventListener('click', function () { setAttendees(st.attendees + 1); });
+        $('fcty-att-minus').addEventListener('click', function () { setAttendees(st.attendees - ATTENDEE_STEP); });
+        $('fcty-att-plus').addEventListener('click', function () { setAttendees(st.attendees + ATTENDEE_STEP); });
         elAtt.addEventListener('input', function () {
             st.attendees = Math.max(1, parseInt(elAtt.value, 10) || 1);
             var hint = $('fcty-seat-hint');
@@ -967,23 +1076,31 @@
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Submitting\u2026';
 
+            var fd = new FormData();
+            fd.append('room_id', room.room_id);
+            fd.append('reservation_date', st.date);
+            fd.append('start_time', minToHHMM(st.start));
+            fd.append('end_time', minToHHMM(st.end));
+            fd.append('purpose', purpose);
+            fd.append('attendees', st.attendees);
+            fd.append('notes', $('fcty-res-notes').value.trim());
+            fd.append('csrf_token', csrf());
+            if (docFile && quota && quota.is_adviser) fd.append('document', docFile, docFile.name);
+
             fetch(apiBase() + 'room-reservation/api/submit-faculty-reserve.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({
-                    room_id: room.room_id, reservation_date: st.date,
-                    start_time: minToHHMM(st.start), end_time: minToHHMM(st.end),
-                    purpose: purpose, attendees: st.attendees,
-                    notes: $('fcty-res-notes').value.trim(),
-                    submitted_as: 'personal', csrf_token: csrf()
-                })
+                body: fd
             })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
-                    btnSubmit.disabled = false;
+                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
-                    if (data.error) { fail(data.error); return; }
+                    if (data.error) {
+                        fail(data.error);
+                        if (data.limit_reached) loadQuota();   /* sync the chip + lock the button */
+                        return;
+                    }
 
                     weekCache = {};
                     document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
@@ -1004,7 +1121,7 @@
                     showDone(data);
                 })
                 .catch(function () {
-                    btnSubmit.disabled = false;
+                    btnSubmit.disabled = isFull();
                     btnSubmit.innerHTML = confirmHTML;
                     fail('Network error. Please try again.');
                 });
@@ -1022,6 +1139,8 @@
                 '<p>' + esc(data.room_name || room.name) + ' \u00b7 ' + longDate(parseYmd(st.date)) + '<br>' +
                 minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
                 (data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
+                (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Supporting letter attached</p>' : '') +
+                (approved && data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +
                 '<div class="fcty-done-actions">' +
                 '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-done-history">' + icon('receipt_long') + 'My reservations</button>' +
                 '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-done-close">Done</button>' +
@@ -1033,11 +1152,13 @@
                 if (tab) tab.click();
             });
             $('fcty-done-close').focus();
+            if (approved && quota) { quota.active = data.active; quota.remaining = Math.max(0, data.max - data.active); renderQuota(); }
         }
 
         refresh();
         loadWeek();
         serverCheck();
+        loadQuota();
     }
 
     function joinWaitlist(btn, room, date, s, e) {

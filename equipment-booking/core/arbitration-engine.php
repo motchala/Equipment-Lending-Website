@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -346,7 +347,6 @@ class ArbitrationEngine
 
             $conn->commit();
             $transaction_open = false;
-
         } catch (\Throwable $e) {
             if ($transaction_open) {
                 $conn->rollback();
@@ -356,7 +356,7 @@ class ArbitrationEngine
             // Log the error to PHP's error log.
             error_log(
                 'ArbitrationEngine::process — unexpected error for request_id='
-                . $request_id . ': ' . $e->getMessage()
+                    . $request_id . ': ' . $e->getMessage()
             );
 
             // Insert an arbitration_error entry into tbl_arbitration_log.
@@ -412,7 +412,7 @@ class ArbitrationEngine
                 // Silently swallow — a logging failure must not propagate.
                 error_log(
                     'ArbitrationEngine::process — failed to write error log for request_id='
-                    . $request_id . ': ' . $log_e->getMessage()
+                        . $request_id . ': ' . $log_e->getMessage()
                 );
             }
         }
@@ -591,7 +591,7 @@ class ArbitrationEngine
         // based on allow_org_borrowing alone (Requirement 7.3).
         $submitted_as    = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
         $is_adviser_mode = ($submitted_as === 'adviser')
-                           || ($submitted_as === null && isset($request['role']) && $request['role'] === 'Organization Adviser');
+            || ($submitted_as === null && isset($request['role']) && $request['role'] === 'Organization Adviser');
 
         if ($is_adviser_mode) {
             return 'A signed request letter is required for organization borrowing.';
@@ -650,7 +650,8 @@ class ArbitrationEngine
             }
 
             // Department Head / Dept. Head → Signatory_Level 2.
-            if (stripos($contents, 'Department Head') !== false
+            if (
+                stripos($contents, 'Department Head') !== false
                 || stripos($contents, 'Dept. Head') !== false
             ) {
                 return 2;
@@ -817,7 +818,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare UPDATE failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -827,7 +828,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute UPDATE failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -848,7 +849,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare SELECT failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -858,7 +859,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute SELECT failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -898,7 +899,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare INSERT log failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -917,7 +918,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute INSERT log failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
         }
 
@@ -952,7 +953,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::cascadeDecline — prepare failed for equipment='{$equipment_name}': "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -962,7 +963,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::cascadeDecline — execute failed for equipment='{$equipment_name}': "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -1060,44 +1061,51 @@ class ArbitrationEngine
             );
             if ($req_datetime === false || $req_datetime <= $now_manila) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_PAST_DATETIME,
+                    'Declined',
+                    self::RULE_PAST_DATETIME,
                     'This reservation date and time has already passed.'
                 );
                 return;
             }
 
-            // ── Step 3: Overdue block ────────────────────────────────────────
-            // Checks tbl_requests (equipment overdue) — same rule applies to rooms.
-            if (($config['rule_overdue_block_enabled'] ?? '0') === '1') {
-                if (self::checkOverdueBlock($conn, $faculty_id)) {
-                    self::writeRoomDecision(
-                        $conn, $reservation_id, $room_id, $room_name, $faculty_id,
-                        (string)$reservation['faculty_name'],
-                        'Declined', self::RULE_OVERDUE_BLOCK,
-                        'You have an overdue equipment item. Please return it before making a room reservation.'
-                    );
-                    return;
-                }
-            }
+            // ── Step 3: (removed) Overdue-equipment block ───────────────────
+            // Policy: a faculty member may reserve a room even while equipment
+            // is still out or overdue. The overdue block therefore applies to
+            // EQUIPMENT requests only (see process()). Overdue history is still
+            // used as a late tie-break when two reservations clash (Step 6).
 
             // ── Step 4: Room status check ────────────────────────────────────
             $room_status = (string)$reservation['room_status'];
             if ($room_status === 'Maintenance') {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'This room is currently under maintenance and cannot be reserved.'
                 );
                 return;
             }
             if ($room_status === 'Not Bookable') {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'This room is not available for reservation.'
                 );
                 return;
@@ -1106,9 +1114,14 @@ class ArbitrationEngine
             // ── Step 4b: Operating hours check ──────────────────────────────
             if (!self::checkOperatingHours($start_time, $end_time)) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'Reservations must be within operating hours: 7:00 AM to 8:00 PM.'
                 );
                 return;
@@ -1119,9 +1132,14 @@ class ArbitrationEngine
             $hold_note = self::checkMissingDocument($reservation, $config);
             if ($hold_note !== null) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_MISSING_DOC_HOLD,
+                    'Declined',
+                    self::RULE_MISSING_DOC_HOLD,
                     $hold_note
                 );
                 return;
@@ -1155,9 +1173,14 @@ class ArbitrationEngine
             if (empty($conflicts)) {
                 // No conflict — approve immediately.
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Approved', self::RULE_1_FIFO,
+                    'Approved',
+                    self::RULE_1_FIFO,
                     'Room reservation approved — no time conflict.'
                 );
                 return;
@@ -1227,32 +1250,46 @@ class ArbitrationEngine
                 // This reservation beats all conflicts — decline the losers.
                 foreach ($conflicts as $loser) {
                     self::writeRoomDecision(
-                        $conn, (int)$loser['id'], $room_id, $room_name,
-                        (string)$loser['faculty_id'], (string)$loser['faculty_name'],
-                        'Declined', $applied_rule,
+                        $conn,
+                        (int)$loser['id'],
+                        $room_id,
+                        $room_name,
+                        (string)$loser['faculty_id'],
+                        (string)$loser['faculty_name'],
+                        'Declined',
+                        $applied_rule,
                         'A higher-priority reservation was submitted for the same time slot.'
                     );
                 }
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Approved', $applied_rule,
+                    'Approved',
+                    $applied_rule,
                     'Room reservation approved via priority scoring.'
                 );
             } else {
                 // A higher-priority reservation already holds this slot.
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', $applied_rule,
+                    'Declined',
+                    $applied_rule,
                     'This time slot is already reserved by a higher-priority request.'
                 );
             }
-
         } catch (\Throwable $e) {
             error_log(
                 'ArbitrationEngine::processRoomReservation — unexpected error for reservation_id='
-                . $reservation_id . ': ' . $e->getMessage()
+                    . $reservation_id . ': ' . $e->getMessage()
             );
         }
     }
@@ -1303,10 +1340,16 @@ class ArbitrationEngine
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($log !== false) {
-            $log->bind_param('iissssss',
-                $reservation_id, $room_id, $room_name,
-                $borrower_id, $borrower_name,
-                $decision, $rule, $reason
+            $log->bind_param(
+                'iissssss',
+                $reservation_id,
+                $room_id,
+                $room_name,
+                $borrower_id,
+                $borrower_name,
+                $decision,
+                $rule,
+                $reason
             );
             $log->execute();
             $log->close();
