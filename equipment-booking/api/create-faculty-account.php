@@ -44,7 +44,6 @@ $last_name     = trim($_POST['last_name'] ?? '');
 $password_raw  = $_POST['password'] ?? '';
 $confirm_raw   = $_POST['confirm_password'] ?? '';
 $is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
-$allow_org_borrowing = (($_POST['allow_org_borrowing'] ?? '0') === '1') ? 1 : 0;
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
 // ── Validation: pupsync_email ─────────────────────────────────────────────────
@@ -112,58 +111,6 @@ if ($is_org_adviser === 1) {
 }
 // If is_org_adviser is 0, organization_id remains NULL (Requirement 4.8)
 
-// ── faculty_id generation (inside transaction) ───────────────────────────────
-$year = date('Y');
-$pattern = $year . '-%-BN-0';
-
-$conn->begin_transaction();
-
-$seq_stmt = $conn->prepare("SELECT faculty_id FROM tbl_users WHERE faculty_id LIKE ? ORDER BY faculty_id DESC LIMIT 1 FOR UPDATE");
-if (!$seq_stmt) {
-    $conn->rollback();
-    error_log('[create-faculty-account] seq lookup prepare failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not create account. Please try again.');
-}
-$seq_stmt->bind_param('s', $pattern);
-if (!$seq_stmt->execute()) {
-    $conn->rollback();
-    error_log('[create-faculty-account] seq lookup execute failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not create account. Please try again.');
-}
-$seq_result = $seq_stmt->get_result();
-$seq_row = $seq_result->fetch_assoc();
-$seq_stmt->close();
-
-$max_seq = 0;
-if ($seq_row !== null) {
-    $parts = explode('-', $seq_row['faculty_id']);
-    $max_seq = intval($parts[1]);
-}
-
-// A deleted account's id must never be handed out again. Borrow / reservation /
-// code history keeps the old faculty_id as plain text, so reusing it would
-// silently attach someone else's history to the new person. Count the ids
-// still present in those tables when picking the next number.
-foreach (['tbl_requests', 'tbl_room_reservations', 'tbl_faculty_codes'] as $hist_table) {
-    $hist_stmt = $conn->prepare("SELECT faculty_id FROM {$hist_table} WHERE faculty_id LIKE ? ORDER BY faculty_id DESC LIMIT 1");
-    if (!$hist_stmt) {
-        $conn->rollback();
-        error_log('[create-faculty-account] history seq lookup prepare failed (' . $hist_table . '): ' . $conn->error);
-        send_json(500, 'error', 'Could not create account. Please try again.');
-    }
-    $hist_stmt->bind_param('s', $pattern);
-    $hist_stmt->execute();
-    $hist_row = $hist_stmt->get_result()->fetch_assoc();
-    $hist_stmt->close();
-    if ($hist_row !== null) {
-        $hist_parts = explode('-', $hist_row['faculty_id']);
-        $max_seq = max($max_seq, intval($hist_parts[1] ?? 0));
-    }
-}
-$seq = $max_seq + 1;
-
-$faculty_id = $year . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT) . '-BN-0';
-
 // ── Fullname concatenation ───────────────────────────────────────────────────
 if ($middle_name === '') {
     $fullname = $first_name . ' ' . $last_name;
@@ -174,33 +121,64 @@ if ($middle_name === '') {
 // ── Password & role ──────────────────────────────────────────────────────────
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
 $role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
-if ($is_org_adviser !== 1) {
-    $allow_org_borrowing = 0; // org borrowing only applies to org advisers
-}
+// Org privileges are automatic: being an Organization Adviser is what grants them.
+$allow_org_borrowing = $is_org_adviser;
 $backup_val = ($backup_email === '') ? null : $backup_email;
 
-// ── Insert ───────────────────────────────────────────────────────────────────
-$ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-if (!$ins_stmt) {
-    $conn->rollback();
-    error_log('[create-faculty-account] INSERT prepare failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not create account. Please try again.');
-}
-$ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
-if (!$ins_stmt->execute()) {
-    $conn->rollback();
-    error_log('[create-faculty-account] INSERT execute failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not create account. Please try again.');
-}
-$ins_stmt->close();
+// ── Insert ───────────────────────────────────────────────────────────────────────
+// The Faculty ID is NOT generated here: the faculty member sets their own after
+// signing in. faculty_id is the table's primary key, so the row is stored under a
+// unique internal placeholder that the UI shows as "Not set yet" (see
+// config/faculty-id.php). It is replaced by the real id when they set it.
+$faculty_id = '';
+$inserted   = false;
+for ($attempt = 0; $attempt < 5 && !$inserted; $attempt++) {
+    $faculty_id = faculty_id_make_placeholder();
+    $errno = 0;
+    $errmsg = '';
+    try {
+        $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        if (!$ins_stmt) {
+            throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
+        }
+        $ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
+        if ($ins_stmt->execute()) {
+            $inserted = true;
+        } else {
+            $errno  = (int)$ins_stmt->errno;
+            $errmsg = (string)$ins_stmt->error;
+        }
+        $ins_stmt->close();
+    } catch (mysqli_sql_exception $e) {
+        // mysqli throws instead of returning false on newer PHP versions
+        $errno  = (int)$e->getCode();
+        $errmsg = $e->getMessage();
+    } catch (Throwable $e) {
+        error_log('[create-faculty-account] ' . $e->getMessage());
+        send_json(500, 'error', 'Could not create account. Please try again.');
+    }
 
-$conn->commit();
+    if (!$inserted) {
+        if ($errno === 1062 && stripos($errmsg, 'email') !== false) {
+            send_json(409, 'error', 'A faculty account with this email already exists.');
+        }
+        if ($errno === 1062) {
+            continue; // the placeholder collided (practically impossible): try another
+        }
+        error_log('[create-faculty-account] INSERT failed: ' . $errmsg);
+        send_json(500, 'error', 'Could not create account. Please try again.');
+    }
+}
+if (!$inserted) {
+    send_json(500, 'error', 'Could not create account. Please try again.');
+}
 
 // ── Success ──────────────────────────────────────────────────────────────────
 http_response_code(201);
 echo json_encode([
     'status' => 'success',
-    'faculty_id' => $faculty_id,
+    'faculty_id' => $faculty_id,        // internal key (placeholder) the admin table needs for edit/delete
+    'faculty_id_pending' => true,       // the faculty member sets the real Faculty ID themselves
     'message' => 'Faculty account created successfully.'
 ]);
 exit;

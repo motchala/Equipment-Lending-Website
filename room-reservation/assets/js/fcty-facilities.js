@@ -57,10 +57,6 @@
 
     var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
 
-    /* Attendees start at 30 every time; the +/- buttons move by 10.
-       Faculty can type any exact number they prefer. */
-    var DEFAULT_ATTENDEES = 30;
-    var ATTENDEE_STEP = 10;
     var ISSUE_TYPES = ['Air conditioning', 'Projector / AV', 'Furniture', 'Lighting', 'Cleanliness', 'Other'];
 
     /* ── DOM refs (resolved in init) ────────────────────────── */
@@ -125,7 +121,7 @@
     function durLabel(mins) {
         var h = Math.floor(mins / 60), m = mins % 60;
         if (!h) return m + ' min';
-        return h + ' hr' + (m ? ' ' + m + ' min' : '');
+        return h + (h === 1 ? ' hour' : ' hours') + (m ? ' ' + m + ' min' : '');
     }
 
     function sortByStart(list) {
@@ -654,7 +650,7 @@
         var nowMin = now.getHours() * 60 + now.getMinutes();
 
         /* Smart defaults: next half-hour today, or 8 AM tomorrow if it's too late */
-        var st = { date: ymd(now), start: 0, end: 0, purpose: '', attendees: DEFAULT_ATTENDEES };
+        var st = { date: ymd(now), start: 0, end: 0, purpose: '' };
         if (nowMin >= SCHOOL_END_MIN - 60) {
             st.date = ymd(addDays(now, 1)); st.start = SCHOOL_START_MIN + 60;
         } else {
@@ -724,7 +720,7 @@
             '</div>' +
             '<div class="fcty-sub"><span class="fcty-sublabel">Quick duration</span>' +
             '<div class="fcty-chips" id="fcty-dur-chips">' +
-            [30, 60, 90, 120, 180].map(function (m) {
+            [60, 180, 300].map(function (m) {
                 return '<button type="button" class="fcty-chip" aria-pressed="false" data-min="' + m + '">' + durLabel(m) + '</button>';
             }).join('') +
             '</div></div>' +
@@ -735,13 +731,6 @@
             '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-purpose">Purpose</label>' +
             chipRow('fcty-purpose-chips', PURPOSES) +
             '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or describe it in your own words\u2026" maxlength="200"></div>' +
-            '<div class="fcty-sub"><span class="fcty-sublabel">Attendees</span>' +
-            '<div class="fcty-stepper">' +
-            '<button type="button" id="fcty-att-minus" aria-label="10 fewer attendees" title="Remove 10">' + icon('remove') + '</button>' +
-            '<input type="number" id="fcty-res-attendees" min="1" value="' + DEFAULT_ATTENDEES + '" aria-label="Number of attendees">' +
-            '<button type="button" id="fcty-att-plus" aria-label="10 more attendees" title="Add 10">' + icon('add') + '</button>' +
-            '</div>' +
-            '<p class="fcty-hint" id="fcty-seat-hint"></p></div>' +
             '<button type="button" class="fcty-link-btn" id="fcty-note-toggle">' + icon('add') + 'Add a note</button>' +
             '<textarea id="fcty-res-notes" class="fcty-input" rows="2" placeholder="Anything the admin should know?" hidden></textarea>' +
             '<div class="fcty-sub" id="fcty-doc-block" hidden>' +
@@ -768,7 +757,7 @@
 
         var elDate = $('fcty-res-date'), elStart = $('fcty-res-start'), elEnd = $('fcty-res-end');
         var elMsg = $('fcty-res-msg'), elAvail = $('fcty-res-avail'), btnSubmit = $('fcty-res-submit');
-        var elAtt = $('fcty-res-attendees'), elPurpose = $('fcty-res-purpose');
+        var elPurpose = $('fcty-res-purpose');
         var confirmHTML = icon('event_available') + 'Confirm reservation';
 
         /* ── Room limit (max 2 active reservations per account) ── */
@@ -901,17 +890,6 @@
             /* Purpose chips */
             setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
 
-            /* Attendees */
-            elAtt.value = st.attendees;
-            $('fcty-att-minus').disabled = st.attendees <= 1;
-            var hint = $('fcty-seat-hint');
-            if (seats !== null && st.attendees > seats) {
-                hint.textContent = 'That\u2019s more than the ' + seats + ' seats in this room.';
-                hint.style.color = 'var(--fcty-maintenance)';
-            } else {
-                hint.textContent = seats !== null ? 'This room seats ' + seats + '.' : '';
-                hint.style.color = '';
-            }
         }
 
         function renderSummary() {
@@ -1045,20 +1023,6 @@
             st.purpose = elPurpose.value;
             setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
         });
-        function setAttendees(n) {
-            st.attendees = Math.max(1, Math.min(999, n || 1));
-            syncControls();
-        }
-        $('fcty-att-minus').addEventListener('click', function () { setAttendees(st.attendees - ATTENDEE_STEP); });
-        $('fcty-att-plus').addEventListener('click', function () { setAttendees(st.attendees + ATTENDEE_STEP); });
-        elAtt.addEventListener('input', function () {
-            st.attendees = Math.max(1, parseInt(elAtt.value, 10) || 1);
-            var hint = $('fcty-seat-hint');
-            var over = seats !== null && st.attendees > seats;
-            hint.textContent = over ? 'That\u2019s more than the ' + seats + ' seats in this room.' : (seats !== null ? 'This room seats ' + seats + '.' : '');
-            hint.style.color = over ? 'var(--fcty-maintenance)' : '';
-            $('fcty-att-minus').disabled = st.attendees <= 1;
-        });
         $('fcty-note-toggle').addEventListener('click', function () {
             var ta = $('fcty-res-notes');
             ta.hidden = !ta.hidden;
@@ -1082,7 +1046,6 @@
             fd.append('start_time', minToHHMM(st.start));
             fd.append('end_time', minToHHMM(st.end));
             fd.append('purpose', purpose);
-            fd.append('attendees', st.attendees);
             fd.append('notes', $('fcty-res-notes').value.trim());
             fd.append('csrf_token', csrf());
             if (docFile && quota && quota.is_adviser) fd.append('document', docFile, docFile.name);

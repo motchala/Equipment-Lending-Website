@@ -40,10 +40,10 @@ $backup_email   = strtolower(trim($_POST['backup_email'] ?? ''));
 $first_name     = trim($_POST['first_name'] ?? '');
 $last_name      = trim($_POST['last_name'] ?? '');
 $is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
-$allow_org_borrowing = (($_POST['allow_org_borrowing'] ?? '0') === '1') ? 1 : 0;
-if ($is_org_adviser !== 1) {
-    $allow_org_borrowing = 0; // org borrowing only applies to org advisers
-}
+// Org privileges are automatic: being an Organization Adviser is what grants them
+// (any posted allow_org_borrowing value is ignored). The Faculty ID is never
+// changed here - faculty set it themselves and admins cannot edit it.
+$allow_org_borrowing = $is_org_adviser;
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
 // ── Validation: faculty_id ────────────────────────────────────────────────────

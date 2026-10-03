@@ -1588,6 +1588,132 @@
             });
     }
 
+    /* -- Faculty ID (set once, then permanent) ------------------------- */
+    let _facultyIdPending = '';
+
+    function facultyIdStep(step) {
+        const enter = document.getElementById('facultyIdStepEnter');
+        const confirm = document.getElementById('facultyIdStepConfirm');
+        if (enter) enter.style.display = (step === 'enter') ? '' : 'none';
+        if (confirm) confirm.style.display = (step === 'confirm') ? '' : 'none';
+    }
+
+    function facultyIdMessage(elId, msg) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    function openFacultyIdModal() {
+        const modal = document.getElementById('facultyIdModal');
+        if (!modal) return;
+        const input = document.getElementById('facultyIdInput');
+        if (input) input.value = '';
+        _facultyIdPending = '';
+        facultyIdMessage('facultyIdError', '');
+        facultyIdMessage('facultyIdConfirmError', '');
+        facultyIdStep('enter');
+        modal.style.display = 'flex';
+        setTimeout(() => { if (input) input.focus(); }, 80);
+    }
+
+    function closeFacultyIdModal() {
+        const modal = document.getElementById('facultyIdModal');
+        if (modal) modal.style.display = 'none';
+        _facultyIdPending = '';
+    }
+
+    function facultyIdRequest(action, id) {
+        const fd = new FormData();
+        fd.append('action', action);
+        fd.append('csrf_token', getCsrfToken());
+        fd.append('faculty_id', id);
+        return fetch('equipment-booking/api/update-profile.php', { method: 'POST', body: fd })
+            .then(r => r.json());
+    }
+
+    /* Step 1 -> 2: validate + check availability (nothing is saved yet). */
+    function facultyIdContinue() {
+        const input = document.getElementById('facultyIdInput');
+        const btn = document.getElementById('facultyIdContinueBtn');
+        const raw = ((input || {}).value || '').trim();
+        facultyIdMessage('facultyIdError', '');
+        if (!raw) {
+            facultyIdMessage('facultyIdError', 'Enter your Faculty ID.');
+            return;
+        }
+        const label = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
+
+        facultyIdRequest('check_faculty_id', raw)
+            .then(data => {
+                if (data.success) {
+                    _facultyIdPending = data.faculty_id;
+                    const v = document.getElementById('facultyIdConfirmValue');
+                    if (v) v.textContent = data.faculty_id;
+                    facultyIdMessage('facultyIdConfirmError', '');
+                    facultyIdStep('confirm');
+                } else if (data.locked) {
+                    closeFacultyIdModal();
+                    showToast(data.msg || 'Your Faculty ID is already set.', 'error');
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    facultyIdMessage('facultyIdError', data.msg || 'That Faculty ID cannot be used.');
+                }
+            })
+            .catch(() => facultyIdMessage('facultyIdError', 'Network error. Please try again.'))
+            .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = label; } });
+    }
+
+    /* Step 2: the permanent save. */
+    function facultyIdConfirm() {
+        const btn = document.getElementById('facultyIdConfirmBtn');
+        if (!_facultyIdPending) { facultyIdStep('enter'); return; }
+        facultyIdMessage('facultyIdConfirmError', '');
+        const label = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+
+        facultyIdRequest('set_faculty_id', _facultyIdPending)
+            .then(data => {
+                if (data.success) {
+                    const id = data.faculty_id;
+                    document.querySelectorAll('[data-fid-display]').forEach(el => {
+                        el.textContent = id;
+                        el.classList.remove('empty', 'acct-row-static-muted');
+                    });
+                    document.querySelectorAll('[data-action="open-faculty-id-modal"]').forEach(b => {
+                        if (b.classList.contains('sov-btn-outline')) {
+                            const lock = document.createElement('span');
+                            lock.className = 'material-symbols-outlined fid-lock';
+                            lock.title = 'Your Faculty ID is permanent';
+                            lock.textContent = 'lock';
+                            b.replaceWith(lock);
+                        } else {
+                            b.remove();
+                        }
+                    });
+                    closeFacultyIdModal();
+                    showToast(data.msg || 'Faculty ID saved.');
+                } else if (data.locked) {
+                    closeFacultyIdModal();
+                    showToast(data.msg || 'Your Faculty ID is already set.', 'error');
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    facultyIdMessage('facultyIdConfirmError', data.msg || 'Your Faculty ID could not be saved.');
+                }
+            })
+            .catch(() => facultyIdMessage('facultyIdConfirmError', 'Network error. Please try again.'))
+            .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = label; } });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && e.target && e.target.id === 'facultyIdInput') {
+            e.preventDefault();
+            facultyIdContinue();
+        }
+    });
+
     /* ── Profile Picture Management ────────────────────────────────────── */
     function togglePictureMenu() {
         const menu = document.getElementById('pictureMenu');
@@ -1889,21 +2015,6 @@
                 alert('The return date cannot be earlier than the borrow date.');
                 return;
             }
-            // ── Adviser: require document attachment ──────────────────────────
-            const fileInp = document.getElementById('request_document');
-            const docErr = document.getElementById('documentError');
-            if (fileInp) {
-                if (!fileInp.files || fileInp.files.length === 0) {
-                    e.preventDefault();
-                    if (docErr) {
-                        docErr.style.display = 'block';
-                        docErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    }
-                    return;
-                }
-                // File attached — hide any previous error
-                if (docErr) docErr.style.display = 'none';
-            }
             e.preventDefault();
             document.getElementById('loading-overlay').classList.add('active');
             const hidden = document.createElement('input');
@@ -2087,6 +2198,22 @@
                     break;
                 case 'save-backup-email':
                     saveBackupEmail();
+                    break;
+                case 'open-faculty-id-modal':
+                    openFacultyIdModal();
+                    break;
+                case 'close-faculty-id-modal':
+                    closeFacultyIdModal();
+                    break;
+                case 'faculty-id-continue':
+                    facultyIdContinue();
+                    break;
+                case 'faculty-id-back':
+                    facultyIdStep('enter');
+                    setTimeout(() => { const i = document.getElementById('facultyIdInput'); if (i) i.focus(); }, 50);
+                    break;
+                case 'faculty-id-confirm':
+                    facultyIdConfirm();
                     break;
                 case 'open-picture-menu':
                     togglePictureMenu();

@@ -1340,63 +1340,6 @@ textarea.fcty-input {
     font-weight: 600;
 }
 
-/* Stepper */
-.fcty-stepper {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    border: 1px solid var(--fcty-line);
-    border-radius: 10px;
-    background: var(--fcty-card);
-    overflow: hidden;
-}
-
-.fcty-stepper button {
-    width: 40px;
-    height: 40px;
-    border: 0;
-    background: transparent;
-    color: var(--fcty-ink);
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-}
-
-.fcty-stepper button:hover:not(:disabled) {
-    background: var(--fcty-soft);
-}
-
-.fcty-stepper button:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-}
-
-.fcty-stepper input {
-    width: 56px;
-    height: 40px;
-    border: 0;
-    border-left: 1px solid var(--fcty-line);
-    border-right: 1px solid var(--fcty-line);
-    background: transparent;
-    color: var(--fcty-ink);
-    font: inherit;
-    font-weight: 700;
-    text-align: center;
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-
-.fcty-stepper input::-webkit-outer-spin-button,
-.fcty-stepper input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.fcty-stepper input:focus {
-    outline: none;
-    background: var(--fcty-soft);
-}
-
 .fcty-link-btn {
     display: inline-flex;
     align-items: center;

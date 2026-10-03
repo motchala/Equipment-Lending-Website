@@ -386,7 +386,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <tr>
                                                     <td>
                                                         <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
-                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($rr['faculty_id']); ?></div>
+                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($rr['faculty_id'], 'Not set')); ?></div>
                                                     </td>
                                                     <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
                                                     <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
@@ -510,7 +510,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-status="Waiting"
                                                 data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
                                                 data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars($r['faculty_id']); ?>"
+                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
                                                 data-req-type="Faculty"
                                                 data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                                 data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
@@ -530,7 +530,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
                                                     <div style="font-size:11px;color:var(--text-light)">Faculty</div>
                                                 </td>
-                                                <td><?php echo htmlspecialchars($r['faculty_id']); ?></td>
+                                                <td><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></td>
                                                 <td><?php echo date('M d, g:i A', strtotime($r['borrow_date'])); ?></td>
@@ -592,7 +592,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <tr>
                                                 <td>
                                                     <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($r['faculty_id']); ?></div>
+                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d', strtotime($r['borrow_date'])); ?></td>
@@ -660,7 +660,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <tr data-id="<?php echo (int)$r['id']; ?>">
                                                 <td>
                                                     <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars($r['faculty_id']); ?></div>
+                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
                                                 </td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td style="color:var(--danger);font-weight:600"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
@@ -732,7 +732,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-status="<?php echo htmlspecialchars($r['status']); ?>"
                                                 data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
                                                 data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars($r['faculty_id']); ?>"
+                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
                                                 data-req-type="Faculty"
                                                 data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                                 data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
@@ -1971,39 +1971,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="eq-card-body">
                                 <?= csrf_field() ?>
 
+                                <div class="fac-edit-section">Account</div>
                                 <div class="form-group">
-                                    <label for="fac-email">PUPSync Email <span class="req-star">*</span></label>
+                                    <label for="fac-email">PUPSync email <span class="req-star">*</span></label>
                                     <input type="email" id="fac-email" name="pupsync_email"
                                         class="form-control-custom" maxlength="254" required
                                         placeholder="faculty@example.com">
                                 </div>
-
                                 <div class="form-group">
-                                    <label for="fac-backup">Google / Backup Email</label>
+                                    <label for="fac-backup">Backup email <span class="fac-edit-opt">(optional)</span></label>
                                     <input type="email" id="fac-backup" name="backup_email"
                                         class="form-control-custom" maxlength="254"
                                         placeholder="backup@gmail.com">
                                 </div>
 
+                                <div class="fac-edit-section">Name</div>
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label for="fac-first">First Name <span class="req-star">*</span></label>
+                                        <label for="fac-first">First name <span class="req-star">*</span></label>
                                         <input type="text" id="fac-first" name="first_name"
                                             class="form-control-custom" maxlength="100" required placeholder="First">
                                     </div>
                                     <div class="form-group">
-                                        <label for="fac-middle">Middle Name</label>
-                                        <input type="text" id="fac-middle" name="middle_name"
-                                            class="form-control-custom" maxlength="100" placeholder="Middle">
+                                        <label for="fac-last">Last name <span class="req-star">*</span></label>
+                                        <input type="text" id="fac-last" name="last_name"
+                                            class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
                                 </div>
-
                                 <div class="form-group">
-                                    <label for="fac-last">Last Name <span class="req-star">*</span></label>
-                                    <input type="text" id="fac-last" name="last_name"
-                                        class="form-control-custom" maxlength="100" required placeholder="Last">
+                                    <label for="fac-middle">Middle name <span class="fac-edit-opt">(optional)</span></label>
+                                    <input type="text" id="fac-middle" name="middle_name"
+                                        class="form-control-custom" maxlength="100" placeholder="Middle">
                                 </div>
 
+                                <div class="fac-edit-section">Password</div>
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="fac-password">Password <span class="req-star">*</span></label>
@@ -2018,7 +2019,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </div>
                                     </div>
                                     <div class="form-group">
-                                        <label for="fac-confirm">Confirm Password <span class="req-star">*</span></label>
+                                        <label for="fac-confirm">Confirm <span class="req-star">*</span></label>
                                         <div class="fac-pw-wrap">
                                             <input type="password" id="fac-confirm" name="confirm_password"
                                                 class="form-control-custom" maxlength="128" required
@@ -2031,91 +2032,93 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </div>
                                 </div>
 
-                                <div style="background:var(--secondary-cream);border-radius:10px;padding:0.85rem;border:1px solid var(--khaki-border);margin-bottom:1rem">
-                                    <div class="form-group faculty-adviser-toggle-wrap" style="margin-bottom:0.65rem">
-                                        <label class="faculty-toggle-label">
-                                            <input type="checkbox" id="fac-adviser" name="is_org_adviser"
-                                                value="1" class="faculty-toggle-input">
-                                            <span class="faculty-toggle-track"></span>
-                                            Organization adviser
-                                        </label>
-                                    </div>
-                                    <div id="fac-org-group" style="display:none;">
-                                        <label style="font-size:12px;font-weight:600;margin-bottom:4px;display:block">Organization</label>
-                                        <?php
-                                        $org_opts_res = $conn->query(
-                                            "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                                        );
-                                        if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
-                                            <select id="fac-org" name="organization_id"
-                                                class="form-control-custom">
-                                                <option value="">&#8212; Select Organization &#8212;</option>
-                                                <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
-                                                    <option value="<?= (int)$org_row['id'] ?>">
-                                                        <?= htmlspecialchars($org_row['name']) ?>
-                                                    </option>
-                                                <?php endwhile; ?>
-                                            </select>
-                                        <?php else: ?>
-                                            <select id="fac-org" name="organization_id"
-                                                class="form-control-custom" disabled>
-                                                <option value="">&#8212; Organizations unavailable &#8212;</option>
-                                            </select>
-                                            <small class="faculty-field-error">
-                                                Could not load organizations.
-                                            </small>
-                                        <?php endif; ?>
+                                <!-- Organization adviser: org borrowing is automatic for advisers -->
+                                <div class="fac-opt-card">
+                                    <label class="fac-opt-row" for="fac-adviser">
+                                        <span class="fac-opt-text">
+                                            <span class="fac-opt-title">Organization adviser</span>
+                                            <span class="fac-opt-sub">Gets organization borrowing automatically</span>
+                                        </span>
+                                        <input type="checkbox" id="fac-adviser" name="is_org_adviser"
+                                            value="1" class="faculty-toggle-input">
+                                        <span class="faculty-toggle-track"></span>
+                                    </label>
+                                    <div class="fac-opt-extra" id="fac-org-group" style="display:none;">
+                                        <div class="form-group">
+                                            <label for="fac-org">Organization</label>
+                                            <?php
+                                            $org_opts_res = $conn->query(
+                                                "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
+                                            );
+                                            if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
+                                                <select id="fac-org" name="organization_id"
+                                                    class="form-control-custom">
+                                                    <option value="">&#8212; Select Organization &#8212;</option>
+                                                    <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
+                                                        <option value="<?= (int)$org_row['id'] ?>">
+                                                            <?= htmlspecialchars($org_row['name']) ?>
+                                                        </option>
+                                                    <?php endwhile; ?>
+                                                </select>
+                                            <?php else: ?>
+                                                <select id="fac-org" name="organization_id"
+                                                    class="form-control-custom" disabled>
+                                                    <option value="">&#8212; Organizations unavailable &#8212;</option>
+                                                </select>
+                                                <small class="faculty-field-error">
+                                                    Could not load organizations.
+                                                </small>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
 
                                 <button type="button" id="fac-submit-btn"
-                                    class="ps-btn ps-btn--primary" style="width:100%">
+                                    class="ps-btn ps-btn--primary" style="width:100%;margin-top:1rem">
                                     <span class="material-symbols-outlined">person_add</span>
                                     Create Account
                                 </button>
+                                <p class="fac-form-hint">The faculty member adds their own Faculty ID after signing in.</p>
                             </div><!-- /eq-card-body -->
                         </div><!-- /faculty-form-card -->
 
 
                         <!-- FACULTY LIST -->
                         <div class="eq-card">
-                            <div class="eq-card-header" style="flex-wrap:wrap;gap:0.75rem">
+                            <div class="eq-card-header fac-list-head">
                                 <h2>
-                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">group</span>
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">groups</span>
                                     Faculty List
                                     <span class="fac-count-badge" id="fac-count-badge">(<?php
                                                                                         $fac_count = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_users");
                                                                                         echo ($fac_count) ? (int)$fac_count->fetch_assoc()['cnt'] : 0;
                                                                                         ?>)</span>
                                 </h2>
-                                <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+                                <div class="fac-search">
+                                    <span class="material-symbols-outlined">search</span>
                                     <input type="text" id="fac-search-input"
                                         class="form-control-custom"
-                                        style="width:180px;font-size:12px"
-                                        placeholder="Search faculty...">
+                                        placeholder="Search name, email or ID">
                                 </div>
                             </div>
                             <div class="tbl-wrap">
-                                <table class="admin-table" id="fac-list-table">
+                                <table class="admin-table fac-table" id="fac-list-table">
                                     <thead>
                                         <tr>
-                                            <th>Name</th>
+                                            <th>Faculty</th>
                                             <th>Faculty ID</th>
-                                            <th>Email</th>
+                                            <th>Role</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="faculty-list-tbody">
                                         <?php
-                                        $_aob_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-                                        $_has_aob_col = $_aob_col && $_aob_col->num_rows > 0;
                                         $fac_res = $conn->query(
                                             "SELECT u.fullname, u.email, u.backup_email, u.role,"
                                                 . " u.faculty_id, u.organization_id,"
-                                                . ($_has_aob_col ? " u.allow_org_borrowing," : " 0 AS allow_org_borrowing,")
-                                                . "     o.name AS org_name"
+                                                . " o.name AS org_name"
                                                 . " FROM tbl_users u"
                                                 . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
                                                 . " ORDER BY u.fullname ASC"
@@ -2123,10 +2126,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         if ($fac_res && $fac_res->num_rows > 0):
                                             while ($frow = $fac_res->fetch_assoc()):
                                                 $isAdviser = ($frow['role'] === 'Organization Adviser');
-                                                $subLabel  = $isAdviser && !empty($frow['org_name'])
-                                                    ? 'Org Adviser &middot; ' . htmlspecialchars($frow['org_name'])
-                                                    : 'Active Faculty';
-                                                $initFac   = strtoupper(substr($frow['fullname'] ?? 'F', 0, 1));
+                                                $idUnset   = faculty_id_is_unset($frow['faculty_id']);
+                                                $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
                                         ?>
                                                 <tr
                                                     data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
@@ -2136,16 +2137,35 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     data-role="<?= htmlspecialchars($frow['role']) ?>"
                                                     data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
                                                     data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
-                                                    data-aob="<?= $frow['allow_org_borrowing'] ? '1' : '0' ?>"
-                                                    data-init="<?= $initFac ?>">
+                                                    data-init="<?= htmlspecialchars($initFac) ?>">
                                                     <td>
-                                                        <div style="font-weight:600"><?= htmlspecialchars($frow['fullname']) ?></div>
-                                                        <div style="font-size:11px;color:var(--text-light)"><?= $subLabel ?></div>
+                                                        <div class="fac-person">
+                                                            <span class="fac-avatar"><?= htmlspecialchars($initFac) ?></span>
+                                                            <div class="fac-person-text">
+                                                                <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?></div>
+                                                                <div class="fac-person-sub"><?= htmlspecialchars($frow['email']) ?></div>
+                                                            </div>
+                                                        </div>
                                                     </td>
-                                                    <td style="font-size:12px;color:var(--text-light)"><?= htmlspecialchars($frow['faculty_id']) ?></td>
-                                                    <td style="font-size:12px"><?= htmlspecialchars($frow['email']) ?></td>
                                                     <td>
-                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">
+                                                        <?php if ($idUnset): ?>
+                                                            <span class="fac-id-pending">Not set yet</span>
+                                                        <?php else: ?>
+                                                            <span class="fac-id"><?= htmlspecialchars($frow['faculty_id']) ?></span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($isAdviser): ?>
+                                                            <span class="fac-role fac-role--adviser">Org Adviser</span>
+                                                            <?php if (!empty($frow['org_name'])): ?>
+                                                                <div class="fac-person-sub"><?= htmlspecialchars($frow['org_name']) ?></div>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <span class="fac-role">Faculty</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="fac-actions">
+                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">
                                                             <span class="material-symbols-outlined">edit</span>
                                                         </button>
                                                     </td>
@@ -3812,43 +3832,43 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
          the click handling (mark-read, delete, navigate, poll).
     ============================================================ -->
     <div class="ps-modal-backdrop" id="notifOverlay">
-        <div class="ps-modal ps-modal--lg notif-modal">
-            <div class="ps-modal-head">
-                <div class="ps-modal-head-icon ps-mhi--maroon">
+        <div class="ps-modal ps-modal--lg notif-modal anotif-box" role="dialog" aria-modal="true" aria-labelledby="notifModalTitle">
+
+            <!-- Head: icon + title + unread line + close (same layout as the faculty notifications modal) -->
+            <div class="anotif-head">
+                <div class="anotif-head-icon">
                     <span class="material-symbols-outlined">notifications</span>
                 </div>
-                <h3>Notifications</h3>
+                <div class="anotif-head-text">
+                    <h3 class="anotif-head-title" id="notifModalTitle">Notifications</h3>
+                    <p class="anotif-count-text">You have
+                        <strong id="unreadCount"><?php echo $notif_unread; ?> unread</strong>
+                        notification<span id="unreadPlural"><?php echo $notif_unread !== 1 ? 's' : ''; ?></span>.
+                    </p>
+                </div>
                 <button class="ps-modal-close" data-action="ps-close-modal" data-modal="notifOverlay" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
 
-            <div class="notif-toolbar">
-                <p class="notif-unread-line">You have
-                    <strong id="unreadCount"><?php echo $notif_unread; ?> unread</strong>
-                    notification<?php echo $notif_unread !== 1 ? 's' : ''; ?>.
-                </p>
-                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="mark-all-read" <?php echo $notif_unread === 0 ? ' disabled' : ''; ?>>Mark all as read</button>
-            </div>
-
+            <!-- Filter pills (same chips as before; every pill is always present and a pill with no
+                 items simply shows no number). Counts are kept live by admin-dashboard.js. -->
             <div class="rq-filter-chips notif-filter-chips" id="notifFilterChips">
-                <button class="rq-filter-chip active" data-notif-filter="all">All</button>
-                <button class="rq-filter-chip" data-notif-filter="unread">Unread<?php echo $notif_unread > 0 ? ' <span class="notif-chip-count">' . $notif_unread . '</span>' : ''; ?></button>
-                <?php if ($notif_cat_counts['request'] > 0): ?>
-                    <button class="rq-filter-chip" data-notif-filter="request">Requests <span class="notif-chip-count"><?php echo $notif_cat_counts['request']; ?></span></button>
-                <?php endif; ?>
-                <?php if ($notif_cat_counts['overdue'] > 0): ?>
-                    <button class="rq-filter-chip" data-notif-filter="overdue">Overdue <span class="notif-chip-count"><?php echo $notif_cat_counts['overdue']; ?></span></button>
-                <?php endif; ?>
-                <?php if ($notif_cat_counts['room'] > 0): ?>
-                    <button class="rq-filter-chip" data-notif-filter="room">Rooms <span class="notif-chip-count"><?php echo $notif_cat_counts['room']; ?></span></button>
-                <?php endif; ?>
-                <?php if ($notif_cat_counts['system'] > 0): ?>
-                    <button class="rq-filter-chip" data-notif-filter="system">System <span class="notif-chip-count"><?php echo $notif_cat_counts['system']; ?></span></button>
-                <?php endif; ?>
+                <?php
+                $anotif_pills = [
+                    'all'     => ['All',      count($notifications)],
+                    'unread'  => ['Unread',   $notif_unread],
+                    'request' => ['Requests', $notif_cat_counts['request']],
+                    'overdue' => ['Overdue',  $notif_cat_counts['overdue']],
+                    'room'    => ['Rooms',    $notif_cat_counts['room']],
+                    'system'  => ['System',   $notif_cat_counts['system']],
+                ];
+                foreach ($anotif_pills as $pill_key => [$pill_label, $pill_n]): ?>
+                    <button type="button" class="rq-filter-chip<?php echo $pill_key === 'all' ? ' active' : ''; ?>" data-notif-filter="<?php echo $pill_key; ?>"><?php echo $pill_label; ?><?php echo (int)$pill_n > 0 ? ' <span class="notif-chip-count">' . (int)$pill_n . '</span>' : ''; ?></button>
+                <?php endforeach; ?>
             </div>
 
-            <div class="ps-modal-body notif-modal-body" id="notifList">
+            <div class="ps-modal-body notif-modal-body anotif-body" id="notifList">
 
                 <div class="ps-empty-state notif-empty-state" id="notifFilterEmptyState" style="display:none;">
                     <span class="material-symbols-outlined">filter_alt_off</span>
@@ -3882,6 +3902,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             data-link-issue-id="<?php echo htmlspecialchars((string)($n['link']['issue_id'] ?? '')); ?>"
                             data-link-item-id="<?php echo htmlspecialchars((string)($n['link']['item_id'] ?? '')); ?>">
                             <div class="notif-card-main" role="button" tabindex="0">
+                                <span class="anotif-check" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>
                                 <div class="notif-icon <?php echo htmlspecialchars($n['icon_class']); ?>">
                                     <span class="material-symbols-outlined"><?php echo htmlspecialchars($n['icon']); ?></span>
                                 </div>
@@ -3909,6 +3930,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <span class="material-symbols-outlined">visibility</span>
                                         <?php echo htmlspecialchars($n['view_label']); ?>
                                     </button>
+                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-toggle-read-btn" data-notif-toggle-read>
+                                        <span class="material-symbols-outlined"><?php echo $n['is_read'] ? 'mark_email_unread' : 'drafts'; ?></span>
+                                        <span data-notif-toggle-label><?php echo $n['is_read'] ? 'Mark as unread' : 'Mark as read'; ?></span>
+                                    </button>
                                     <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification">
                                         <span class="material-symbols-outlined">delete</span>
                                         Delete
@@ -3920,6 +3945,52 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 endif; ?>
 
             </div><!-- /notif-modal-body -->
+
+            <!-- Footer: Mark all as read | Select -- and, while selecting, Select all / Read / Unread / Delete selected / Delete all -->
+            <div class="anotif-footer" id="notifFooter">
+
+                <!-- Inline confirmation for bulk deletes -->
+                <div class="anotif-confirm" id="notifConfirm" role="alertdialog" aria-live="assertive" hidden>
+                    <span class="material-symbols-outlined">warning</span>
+                    <span class="anotif-confirm-text" id="notifConfirmText"></span>
+                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-nbar="confirm-cancel">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm" data-nbar="confirm-ok">Delete</button>
+                </div>
+
+                <!-- Selection bar -- only while selecting -->
+                <div class="anotif-selbar" id="notifSelBar" hidden>
+                    <label class="anotif-selall">
+                        <input type="checkbox" id="notifSelectAll">
+                        <span>Select all</span>
+                    </label>
+                    <span class="anotif-sel-count" id="notifSelCount" aria-live="polite">0 selected</span>
+                    <div class="anotif-sel-actions">
+                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-nbar="mark-read" data-needs-sel>
+                            <span class="material-symbols-outlined">drafts</span> Read
+                        </button>
+                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-nbar="mark-unread" data-needs-sel>
+                            <span class="material-symbols-outlined">mark_email_unread</span> Unread
+                        </button>
+                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm anotif-danger" data-nbar="delete-selected" data-needs-sel>
+                            <span class="material-symbols-outlined">delete</span> Delete<span class="anotif-sel-word"> selected</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="anotif-footer-main">
+                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="mark-all-read" <?php echo $notif_unread === 0 ? ' disabled' : ''; ?>>
+                        <span class="material-symbols-outlined">done_all</span> Mark all as read
+                    </button>
+                    <div class="anotif-footer-right">
+                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm anotif-danger" id="notifDeleteAllBtn" data-nbar="delete-all" hidden>
+                            <span class="material-symbols-outlined">delete_sweep</span> Delete all
+                        </button>
+                        <button type="button" class="ps-btn ps-btn--primary ps-btn--sm" id="notifSelectBtn" data-nbar="select" aria-pressed="false" <?php echo empty($notifications) ? ' disabled' : ''; ?>>
+                            <span class="material-symbols-outlined">checklist</span> <span id="notifSelectLbl">Select</span>
+                        </button>
+                    </div>
+                </div>
+            </div><!-- /anotif-footer -->
         </div>
     </div><!-- /notifOverlay -->
 
@@ -4648,7 +4719,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <label class="fac-opt-row" for="fac-edit-adviser">
                         <span class="fac-opt-text">
                             <span class="fac-opt-title">Organization adviser</span>
-                            <span class="fac-opt-sub">Advises a student organization</span>
+                            <span class="fac-opt-sub">Gets organization borrowing automatically</span>
                         </span>
                         <input type="checkbox" id="fac-edit-adviser" class="faculty-toggle-input">
                         <span class="faculty-toggle-track"></span>
@@ -4676,14 +4747,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </select>
                             <?php endif; ?>
                         </div>
-                        <label class="fac-opt-row" for="fac-edit-aob">
-                            <span class="fac-opt-text">
-                                <span class="fac-opt-title">Allow org borrowing</span>
-                                <span class="fac-opt-sub">Can borrow on behalf of the organization</span>
-                            </span>
-                            <input type="checkbox" id="fac-edit-aob" class="faculty-toggle-input">
-                            <span class="faculty-toggle-track"></span>
-                        </label>
                     </div>
                 </div>
 
@@ -4806,14 +4869,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 if (!chk || !grp) return;
                 grp.style.display = chk.checked ? '' : 'none';
 
-                /* The organization picker and the org-borrowing switch only
-                   exist for advisers. Hiding them also clears them, so a regular
-                   faculty account can never be saved with either one set. */
-                if (!chk.checked) {
-                    if (sel) sel.value = '';
-                    var aobChk = document.getElementById('fac-edit-aob');
-                    if (aobChk) aobChk.checked = false;
-                }
+                /* The organization picker only exists for advisers. Hiding it also
+                   clears it, so a regular faculty account is never saved with an
+                   organization. (Org borrowing itself is automatic for advisers.) */
+                if (!chk.checked && sel) sel.value = '';
             }
 
             var _facEditAdviserChk = document.getElementById('fac-edit-adviser');
@@ -4853,10 +4912,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 var role = row.dataset.role || '';
                 var org = row.dataset.org || '';
                 var orgId = row.dataset.orgId || '';
-                var aob = row.dataset.aob === '1';
                 var init = row.dataset.init || (fullname.charAt(0).toUpperCase()) || 'F';
                 var isAdviser = role === 'Organization Adviser';
-                var subLine = facId + ' \u00B7 ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
+                var idUnset = !facId || facId.indexOf('NOTSET-') === 0;
+                var subLine = (idUnset ? 'Faculty ID not set yet' : facId) + ' \u00B7 ' + (isAdviser && org ? 'Org Adviser' : 'Active Faculty');
 
                 var parts = fullname.trim().split(' ');
                 var lastName = parts.length > 1 ? parts[parts.length - 1] : '';
@@ -4872,7 +4931,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 document.getElementById('fac-edit-adviser').checked = isAdviser;
                 var orgSel = document.getElementById('fac-edit-org');
                 if (orgSel) orgSel.value = (isAdviser && orgId) ? orgId : '';
-                document.getElementById('fac-edit-aob').checked = aob;
                 document.getElementById('fac-delete-name').textContent = fullname;
 
                 _syncFacEditOrgVisibility();
@@ -5056,7 +5114,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     var backup = (document.getElementById('fac-edit-backup').value || '').trim();
                     var isAdviser = document.getElementById('fac-edit-adviser').checked ? '1' : '0';
                     var orgId = document.getElementById('fac-edit-org') ? document.getElementById('fac-edit-org').value : '';
-                    var aob = document.getElementById('fac-edit-aob').checked ? '1' : '0';
 
                     if (!firstName) {
                         _showFacEditAlert('First name is required.', true);
@@ -5088,8 +5145,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         first_name: firstName,
                         last_name: lastName,
                         is_org_adviser: isAdviser,
-                        organization_id: orgId,
-                        allow_org_borrowing: aob
+                        organization_id: orgId
                     });
 
                     fetch('equipment-booking/api/update-faculty-account.php', {
@@ -5112,28 +5168,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     '';
                                 var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
 
-                                // Update the row's dataset so re-opening Edit shows the saved values
-                                _facEditRow.dataset.fullname = fullname;
-                                _facEditRow.dataset.email = email;
-                                _facEditRow.dataset.backupEmail = backup;
-                                _facEditRow.dataset.role = role;
-                                _facEditRow.dataset.org = orgNameSafe;
-                                _facEditRow.dataset.orgId = isAdviser === '1' ? orgId : '0';
-                                _facEditRow.dataset.aob = aob;
-                                _facEditRow.dataset.init = fullname.charAt(0).toUpperCase() || 'F';
-
-                                // Reflect the changes in the visible table cells
-                                var subLabel = (isAdviser === '1' && orgNameSafe) ?
-                                    'Org Adviser \u00B7 ' + orgNameSafe :
-                                    'Active Faculty';
-                                var cells = _facEditRow.querySelectorAll('td');
-                                if (cells[0]) {
-                                    var nameDiv = cells[0].querySelector('div:first-child');
-                                    var subDiv = cells[0].querySelector('div:last-child');
-                                    if (nameDiv) nameDiv.textContent = fullname;
-                                    if (subDiv) subDiv.textContent = subLabel;
+                                // Re-render the row (name, email, role, organization) from the saved values
+                                if (typeof window.psFacRender === 'function') {
+                                    window.psFacRender(_facEditRow, {
+                                        fullname: fullname,
+                                        email: email,
+                                        backup_email: backup,
+                                        role: role,
+                                        org_name: orgNameSafe,
+                                        org_id: isAdviser === '1' ? orgId : '0',
+                                        faculty_id: facultyId
+                                    });
                                 }
-                                if (cells[2]) cells[2].textContent = email;
 
                                 closeFacModal('fac-edit-modal');
                                 if (typeof showToast === 'function') showToast('Faculty account updated successfully.');

@@ -3635,23 +3635,59 @@ input[type="range"] {
     max-height: 85vh;
 }
 
-.notif-toolbar {
+/* Head: icon + title + unread line + close (same layout as the faculty modal) */
+.anotif-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 1rem 1.25rem 0;
+    gap: 12px;
+    padding: 1.1rem 1.25rem 0.85rem;
     flex-shrink: 0;
 }
 
-.notif-unread-line {
-    font-size: 12.5px;
-    color: var(--text-light);
-    margin: 0;
+.anotif-head-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
 }
 
-.notif-unread-line strong {
+.anotif-head-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.anotif-head-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.anotif-head-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.anotif-count-text {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+.anotif-count-text strong {
     color: var(--accent-maroon);
+}
+
+.anotif-box .notif-filter-chips {
+    padding-top: 0;
+    padding-bottom: 0.85rem;
+}
+
+.anotif-body {
+    border-top: 1px solid var(--khaki-border);
 }
 
 .notif-filter-chips {
@@ -4010,6 +4046,216 @@ input[type="range"] {
 
 .notif-delete-btn:hover {
     background: #fdecea !important;
+}
+
+/* Expanded card: "Mark as read / unread" sits right, Delete stays beside it */
+.notif-card-actions .notif-delete-btn {
+    margin-left: 0;
+}
+
+/* A read notification shows no dot (the dot used to be hidden by script only) */
+.notif-item:not(.unread) .unread-dot {
+    display: none;
+}
+
+/* -- NOTIFICATIONS: footer, select mode, bulk actions ------------------- */
+.anotif-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--khaki-border);
+    background: var(--primary-white);
+}
+
+.anotif-footer [hidden] {
+    display: none !important;
+}
+
+.anotif-footer-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.anotif-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.anotif-footer .ps-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.anotif-footer .ps-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.anotif-footer .ps-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+.anotif-footer .anotif-danger {
+    color: var(--danger);
+}
+
+.anotif-footer .anotif-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Selection bar -- only while selecting */
+.anotif-selbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+}
+
+.anotif-selall {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+}
+
+.anotif-selall input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-maroon);
+    cursor: pointer;
+}
+
+.anotif-sel-count {
+    margin-right: auto;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.anotif-sel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Inline delete confirmation */
+.anotif-confirm {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--danger) 9%, var(--primary-white));
+    border: 1px solid var(--danger);
+    font-size: 12.5px;
+    color: var(--text-dark);
+}
+
+.anotif-confirm>.material-symbols-outlined {
+    font-size: 20px;
+    color: var(--danger);
+}
+
+.anotif-confirm-text {
+    flex: 1;
+    min-width: 160px;
+    font-weight: 600;
+}
+
+/* Select mode: a checkbox slides in at the left of each row, details fold away */
+.anotif-check {
+    display: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: 2px solid var(--text-light);
+    background: var(--primary-white);
+    color: transparent;
+    flex-shrink: 0;
+    place-items: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.anotif-check .material-symbols-outlined {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.notif-modal-body.is-selecting .anotif-check {
+    display: grid;
+}
+
+.notif-modal-body.is-selecting .notif-item {
+    user-select: none;
+}
+
+.notif-modal-body.is-selecting .notif-chevron {
+    display: none;
+}
+
+.notif-modal-body.is-selecting .notif-card-detail {
+    display: none !important;
+}
+
+.notif-item.is-selected {
+    border-color: var(--accent-maroon);
+    background: var(--hover-bg);
+}
+
+.notif-item.is-selected .anotif-check {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #ffffff;
+}
+
+@media (max-width: 600px) {
+    .anotif-footer {
+        padding: 0.65rem 1rem;
+    }
+
+    .anotif-head {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .anotif-sel-word {
+        display: none;
+    }
+
+    .anotif-sel-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+    }
+
+    .anotif-sel-actions .ps-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .anotif-sel-count {
+        margin-right: 0;
+    }
 }
 
 /* Card removal (delete) — brief collapse instead of an abrupt disappear */
@@ -7375,5 +7621,168 @@ body:has(#roomScheduleModal:not(.hidden)) {
 @media (max-width: 420px) {
     .ps-modal-foot.fac-foot-split {
         flex-wrap: wrap;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FACULTY TAB — Create form + Faculty list
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Create form: same compact look as the edit modal ──────── */
+.faculty-form-card .form-group {
+    margin-bottom: 0.8rem;
+}
+
+.faculty-form-card .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 5px;
+}
+
+.faculty-form-card .fac-edit-opt {
+    font-weight: 400;
+    color: var(--text-light);
+}
+
+.faculty-form-card .fac-edit-section {
+    margin-top: 1.1rem;
+}
+
+.faculty-form-card .fac-edit-section:first-of-type {
+    margin-top: 0;
+}
+
+.fac-form-hint {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin: 0.6rem 0 0;
+}
+
+/* ── Faculty list ──────────────────────────────────────────── */
+.fac-list-head {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.fac-search {
+    position: relative;
+    margin-left: auto;
+}
+
+.fac-search .material-symbols-outlined {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 17px;
+    color: var(--text-light);
+    pointer-events: none;
+}
+
+.fac-search input {
+    width: 220px;
+    max-width: 100%;
+    padding-left: 34px;
+    font-size: 12px;
+}
+
+.fac-table td {
+    vertical-align: middle;
+}
+
+.fac-table th:last-child,
+.fac-actions {
+    text-align: right;
+}
+
+.fac-actions {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.fac-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.fac-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.fac-person-name {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--text-dark);
+}
+
+.fac-person-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+}
+
+.fac-role+.fac-person-sub {
+    margin-top: 4px;
+}
+
+.fac-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-dark);
+    white-space: nowrap;
+}
+
+.fac-id-pending,
+.fac-role {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+.fac-id-pending {
+    color: #8a5a00;
+    background: #fef6e4;
+    border: 1px solid #f3dca6;
+}
+
+.fac-role {
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+}
+
+.fac-role--adviser {
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+    border-color: transparent;
+}
+
+@media (max-width: 520px) {
+    .fac-search {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .fac-search input {
+        width: 100%;
     }
 }

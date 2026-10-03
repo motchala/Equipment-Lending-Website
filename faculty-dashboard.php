@@ -103,18 +103,14 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
     // ── ADVISER BRANCH ────────────────────────────────────────────────────
     if ($submitted_as_post === 'adviser') {
 
-        // Re-read allow_org_borrowing from DB — server-side gate (Requirement 1.5, 1.6)
-        // Guard: if migration hasn't run yet the column may not exist; treat as 0.
-        $_gate_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-        if (!$_gate_col || $_gate_col->num_rows === 0) {
-            die("Error: Organisation borrowing not permitted for this account.");
-        }
-        $stmt_gate = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+        // Org privileges come from the adviser role itself (read fresh from the DB here,
+        // never from a form field): only an Organization Adviser may submit for an organization.
+        $stmt_gate = $conn->prepare("SELECT role FROM tbl_users WHERE faculty_id = ? LIMIT 1");
         $stmt_gate->bind_param('s', $_SESSION['faculty_id']);
         $stmt_gate->execute();
         $gate_row = $stmt_gate->get_result()->fetch_assoc();
         $stmt_gate->close();
-        if ((int)($gate_row['allow_org_borrowing'] ?? 0) !== 1) {
+        if (($gate_row['role'] ?? '') !== 'Organization Adviser') {
             die("Error: Organisation borrowing not permitted for this account.");
         }
 
@@ -141,35 +137,34 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
         if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
 
-        // Validate document is present (Requirement 4.6)
-        if (!isset($_FILES['request_document']) || $_FILES['request_document']['error'] === UPLOAD_ERR_NO_FILE) {
-            die("Error: A signed request letter is required for organisation borrowing.");
-        }
+        // The request letter is OPTIONAL for organization requests. If one is attached it is
+        // validated and stored; without one the request is filed with no document (it just
+        // gets no letter-based priority from the arbitration engine).
+        $rel_path = null;
+        if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
+            if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
+                die("File upload error. Please try again.");
+            }
+            if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
+                die("File too large. Maximum size is 5 MB.");
+            }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
+            finfo_close($finfo);
+            $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+            if (!in_array($mime, $allowed_mimes, true)) {
+                die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
+            }
 
-        // File upload validation (Requirement 10.6)
-        if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
-            die("File upload error. Please try again.");
-        }
-        if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
-            die("File too large. Maximum size is 5 MB.");
-        }
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
-        finfo_close($finfo);
-        $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-        if (!in_array($mime, $allowed_mimes, true)) {
-            die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
-        }
-
-        // Move uploaded file to uploads/request_letters/ (Requirement 10.7)
-        $orig_name = basename($_FILES['request_document']['name']);
-        $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
-        $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
-        $dest_dir  = __DIR__ . '/uploads/request_letters/';
-        $dest_path = $dest_dir . $dest_name;
-        $rel_path  = 'uploads/request_letters/' . $dest_name;
-        if (!move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
-            die("Error: Could not save uploaded document.");
+            $orig_name = basename($_FILES['request_document']['name']);
+            $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
+            $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
+            $dest_dir  = __DIR__ . '/uploads/request_letters/';
+            $dest_path = $dest_dir . $dest_name;
+            if (!move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
+                die("Error: Could not save uploaded document.");
+            }
+            $rel_path = 'uploads/request_letters/' . $dest_name;
         }
 
         // Collect items array (Requirement 4.4, 5.1)
@@ -461,20 +456,13 @@ $db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
 $db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
 $is_org_adviser       = ($profile_row['role'] ?? '') === 'Organization Adviser';
 
-// ── Dual-mode gate — read allow_org_borrowing fresh on every page load ────
-// (Requirements 1.3, 1.4, 1.5 — never sourced from a hidden field)
-// Guard: if the migration hasn't been run yet the column may not exist;
-// fall back to 0 (single-mode) so the dashboard doesn't crash.
-$is_dual_mode = false;
-$_col_check = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-if ($_col_check && $_col_check->num_rows > 0) {
-    $stmt_dm = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
-    $stmt_dm->bind_param('s', $uid_safe);
-    $stmt_dm->execute();
-    $dm_row = $stmt_dm->get_result()->fetch_assoc();
-    $stmt_dm->close();
-    $is_dual_mode = (int)($dm_row['allow_org_borrowing'] ?? 0) === 1;
-}
+// Dual-mode (personal + organization) borrowing is automatic for Organization Advisers.
+$is_dual_mode = $is_org_adviser;
+
+// Faculty ID: set by the faculty member themselves (once). Until then the account is stored
+// under an internal placeholder that must never be shown (see config/faculty-id.php).
+$fid_unset = faculty_id_is_unset((string)$_SESSION['faculty_id']);
+$fid_label = faculty_id_display((string)$_SESSION['faculty_id'], 'Not set');
 
 // ── Adviser-mode inventory checklist — only loaded if dual mode active ────
 $avail_items = [];
@@ -1970,7 +1958,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <!-- Lending Sub-Nav -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-lending-nav="browse">
-                        <span class="material-symbols-outlined">search</span> Browse Equipment
+                        <span class="material-symbols-outlined">inventory_2</span> Browse Equipment
                     </button>
                     <button class="lending-nav-btn" data-lending-nav="requests">
                         <span class="material-symbols-outlined">receipt_long</span> My Requests
@@ -2293,7 +2281,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <!-- Rooms Sub-Nav — Browse | My Reservations -->
                 <div class="lending-subnav">
                     <button class="lending-nav-btn active" data-rooms-nav="browse">
-                        <span class="material-symbols-outlined">search</span> Browse Facilities
+                        <span class="material-symbols-outlined">meeting_room</span> Browse Facilities
                     </button>
                     <button class="lending-nav-btn" data-rooms-nav="history">
                         <span class="material-symbols-outlined">receipt_long</span> My Reservations
@@ -2940,9 +2928,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <h2>
                                 <?php echo htmlspecialchars($fullname); ?>
                             </h2>
-                            <p>ID:
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </p>
+                            <p>ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
                             <span class="acc-badge">
                                 <span
                                     style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
@@ -2975,9 +2961,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Faculty ID</span>
-                            <span class="info-val">
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="info-card">
@@ -3027,9 +3014,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Faculty ID</span>
-                            <span class="info-val">
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Full Name</span>
@@ -3166,7 +3154,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <div class="acct-banner-avatar"><?php echo htmlspecialchars($initials); ?></div>
                         <div class="acct-banner-text">
                             <h2 class="acct-banner-name"><?php echo htmlspecialchars($fullname); ?></h2>
-                            <p class="acct-banner-meta"><?php echo $acct_meta; ?> &middot; ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></p>
+                            <p class="acct-banner-meta"><?php echo $acct_meta; ?> &middot; ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
                             <span class="acct-banner-badge">
                                 <span class="material-symbols-outlined">check_circle</span>
                                 Active Faculty Account
@@ -3224,8 +3212,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <div class="acct-row">
                                         <span class="acct-row-label">Faculty ID</span>
                                         <div class="acct-row-value">
-                                            <span class="acct-row-static" id="sovFacultyId"><?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
+                                            <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
                                         </div>
+                                        <?php if ($fid_unset): ?>
+                                            <button class="sov-btn-outline" data-action="open-faculty-id-modal">Add</button>
+                                        <?php else: ?>
+                                            <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="acct-row">
                                         <span class="acct-row-label">Email Address</span>
@@ -3740,7 +3733,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </div>
                         <?php if ($is_org_adviser): ?>
                             <div class="form-group">
-                                <span class="form-label">Request Letter <span class="bm-req">Required</span></span>
+                                <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
                                 <label class="bm-drop" for="request_document">
                                     <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
                                     <span class="bm-drop-text">
@@ -3748,11 +3741,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                         <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
                                     </span>
                                     <input type="file" id="request_document" name="request_document"
-                                        accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp">
                                 </label>
-                                <small id="documentError" class="bm-error" role="alert">
-                                    Please attach a signed request letter before submitting.
-                                </small>
+                                <p class="bm-hint">A signed letter may help prioritise your request.</p>
                             </div>
                         <?php endif; ?>
                         <div class="bm-actions">
@@ -3905,9 +3896,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 </div>
                             </div>
 
-                            <!-- Document upload — required for adviser mode (Requirement 4.6) -->
+                            <!-- Document upload — optional -->
                             <div class="form-group">
-                                <span class="form-label">Request Letter <span class="bm-req">Required</span></span>
+                                <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
                                 <label class="bm-drop" for="adv_request_document">
                                     <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
                                     <span class="bm-drop-text">
@@ -3915,8 +3906,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                         <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
                                     </span>
                                     <input type="file" id="adv_request_document" name="request_document"
-                                        accept=".pdf,.jpg,.jpeg,.png,.webp" required>
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp">
                                 </label>
+                                <p class="bm-hint">A signed letter may help prioritise your request.</p>
                             </div>
 
                             <div class="bm-actions">
@@ -4119,6 +4111,54 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
                     Backup Email
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Faculty ID Modal: set once, permanent -->
+    <div class="modal-backdrop" id="facultyIdModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="facultyIdTitle">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="facultyIdTitle"><span class="material-symbols-outlined"
+                        style="font-size:18px;vertical-align:middle;margin-right:8px;">badge</span>Faculty ID</h3>
+                <button class="modal-close-btn" data-action="close-faculty-id-modal" aria-label="Close"><span
+                        class="material-symbols-outlined">close</span></button>
+            </div>
+
+            <!-- Step 1: enter -->
+            <div id="facultyIdStepEnter">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="facultyIdInput">Your Faculty ID</label>
+                        <input type="text" id="facultyIdInput" class="form-input" placeholder="e.g. 2023-00123-BN-0"
+                            maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                    </div>
+                    <p class="modal-error" id="facultyIdError" style="display:none;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel-acc" data-action="close-faculty-id-modal">Cancel</button>
+                    <button class="btn-save-acc" id="facultyIdContinueBtn" data-action="faculty-id-continue">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 2: confirm (permanent) -->
+            <div id="facultyIdStepConfirm" style="display:none;">
+                <div class="modal-body">
+                    <div class="fid-confirm-id" id="facultyIdConfirmValue"></div>
+                    <div class="warning-box">
+                        <span class="material-symbols-outlined" style="color:#856404;flex-shrink:0;">lock</span>
+                        <div><strong style="color:#856404;display:block;margin-bottom:2px;">This is permanent</strong>
+                            <p style="color:#856404;margin:0;font-size:0.875rem;">You can&rsquo;t change your Faculty ID after saving it, and neither can an admin.</p>
+                        </div>
+                    </div>
+                    <p class="modal-error" id="facultyIdConfirmError" style="display:none;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel-acc" data-action="faculty-id-back">Go Back</button>
+                    <button class="btn-save-acc" id="facultyIdConfirmBtn" data-action="faculty-id-confirm">
+                        <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">lock</span>Confirm &amp; Lock ID
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -39,7 +39,7 @@ switch ($section) {
         while ($row = $result->fetch_assoc()) {
             $isPast = strtotime($row['borrow_date']) < strtotime(date('Y-m-d'));
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td class='" . ($isPast ? "text-danger fw-bold" : "") . "'>
@@ -75,7 +75,7 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td><span class='badge " . ($status === 'Approved' ? 'bg-success' : 'bg-danger') . "'>{$row['status']}</span></td>
@@ -135,7 +135,7 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td>" . htmlspecialchars($row['instructor']) . "</td>

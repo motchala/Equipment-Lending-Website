@@ -713,6 +713,130 @@ if ($action === 'update_backup_email') {
     exit;
 }
 
+/* ------------------------------------------------------------------
+   ACTION: check_faculty_id / set_faculty_id
+   A faculty member sets their own Faculty ID ONCE. Admins cannot edit it and
+   it cannot be changed afterwards.
+     check_faculty_id  validates + checks availability only (nothing is saved)
+     set_faculty_id    saves it permanently
+   The account is created under an internal placeholder id (see
+   config/faculty-id.php); saving replaces that placeholder everywhere it appears.
+------------------------------------------------------------------ */
+if ($action === 'check_faculty_id' || $action === 'set_faculty_id') {
+    $current_id = (string)$_SESSION['faculty_id'];
+
+    if (!faculty_id_is_unset($current_id)) {
+        echo json_encode([
+            'success' => false,
+            'locked'  => true,
+            'msg'     => 'Your Faculty ID is already set and cannot be changed.'
+        ]);
+        exit;
+    }
+
+    $new_id = faculty_id_normalize((string)($_POST['faculty_id'] ?? ''));
+    if ($new_id === null) {
+        echo json_encode([
+            'success' => false,
+            'msg'     => 'Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).'
+        ]);
+        exit;
+    }
+
+    // Already registered to another account?
+    $taken_stmt = $conn->prepare('SELECT 1 FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    if (!$taken_stmt) {
+        echo json_encode(['success' => false, 'msg' => 'Could not check that ID. Please try again.']);
+        exit;
+    }
+    $taken_stmt->bind_param('s', $new_id);
+    $taken_stmt->execute();
+    $taken_stmt->store_result();
+    $is_taken = $taken_stmt->num_rows > 0;
+    $taken_stmt->close();
+    if ($is_taken) {
+        echo json_encode(['success' => false, 'msg' => 'That Faculty ID is already registered to another account.']);
+        exit;
+    }
+
+    if ($action === 'check_faculty_id') {
+        echo json_encode(['success' => true, 'faculty_id' => $new_id]);
+        exit;
+    }
+
+    // set_faculty_id: replace the placeholder on the account and on every record that carries it
+    $id_columns = [
+        ['tbl_requests',             'faculty_id'],
+        ['tbl_requests',             'submitted_by_id'],
+        ['tbl_room_reservations',    'faculty_id'],
+        ['tbl_room_reservations',    'submitted_by_id'],
+        ['tbl_faculty_codes',        'faculty_id'],
+        ['tbl_arbitration_log',      'borrower_id'],
+        ['tbl_room_arbitration_log', 'borrower_id'],
+        ['tbl_room_issues',          'reported_by_id'],
+        ['tbl_faculty_notif_state',  'faculty_id'],
+        ['tbl_room_waitlist',        'faculty_id'],
+    ];
+
+    $conn->begin_transaction();
+    try {
+        // The WHERE clause is what makes this one-time, even if the button is double-clicked.
+        $up = $conn->prepare("UPDATE tbl_users SET faculty_id = ? WHERE faculty_id = ? AND faculty_id LIKE 'NOTSET-%'");
+        if (!$up) {
+            throw new RuntimeException('prepare failed: ' . $conn->error);
+        }
+        $up->bind_param('ss', $new_id, $current_id);
+        $up->execute();
+        $changed = $up->affected_rows;
+        $up->close();
+
+        if ($changed !== 1) {
+            $conn->rollback();
+            echo json_encode(['success' => false, 'msg' => 'Your Faculty ID could not be saved. Please refresh and try again.']);
+            exit;
+        }
+
+        foreach ($id_columns as $tc) {
+            // table and column names come from the fixed list above, never from input
+            try {
+                $mv = $conn->prepare("UPDATE `{$tc[0]}` SET `{$tc[1]}` = ? WHERE `{$tc[1]}` = ?");
+                if ($mv) {
+                    $mv->bind_param('ss', $new_id, $current_id);
+                    $mv->execute();
+                    $mv->close();
+                }
+            } catch (Throwable $e) {
+                // a table that does not exist on this install simply has nothing to move
+                error_log('[set_faculty_id] skipped ' . $tc[0] . '.' . $tc[1] . ': ' . $e->getMessage());
+            }
+        }
+
+        $conn->commit();
+    } catch (Throwable $e) {
+        $conn->rollback();
+        $dup = ($e instanceof mysqli_sql_exception && (int)$e->getCode() === 1062);
+        if (!$dup) {
+            error_log('[set_faculty_id] ' . $e->getMessage());
+        }
+        echo json_encode([
+            'success' => false,
+            'msg'     => $dup ? 'That Faculty ID is already registered to another account.'
+                : 'Your Faculty ID could not be saved. Please try again.'
+        ]);
+        exit;
+    }
+
+    // Keep this login working under the new id (config/session.php re-checks it on every request).
+    $_SESSION['faculty_id'] = $new_id;
+
+    echo json_encode([
+        'success'    => true,
+        'faculty_id' => $new_id,
+        'msg'        => 'Faculty ID saved. It is now permanent.'
+    ]);
+    exit;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    ACTION: upload_profile_picture
    Handles profile picture upload with validation

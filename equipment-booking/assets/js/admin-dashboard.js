@@ -311,6 +311,15 @@
        filtering the visible list, navigating to the right screen when
        a notification is opened, and short-polling for new ones.
     ════════════════════════════════════════════════════════════════ */
+    /* Select / bulk-action state for the Notifications modal (see the
+       NOTIF-SELECT region below). Declared up here so every helper in this
+       section can safely read it. */
+    let _anSelectMode = false;   // "Select" mode on: rows toggle a checkbox instead of expanding
+    let _anPending = null;       // { keys, text } while the inline delete confirmation is open
+    let _anLastAnchor = null;    // last row clicked, for shift-click range select
+    let _anBusy = 0;             // in-flight bulk requests (polling pauses while > 0)
+    const _anSelected = new Set();
+
     function _getUnreadCount() {
         return document.querySelectorAll('#notifList .notif-item.unread').length;
     }
@@ -318,6 +327,8 @@
     function _updateBadges(count) {
         const uc = document.getElementById('unreadCount');
         if (uc) uc.textContent = count + ' unread';
+        const up = document.getElementById('unreadPlural');
+        if (up) up.textContent = count === 1 ? '' : 's';
         const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
         if (markAllBtn) markAllBtn.disabled = (count === 0);
         const navDot = document.getElementById('navNotifDot');
@@ -350,34 +361,40 @@
             .catch(() => null);
     }
 
-    /* Cheap, local recount of the chip badges (no network round-trip) —
-       called after any instant local action (read/delete/mark-all-read)
-       so the numbers never lag behind what's actually in the list. Chip
-       add/remove (a category appearing/disappearing entirely) is handled
-       by the next poll via _syncFilterChips. */
+    /* Cheap, local recount of the filter-pill numbers (no network round-trip).
+       Called after any local action (read / unread / delete / mark-all-read) and
+       after every poll, so the numbers never lag behind what is in the list.
+       Cards that are mid-removal, or in a category muted under Settings ->
+       Notification Preferences, are not counted. */
+    function _anMutedCats() {
+        const hidden = [];
+        if (LS.get('notifPrefRequests') === 'false') hidden.push('request');
+        if (LS.get('notifPrefOverdue') === 'false') hidden.push('overdue');
+        return hidden;
+    }
+
     function _updateChipCounts() {
         const bar = document.getElementById('notifFilterChips');
         if (!bar) return;
-        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
-        let unread = 0;
-        document.querySelectorAll('#notifList .notif-item[data-notif-key]').forEach(item => {
+        const muted = _anMutedCats();
+        const counts = { all: 0, unread: 0, request: 0, overdue: 0, room: 0, system: 0 };
+        document.querySelectorAll('#notifList .notif-item[data-notif-key]:not(.notif-removing)').forEach(item => {
+            if (muted.indexOf(item.dataset.cat) !== -1) return;
+            counts.all++;
+            if (item.classList.contains('unread')) counts.unread++;
             if (counts.hasOwnProperty(item.dataset.cat)) counts[item.dataset.cat]++;
-            if (item.classList.contains('unread')) unread++;
         });
-        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
-        Object.keys(counts).forEach(cat => {
+        const labels = { all: 'All', unread: 'Unread', request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(labels).forEach(cat => {
             const chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
             if (chip) chip.innerHTML = _esc(labels[cat]) + (counts[cat] > 0 ? ' <span class="notif-chip-count">' + counts[cat] + '</span>' : '');
         });
-        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
-        if (unreadChip) unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
+        _anRefreshChrome();
     }
 
     function _markCardRead(card) {
         if (!card.classList.contains('unread')) return;
-        card.classList.remove('unread');
-        const dot = card.querySelector('.unread-dot');
-        if (dot) dot.style.display = 'none';
+        _anApplyReadState(card, true);   // class + dot + the "Mark as read/unread" button label
         _updateBadges(_getUnreadCount());
         _updateChipCounts();
         const key = card.dataset.notifKey;
@@ -387,6 +404,7 @@
     function _deleteCard(card) {
         const key = card.dataset.notifKey;
         const wasUnread = card.classList.contains('unread');
+        _anSelected.delete(key);
         card.classList.add('notif-removing');
         setTimeout(() => {
             const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
@@ -400,6 +418,7 @@
             if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
             _updateChipCounts();
         }, 220);
+        _updateChipCounts();
         if (wasUnread) _updateBadges(Math.max(0, _getUnreadCount() - 1));
         if (key) _notifPost('equipment-booking/api/notif-delete.php', key);
         showToast('Notification deleted.');
@@ -486,7 +505,8 @@
 
             const mainRow = card.querySelector('.notif-card-main');
             if (mainRow) {
-                mainRow.addEventListener('click', () => {
+                mainRow.addEventListener('click', (e) => {
+                    if (_anSelectMode) { _anToggleSelect(card, e.shiftKey); return; }
                     const isExpanded = card.classList.contains('expanded');
                     document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
                     if (!isExpanded) {
@@ -502,6 +522,14 @@
             if (gotoBtn) {
                 gotoBtn.addEventListener('click', e => { e.stopPropagation(); _notifGoto(card); });
             }
+            const toggleBtn = card.querySelector('[data-notif-toggle-read]');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    // currently unread -> mark read; currently read -> mark unread
+                    _anSetRead([card.dataset.notifKey], card.classList.contains('unread'), true);
+                });
+            }
             const deleteBtn = card.querySelector('[data-notif-delete]');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', e => { e.stopPropagation(); _deleteCard(card); });
@@ -509,7 +537,13 @@
         });
     }
 
-    function filterNotifs(cat) {
+    function filterNotifs(cat, keepSelection) {
+        // A selection / pending delete must never silently follow you to a different pill.
+        if (!keepSelection) {
+            _anSelected.clear();
+            _anLastAnchor = null;
+            _anPending = null;
+        }
         document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(t => t.classList.remove('active'));
         const btn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="' + cat + '"]');
         if (btn) btn.classList.add('active');
@@ -544,57 +578,301 @@
         const filterEmpty = document.getElementById('notifFilterEmptyState');
         const hasAnyCardAtAll = !!document.querySelector('#notifList .notif-item');
         if (filterEmpty) filterEmpty.style.display = (hasAnyCardAtAll && !anyCardVisible) ? '' : 'none';
+        _anRefreshChrome();
     }
 
-    /* Keep the filter chip row honest against live data: add a chip for
-       a category that just got its first notification, refresh the
-       counts on every chip, and drop a chip whose category emptied out
-       (unless it's the one currently active — filterNotifs() handles
-       falling back to "All" for that case). */
-    function _syncFilterChips(notifications) {
-        const bar = document.getElementById('notifFilterChips');
-        if (!bar) return;
-        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
-        let unread = 0;
-        notifications.forEach(n => {
-            if (counts.hasOwnProperty(n.cat)) counts[n.cat]++;
-            if (!n.is_read) unread++;
-        });
-
-        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
-        Object.keys(counts).forEach(cat => {
-            let chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
-            if (counts[cat] > 0) {
-                if (!chip) {
-                    chip = document.createElement('button');
-                    chip.className = 'rq-filter-chip';
-                    chip.dataset.notifFilter = cat;
-                    chip.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
-                    bar.appendChild(chip);
-                }
-                chip.innerHTML = _esc(labels[cat]) + ' <span class="notif-chip-count">' + counts[cat] + '</span>';
-            } else if (chip && !chip.classList.contains('active')) {
-                chip.remove();
-            }
-        });
-
-        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
-        if (unreadChip) {
-            unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
-        }
+    /* Keep the filter pills honest against live data after a poll. (Every pill
+       is always rendered now, so this only has to refresh the numbers.) */
+    function _syncFilterChips() {
+        _updateChipCounts();
     }
 
     function markAllRead() {
-        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
-            item.classList.remove('unread');
-            const dot = item.querySelector('.unread-dot');
-            if (dot) dot.style.display = 'none';
-        });
+        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => _anApplyReadState(item, true));
         _updateBadges(0);
         _updateChipCounts();
+        _anReapplyFilter();
         _notifPost('equipment-booking/api/notif-mark-all-read.php');
         showToast('All notifications marked as read.');
     }
+
+    /* ▼ NOTIF-SELECT-BEGIN ───────────────────────────────────────────────────
+       Select · Select all · Mark read / unread · Delete selected · Delete all
+       Same behaviour as the faculty Notifications modal, working on the
+       server-rendered cards above. Bulk writes go to api/notif-bulk.php. */
+    function _anPlural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    function _anCards() {
+        return Array.from(document.querySelectorAll('#notifList .notif-item[data-notif-key]:not(.notif-removing)'));
+    }
+
+    function _anActiveFilter() {
+        const a = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
+        return a ? a.dataset.notifFilter : 'all';
+    }
+
+    /* The cards the current pill is showing (muted categories never count). */
+    function _anMatches() {
+        const f = _anActiveFilter();
+        const muted = _anMutedCats();
+        return _anCards().filter(c => {
+            if (muted.indexOf(c.dataset.cat) !== -1) return false;
+            if (f === 'all') return true;
+            if (f === 'unread') return c.classList.contains('unread');
+            return c.dataset.cat === f;
+        });
+    }
+
+    function _anReapplyFilter() { filterNotifs(_anActiveFilter(), true); }
+
+    function _anBulk(action, keys) {
+        const body = new URLSearchParams();
+        body.set('action', action);
+        body.set('csrf_token', getCsrfToken());
+        keys.forEach(k => body.append('keys[]', k));
+        _anBusy++;
+        return fetch('equipment-booking/api/notif-bulk.php', { method: 'POST', body: body, credentials: 'same-origin' })
+            .then(r => r.json().catch(() => ({})).then(j => {
+                if (!r.ok || j.status !== 'success') throw new Error(j.message || j.error || 'Request failed');
+                return j;
+            }))
+            .finally(() => { _anBusy--; });
+    }
+
+    function _anApplyReadState(card, read) {
+        card.classList.toggle('unread', !read);
+        const dot = card.querySelector('.unread-dot');
+        if (dot) dot.style.display = '';
+        const btn = card.querySelector('[data-notif-toggle-read]');
+        if (btn) {
+            const ic = btn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = read ? 'mark_email_unread' : 'drafts';
+            const lb = btn.querySelector('[data-notif-toggle-label]');
+            if (lb) lb.textContent = read ? 'Mark as unread' : 'Mark as read';
+        }
+    }
+
+    /* Optimistic: the list updates instantly, the server follows. */
+    function _anSetRead(keys, read) {
+        const cards = _anCards().filter(c => keys.indexOf(c.dataset.notifKey) !== -1 && c.classList.contains('unread') === read);
+        if (!cards.length) return Promise.resolve(true);
+        cards.forEach(c => _anApplyReadState(c, read));
+        _updateBadges(_getUnreadCount());
+        _updateChipCounts();
+        _anReapplyFilter();
+        return _anBulk(read ? 'mark_read' : 'mark_unread', cards.map(c => c.dataset.notifKey))
+            .then(() => true)
+            .catch(() => {
+                showToast('Could not update notifications. Please try again.');
+                _notifPoll();
+                return false;
+            });
+    }
+
+    function _anDelete(keys) {
+        const doomed = _anCards().filter(c => keys.indexOf(c.dataset.notifKey) !== -1);
+        if (!doomed.length) return Promise.resolve(true);
+        const gone = new Set(doomed.map(c => c.dataset.notifKey));
+        const unreadLeft = _anCards().filter(c => !gone.has(c.dataset.notifKey) && c.classList.contains('unread')).length;
+        gone.forEach(k => _anSelected.delete(k));
+        doomed.forEach(c => _deleteCardSilent(c));
+        _updateBadges(unreadLeft);
+        _updateChipCounts();
+        return _anBulk('delete', Array.from(gone))
+            .then(() => {
+                showToast(gone.size === 1 ? 'Notification deleted.' : _anPlural(gone.size, 'notification') + ' deleted.');
+                return true;
+            })
+            .catch(() => {
+                showToast('Could not delete. Please try again.');
+                _notifPoll();
+                return false;
+            });
+    }
+
+    function _anToggleSelect(card, range) {
+        const key = card.dataset.notifKey;
+        if (range && _anLastAnchor) {
+            const list = _anMatches();
+            const a = list.findIndex(c => c.dataset.notifKey === _anLastAnchor);
+            const b = list.findIndex(c => c.dataset.notifKey === key);
+            if (a > -1 && b > -1) {
+                for (let i = Math.min(a, b); i <= Math.max(a, b); i++) _anSelected.add(list[i].dataset.notifKey);
+                _anRefreshChrome();
+                return;
+            }
+        }
+        if (_anSelected.has(key)) _anSelected.delete(key); else _anSelected.add(key);
+        _anLastAnchor = key;
+        _anRefreshChrome();
+    }
+
+    function _anEnterSelect() {
+        _anSelectMode = true;
+        _anPending = null;
+        document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
+        _anRefreshChrome();
+    }
+
+    function _anExitSelect() {
+        _anSelectMode = false;
+        _anSelected.clear();
+        _anLastAnchor = null;
+        _anPending = null;
+        _anRefreshChrome();
+    }
+
+    function _anSelectAll() {
+        const list = _anMatches();
+        const all = list.length > 0 && list.every(c => _anSelected.has(c.dataset.notifKey));
+        list.forEach(c => { if (all) _anSelected.delete(c.dataset.notifKey); else _anSelected.add(c.dataset.notifKey); });
+        _anRefreshChrome();
+    }
+
+    function _anAskDelete(keys, text) {
+        if (!keys.length) return;
+        _anPending = { keys: keys.slice(), text: text };
+        _anRefreshChrome();
+    }
+
+    /* Everything outside the cards that depends on the data: footer buttons,
+       selection bar, confirm strip, row checkboxes. Cheap -- safe to call often. */
+    function _anRefreshChrome() {
+        const list = document.getElementById('notifList');
+        if (!list) return;
+        const muted = _anMutedCats();
+        const cards = _anCards().filter(c => muted.indexOf(c.dataset.cat) === -1);
+
+        if (_anSelectMode && cards.length === 0) { _anSelectMode = false; _anSelected.clear(); _anPending = null; }
+        const live = new Set(_anCards().map(c => c.dataset.notifKey));
+        Array.from(_anSelected).forEach(k => { if (!live.has(k)) _anSelected.delete(k); });
+
+        const matches = _anMatches();
+        const matchKeys = new Set(matches.map(c => c.dataset.notifKey));
+        const selCount = matches.filter(c => _anSelected.has(c.dataset.notifKey)).length;
+
+        list.classList.toggle('is-selecting', _anSelectMode);
+        _anCards().forEach(c => {
+            const on = _anSelectMode && _anSelected.has(c.dataset.notifKey) && matchKeys.has(c.dataset.notifKey);
+            c.classList.toggle('is-selected', on);
+            const row = c.querySelector('.notif-card-main');
+            if (row) {
+                if (_anSelectMode) {
+                    row.setAttribute('role', 'checkbox');
+                    row.setAttribute('aria-checked', on ? 'true' : 'false');
+                } else {
+                    row.setAttribute('role', 'button');
+                    row.removeAttribute('aria-checked');
+                }
+            }
+        });
+
+        const selectBtn = document.getElementById('notifSelectBtn');
+        if (selectBtn) {
+            selectBtn.disabled = !_anSelectMode && cards.length === 0;
+            selectBtn.setAttribute('aria-pressed', _anSelectMode ? 'true' : 'false');
+            const lbl = document.getElementById('notifSelectLbl');
+            if (lbl) lbl.textContent = _anSelectMode ? 'Done' : 'Select';
+            const ic = selectBtn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = _anSelectMode ? 'close' : 'checklist';
+        }
+        const delAll = document.getElementById('notifDeleteAllBtn');
+        if (delAll) {
+            delAll.hidden = !_anSelectMode;
+            delAll.disabled = matches.length === 0;
+            const tail = delAll.lastChild;
+            if (tail && tail.nodeType === 3) tail.nodeValue = ' Delete all' + (_anActiveFilter() === 'all' ? '' : ' (' + matches.length + ')');
+        }
+        const selBar = document.getElementById('notifSelBar');
+        if (selBar) selBar.hidden = !_anSelectMode;
+        const selCountEl = document.getElementById('notifSelCount');
+        if (selCountEl) selCountEl.textContent = selCount + ' selected';
+        const selAll = document.getElementById('notifSelectAll');
+        if (selAll) {
+            selAll.checked = matches.length > 0 && selCount === matches.length;
+            selAll.indeterminate = selCount > 0 && selCount < matches.length;
+            selAll.disabled = matches.length === 0;
+        }
+        document.querySelectorAll('#notifSelBar [data-needs-sel]').forEach(b => { b.disabled = selCount === 0; });
+
+        const conf = document.getElementById('notifConfirm');
+        if (conf) {
+            conf.hidden = !_anPending;
+            const ct = document.getElementById('notifConfirmText');
+            if (ct && _anPending) ct.textContent = _anPending.text;
+        }
+    }
+
+    (function initNotifSelect() {
+        const overlay = document.getElementById('notifOverlay');
+        if (!overlay) return;
+
+        overlay.addEventListener('click', function (e) {
+            const b = e.target.closest('[data-nbar]');
+            if (!b || b.disabled) return;
+            const matches = _anMatches();
+            const selKeys = matches.filter(c => _anSelected.has(c.dataset.notifKey)).map(c => c.dataset.notifKey);
+            switch (b.dataset.nbar) {
+                case 'select':
+                    if (_anSelectMode) _anExitSelect(); else _anEnterSelect();
+                    break;
+                case 'mark-read':
+                    _anSetRead(selKeys, true).then(ok => { if (ok) showToast(_anPlural(selKeys.length, 'notification') + ' marked as read.'); });
+                    break;
+                case 'mark-unread':
+                    _anSetRead(selKeys, false).then(ok => { if (ok) showToast(_anPlural(selKeys.length, 'notification') + ' marked as unread.'); });
+                    break;
+                case 'delete-selected':
+                    _anAskDelete(selKeys, 'Delete ' + (selKeys.length === 1 ? 'the selected notification' : selKeys.length + ' selected notifications') + '? This can\u2019t be undone.');
+                    break;
+                case 'delete-all': {
+                    const keys = matches.map(c => c.dataset.notifKey);
+                    const f = _anActiveFilter();
+                    const scope = f === 'all' ? '' : ' ' + f;
+                    _anAskDelete(keys, 'Delete all ' + (keys.length === 1 ? '1' + scope + ' notification' : keys.length + scope + ' notifications') + '? This can\u2019t be undone.');
+                    break;
+                }
+                case 'confirm-cancel':
+                    _anPending = null;
+                    _anRefreshChrome();
+                    break;
+                case 'confirm-ok': {
+                    if (!_anPending) break;
+                    const keys = _anPending.keys;
+                    _anPending = null;
+                    _anRefreshChrome();
+                    _anDelete(keys);
+                    break;
+                }
+            }
+        });
+
+        const selAllBox = document.getElementById('notifSelectAll');
+        if (selAllBox) selAllBox.addEventListener('change', _anSelectAll);
+
+        // Shift-click selects a range -- don't start a text selection while doing it
+        const listEl = document.getElementById('notifList');
+        if (listEl) {
+            listEl.addEventListener('mousedown', function (e) { if (e.shiftKey && _anSelectMode) e.preventDefault(); });
+        }
+
+        // Esc: close the delete confirmation first, then leave Select mode, before anything else sees it
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || !overlay.classList.contains('ps-modal-open')) return;
+            if (_anPending) { e.preventDefault(); e.stopPropagation(); _anPending = null; _anRefreshChrome(); }
+            else if (_anSelectMode) { e.preventDefault(); e.stopPropagation(); _anExitSelect(); }
+        }, true);
+
+        // However the modal gets closed (X, backdrop, navigating to a notification), leave Select mode behind
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(function () {
+                if (!overlay.classList.contains('ps-modal-open') && (_anSelectMode || _anPending || _anSelected.size)) _anExitSelect();
+            }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        }
+
+        _anRefreshChrome();
+    })();
+    /* ▲ NOTIF-SELECT-END ──────────────────────────────────────────────────── */
 
     /* ── Poll for genuinely new notifications (new request submitted,
        item went overdue, room issue reported, stock dropped, etc.)
@@ -620,6 +898,7 @@
 
         wrap.innerHTML =
             '<div class="notif-card-main" role="button" tabindex="0">' +
+            '<span class="anotif-check" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>' +
             '<div class="notif-icon ' + _esc(n.icon_class) + '"><span class="material-symbols-outlined">' + _esc(n.icon) + '</span></div>' +
             '<div class="notif-body-wrap"><h4>' + _esc(n.title) + '</h4><p>' + n.body + '</p></div>' +
             '<div class="notif-meta"><span class="notif-time">' + _esc(n.time_label) + '</span><div class="unread-dot"></div>' +
@@ -628,6 +907,7 @@
             '<div class="notif-card-detail"><div class="ps-detail-grid">' + detailRows + '</div>' +
             '<div class="notif-card-actions">' +
             '<button type="button" class="ps-btn ps-btn--primary ps-btn--sm" data-notif-goto><span class="material-symbols-outlined">visibility</span>' + _esc(n.view_label) + '</button>' +
+            '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-toggle-read-btn" data-notif-toggle-read><span class="material-symbols-outlined">' + (n.is_read ? 'mark_email_unread' : 'drafts') + '</span><span data-notif-toggle-label>' + (n.is_read ? 'Mark as unread' : 'Mark as read') + '</span></button>' +
             '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification"><span class="material-symbols-outlined">delete</span>Delete</button>' +
             '</div></div>';
         return wrap;
@@ -640,6 +920,9 @@
     }
 
     function _notifPoll() {
+        // Don't reshuffle the list under the admin's hands: pause while a bulk
+        // action is in flight or a delete confirmation is open.
+        if (_anBusy > 0 || _anPending) return;
         fetch('equipment-booking/api/notif-list.php')
             .then(r => r.ok ? r.json() : null)
             .then(data => {
@@ -685,7 +968,7 @@
                     initNotifCards();
                 }
                 const activeFilter = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
-                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all');
+                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all', true);
 
                 _updateBadges(data.unread_count);
             })
@@ -703,6 +986,7 @@
                 if (!next || !next.classList.contains('notif-item')) group.remove();
             }
             if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+            _updateChipCounts();
         }, 220);
     }
 
@@ -1201,35 +1485,46 @@
         return d.innerHTML;
     }
 
-    function _buildFacultyRow(data) {
-        // data = { fullname, email, backup_email, role, org_name, org_id, faculty_id, allow_org_borrowing }
-        const tr = document.createElement('tr');
-        const isAdviser = data.role === 'Organization Adviser';
-        const subLabel = isAdviser && data.org_name
-            ? 'Org Adviser \u00B7 ' + data.org_name
-            : 'Active Faculty';
-        const init = (data.fullname || 'F').charAt(0).toUpperCase();
+    /* The faculty-list row is rendered in ONE place so the create form and the edit
+       modal produce rows identical to the ones the server prints (admin-dashboard.php).
+       An id starting with NOTSET- is the internal placeholder for "no Faculty ID yet"
+       (see config/faculty-id.php) and is shown as "Not set yet". */
+    window.psFacRender = function (tr, d) {
+        const isAdviser = d.role === 'Organization Adviser';
+        const idUnset = !d.faculty_id || String(d.faculty_id).indexOf('NOTSET-') === 0;
+        const init = ((d.fullname || 'F').trim().charAt(0) || 'F').toUpperCase();
 
-        tr.dataset.fullname = data.fullname || '';
-        tr.dataset.email = data.email || '';
-        tr.dataset.backupEmail = data.backup_email || '';
-        tr.dataset.facultyId = data.faculty_id || '';
-        tr.dataset.role = data.role || '';
-        tr.dataset.org = data.org_name || '';
-        tr.dataset.orgId = data.org_id || '0';
-        tr.dataset.aob = data.allow_org_borrowing === 1 ? '1' : '0';
+        tr.dataset.fullname = d.fullname || '';
+        tr.dataset.email = d.email || '';
+        tr.dataset.backupEmail = d.backup_email || '';
+        tr.dataset.facultyId = d.faculty_id || '';
+        tr.dataset.role = d.role || '';
+        tr.dataset.org = d.org_name || '';
+        tr.dataset.orgId = String(d.org_id || '0');
         tr.dataset.init = init;
 
         tr.innerHTML =
-            '<td>' +
-            '<div style="font-weight:600">' + _esc(data.fullname) + '</div>' +
-            '<div style="font-size:11px;color:var(--text-light)">' + _esc(subLabel) + '</div>' +
-            '</td>' +
-            '<td style="font-size:12px;color:var(--text-light)">' + _esc(data.faculty_id || '') + '</td>' +
-            '<td style="font-size:12px">' + _esc(data.email) + '</td>' +
-            '<td><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">' +
+            '<td><div class="fac-person">' +
+            '<span class="fac-avatar">' + _esc(init) + '</span>' +
+            '<div class="fac-person-text">' +
+            '<div class="fac-person-name">' + _esc(d.fullname) + '</div>' +
+            '<div class="fac-person-sub">' + _esc(d.email) + '</div>' +
+            '</div></div></td>' +
+            '<td>' + (idUnset
+                ? '<span class="fac-id-pending">Not set yet</span>'
+                : '<span class="fac-id">' + _esc(d.faculty_id) + '</span>') + '</td>' +
+            '<td>' + (isAdviser
+                ? '<span class="fac-role fac-role--adviser">Org Adviser</span>' +
+                (d.org_name ? '<div class="fac-person-sub">' + _esc(d.org_name) + '</div>' : '')
+                : '<span class="fac-role">Faculty</span>') + '</td>' +
+            '<td class="fac-actions"><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">' +
             '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
+    };
+
+    function _buildFacultyRow(data) {
+        // data = { fullname, email, backup_email, role, org_name, org_id, faculty_id }
+        return window.psFacRender(document.createElement('tr'), data);
     }
 
     /* ── Faculty: create-account submit ──────────────────────── */
@@ -1313,7 +1608,7 @@
                 .then(data => {
                     if (data.status === 'success') {
                         _showFacAlert(
-                            'Account created. Faculty ID: ' + data.faculty_id, false
+                            'Account created. They will add their own Faculty ID after signing in.', false
                         );
                         showToast('Faculty account created successfully.');
 
@@ -1340,8 +1635,7 @@
                                 role,
                                 org_name: orgName,
                                 org_id: orgIdVal,
-                                faculty_id: data.faculty_id || '',
-                                allow_org_borrowing: 0
+                                faculty_id: data.faculty_id || ''
                             });
                             tbody.prepend(newRow);
                         }

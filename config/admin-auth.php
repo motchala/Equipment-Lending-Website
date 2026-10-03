@@ -221,6 +221,26 @@ function faculty_session_guard(): void
     $stmt->close();
 
     if (!$exists) {
+        // A faculty member can set their own Faculty ID once (it replaces the id
+        // they were created with). If that happened in another tab or device, this
+        // session still holds the old id: find the account by email and follow it.
+        $email = (string)($_SESSION['faculty_email'] ?? '');
+        if ($email !== '') {
+            $st = $conn->prepare('SELECT faculty_id FROM tbl_users WHERE email = ? LIMIT 1');
+            if ($st) {
+                $st->bind_param('s', $email);
+                if ($st->execute()) {
+                    $res = $st->get_result();
+                    $row = ($res && $res->num_rows === 1) ? $res->fetch_assoc() : null;
+                    if ($row) {
+                        $st->close();
+                        $_SESSION['faculty_id'] = (string)$row['faculty_id'];
+                        return;
+                    }
+                }
+                $st->close();
+            }
+        }
         faculty_session_end('This faculty account is no longer available. Please contact your administrator.');
     }
 }

@@ -568,36 +568,10 @@ class ArbitrationEngine
      */
     private static function checkMissingDocument(array $request, array $config): ?string
     {
-        // Step 1: Check if the missing-doc block rule is enabled.
-        if (($config['rule_missing_doc_block_enabled'] ?? '0') !== '1') {
-            return null;
-        }
-
-        // Step 2: Determine if a document is present.
-        $has_document = isset($request['document_path'])
-            && $request['document_path'] !== null
-            && $request['document_path'] !== '';
-
-        // Step 3: Document present — no hold needed.
-        if ($has_document) {
-            return null;
-        }
-
-        // Step 4: No document — check if this is an adviser-mode request.
-        // Two paths qualify:
-        //   (a) submitted_as = 'adviser'  → new explicit mode (Requirements 7.1)
-        //   (b) submitted_as = NULL AND role = 'Organization Adviser' → legacy path (Requirement 7.2)
-        // Personal-mode submissions (submitted_as = 'personal') do NOT trigger this hold
-        // based on allow_org_borrowing alone (Requirement 7.3).
-        $submitted_as    = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
-        $is_adviser_mode = ($submitted_as === 'adviser')
-            || ($submitted_as === null && isset($request['role']) && $request['role'] === 'Organization Adviser');
-
-        if ($is_adviser_mode) {
-            return 'A signed request letter is required for organization borrowing.';
-        }
-
-        // No hold required.
+        // A supporting / request letter is OPTIONAL for organization requests.
+        // Attaching one can still raise a request's priority (see validateDocument()),
+        // but a missing letter never puts a request on hold. The old
+        // rule_missing_doc_block_enabled setting is therefore no longer applied.
         return null;
     }
 

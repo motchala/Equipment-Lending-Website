@@ -1,4 +1,5 @@
 <?php
+
 /**
  * notif-functions.php
  *
@@ -100,6 +101,71 @@ if (!function_exists('notif_set_state')) {
     }
 }
 
+if (!function_exists('notif_set_state_many')) {
+    /**
+     * Upsert read/deleted flags for MANY keys at once (one transaction) --
+     * the bulk counterpart of notif_set_state(), used by api/notif-bulk.php
+     * (Select / Mark read / Mark unread / Delete selected / Delete all).
+     * Pass null to leave a flag untouched. Keys are checked against the live
+     * feed first (deleted ones included), so only notifications that really
+     * exist can ever be written.
+     *
+     * @return int number of keys written
+     */
+    function notif_set_state_many(mysqli $conn, array $keys, ?bool $isRead, ?bool $isDeleted): int
+    {
+        notif_ensure_table($conn);
+        if ($isRead === null && $isDeleted === null) return 0;
+
+        $valid = array_flip(array_column(notif_build_list($conn, true), 'key'));
+        $keys  = array_values(array_unique(array_filter(
+            $keys,
+            fn($k) => is_string($k) && preg_match('/^[a-z]+-\d+$/', $k) && isset($valid[$k])
+        )));
+        if (!$keys) return 0;
+
+        if ($isRead !== null && $isDeleted !== null) {
+            $sql = "INSERT INTO tbl_notif_state (notif_key, is_read, is_deleted) VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE is_read = VALUES(is_read), is_deleted = VALUES(is_deleted), updated_at = NOW()";
+        } elseif ($isRead !== null) {
+            $sql = "INSERT INTO tbl_notif_state (notif_key, is_read) VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE is_read = VALUES(is_read), updated_at = NOW()";
+        } else {
+            $sql = "INSERT INTO tbl_notif_state (notif_key, is_deleted) VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE is_deleted = VALUES(is_deleted), updated_at = NOW()";
+        }
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) return 0;
+
+        $n = 0;
+        $conn->begin_transaction();
+        try {
+            foreach ($keys as $key) {
+                if ($isRead !== null && $isDeleted !== null) {
+                    $r = (int)$isRead;
+                    $d = (int)$isDeleted;
+                    $stmt->bind_param('sii', $key, $r, $d);
+                } elseif ($isRead !== null) {
+                    $r = (int)$isRead;
+                    $stmt->bind_param('si', $key, $r);
+                } else {
+                    $d = (int)$isDeleted;
+                    $stmt->bind_param('si', $key, $d);
+                }
+                if ($stmt->execute()) $n++;
+            }
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('[PUPSync] notif_set_state_many failed: ' . $e->getMessage());
+            $n = 0;
+        }
+        $stmt->close();
+        return $n;
+    }
+}
+
 if (!function_exists('notif_mark_all_read')) {
     /** Marks every key currently in the live feed as read (deleted ones are skipped automatically). */
     function notif_mark_all_read(mysqli $conn): int
@@ -121,8 +187,14 @@ if (!function_exists('notif_time_ago')) {
     {
         $diff = time() - strtotime($datetime);
         if ($diff < 60) return 'Just now';
-        if ($diff < 3600) { $m = floor($diff / 60); return $m . ' min' . ($m != 1 ? 's' : '') . ' ago'; }
-        if ($diff < 86400) { $h = floor($diff / 3600); return $h . ' hour' . ($h != 1 ? 's' : '') . ' ago'; }
+        if ($diff < 3600) {
+            $m = floor($diff / 60);
+            return $m . ' min' . ($m != 1 ? 's' : '') . ' ago';
+        }
+        if ($diff < 86400) {
+            $h = floor($diff / 3600);
+            return $h . ' hour' . ($h != 1 ? 's' : '') . ' ago';
+        }
         if ($diff < 172800) return 'Yesterday, ' . date('g:i A', strtotime($datetime));
         return date('M d, g:i A', strtotime($datetime));
     }
@@ -160,7 +232,7 @@ if (!function_exists('notif_build_list')) {
                     'urgent'       => true,
                     'title'        => 'Overdue: ' . $r['equipment_name'],
                     'body'         => '<strong>' . htmlspecialchars($r['faculty_name']) . '</strong> has not returned this item. '
-                                        . $daysLate . ' day' . ($daysLate != 1 ? 's' : '') . ' overdue.',
+                        . $daysLate . ' day' . ($daysLate != 1 ? 's' : '') . ' overdue.',
                     'time_label'   => 'Due ' . date('M d', strtotime($r['return_date'])),
                     'sort_ts'      => strtotime($r['return_date']),
                     'detail' => [
@@ -195,7 +267,7 @@ if (!function_exists('notif_build_list')) {
                     'urgent'       => false,
                     'title'        => 'New Borrow Request',
                     'body'         => '<strong>' . htmlspecialchars($r['faculty_name']) . '</strong> requested <strong>'
-                                        . htmlspecialchars($r['equipment_name']) . '</strong> — awaiting approval.',
+                        . htmlspecialchars($r['equipment_name']) . '</strong> — awaiting approval.',
                     'time_label'   => notif_time_ago($r['request_date']),
                     'sort_ts'      => strtotime($r['request_date']),
                     'detail' => [
@@ -245,7 +317,7 @@ if (!function_exists('notif_build_list')) {
                         'urgent'       => false,
                         'title'        => 'Issue Reported: ' . $r['room_name'],
                         'body'         => '<strong>' . htmlspecialchars($r['reported_by_name']) . '</strong> reported an issue — '
-                                            . htmlspecialchars(mb_substr($r['description'], 0, 80)) . (mb_strlen($r['description']) > 80 ? '…' : ''),
+                            . htmlspecialchars(mb_substr($r['description'], 0, 80)) . (mb_strlen($r['description']) > 80 ? '…' : ''),
                         'time_label'   => notif_time_ago($r['created_at']),
                         'sort_ts'      => strtotime($r['created_at']),
                         'detail' => [
@@ -290,8 +362,8 @@ if (!function_exists('notif_build_list')) {
                     'urgent'       => false,
                     'title'        => $outOfStock ? 'Out of Stock: ' . $r['item_name'] : 'Low Stock: ' . $r['item_name'],
                     'body'         => $outOfStock
-                                        ? 'This item has <strong>0 units</strong> available and cannot be lent out.'
-                                        : 'Only <strong>' . (int)$r['quantity'] . ' unit' . ($r['quantity'] != 1 ? 's' : '') . '</strong> remaining — at or below the configured threshold.',
+                        ? 'This item has <strong>0 units</strong> available and cannot be lent out.'
+                        : 'Only <strong>' . (int)$r['quantity'] . ' unit' . ($r['quantity'] != 1 ? 's' : '') . '</strong> remaining — at or below the configured threshold.',
                     'time_label'   => 'Ongoing',
                     'sort_ts'      => time() - (int)$r['item_id'], // stable order, most-recently-added items first
                     'detail' => [
