@@ -498,6 +498,7 @@
                 if (returnInp) returnInp.value = '';
                 const fileInp = document.getElementById('request_document');
                 if (fileInp) fileInp.value = '';
+                syncBorrowDrops();
             }
         }
     }
@@ -506,6 +507,31 @@
         const modal = document.getElementById('borrowModal');
         if (modal) modal.style.display = 'none';
     }
+
+    /* Borrow modal: show the chosen file's name inside the styled drop area */
+    function syncBorrowDrops() {
+        document.querySelectorAll('.bm-drop').forEach(function (drop) {
+            const inp = drop.querySelector('input[type="file"]');
+            const title = drop.querySelector('[data-bm-drop-title]');
+            const icon = drop.querySelector('.bm-drop-icon');
+            if (!inp || !title) return;
+            if (!title.dataset.defaultText) title.dataset.defaultText = title.textContent;
+            const file = inp.files && inp.files[0];
+            title.textContent = file ? file.name : title.dataset.defaultText;
+            drop.classList.toggle('has-file', !!file);
+            if (icon) icon.textContent = file ? 'description' : 'upload_file';
+        });
+    }
+    window.syncBorrowDrops = syncBorrowDrops;
+
+    document.addEventListener('change', function (e) {
+        const inp = e.target;
+        if (!inp || !inp.matches || !inp.matches('.bm-drop input[type="file"]')) return;
+        syncBorrowDrops();
+        const group = inp.closest('.form-group');
+        const err = group && group.querySelector('.bm-error');
+        if (err && inp.files && inp.files.length) err.style.display = 'none';
+    });
 
     /* ── Room Form ─────────────────────────────────────────────────────── */
     function openRoomForm(roomName) {

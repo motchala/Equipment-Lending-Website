@@ -284,8 +284,75 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div>
 
-                <!-- Bottom two-col: Recent Requests + Recent Activity -->
+                <!-- Two-col: Room Status + Faculty Overview (sits between Quick Actions and the Recent tables) -->
                 <div class="ps-two-col" style="margin-bottom:1.25rem;">
+                    <div class="ps-card">
+                        <div class="ps-card-header">
+                            <h3><span class="material-symbols-outlined">meeting_room</span> Room Status</h3>
+                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-rooms">Manage</button>
+                        </div>
+                        <div class="ps-card-body">
+                            <?php
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0");
+                            $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
+                            $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE()");
+                            $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            ?>
+                            <div class="ps-mini-stats">
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val"><?php echo $rooms_total; ?></div>
+                                    <div class="ps-mini-lbl">Active Rooms</div>
+                                </div>
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val" style="color:var(--warning)"><?php echo $rooms_issues; ?></div>
+                                    <div class="ps-mini-lbl">Reported Issues</div>
+                                </div>
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $rooms_today; ?></div>
+                                    <div class="ps-mini-lbl">Reservations Today</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ps-card">
+                        <div class="ps-card-header">
+                            <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
+                            <?php if ($is_super_admin): ?>
+                                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="ps-card-body">
+                            <?php
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users");
+                            $fac_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role != 'Organization Adviser'");
+                            $fac_active = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role = 'Organization Adviser'");
+                            $fac_org    = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
+                            ?>
+                            <div class="ps-mini-stats">
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val"><?php echo $fac_total; ?></div>
+                                    <div class="ps-mini-lbl">Total Faculty</div>
+                                </div>
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $fac_active; ?></div>
+                                    <div class="ps-mini-lbl">Active</div>
+                                </div>
+                                <div class="ps-mini-stat">
+                                    <div class="ps-mini-val" style="color:var(--accent-maroon)"><?php echo $fac_org; ?></div>
+                                    <div class="ps-mini-lbl">Org Advisers</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Two-col: Recent Requests + Recent Activity -->
+                <div class="ps-two-col">
 
                     <!-- Recent Requests -->
                     <div class="ps-card">
@@ -360,73 +427,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             else: ?>
                                 <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem">No activity yet.</p>
                             <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bottom two-col: Room Status + Faculty Overview -->
-                <div class="ps-two-col">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">meeting_room</span> Room Status</h3>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-rooms">Manage</button>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0");
-                            $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
-                            $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE()");
-                            $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $rooms_total; ?></div>
-                                    <div class="ps-mini-lbl">Active Rooms</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--warning)"><?php echo $rooms_issues; ?></div>
-                                    <div class="ps-mini-lbl">Reported Issues</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $rooms_today; ?></div>
-                                    <div class="ps-mini-lbl">Reservations Today</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
-                            <?php if ($is_super_admin): ?>
-                                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users");
-                            $fac_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role != 'Organization Adviser'");
-                            $fac_active = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role = 'Organization Adviser'");
-                            $fac_org    = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $fac_total; ?></div>
-                                    <div class="ps-mini-lbl">Total Faculty</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $fac_active; ?></div>
-                                    <div class="ps-mini-lbl">Active</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--accent-maroon)"><?php echo $fac_org; ?></div>
-                                    <div class="ps-mini-lbl">Org Advisers</div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

@@ -3699,63 +3699,68 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         <!-- SINGLE-MODE: existing form unchanged (Requirement 4.1, 11.4) -->
         <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
             <div class="modal-box borrow-modal-box">
-                <div class="modal-header">
-                    <h3 id="borrowModalTitle">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
-                        Borrow Request
-                    </h3>
+                <div class="modal-header bm-head">
+                    <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">inventory_2</span></span>
+                    <div class="bm-heading">
+                        <h3 id="borrowModalTitle">Borrow Request</h3>
+                        <p class="bm-sub">Tell us where and when you need the equipment.</p>
+                    </div>
                     <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
-                        <span class="material-symbols-outlined">inventory_2</span>
-                        <span id="selectedItemLabel">No item selected</span>
+                    <div class="bm-item" id="selectedItemBanner">
+                        <span class="bm-item-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                        <div class="bm-item-text">
+                            <span class="bm-item-cap">Selected equipment</span>
+                            <span class="bm-item-name" id="selectedItemLabel">No item selected</span>
+                        </div>
                     </div>
-                    <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                    <form id="borrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                         <?= csrf_field() ?>
                         <input type="hidden" name="equipment_name" id="selectedItem">
                         <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                         <div class="form-group">
-                            <label class="form-label">Room / Laboratory</label>
-                            <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
+                            <label class="form-label" for="borrow_room">Room / Laboratory</label>
+                            <input type="text" name="room" id="borrow_room" class="form-input" placeholder="e.g. Lab 301" required>
+                            <p class="bm-hint">Where the equipment will be used.</p>
                         </div>
                         <div class="form-row-2">
                             <div class="form-group">
-                                <label class="form-label">Borrow Date</label>
-                                <input type="date"
-                                    name="borrow_date"
-                                    id="borrow_date"
-                                    class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>"
-                                    required>
+                                <label class="form-label" for="borrow_date">Borrow Date</label>
+                                <input type="date" name="borrow_date" id="borrow_date" class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Return Date</label>
-                                <input type="date"
-                                    name="return_date"
-                                    id="return_date"
-                                    class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>"
-                                    required>
+                                <label class="form-label" for="return_date">Return Date</label>
+                                <input type="date" name="return_date" id="return_date" class="form-input"
+                                    min="<?php echo date('Y-m-d'); ?>" required>
                             </div>
                         </div>
                         <?php if ($is_org_adviser): ?>
                             <div class="form-group">
-                                <label for="request_document">Request Letter
-                                    <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
+                                <span class="form-label">Request Letter <span class="bm-req">Required</span></span>
+                                <label class="bm-drop" for="request_document">
+                                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                                    <span class="bm-drop-text">
+                                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
+                                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                                    </span>
+                                    <input type="file" id="request_document" name="request_document"
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp" required>
                                 </label>
-                                <input type="file" id="request_document" name="request_document"
-                                    accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
-                                <small id="documentError" role="alert" style="color:var(--color-error);font-size:0.75rem;display:none;">
+                                <small id="documentError" class="bm-error" role="alert">
                                     Please attach a signed request letter before submitting.
                                 </small>
                             </div>
                         <?php endif; ?>
-                        <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                            <span class="material-symbols-outlined">send</span> Submit Borrow Request
-                        </button>
+                        <div class="bm-actions">
+                            <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                            <button type="submit" class="btn-save-acc">
+                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -3763,44 +3768,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <?php else: ?>
         <!-- DUAL-MODE: two-tab layout (Requirement 4.2, 4.3, 4.4) -->
         <style nonce="<?= $csp_nonce ?>">
-            /* ── Dual-mode borrow modal sub-tabs ─────────────────────────── */
-            .borrow-subtab-bar {
-                display: flex;
-                gap: 6px;
-                margin-bottom: 18px;
-                border-bottom: 2px solid var(--color-outline-variant);
-                padding-bottom: 0;
-            }
-
-            .borrow-subtab-btn {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 6px;
-                padding: 9px 14px;
-                font-size: 0.85rem;
-                font-weight: 600;
-                color: var(--color-secondary);
-                background: transparent;
-                border: none;
-                border-bottom: 3px solid transparent;
-                border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-                cursor: pointer;
-                transition: color var(--transition), border-bottom-color var(--transition), background var(--transition);
-                margin-bottom: -2px;
-            }
-
-            .borrow-subtab-btn:hover {
-                color: var(--color-primary);
-                background: color-mix(in srgb, var(--color-primary) 6%, transparent);
-            }
-
-            .borrow-subtab-btn.active {
-                color: var(--color-primary);
-                border-bottom-color: var(--color-primary);
-            }
-
+            /* Panel switching for the dual-mode tabs. Visual styling of the tabs,
+               checklist and form lives in faculty-dashboard.css (Borrow Request modal). */
             .borrow-subtab-panel {
                 display: none;
             }
@@ -3808,62 +3777,15 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             .borrow-subtab-panel.active {
                 display: block;
             }
-
-            /* ── Adviser checklist ───────────────────────────────────────── */
-            .adv-checklist-wrap {
-                max-height: 220px;
-                overflow-y: auto;
-                border: 1px solid var(--color-outline-variant);
-                border-radius: var(--radius-md);
-                padding: 10px 14px;
-                margin-bottom: 14px;
-                background: var(--color-surface-container);
-            }
-
-            .adv-checklist-category {
-                font-size: 0.7rem;
-                font-weight: 700;
-                letter-spacing: 0.8px;
-                text-transform: uppercase;
-                color: var(--color-secondary);
-                margin: 10px 0 4px;
-            }
-
-            .adv-checklist-category:first-child {
-                margin-top: 0;
-            }
-
-            .adv-checklist-item {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 5px 2px;
-                font-size: 0.875rem;
-                color: var(--color-on-surface);
-            }
-
-            .adv-checklist-item input[type="checkbox"] {
-                width: 16px;
-                height: 16px;
-                accent-color: var(--color-primary);
-                cursor: pointer;
-                flex-shrink: 0;
-            }
-
-            .adv-validation-msg {
-                font-size: 0.8rem;
-                color: var(--color-error);
-                margin-bottom: 8px;
-                display: none;
-            }
         </style>
         <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
             <div class="modal-box borrow-modal-box">
-                <div class="modal-header">
-                    <h3 id="borrowModalTitle">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
-                        Borrow Request
-                    </h3>
+                <div class="modal-header bm-head">
+                    <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">inventory_2</span></span>
+                    <div class="bm-heading">
+                        <h3 id="borrowModalTitle">Borrow Request</h3>
+                        <p class="bm-sub">Tell us where and when you need the equipment.</p>
+                    </div>
                     <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -3887,61 +3809,60 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
                     <!-- ── Personal Tab ──────────────────────────────────── -->
                     <div class="borrow-subtab-panel active" id="subtab-personal" role="tabpanel" aria-labelledby="subtab-personal-btn">
-                        <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                            <span id="selectedItemLabel">No item selected</span>
+                        <div class="bm-item" id="selectedItemBanner">
+                            <span class="bm-item-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                            <div class="bm-item-text">
+                                <span class="bm-item-cap">Selected equipment</span>
+                                <span class="bm-item-name" id="selectedItemLabel">No item selected</span>
+                            </div>
                         </div>
-                        <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <form id="borrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                             <?= csrf_field() ?>
                             <input type="hidden" name="equipment_name" id="selectedItem">
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <input type="hidden" name="submitted_as" value="personal">
                             <div class="form-group">
-                                <label class="form-label">Room / Laboratory</label>
-                                <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
+                                <label class="form-label" for="borrow_room">Room / Laboratory</label>
+                                <input type="text" name="room" id="borrow_room" class="form-input" placeholder="e.g. Lab 301" required>
+                                <p class="bm-hint">Where the equipment will be used.</p>
                             </div>
                             <div class="form-row-2">
                                 <div class="form-group">
-                                    <label class="form-label">Borrow Date</label>
-                                    <input type="date"
-                                        name="borrow_date"
-                                        id="borrow_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
+                                    <label class="form-label" for="borrow_date">Borrow Date</label>
+                                    <input type="date" name="borrow_date" id="borrow_date" class="form-input"
+                                        min="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Return Date</label>
-                                    <input type="date"
-                                        name="return_date"
-                                        id="return_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
+                                    <label class="form-label" for="return_date">Return Date</label>
+                                    <input type="date" name="return_date" id="return_date" class="form-input"
+                                        min="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
                             </div>
                             <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
-                            <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
-                            </button>
+                            <div class="bm-actions">
+                                <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                                <button type="submit" class="btn-save-acc">
+                                    <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                                </button>
+                            </div>
                         </form>
                     </div><!-- /subtab-personal -->
 
                     <!-- ── Adviser Tab ───────────────────────────────────── -->
                     <div class="borrow-subtab-panel" id="subtab-adviser" role="tabpanel" aria-labelledby="subtab-adviser-btn">
-                        <form id="adviserBorrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <form id="adviserBorrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                             <?= csrf_field() ?>
                             <input type="hidden" name="submitted_as" value="adviser">
 
                             <!-- Multi-item checklist (Requirement 4.4, 5.1) -->
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label" style="margin-bottom:6px;">Select Equipment Items</label>
+                            <div class="form-group">
+                                <span class="form-label">Select Equipment Items</span>
                                 <p id="advChecklistValidation" class="adv-validation-msg" role="alert">
                                     Please select at least one item before submitting.
                                 </p>
                                 <div class="adv-checklist-wrap" role="group" aria-label="Available equipment">
                                     <?php if (empty($avail_items)): ?>
-                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;">No available items at this time.</p>
+                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;padding:8px;">No available items at this time.</p>
                                         <?php else:
                                         $current_category = null;
                                         foreach ($avail_items as $av_item):
@@ -3956,7 +3877,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     value="<?= htmlspecialchars($av_item['item_name']) ?>"
                                                     data-category="<?= htmlspecialchars($av_item['category']) ?>">
                                                 <?= htmlspecialchars($av_item['item_name']) ?>
-                                                <span style="font-size:0.75rem;color:var(--color-secondary);margin-left:auto;">
+                                                <span class="adv-checklist-qty">
                                                     (<?= (int)$av_item['quantity'] ?> available)
                                                 </span>
                                             </label>
@@ -3966,43 +3887,44 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </div>
 
                             <!-- Shared fields -->
-                            <div class="form-group" style="margin-top:14px;">
-                                <label class="form-label">Room / Laboratory</label>
+                            <div class="form-group">
+                                <label class="form-label" for="adv_room">Room / Laboratory</label>
                                 <input type="text" name="room" id="adv_room" class="form-input" placeholder="e.g. Lab 301" required>
+                                <p class="bm-hint">Where the equipment will be used.</p>
                             </div>
                             <div class="form-row-2">
                                 <div class="form-group">
-                                    <label class="form-label">Borrow Date</label>
-                                    <input type="date"
-                                        name="borrow_date"
-                                        id="adv_borrow_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
+                                    <label class="form-label" for="adv_borrow_date">Borrow Date</label>
+                                    <input type="date" name="borrow_date" id="adv_borrow_date" class="form-input"
+                                        min="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">Return Date</label>
-                                    <input type="date"
-                                        name="return_date"
-                                        id="adv_return_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
+                                    <label class="form-label" for="adv_return_date">Return Date</label>
+                                    <input type="date" name="return_date" id="adv_return_date" class="form-input"
+                                        min="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
                             </div>
 
                             <!-- Document upload — required for adviser mode (Requirement 4.6) -->
                             <div class="form-group">
-                                <label for="adv_request_document">Request Letter
-                                    <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
+                                <span class="form-label">Request Letter <span class="bm-req">Required</span></span>
+                                <label class="bm-drop" for="adv_request_document">
+                                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                                    <span class="bm-drop-text">
+                                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
+                                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                                    </span>
+                                    <input type="file" id="adv_request_document" name="request_document"
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp" required>
                                 </label>
-                                <input type="file" id="adv_request_document" name="request_document"
-                                    accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
                             </div>
 
-                            <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                                <span class="material-symbols-outlined">send</span> Submit Adviser Request
-                            </button>
+                            <div class="bm-actions">
+                                <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                                <button type="submit" class="btn-save-acc">
+                                    <span class="material-symbols-outlined">send</span> Submit Adviser Request
+                                </button>
+                            </div>
                         </form>
                     </div><!-- /subtab-adviser -->
 
@@ -4077,6 +3999,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     if (borrowInp) borrowInp.value = '';
                     if (returnInp) returnInp.value = '';
                     if (fileInp) fileInp.value = '';
+                    if (window.syncBorrowDrops) window.syncBorrowDrops();
                     if (advValidationMsg) advValidationMsg.style.display = 'none';
                 }
 

@@ -1472,6 +1472,7 @@ main#app-main {
    excluded, matching the header-consolidation pass earlier. */
 .ps-card-header,
 .inv-list-header,
+.inv-form-header,
 #panel-rooms .pr-card-header,
 .eq-card-header,
 .info-card-head,
@@ -1481,6 +1482,7 @@ main#app-main {
 
 .ps-card-header::before,
 .inv-list-header::before,
+.inv-form-header::before,
 #panel-rooms .pr-card-header::before,
 .eq-card-header::before,
 .info-card-head::before,
@@ -6599,12 +6601,17 @@ body:has(#roomScheduleModal:not(.hidden)) {
     font-weight: 600;
 }
 
-/* ── Profile Hero — dark wine card matching screenshot ──────────── */
+/* ── Profile Hero — maroon-to-gold card (same gradient as the faculty Settings banner) ──
+   Deep maroon where the name sits, melting into gold on the right, with a soft
+   light bloom in the top-right corner. Fixed colours: the hero never follows the
+   site theme. */
 .ov-profile-hero {
     display: flex;
     align-items: center;
     gap: 1.35rem;
-    background: linear-gradient(135deg, #4a0010 0%, #2c0008 100%);
+    background:
+        radial-gradient(120% 150% at 100% 0%, rgba(255, 233, 160, 0.55) 0%, rgba(255, 233, 160, 0) 52%),
+        linear-gradient(100deg, #570000 0%, #800000 34%, #a63d0f 62%, #d99a1e 84%, #fbbf24 100%);
     border: none;
     border-radius: 14px;
     padding: 1.5rem 1.75rem;
@@ -6612,25 +6619,59 @@ body:has(#roomScheduleModal:not(.hidden)) {
     flex-wrap: wrap;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 6px 20px rgba(87, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* Two faint concentric rings in the gold corner — decorative only */
+.ov-profile-hero::before,
 .ov-profile-hero::after {
     content: '';
     position: absolute;
-    right: -60px;
-    top: -60px;
-    width: 200px;
-    height: 200px;
-    background: rgba(255, 255, 255, 0.04);
     border-radius: 50%;
     pointer-events: none;
+}
+
+.ov-profile-hero::before {
+    width: 260px;
+    height: 260px;
+    right: -70px;
+    top: -120px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.ov-profile-hero::after {
+    width: 400px;
+    height: 400px;
+    right: -150px;
+    top: -170px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.ov-profile-hero>* {
+    position: relative;
+    z-index: 1;
+}
+
+/* Stacked layouts (the Settings panel measures its own width): run the gradient
+   top-to-bottom so the text stays on maroon and the buttons land on gold. */
+#panel-settings[data-sett-size="narrow"] .ov-profile-hero,
+#panel-settings[data-sett-size="tiny"] .ov-profile-hero {
+    background:
+        radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%),
+        linear-gradient(165deg, #570000 0%, #800000 46%, #a63d0f 74%, #e0a21f 100%);
+}
+
+#panel-settings[data-sett-size="narrow"] .ov-profile-hero::after,
+#panel-settings[data-sett-size="tiny"] .ov-profile-hero::after {
+    display: none;
 }
 
 .ov-av-lg {
     width: 60px;
     height: 60px;
     background: rgba(255, 255, 255, 0.18);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18);
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -6674,6 +6715,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .ov-hero-badge .material-symbols-outlined {
     font-size: 13px;
+    color: #fbbf24;
 }
 
 .ov-hero-actions {
@@ -6695,8 +6737,9 @@ body:has(#roomScheduleModal:not(.hidden)) {
     align-items: center;
     gap: 6px;
     padding: 0.45rem 0.9rem;
-    background: transparent;
-    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    background: #570000;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(87, 0, 0, 0.35);
     border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
@@ -6711,8 +6754,8 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-edit-acc:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.7);
+    background: #6e0606;
+    border-color: rgba(255, 255, 255, 0.6);
 }
 
 .ov-profile-hero .btn-save-acc {
@@ -6740,16 +6783,20 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-cancel-acc {
-    padding: 0.45rem 0.75rem;
-    background: transparent;
-    border: none;
+    padding: 0.45rem 0.9rem;
+    background: rgba(87, 0, 0, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+    color: #fff;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .ov-profile-hero .btn-cancel-acc:hover {
+    background: rgba(87, 0, 0, 0.85);
     color: #fff;
 }
 
