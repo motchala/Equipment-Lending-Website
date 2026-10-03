@@ -175,15 +175,12 @@
     function showToast(msg, type) {
         const t = document.getElementById('app-toast');
         if (!t) return;
-        // Colour the toast based on type
-        if (type === 'error') {
-            t.style.background = 'var(--color-error, #ba1a1a)';
-        } else if (type === 'success') {
-            t.style.background = 'var(--color-primary-container, #570000)';
-        } else {
-            t.style.background = '';
-        }
-        t.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px;">check_circle</span> ' + msg;
+        // Colours come from the theme (see "Toast / snackbar" in faculty-dashboard.css),
+        // so the toast stays readable in Light, Dark and High Contrast.
+        t.style.background = '';
+        t.dataset.type = (type === 'error' || type === 'success') ? type : 'info';
+        const icon = type === 'error' ? 'error' : (type === 'success' ? 'check_circle' : 'info');
+        t.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span><span>' + msg + '</span>';
         t.classList.add('show');
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
@@ -1761,7 +1758,7 @@
             const noteCol = r.status === 'Declined'
                 ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
                 : r.status === 'Overdue'
-                    ? `<span style="font-size:0.8rem;color:#e65100;font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
+                    ? `<span style="font-size:0.8rem;color:var(--color-warning);font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
                     : '—';
 
             // Dedicated Return QR column — shown for Approved/Overdue rows with a token

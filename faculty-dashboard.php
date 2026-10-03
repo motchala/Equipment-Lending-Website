@@ -532,7 +532,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
 
     <!-- Dashboard Redesign v3 — Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
@@ -581,7 +580,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         .dash-hero-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 800;
             color: #fff;
@@ -645,7 +644,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         .dash-stats-row-layout .stat-card-value {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 800;
             line-height: 1;
@@ -745,7 +744,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .bento-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 1.05rem;
             font-weight: 700;
             letter-spacing: -0.01em;
@@ -795,7 +794,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .active-card-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-weight: 700;
         }
 
@@ -848,7 +847,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border-radius: 8px;
             border: 1.5px solid #e5e7eb;
             background: #ffffff;
-            color: #374151;
+            color: var(--color-on-surface-variant);
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
@@ -887,21 +886,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             box-shadow: none;
         }
 
-        #panel-lending .page-title-sm {
-            font-family: 'Hanken Grotesk', var(--font-display);
-            font-size: 1.875rem !important;
-            font-weight: 700 !important;
-            color: #111827 !important;
-            letter-spacing: -0.4px;
-            margin-bottom: 4px;
-            line-height: 1.15;
-        }
-
-        #panel-lending .page-subtitle {
-            font-size: 0.875rem !important;
-            color: #6b7280 !important;
-            font-weight: 400 !important;
-        }
 
         /* ── Featured Banner ──────────────────────────────────────── */
         #panel-lending .featured-section {
@@ -915,7 +899,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             margin-bottom: 16px;
             letter-spacing: -0.1px;
         }
@@ -1001,7 +985,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1.45rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             letter-spacing: -0.3px;
             margin-bottom: 6px;
             line-height: 1.25;
@@ -1009,7 +993,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .feat-hero-desc {
             font-size: 0.835rem;
-            color: #6b7280;
+            color: var(--color-secondary);
             line-height: 1.55;
             margin-bottom: 0;
             flex: 1;
@@ -1083,7 +1067,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             letter-spacing: -0.15px;
             margin-bottom: 3px;
         }
@@ -1091,7 +1075,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .feat-secondary-cat {
             font-size: 0.72rem;
             font-weight: 600;
-            color: #9ca3af;
+            color: var(--color-secondary);
             text-transform: uppercase;
             letter-spacing: 0.07em;
             display: flex;
@@ -1113,18 +1097,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             margin-bottom: 16px;
         }
 
-        #panel-lending .catalog-section-title {
-            font-family: 'Hanken Grotesk', var(--font-display);
-            font-size: 1rem;
-            font-weight: 700;
-            color: #111827;
-            letter-spacing: -0.1px;
-        }
 
         #panel-lending .catalog-count-chip {
             font-size: 0.72rem;
             font-weight: 600;
-            color: #6b7280;
+            color: var(--color-secondary);
             background: #f3f4f6;
             border-radius: 20px;
             padding: 3px 10px;
@@ -1172,7 +1149,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .catalog-search-wrap .material-symbols-outlined {
             font-size: 18px;
-            color: #9ca3af;
+            color: var(--color-secondary);
             flex-shrink: 0;
         }
 
@@ -1182,12 +1159,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             outline: none;
             font-family: var(--font-sans);
             font-size: 0.875rem;
-            color: #111827;
+            color: var(--color-on-surface);
             width: 100%;
         }
 
         #panel-lending .catalog-search-wrap input::placeholder {
-            color: #9ca3af;
+            color: var(--color-secondary);
         }
 
         #panel-lending .catalog-filter-select {
@@ -1195,7 +1172,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border: 1.5px solid #e5e7eb !important;
             border-radius: 10px !important;
             background: #f9fafb !important;
-            color: #374151 !important;
+            color: var(--color-on-surface-variant) !important;
             font-family: var(--font-sans);
             font-size: 0.875rem !important;
             font-weight: 500;
@@ -1328,7 +1305,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display) !important;
             font-weight: 700 !important;
             font-size: 0.975rem !important;
-            color: #111827 !important;
+            color: var(--color-on-surface) !important;
             margin-bottom: 4px !important;
             letter-spacing: -0.1px;
             line-height: 1.3;
@@ -1343,7 +1320,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .eq-item-cat {
             font-size: 0.69rem !important;
             font-weight: 600 !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             text-transform: uppercase;
             letter-spacing: 0.07em;
             display: flex;
@@ -1420,7 +1397,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .btn-borrow:disabled,
         #panel-lending .btn-borrow[disabled] {
             background: #f3f4f6 !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
             border: 1px solid #e5e7eb !important;
@@ -1428,7 +1405,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .btn-borrow-blocked {
             background: transparent !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             border: 1px solid #e5e7eb !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
@@ -1443,7 +1420,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border: 1.5px solid #e5e7eb;
             border-radius: 9px;
             background: transparent;
-            color: #374151;
+            color: var(--color-on-surface-variant);
             font-size: 0.82rem;
             font-weight: 600;
             font-family: var(--font-sans);
@@ -1487,7 +1464,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .btn-borrow-primary:disabled {
             background: #f3f4f6;
-            color: #9ca3af;
+            color: var(--color-secondary);
             box-shadow: none;
             cursor: not-allowed;
         }
@@ -1514,7 +1491,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .eq-empty p {
             font-size: 0.9rem;
             font-weight: 500;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
         }
 
         /* ── Dark theme ───────────────────────────────────────────── */
@@ -1565,9 +1542,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: #fff !important;
         }
 
-        [data-theme="dark"] #panel-lending .page-title-sm {
-            color: var(--color-on-surface) !important;
-        }
 
         [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled),
         [data-theme="dark"] #panel-lending .btn-borrow-primary:not(:disabled) {
@@ -1582,8 +1556,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         [data-theme="dark"] #panel-lending .feat-hero-title,
         [data-theme="dark"] #panel-lending .feat-secondary-title,
-        [data-theme="dark"] #panel-lending .featured-label,
-        [data-theme="dark"] #panel-lending .catalog-section-title {
+        [data-theme="dark"] #panel-lending .featured-label {
             color: var(--color-on-surface) !important;
         }
 
@@ -1773,7 +1746,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                         $h = (int)date('H');
                                                         echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
                                                         ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
-                    <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> — Here is an overview of your active equipment and requests.</p>
                 </div>
 
                 <!-- ── Top Two-Column: [Stats+Bentos] | [Code Card] ── -->
@@ -2009,7 +1981,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Equipment</h2>
-                        <p class="page-subtitle">Search and select equipment to submit a borrow request.</p>
                     </div>
 
                     <!-- ── Featured Section ────────────────────────────────── -->
@@ -2201,12 +2172,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                             <!-- Stock badge overlay on image -->
                                             <div class="eq-stock-overlay">
                                                 <?php if ($item['quantity'] > 0): ?>
-                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(209,250,229,.9) !important;">
+                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;backdrop-filter:blur(4px);background:var(--color-success-container) !important;">
                                                         <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
                                                         <?php echo (int)$item['quantity']; ?> available
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="stock-badge stock-unavail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(254,226,226,.9) !important;">
+                                                    <span class="stock-badge stock-unavail" style="margin-bottom:0;backdrop-filter:blur(4px);background:var(--color-error-container) !important;">
                                                         <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
                                                         Out of stock
                                                     </span>
@@ -2269,11 +2240,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="lending-sub" id="lending-requests">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">My Requests</h2>
-                        <p class="page-subtitle">Track and manage all submitted borrow requests.</p>
                     </div>
                     <div class="table-surface">
                         <div class="table-toolbar">
-                            <h3 class="table-toolbar-title">Request History</h3>
                             <div class="table-toolbar-actions">
                                 <div class="req-filter-wrap">
                                     <span class="material-symbols-outlined"
@@ -2338,7 +2307,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="lending-sub active" id="rooms-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Facilities</h2>
-                        <p class="page-subtitle">Explore available rooms and submit a reservation.</p>
                     </div>
                     <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
                 </div><!-- /rooms-browse -->
@@ -2347,11 +2315,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="lending-sub" id="rooms-history">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">My Room Reservations</h2>
-                        <p class="page-subtitle">All room reservations you or your students have submitted.</p>
                     </div>
                     <div class="table-surface">
                         <div class="table-toolbar">
-                            <h3 class="table-toolbar-title">Reservation History</h3>
                             <div class="table-toolbar-actions">
                                 <div class="req-filter-wrap">
                                     <span class="material-symbols-outlined"
@@ -2597,7 +2563,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <div class="myact-header">
                     <div>
                         <h2 class="myact-title">My Activity</h2>
-                        <p class="myact-subtitle">What you're borrowing, what's coming up, and what you've returned.</p>
                     </div>
                     <button class="myact-download-btn" onclick="window.print()">
                         <span class="material-symbols-outlined">download</span>
@@ -2751,7 +2716,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <div class="myact-ledger-head">
                                 <div>
                                     <h3 class="myact-section-title">Activity Ledger</h3>
-                                    <p class="myact-ledger-sub">Historical facility requisitions and item returns</p>
                                 </div>
                                 <?php if ($act_history && mysqli_num_rows($act_history) > 0): ?>
                                     <div class="myact-ledger-controls">
@@ -3186,7 +3150,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <!-- ── Page heading ──────────────────────────────────── -->
             <div class="sov-pagehead">
                 <h1 class="sov-pagehead-title">Settings</h1>
-                <p class="sov-pagehead-sub">Manage your profile, appearance, and account preferences.</p>
             </div>
 
             <!-- ── Body ─────────────────────────────────────────── -->
@@ -4161,9 +4124,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     changes you're about to make:</p>
                 <div class="changes-summary" id="changesSummary"></div>
                 <div class="warning-box">
-                    <span class="material-symbols-outlined" style="color:#856404;flex-shrink:0;">warning</span>
-                    <div><strong style="color:#856404;display:block;margin-bottom:4px;">Important Notice</strong>
-                        <p style="color:#856404;margin:0;font-size:0.875rem;" id="warningMessage">Some changes cannot be
+                    <span class="material-symbols-outlined" style="color:var(--color-on-warning-container);flex-shrink:0;">warning</span>
+                    <div><strong style="color:var(--color-on-warning-container);display:block;margin-bottom:4px;">Important Notice</strong>
+                        <p style="color:var(--color-on-warning-container);margin:0;font-size:0.875rem;" id="warningMessage">Some changes cannot be
                             reversed once saved.</p>
                     </div>
                 </div>

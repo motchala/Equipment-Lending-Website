@@ -3024,14 +3024,7 @@ body {
         max-width: none;
     }
 
-    /* Typography */
-    .page-title {
-        font-size: 1.4rem;
-    }
-
-    .page-title-sm {
-        font-size: 1.15rem;
-    }
+    /* Typography: page/section titles follow the shared scale (--fs-page-title) */
 
     /* Settings: native mobile list layout */
 
@@ -3416,7 +3409,7 @@ body {
     font-family: 'Inter', var(--font-sans);
     font-size: 1.875rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--color-on-surface);
     line-height: 1.2;
     margin-bottom: 4px;
     letter-spacing: -0.3px;
@@ -3424,7 +3417,7 @@ body {
 
 #panel-home .dash-flat-sub {
     font-size: 0.875rem;
-    color: #6b7280;
+    color: var(--color-secondary);
     font-weight: 400;
 }
 
@@ -3521,7 +3514,7 @@ body {
 .dash-code-card-title {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--color-on-surface);
 }
 
 .dash-code-active-badge {
@@ -3556,7 +3549,7 @@ body {
     font-size: 2.1rem !important;
     font-weight: 700 !important;
     letter-spacing: 2px !important;
-    color: #111827 !important;
+    color: var(--color-on-surface) !important;
     line-height: 1.2 !important;
     flex: 1 !important;
     word-break: break-all !important;
@@ -3564,14 +3557,14 @@ body {
 }
 
 .dash-code-card .fcc-copy-btn {
-    color: #6b7280 !important;
+    color: var(--color-secondary) !important;
     margin-top: 6px !important;
     background: none !important;
     border: none !important;
 }
 
 .dash-code-card .fcc-code-display.fcc-code-used .fcc-code-value {
-    color: #9ca3af !important;
+    color: var(--color-secondary) !important;
     text-decoration: line-through !important;
 }
 
@@ -3601,7 +3594,7 @@ body {
 .dash-section-title {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #111827;
+    color: var(--color-on-surface);
     margin-top: 28px;
     margin-bottom: 14px;
 }
@@ -3633,13 +3626,13 @@ body {
 .dash-activity-card-title {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #111827;
+    color: var(--color-on-surface);
 }
 
 .dash-activity-card-btn {
     font-size: 0.75rem;
     font-weight: 500;
-    color: #6b7280;
+    color: var(--color-secondary);
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
@@ -3700,7 +3693,7 @@ body {
 .dash-timeline-time {
     width: 68px;
     font-size: 0.72rem;
-    color: #9ca3af;
+    color: var(--color-secondary);
     flex-shrink: 0;
     padding-top: 1px;
     line-height: 1.4;
@@ -3716,13 +3709,13 @@ body {
 .dash-timeline-title {
     font-size: 0.875rem;
     font-weight: 500;
-    color: #111827;
+    color: var(--color-on-surface);
     line-height: 1.3;
 }
 
 .dash-timeline-date {
     font-size: 0.72rem;
-    color: #9ca3af;
+    color: var(--color-secondary);
     margin-top: 2px;
 }
 
@@ -3748,7 +3741,7 @@ body {
 
 .dash-bar-chart-y span {
     font-size: 0.62rem;
-    color: #9ca3af;
+    color: var(--color-secondary);
 }
 
 /* Horizontal grid lines behind bars */
@@ -3814,7 +3807,7 @@ body {
 
 .dash-bar-chart-x span {
     font-size: 0.6rem;
-    color: #9ca3af;
+    color: var(--color-secondary);
     flex: 1;
     text-align: center;
     min-width: 0;
@@ -3829,7 +3822,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #9ca3af;
+    color: var(--color-secondary);
     font-size: 0.875rem;
     min-height: 160px;
 }
@@ -4128,7 +4121,7 @@ body {
     border-radius: 8px;
     border: 1.5px solid #e5e7eb;
     background: #ffffff;
-    color: #374151;
+    color: var(--color-on-surface-variant);
     font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
@@ -4154,7 +4147,7 @@ body {
 #panel-rooms .lending-nav-btn:not(.active):hover {
     background: #f9fafb;
     border-color: #9ca3af;
-    color: #111827;
+    color: var(--color-on-surface);
 }
 
 /* ── Page header: title + subtitle ──────────────────────────── */
@@ -4175,37 +4168,9 @@ body {
     box-shadow: none;
 }
 
-#panel-rooms .page-title-sm {
-    font-family: 'Hanken Grotesk', var(--font-display);
-    font-size: 1.875rem !important;
-    font-weight: 700 !important;
-    color: #111827 !important;
-    letter-spacing: -0.4px;
-    margin-bottom: 4px;
-    line-height: 1.15;
-}
 
-#panel-rooms .page-subtitle {
-    font-size: 0.875rem !important;
-    color: #6b7280 !important;
-    font-weight: 400 !important;
-}
 
-#panel-lending .page-title-sm {
-    font-family: 'Hanken Grotesk', var(--font-display);
-    font-size: 1.875rem;
-    font-weight: 700;
-    color: #111827;
-    letter-spacing: -0.3px;
-    margin-bottom: 4px;
-    line-height: 1.2;
-}
 
-#panel-lending .page-subtitle {
-    font-size: 0.875rem;
-    color: #6b7280;
-    font-weight: 400;
-}
 
 /* ── Catalog wrapper: white card with border ─────────────────── */
 #panel-lending .catalog-card {
@@ -4247,7 +4212,7 @@ body {
 
 #panel-lending .catalog-search-wrap .material-symbols-outlined {
     font-size: 18px;
-    color: #9ca3af;
+    color: var(--color-secondary);
     flex-shrink: 0;
 }
 
@@ -4257,12 +4222,12 @@ body {
     outline: none;
     font-family: var(--font-sans);
     font-size: 0.875rem;
-    color: #111827;
+    color: var(--color-on-surface);
     width: 100%;
 }
 
 #panel-lending .catalog-search-wrap input::placeholder {
-    color: #9ca3af;
+    color: var(--color-secondary);
 }
 
 #panel-lending .catalog-filter-select {
@@ -4270,7 +4235,7 @@ body {
     border: 1px solid #e5e7eb;
     border-radius: 8px;
     background: rgba(249, 250, 251, 0.6);
-    color: #374151;
+    color: var(--color-on-surface-variant);
     font-family: var(--font-sans);
     font-size: 0.875rem;
     font-weight: 500;
@@ -4298,7 +4263,7 @@ body {
     grid-column: 1 / -1;
     text-align: center;
     padding: 5rem 1rem;
-    color: #9ca3af;
+    color: var(--color-secondary);
 }
 
 #panel-lending .eq-empty .material-symbols-outlined {
@@ -4312,7 +4277,7 @@ body {
 #panel-lending .eq-empty p {
     font-size: 0.9rem;
     font-weight: 500;
-    color: #9ca3af;
+    color: var(--color-secondary);
 }
 
 /* ── Equipment item card ─────────────────────────────────────── */
@@ -4398,7 +4363,7 @@ body {
     font-family: 'Hanken Grotesk', var(--font-display);
     font-weight: 700;
     font-size: 0.975rem;
-    color: #111827;
+    color: var(--color-on-surface);
     margin-bottom: 4px;
     letter-spacing: -0.1px;
     line-height: 1.3;
@@ -4413,7 +4378,7 @@ body {
 #panel-lending .eq-item-cat {
     font-size: 0.72rem;
     font-weight: 600;
-    color: #9ca3af;
+    color: var(--color-secondary);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     display: flex;
@@ -4487,7 +4452,7 @@ body {
 
 #panel-lending .btn-borrow:disabled {
     background: #f3f4f6;
-    color: #9ca3af;
+    color: var(--color-secondary);
     cursor: not-allowed;
     box-shadow: none;
     border: 1px solid #e5e7eb;
@@ -4495,7 +4460,7 @@ body {
 
 #panel-lending .btn-borrow-blocked {
     background: transparent !important;
-    color: #9ca3af !important;
+    color: var(--color-secondary) !important;
     border: 1px solid #e5e7eb !important;
     cursor: not-allowed !important;
     box-shadow: none !important;
@@ -4560,9 +4525,6 @@ body {
     color: #ffffff;
 }
 
-[data-theme="dark"] #panel-lending .page-title-sm {
-    color: var(--color-on-surface);
-}
 
 [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled) {
     background: var(--color-primary-container);
@@ -8466,7 +8428,7 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
 }
 
 .stat-tile-value {
-    font-family: 'Syne', var(--font-display);
+    font-family: var(--font-display);
     font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.1;
@@ -8542,4 +8504,592 @@ body .side-nav .side-nav-links::-webkit-scrollbar-thumb {
     border-top-left-radius: inherit;
     border-top-right-radius: inherit;
     z-index: 1;
+}
+
+
+/* ================================================================
+   FACULTY TYPOGRAPHY — one scale for every faculty screen
+
+   Two families only:
+     · Hanken Grotesk (--font-display)  titles and big numbers
+     · Inter          (--font-sans)     everything else
+
+   Page title     1.75rem / 700   (1.5rem on phones)
+   Section title  1.0625rem / 700 (cards, tables, panels)
+   Dialog title   1.125rem / 700
+
+   The selectors carry an html/body prefix on purpose: they must
+   outrank the older per-panel rules so no screen drifts again.
+   Colours come from theme tokens, so Light / Dark / High Contrast
+   all follow without separate overrides.
+================================================================ */
+:root {
+    --fs-page-title: 1.75rem;
+    --fs-section-title: 1.0625rem;
+    --fs-dialog-title: 1.125rem;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --fs-page-title: 1.5rem;
+    }
+}
+
+/* Form controls don't inherit the page font by default */
+html body button,
+html body input,
+html body select,
+html body textarea {
+    font-family: inherit;
+}
+
+/* Page titles: Dashboard, Equipment, Facilities, My Activity, Settings */
+html body #panel-home .dash-flat-title,
+html body .page-title,
+html body .page-title-sm,
+html body .myact-title,
+html body .sov-pagehead-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--fs-page-title);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--color-on-surface);
+}
+
+html body .dash-flat-header,
+html body .page-header-block,
+html body .sov-pagehead {
+    margin-bottom: 20px;
+}
+
+/* Section titles: cards, tables, panels */
+html body .dash-section-title,
+html body .dash-activity-card-title,
+html body .dash-code-card-title,
+html body .catalog-section-title,
+html body .myact-section-title,
+html body .acct-card-head h3,
+html body .sov-tab-panel h3,
+html body #rooms-browse .fcty-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--fs-section-title);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    color: var(--color-on-surface);
+}
+
+/* Dialog titles */
+html body .fnotif-head-title,
+html body #borrowModalTitle,
+html body .fcty-dialog-title {
+    font-family: var(--font-display);
+    font-size: var(--fs-dialog-title);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+}
+
+/* Big numbers and card names use the display face too */
+html body .stat-tile-value,
+html body .active-card-title {
+    font-family: var(--font-display);
+}
+
+/* A toolbar with no title just holds its filter, on the right */
+html body .table-toolbar {
+    justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+    html body .table-toolbar {
+        justify-content: stretch;
+    }
+}
+
+
+/* ================================================================
+   THEME CONTRAST LAYER — Light · Dark · High Contrast
+   ----------------------------------------------------------------
+   Loaded last on purpose. It does three things:
+
+   1. Completes the token set. Every "text on a tinted background"
+      pair now has a matching token in all three themes, so a badge,
+      toast or error message can never end up light-on-light or
+      dark-on-dark when the theme changes.
+   2. Gives elements that were hard-wired to the light palette
+      (Equipment page in High Contrast, stock badges, disabled
+      buttons, warning box) real tokens instead.
+   3. Makes sure neighbouring surfaces stay distinguishable: card
+      edges, form-control borders, shadows (dark) and outlines (HC),
+      and a visible keyboard focus ring everywhere.
+
+   Targets: normal text 4.5:1 · large text and UI parts 3:1.
+   Tint pairs below were checked with a contrast calculator, and the
+   whole UI was audited in all three themes.
+================================================================ */
+
+/* ── 1. Tokens ──────────────────────────────────────────────── */
+:root {
+    /* tint pairs: text that sits on --color-*-container */
+    --color-on-error-container: #7f1d1d;
+    --color-on-success-container: #14532d;
+    --color-warning-container: #fef3c7;
+    --color-on-warning-container: #92400e;
+
+    /* solid fills that carry white text (buttons, toasts, badges) */
+    --color-error-solid: #c0392b;
+    --color-on-error-solid: #ffffff;
+    --color-on-primary-accent: #ffffff;
+    /* ^ text on --color-primary: white on maroon here, dark on the
+         light pinks that --color-primary becomes in Dark / HC */
+
+    /* edges */
+    --control-border: #a98080;
+    /* inputs, selects, search boxes: 3.4:1 on white */
+    --focus-ring: #800000;
+    --focus-ring-w: 2px;
+
+    /* toasts */
+    --toast-success-bg: #800000;
+    --toast-success-fg: #ffffff;
+    --toast-error-bg: var(--color-error-solid);
+    --toast-error-fg: #ffffff;
+    --toast-info-bg: #3b2a2a;
+    --toast-info-fg: #ffffff;
+    --toast-edge: transparent;
+    --toast-edge-w: 1px;
+
+    /* the second (redesign) token family */
+    --redesign-card-border: #d8c8c8;
+    --redesign-text-muted: #6b6464;
+}
+
+[data-theme="dark"] {
+    --color-outline-variant: #6b4040;
+    --color-error-container: #4a1414;
+    --color-on-error-container: #fca5a5;
+    --color-on-success-container: #86efac;
+    --color-warning-container: #3d2a05;
+    --color-on-warning-container: #fbbf24;
+    --color-error-solid: #b91c1c;
+    --color-on-primary-accent: #2b0000;
+    --control-border: #8a5f5f;
+    --focus-ring: #ffb4b4;
+    --toast-success-bg: #166534;
+    --toast-error-bg: #b91c1c;
+    --toast-info-bg: #9b1c1c;
+    --toast-edge: rgba(255, 255, 255, 0.3);
+    --redesign-card-border: #5a3434;
+    --redesign-text-muted: #b89a9a;
+
+    /* Black shadows vanish on dark surfaces: deeper, plus a 1px top
+       highlight so raised surfaces read as raised. */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.5);
+    --redesign-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+    --redesign-card-shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="high-contrast"] {
+    --color-outline-variant: #8c8c8c;
+    --color-error-container: #330000;
+    --color-on-error-container: #ffb3b3;
+    --color-on-success-container: #00ff88;
+    --color-warning-container: #332a00;
+    --color-on-warning-container: #ffd700;
+    --color-error-solid: #cc0000;
+    --color-on-primary-accent: #000000;
+    --control-border: #cccccc;
+    --focus-ring: #ffd700;
+    --focus-ring-w: 3px;
+    --toast-success-bg: #008a3e;
+    --toast-error-bg: #cc0000;
+    --toast-info-bg: #000000;
+    --toast-edge: #ffffff;
+    --toast-edge-w: 2px;
+    --redesign-text-muted: #bbbbbb;
+
+    /* No soft shadows in High Contrast: edges do the work. Floating
+       things (modals, menus, toasts) get a hard 2px ring. */
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: 0 0 0 2px #ffffff;
+    --redesign-card-shadow: none;
+    --redesign-card-shadow-hover: 0 0 0 2px #ffffff;
+}
+
+/* ── 2. Keyboard focus: visible on every surface ─────────────── */
+html body :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: var(--focus-ring-w) solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* ── 3. Toast / snackbar ─────────────────────────────────────────
+   The type now arrives as data-type (see showToast in the JS) so the
+   colours come from tokens rather than an inline style. */
+html body #app-toast {
+    background: var(--toast-info-bg);
+    color: var(--toast-info-fg);
+    border: var(--toast-edge-w) solid var(--toast-edge);
+    line-height: 1.4;
+}
+
+html body #app-toast[data-type="success"] {
+    background: var(--toast-success-bg);
+    color: var(--toast-success-fg);
+}
+
+html body #app-toast[data-type="error"] {
+    background: var(--toast-error-bg);
+    color: var(--toast-error-fg);
+}
+
+html body #app-toast .material-symbols-outlined {
+    flex-shrink: 0;
+    font-size: 20px;
+}
+
+/* "Borrowing Blocked" banner */
+html body .overdue-toast {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    border: 1px solid var(--color-error);
+}
+
+[data-theme="high-contrast"] .overdue-toast {
+    border-width: 2px;
+}
+
+/* ── 4. Alerts, inline errors, warning box ───────────────────── */
+html body .alert-success {
+    background: var(--color-success-container);
+    color: var(--color-on-success-container);
+    border: 1px solid var(--color-success);
+}
+
+html body .alert-danger {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    border: 1px solid var(--color-error);
+}
+
+html body .modal-error {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+    border: 1px solid var(--color-error);
+}
+
+html body .warning-box {
+    background: var(--color-warning-container);
+    border: 1px solid var(--color-on-warning-container);
+    color: var(--color-on-warning-container);
+}
+
+html body .warning-box .material-symbols-outlined,
+html body .warning-box strong,
+html body .warning-box p {
+    color: var(--color-on-warning-container) !important;
+}
+
+/* ── 5. Badges and chips on tinted backgrounds ───────────────── */
+html body .stock-avail {
+    background: var(--color-success-container);
+    color: var(--color-on-success-container);
+}
+
+html body .stock-unavail {
+    background: var(--color-error-container);
+    color: var(--color-on-error-container);
+}
+
+html body .stock-popular {
+    background: var(--color-surface-high);
+    color: var(--color-primary);
+}
+
+html body .status-chip.chip-error,
+html body .status-pill.status-declined,
+html body .myact-badge.myact-badge-error,
+html body .myact-pill.myact-pill-declined {
+    color: var(--color-on-error-container);
+}
+
+/* small caps label above each active-loan card */
+html body .active-card-meta {
+    opacity: 1;
+    color: var(--color-primary);
+}
+
+/* ── 6. White text on --color-primary / --color-error fills ─────
+   --color-primary turns into a light pink in Dark and a light red in
+   High Contrast, so white labels on it were unreadable. */
+html body .qa-btn .notif-badge,
+html body .lending-nav-btn.active,
+html body .lending-nav-btn:hover,
+html body .notif-tab.active,
+html body .notif-tab:hover,
+html body .fnotif-tabs .notif-tab.active,
+html body .fnotif-tabs .notif-tab.active:hover,
+html body .font-scale-btn.font-scale-active,
+html body .act-ai-fab,
+html body .act-ai-chat-send,
+html body .act-chat-bubble-user,
+html body .notif-card.is-selected .fnotif-check,
+html body .fnotif-pg-num.active,
+html body .eq-pg-num.active,
+html body .myact-hist-pg-num.active {
+    color: var(--color-on-primary-accent);
+}
+
+html body .btn-cancel-rr:hover,
+html body .fnotif-foot-btn.fnotif-foot-solid-danger,
+html body .side-nav-badge {
+    background: var(--color-error-solid);
+    color: var(--color-on-error-solid);
+}
+
+/* disabled footer buttons stay readable */
+html body .fnotif-foot-btn:disabled {
+    opacity: 0.6;
+}
+
+/* floor counter chip: no fading on top of its tint */
+html body #rooms-browse .fcty-floor-count {
+    opacity: 1;
+}
+
+/* ── 7. Surfaces: neighbours stay distinguishable ────────────── */
+html body .stat-tile,
+html body .dash-activity-card,
+html body .dash-code-card,
+html body .active-card,
+html body .myact-ledger-card,
+html body .table-surface,
+html body .acct-card {
+    border-color: var(--redesign-card-border);
+}
+
+/* inputs / selects / search boxes: a real boundary, not a hint */
+html body .catalog-search-wrap:not(:focus-within),
+html body .catalog-filter-select:not(:focus),
+html body .req-filter-select:not(:focus),
+html body .form-input:not(:focus),
+html body .info-input-f:not(:focus),
+html body .fcty-input:not(:focus),
+html body .fcty-stepper:not(:focus-within) {
+    border-color: var(--control-border);
+}
+
+/* ── 8. Equipment page, High Contrast ───────────────────────────
+   Dark mode already re-themed this page with tokens; High Contrast had
+   no rules at all, so it kept white cards on a black page. The same
+   token rules now cover both. */
+[data-theme="dark"] #panel-lending .catalog-card,
+[data-theme="high-contrast"] #panel-lending .catalog-card {
+    background: var(--color-surface-low) !important;
+    border-color: var(--color-outline-variant) !important;
+}
+
+[data-theme="dark"] #panel-lending .eq-item-card,
+[data-theme="dark"] #panel-lending .item-node,
+[data-theme="high-contrast"] #panel-lending .eq-item-card,
+[data-theme="high-contrast"] #panel-lending .item-node,
+[data-theme="dark"] #panel-lending .feat-hero,
+[data-theme="dark"] #panel-lending .feat-secondary,
+[data-theme="high-contrast"] #panel-lending .feat-hero,
+[data-theme="high-contrast"] #panel-lending .feat-secondary {
+    background: var(--color-surface-container) !important;
+    border-color: var(--color-outline-variant) !important;
+}
+
+[data-theme="high-contrast"] #panel-lending .eq-item-body {
+    background: var(--color-surface-low) !important;
+    border-top-color: var(--color-outline-variant) !important;
+}
+
+[data-theme="dark"] #panel-lending .catalog-search-wrap,
+[data-theme="dark"] #panel-lending .catalog-filter-select,
+[data-theme="high-contrast"] #panel-lending .catalog-search-wrap,
+[data-theme="high-contrast"] #panel-lending .catalog-filter-select {
+    background: var(--color-surface-container) !important;
+    border-color: var(--control-border) !important;
+    color: var(--color-on-surface) !important;
+}
+
+[data-theme="high-contrast"] #panel-lending .catalog-search-wrap input {
+    color: var(--color-on-surface);
+}
+
+[data-theme="dark"] #panel-lending .eq-item-img-placeholder,
+[data-theme="dark"] #panel-lending .feat-hero-img-placeholder,
+[data-theme="dark"] #panel-lending .feat-secondary-img,
+[data-theme="high-contrast"] #panel-lending .eq-item-img-placeholder,
+[data-theme="high-contrast"] #panel-lending .feat-hero-img-placeholder,
+[data-theme="high-contrast"] #panel-lending .feat-secondary-img {
+    background: var(--color-surface-high) !important;
+}
+
+[data-theme="dark"] #panel-lending .catalog-count-chip,
+[data-theme="high-contrast"] #panel-lending .catalog-count-chip {
+    background: var(--color-surface-high) !important;
+    color: var(--color-on-surface-variant) !important;
+}
+
+[data-theme="dark"] #panel-lending .feat-hero-title,
+[data-theme="dark"] #panel-lending .feat-secondary-title,
+[data-theme="dark"] #panel-lending .featured-label,
+[data-theme="dark"] #panel-lending .eq-item-name,
+[data-theme="high-contrast"] #panel-lending .feat-hero-title,
+[data-theme="high-contrast"] #panel-lending .feat-secondary-title,
+[data-theme="high-contrast"] #panel-lending .featured-label,
+[data-theme="high-contrast"] #panel-lending .eq-item-name,
+[data-theme="high-contrast"] #panel-lending .catalog-section-title {
+    color: var(--color-on-surface) !important;
+}
+
+[data-theme="dark"] #panel-lending .eq-item-card:hover .eq-item-name,
+[data-theme="dark"] #panel-lending .item-node:hover .eq-item-name,
+[data-theme="high-contrast"] #panel-lending .eq-item-card:hover .eq-item-name,
+[data-theme="high-contrast"] #panel-lending .item-node:hover .eq-item-name {
+    color: var(--color-primary) !important;
+}
+
+[data-theme="dark"] #panel-lending .btn-borrow:not(:disabled),
+[data-theme="dark"] #panel-lending .btn-borrow-primary:not(:disabled),
+[data-theme="high-contrast"] #panel-lending .btn-borrow:not(:disabled),
+[data-theme="high-contrast"] #panel-lending .btn-borrow-primary:not(:disabled) {
+    background: var(--color-primary-container) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] #panel-lending .btn-borrow-ghost,
+[data-theme="high-contrast"] #panel-lending .btn-borrow-ghost {
+    background: transparent !important;
+    border-color: var(--control-border) !important;
+    color: var(--color-on-surface-variant) !important;
+}
+
+/* "Overdue Block" / out-of-stock: a disabled look that is still legible */
+html body #panel-lending .btn-borrow-blocked,
+html body #panel-lending .btn-borrow:disabled,
+html body #panel-lending .btn-borrow[disabled],
+html body #panel-lending .btn-borrow-primary:disabled {
+    background: var(--color-surface-high) !important;
+    color: var(--color-on-surface-variant) !important;
+    border: 1px solid var(--color-outline-variant) !important;
+    opacity: 1;
+    cursor: not-allowed;
+}
+
+html body #panel-lending .eq-item-cat,
+html body #panel-lending .feat-secondary-cat,
+html body #panel-lending .feat-hero-desc {
+    color: var(--color-secondary) !important;
+}
+
+/* ── 9. High Contrast: lines instead of shadows ──────────────── */
+[data-theme="high-contrast"] .stat-tile,
+[data-theme="high-contrast"] .dash-activity-card,
+[data-theme="high-contrast"] .dash-code-card,
+[data-theme="high-contrast"] .active-card,
+[data-theme="high-contrast"] .myact-ledger-card,
+[data-theme="high-contrast"] .table-surface,
+[data-theme="high-contrast"] .acct-card,
+[data-theme="high-contrast"] .modal-box {
+    border: 1px solid #999999;
+}
+
+[data-theme="high-contrast"] .modal-box {
+    border-width: 2px;
+    border-color: #ffffff;
+}
+
+
+/* ── 10. Equipment cards: stock badges, unavailable look, borders ─
+   The page's inline styles hard-wire the stock badges to light-mode
+   colours with !important, so they are re-pointed at tokens here. */
+html body #panel-lending .stock-avail {
+    background: var(--color-success-container) !important;
+    color: var(--color-on-success-container) !important;
+    border: 1px solid var(--color-success) !important;
+}
+
+html body #panel-lending .stock-unavail {
+    background: var(--color-error-container) !important;
+    color: var(--color-on-error-container) !important;
+    border: 1px solid var(--color-error) !important;
+}
+
+html body #panel-lending .stock-avail .material-symbols-outlined,
+html body #panel-lending .stock-unavail .material-symbols-outlined {
+    color: inherit !important;
+}
+
+/* Out-of-stock cards used to fade the whole card to 72%, which also
+   faded the name, category and badge below readable contrast. Only the
+   picture is muted now; every label keeps full contrast. */
+html body #panel-lending .item-node[data-category]:has(.stock-unavail) {
+    opacity: 1;
+}
+
+html body #panel-lending .item-node:has(.stock-unavail) :is(img, .eq-item-img-placeholder) {
+    /* filter, not opacity: a see-through picture would let the light
+       gradient behind it show as a pale block in Dark / High Contrast */
+    filter: grayscale(0.6) brightness(0.8);
+}
+
+/* search and category filter on the Equipment page */
+html body #panel-lending .catalog-search-wrap:not(:focus-within),
+html body #panel-lending .catalog-filter-select:not(:focus) {
+    border-color: var(--control-border) !important;
+}
+
+html body #panel-lending .catalog-search-wrap:focus-within,
+html body #panel-lending .catalog-filter-select:focus {
+    border-color: var(--focus-ring) !important;
+}
+
+html body #panel-lending .catalog-search-wrap input {
+    background: transparent;
+}
+
+/* High Contrast success toast: white text needs a deeper green */
+[data-theme="high-contrast"] {
+    --toast-success-bg: #007a36;
+}
+
+
+/* ── 11. Browse / My Requests / My Reservations tab buttons ──────
+   High Contrast had no rule for these, so the inactive tab kept its
+   white fill with near-white text. Mirrors the Dark Mode treatment
+   with High Contrast tokens. */
+[data-theme="high-contrast"] #panel-lending .lending-nav-btn,
+[data-theme="high-contrast"] #panel-rooms .lending-nav-btn {
+    background: var(--color-surface-container) !important;
+    border-color: var(--control-border) !important;
+    color: var(--color-on-surface) !important;
+}
+
+[data-theme="high-contrast"] #panel-lending .lending-nav-btn.active,
+[data-theme="high-contrast"] #panel-rooms .lending-nav-btn.active {
+    background: var(--color-primary-container) !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+}
+
+[data-theme="high-contrast"] #panel-lending .lending-nav-btn .lnb-badge,
+[data-theme="high-contrast"] #panel-rooms .lending-nav-btn .lnb-badge {
+    background: var(--color-surface-highest);
+    color: var(--color-on-surface);
+}
+
+[data-theme="high-contrast"] #panel-lending .lending-nav-btn.active .lnb-badge,
+[data-theme="high-contrast"] #panel-rooms .lending-nav-btn.active .lnb-badge {
+    background: #ffffff;
+    color: #000000;
 }

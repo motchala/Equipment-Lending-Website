@@ -165,39 +165,9 @@ table,
     margin-bottom: 20px;
 }
 
-.dash-flat-title {
-    font-family: 'Syne', var(--font-display);
-    font-size: clamp(1.35rem, 4vw, 1.9rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--color-on-surface);
-    line-height: 1.15;
-    margin-bottom: 4px;
-}
-
-.dash-flat-sub {
-    font-size: 0.85rem;
-    color: var(--color-on-surface-variant);
-    font-weight: 400;
-}
-
 @media (max-width: 768px) {
     .dash-flat-header {
         margin-bottom: 14px;
-    }
-
-    .dash-flat-title {
-        font-size: clamp(1.15rem, 5.5vw, 1.5rem);
-    }
-
-    .dash-flat-sub {
-        font-size: 0.78rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .dash-flat-title {
-        font-size: 1.15rem;
     }
 }
 
@@ -791,28 +761,6 @@ table,
     .page-header-block {
         margin-bottom: 16px;
     }
-
-    .page-title {
-        font-size: 1.35rem !important;
-    }
-
-    .page-title-sm {
-        font-size: 1.15rem !important;
-    }
-
-    .page-subtitle {
-        font-size: 0.8rem !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .page-title {
-        font-size: 1.2rem !important;
-    }
-
-    .page-title-sm {
-        font-size: 1.05rem !important;
-    }
 }
 
 /* Hero block (legacy, used by older panel-home) */
@@ -1064,4 +1012,38 @@ html {
     .app-main {
         padding: 40px 52px;
     }
+}
+
+
+/* ================================================================
+   § 27  ACTIVE NOW CARDS — a long equipment name never widens a column
+   `1fr` tracks refuse to shrink below their content, so one long
+   name pushed the card past the screen edge on phones and past its
+   own border on desktop. minmax(0, 1fr) lets the track shrink and the
+   name truncates instead.
+================================================================ */
+#panel-home .active-cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+    #panel-home .active-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    #panel-home .active-cards-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+#panel-home .active-card {
+    min-width: 0;
+}
+
+#panel-home .active-card-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
