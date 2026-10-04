@@ -1529,11 +1529,6 @@
         return tr;
     };
 
-    function _buildFacultyRow(data) {
-        // data = { fullname, email, backup_email, role, org_name, org_id, faculty_id }
-        return window.psFacRender(document.createElement('tr'), data);
-    }
-
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
@@ -1550,6 +1545,48 @@
         if (!facFormAlert) return;
         facFormAlert.classList.add('hidden');
         facFormAlert.textContent = '';
+    }
+
+    /* After a successful create: show a small "Account created" overlay for a moment, then
+       load the Faculty tab fresh so the form, the list and its count are all back to a clean
+       state (the new account is simply part of the server-printed list).
+       FAC_CREATED_OVERLAY_MS must match the .fac-created-bar animation (2s) in admin-dashboard.css. */
+    const FAC_CREATED_OVERLAY_MS = 2000;
+    let _facReloading = false;
+
+    function _facAccountCreated(fullname) {
+        _facReloading = true;
+
+        // Empty the form right away so no browser can restore typed values (the password
+        // included) after the reload.
+        ['fac-email', 'fac-backup', 'fac-first', 'fac-middle', 'fac-last', 'fac-password', 'fac-confirm']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        if (facAdviserChk) facAdviserChk.checked = false;
+        _syncAdviserToggle();
+        _clearFacAlert();
+
+        const ov = document.createElement('div');
+        ov.className = 'fac-created-overlay';
+        ov.setAttribute('role', 'status');
+        ov.setAttribute('aria-live', 'polite');
+        ov.innerHTML =
+            '<div class="fac-created-card">' +
+            '<span class="fac-created-icon"><span class="material-symbols-outlined">check</span></span>' +
+            '<div class="fac-created-title">Account created</div>' +
+            '<div class="fac-created-sub"></div>' +
+            '<span class="fac-created-bar"></span>' +
+            '</div>';
+        ov.querySelector('.fac-created-sub').textContent = fullname; // text, never parsed as HTML
+        document.body.appendChild(ov);
+
+        setTimeout(function () {
+            // ?view=faculty makes the dashboard open on the Faculty tab (a plain reload
+            // would drop back to the default tab).
+            window.location.href = window.location.pathname + '?view=faculty';
+        }, FAC_CREATED_OVERLAY_MS);
     }
 
     if (facSubmitBtn) {
@@ -1614,48 +1651,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        _showFacAlert(
-                            'Account created. They will add their own Faculty ID after signing in.', false
-                        );
-                        showToast('Faculty account created successfully.');
-
-                        // Build fullname for the new DOM row
-                        const parts = [firstName, middleName, lastName].filter(Boolean);
-                        const fullname = parts.join(' ');
-                        const role = isAdviser === '1'
-                            ? 'Organization Adviser'
-                            : 'Regular Faculty';
-                        const orgName = isAdviser === '1'
-                            ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
-                            : '';
-                        const orgIdVal = isAdviser === '1' ? orgId : '0';
-
-                        // DOM prepend: remove empty-state row if present, then prepend new row
-                        const emptyRow = document.getElementById('fac-empty-row');
-                        if (emptyRow) emptyRow.remove();
-
-                        const tbody = document.getElementById('faculty-list-tbody');
-                        if (tbody) {
-                            const newRow = _buildFacultyRow({
-                                fullname, email,
-                                backup_email: backup,
-                                role,
-                                org_name: orgName,
-                                org_id: orgIdVal,
-                                faculty_id: data.faculty_id || ''
-                            });
-                            tbody.prepend(newRow);
-                        }
-
-                        // Reset form
-                        ['fac-email', 'fac-backup', 'fac-first', 'fac-middle', 'fac-last', 'fac-password', 'fac-confirm']
-                            .forEach(id => {
-                                const el = document.getElementById(id);
-                                if (el) el.value = '';
-                            });
-                        if (facAdviserChk) facAdviserChk.checked = false;
-                        _syncAdviserToggle();
-
+                        _facAccountCreated([firstName, middleName, lastName].filter(Boolean).join(' '));
                     } else {
                         _showFacAlert(data.message || 'An error occurred.', true);
                     }
@@ -1664,6 +1660,7 @@
                     _showFacAlert('Network error. Please try again.', true);
                 })
                 .finally(() => {
+                    if (_facReloading) return; // stay locked: the page is about to reload
                     facSubmitBtn.disabled = false;
                     facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
                 });

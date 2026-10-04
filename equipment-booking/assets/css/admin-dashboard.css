@@ -7910,3 +7910,110 @@ body:has(#roomScheduleModal:not(.hidden)) {
         animation: none;
     }
 }
+
+/* ── Faculty tab: "Account created" overlay (shown ~2s, then the page reloads) ── */
+.fac-created-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.45);
+    animation: fac-created-fade 0.18s ease-out;
+}
+
+.fac-created-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-width: 280px;
+    padding: 1.6rem 1.5rem 1.5rem;
+    text-align: center;
+    background: var(--primary-white);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    animation: fac-created-pop 0.22s ease-out;
+}
+
+.fac-created-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin: 0 auto 0.8rem;
+    display: grid;
+    place-items: center;
+    background: #eafaf2;
+    color: var(--success);
+}
+
+.fac-created-icon .material-symbols-outlined {
+    font-size: 28px;
+}
+
+.fac-created-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.fac-created-sub {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+}
+
+/* Thin bar that drains while the overlay is up (2s = FAC_CREATED_OVERLAY_MS in admin-dashboard.js) */
+.fac-created-bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--success);
+    transform-origin: left;
+    animation: fac-created-bar 2s linear forwards;
+}
+
+@keyframes fac-created-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fac-created-pop {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes fac-created-bar {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .fac-created-overlay,
+    .fac-created-card,
+    .fac-created-bar {
+        animation: none;
+    }
+}
