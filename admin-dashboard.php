@@ -40,6 +40,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | Admin Portal</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
@@ -204,9 +209,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
                         <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
                     </div>
-                    <a href="?export=1" class="ps-btn ps-btn--outline">
-                        <span class="material-symbols-outlined">download</span> Export Report
-                    </a>
+                    <div class="ps-dash-top-actions">
+                        <!-- Dashboard-only shortcuts (the sidebar keeps its own Notifications / account buttons).
+                             They live inside #panel-dashboard, so they are only visible on this tab. The badge
+                             uses .notif-btn-badge, which _updateBadges() in admin-dashboard.js keeps in sync. -->
+                        <button type="button" class="notif-btn ps-dash-top-btn" id="dashNotifBtn"
+                            data-action="open-notif-modal" aria-label="Open notifications" title="Notifications">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <span class="notif-btn-badge" id="dashNotifBadge"
+                                style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
+                        </button>
+                        <button type="button" class="avatar-btn" id="dashAvatarBtn"
+                            data-action="open-account-settings" aria-label="Open my account" title="My account"><?php echo htmlspecialchars($initials); ?></button>
+                    </div>
                 </div>
 
                 <!-- Stat cards -->

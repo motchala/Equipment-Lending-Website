@@ -1289,6 +1289,13 @@
                     _closeMobileSidebar();
                     break;
 
+                case 'open-account-settings': {
+                    // Dashboard header avatar → same screen as the sidebar's Settings item (My Account)
+                    const settingsNav = document.getElementById('snav-settings');
+                    if (settingsNav) settingsNav.click();
+                    break;
+                }
+
                 case 'open-change-pass': {
                     const modal = document.getElementById('changePassModal');
                     if (modal) {

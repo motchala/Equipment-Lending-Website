@@ -95,6 +95,11 @@ if ($is_ajax) {
 <head>
     <meta charset="UTF-8">
     <title>Return Confirmation</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="../favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="../assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style nonce="<?php echo $csp_nonce; ?>">
         body {

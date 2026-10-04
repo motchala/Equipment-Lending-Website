@@ -497,6 +497,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token()); ?>">
     <title>PUPSync | Faculty Dashboard</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
     <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

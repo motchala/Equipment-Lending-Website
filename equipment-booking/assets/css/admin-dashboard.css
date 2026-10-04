@@ -7786,3 +7786,127 @@ body:has(#roomScheduleModal:not(.hidden)) {
         width: 100%;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Dashboard header shortcuts (bell + avatar, top-right of the Dashboard tab only)
+   ═══════════════════════════════════════════════════════════════════════ */
+#panel-dashboard .ps-page-header-row {
+    gap: 1rem;
+}
+
+.ps-dash-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-shrink: 0;
+}
+
+.ps-dash-top-actions .notif-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--primary-white);
+    border: 1.5px solid var(--khaki-border, rgba(96, 3, 2, 0.18));
+    color: var(--accent-maroon);
+    box-shadow: 0 1px 3px rgba(96, 3, 2, 0.06);
+}
+
+.ps-dash-top-actions .notif-btn:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+}
+
+.ps-dash-top-actions .notif-btn .material-symbols-outlined {
+    font-size: 21px;
+}
+
+.ps-dash-top-actions .notif-btn-badge {
+    top: -5px;
+    right: -5px;
+}
+
+/* Same gold-ringed avatar as the Settings profile bar — a size up from the 40px bell */
+.ps-dash-top-actions .avatar-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1rem;
+    border-color: rgba(251, 191, 36, 0.95);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18);
+    font-family: inherit;
+}
+
+.ps-dash-top-actions .avatar-btn:hover {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.32);
+}
+
+.ps-dash-top-actions .avatar-btn:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 3px;
+}
+
+/* Phones / tablets (hamburger is showing): the icons become a slim top row, right-aligned */
+@media (max-width: 768px) {
+    #panel-dashboard .ps-page-header-row {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 0.9rem;
+    }
+
+    .ps-dash-top-actions {
+        justify-content: flex-end;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Notification modal — focus backdrop
+   The page behind goes soft and out of focus while the modal is open, so the
+   modal is the only sharp thing on screen. Blur + a plain dim, nothing else.
+   ═══════════════════════════════════════════════════════════════════════ */
+#notifOverlay {
+    background: rgba(22, 8, 10, 0.38);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+#notifOverlay.ps-modal-open {
+    animation: anotifFocusIn 0.28s ease-out both;
+}
+
+#notifOverlay.ps-modal-open>.ps-modal {
+    animation: anotifBoxIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes anotifFocusIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes anotifBoxIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+[data-theme="dark"] #notifOverlay {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #notifOverlay.ps-modal-open,
+    #notifOverlay.ps-modal-open>.ps-modal {
+        animation: none;
+    }
+}
