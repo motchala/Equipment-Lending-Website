@@ -1169,7 +1169,7 @@
                     if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
                     const initials = _computeInitials(data.admin_name);
                     if (initials) {
-                        document.querySelectorAll('.nav-account-avatar, .dd-avatar').forEach(el => { el.textContent = initials; });
+                        document.querySelectorAll('.nav-account-avatar, .dd-avatar, #dashAvatarBtn').forEach(el => { el.textContent = initials; });
                     }
 
                     // The database is now the source of truth for these fields —
@@ -1290,9 +1290,9 @@
                     break;
 
                 case 'open-account-settings': {
-                    // Dashboard header avatar → same screen as the sidebar's Settings item (My Account)
-                    const settingsNav = document.getElementById('snav-settings');
-                    if (settingsNav) settingsNav.click();
+                    // Dashboard header avatar → Settings (My Account). The sidebar no longer has a
+                    // Settings item, so switch the tab directly.
+                    _switchTabDOM('settings', null);
                     break;
                 }
 

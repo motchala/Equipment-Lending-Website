@@ -498,7 +498,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token()); ?>">
     <title>PUPSync | Faculty Dashboard</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
-    <link rel="icon" href="favicon.ico" sizes="32x32">
+    <link rel="icon" href="assets/images/favicon.ico" sizes="32x32">
     <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
     <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
@@ -528,6 +528,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
     <!-- facilities tab portal -->
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-activity.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-activity.css'); ?>">
 
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
@@ -1628,35 +1629,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-footer">
-            <!-- Account group: the toggle shows the avatar + faculty name. Clicking it expands
-                 Settings + Notifications inline, directly under the toggle and above Log Out. -->
-            <div class="side-nav-group" id="navAccountGroup">
-                <button type="button" class="side-nav-item side-nav-group-toggle" id="navAccountToggle"
-                    aria-expanded="false" aria-controls="navAccountMenu"
-                    aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                    <span class="side-nav-avatar"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></span>
-                    <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
-                    <b class="side-nav-notif-dot" id="navNotifDot" aria-hidden="true"
-                        <?php if ($notif_count <= 0) echo 'hidden'; ?>></b>
-                    <span class="material-symbols-outlined side-nav-chevron" aria-hidden="true">expand_more</span>
-                </button>
-                <div class="side-nav-submenu" id="navAccountMenu" role="group" aria-label="Account">
-                    <div class="side-nav-submenu-inner">
-                        <a class="side-nav-item side-nav-subitem" id="nav-settings" data-action="open-overlay"
-                            data-target="settingsOverlay" href="#">
-                            <span class="material-symbols-outlined">settings</span>
-                            <span>Settings</span>
-                        </a>
-                        <button type="button" class="side-nav-item side-nav-subitem" id="nav-notifications"
-                            data-action="open-notif-modal"
-                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                            <span class="material-symbols-outlined">notifications</span>
-                            <span>Notifications</span>
-                            <b class="side-nav-badge" id="notifBadge"
-                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
-                        </button>
-                    </div>
-                </div>
+            <!-- Signed-in faculty: the name only. Not a button, no avatar. Notifications and Settings
+                 live in the Dashboard's top-right bell / avatar. (.side-nav-user-name stays on the span:
+                 faculty-dashboard.js reads and updates it.) -->
+            <div class="side-nav-user" id="navAccountGroup">
+                <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
             </div>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
@@ -1739,6 +1716,21 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                         $h = (int)date('H');
                                                         echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
                                                         ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                    <!-- Dashboard-only shortcuts (same as the admin Dashboard). They live inside #panel-home, so
+                         they only show on this tab. The badge keeps id="notifBadge": the notification code in
+                         faculty-dashboard.js updates it. The avatar has .avatar-btn so name / photo changes reach it. -->
+                    <div class="fd-dash-top-actions">
+                        <button type="button" class="fd-top-btn" id="dashNotifBtn" data-action="open-notif-modal"
+                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>"
+                            title="Notifications">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <b class="fd-top-badge" id="notifBadge"
+                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
+                        </button>
+                        <button type="button" class="avatar-btn fd-top-avatar" id="dashAvatarBtn"
+                            data-action="open-overlay" data-target="settingsOverlay"
+                            aria-label="Open my account" title="My account"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></button>
+                    </div>
                 </div>
 
                 <!-- ── Top Two-Column: [Stats+Bentos] | [Code Card] ── -->
@@ -2445,15 +2437,24 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <div class="tab-panel" id="panel-activity">
 
                 <?php
-                /* ── Activity panel data & helpers ───────────────────────────
-                   Status lifecycle: Waiting -> Approved -> Overdue -> Returned
-                                              \-> Declined
-                   Every request maps to exactly ONE of the three sections below
-                   (no overlaps, no gaps):
-                     • Currently Borrowing : Overdue, or Approved that already started
+                /* ── My Activity: data & helpers ─────────────────────────────
+                   The screen has three layers, top to bottom:
+
+                     1. Summary strip   four numbers, two for equipment, two for rooms
+                     2. Right now       Equipment card | Room reservations card
+                     3. History         one table for both, filtered All / Equipment / Rooms
+
+                   Equipment status lifecycle: Waiting -> Approved -> Overdue -> Returned
+                                                          \-> Declined
+                   Every equipment request lands in exactly ONE place:
+                     • Currently borrowing : Overdue, or Approved that already started
                      • Upcoming            : Waiting, or Approved that hasn't started yet
                      • History             : Returned or Declined
+
+                   Rooms are loaded by room-reservation/core/faculty-activity-rooms.php, the
+                   same code the live-refresh endpoint (api/get-activity-rooms.php) uses.
                 ─────────────────────────────────────────────────────────────── */
+                require_once __DIR__ . '/room-reservation/core/faculty-activity-rooms.php';
 
                 $act_current = mysqli_query(
                     $conn,
@@ -2481,12 +2482,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 );
 
                 /* ── Stat counters ─────────────────────────────────────────── */
-                $act_stat_current = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe'
-                     AND (status='Overdue' OR (status='Approved' AND borrow_date <= '$today'))"
-                ))['c'] ?? 0;
+                $act_stat_current = $act_current ? (int) mysqli_num_rows($act_current) : 0;
+                $act_stat_upcoming = $act_upcoming ? (int) mysqli_num_rows($act_upcoming) : 0;
 
                 $act_stat_waiting = mysqli_fetch_assoc(mysqli_query(
                     $conn,
@@ -2500,18 +2497,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                      WHERE faculty_id='$uid_safe' AND status='Overdue'"
                 ))['c'] ?? 0;
 
-                $act_stat_completed = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe' AND status='Returned'"
-                ))['c'] ?? 0;
+                /* ── Room reservations (shared with the live-refresh endpoint) ── */
+                $act_rooms      = fact_load_rooms($conn, (string) $_SESSION['faculty_id']);
+                $act_room_stats = fact_room_stats($act_rooms);
 
-                /* actEquipIcon() moved to the shared helpers near the top of this
-                   file, so both "Active Now" (Home tab) and My Activity can use
-                   it — see actEquipIcon()/actEquipImage() near $equip_image_map. */
-
-                /* ── Loan progress — linear (matches "Active Now" on the
-                       Home tab) instead of the old SVG ring ─────────────────── */
+                /* ── Loan progress — linear (matches "Active Now" on the Home tab) ── */
                 function actLoanProgress(string $borrowDate, string $returnDate, string $today, bool $isOverdue): array
                 {
                     $bd      = strtotime($borrowDate);
@@ -2535,278 +2525,317 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     return ['pct' => max(4, min(100, $pct)), 'label' => $label];
                 }
 
-                /* ── Status pill — shared by the Upcoming and History rows ── */
+                /* ── Equipment status pill (uses the same chip as the room side) ── */
                 function actStatusPill(string $status): string
                 {
                     $map = [
-                        'Waiting'  => ['cls' => 'myact-pill-waiting',  'icon' => 'schedule',     'label' => 'Pending'],
-                        'Approved' => ['cls' => 'myact-pill-approved', 'icon' => 'check_circle', 'label' => 'Approved'],
-                        'Declined' => ['cls' => 'myact-pill-declined', 'icon' => 'cancel',       'label' => 'Declined'],
-                        'Overdue'  => ['cls' => 'myact-pill-overdue',  'icon' => 'warning',      'label' => 'Overdue'],
-                        'Returned' => ['cls' => 'myact-pill-returned', 'icon' => 'task_alt',     'label' => 'Returned'],
+                        'Waiting'  => ['Pending',  'wait',  'schedule'],
+                        'Approved' => ['Approved', 'ok',    'check_circle'],
+                        'Declined' => ['Declined', 'bad',   'cancel'],
+                        'Overdue'  => ['Overdue',  'warn',  'warning'],
+                        'Returned' => ['Returned', 'muted', 'task_alt'],
                     ];
                     $d = $map[$status] ?? $map['Waiting'];
-                    return '<span class="myact-pill ' . $d['cls'] . '">'
-                        . '<span class="material-symbols-outlined" style="font-size:13px;">' . $d['icon'] . '</span>'
-                        . htmlspecialchars($d['label']) . '</span>';
+                    return fact_chip($d[0], $d[1], $d[2]);
+                }
+
+                /* "Room 201" for a bare room number, otherwise as typed */
+                function actRoomLabel(string $room): string
+                {
+                    $room = trim($room);
+                    return stripos($room, 'room') === 0 ? $room : 'Room ' . $room;
                 }
                 ?>
 
                 <!-- ── Header ───────────────────────────────────────────── -->
-                <div class="myact-header">
+                <header class="fact-head">
                     <div>
                         <h2 class="myact-title">My Activity</h2>
+                        <p class="fact-sub">Your equipment loans and room reservations, all in one place.</p>
                     </div>
-                    <button class="myact-download-btn" onclick="window.print()">
+                    <button type="button" class="myact-download-btn" data-fact-print>
                         <span class="material-symbols-outlined">download</span>
                         <span class="myact-download-label">Download Report</span>
                     </button>
+                </header>
+
+                <!-- ── Summary strip: 2 equipment numbers + 2 room numbers ── -->
+                <div class="fact-stats" role="group" aria-label="Activity summary">
+                    <div class="fact-stat">
+                        <span class="fact-stat-value"><?php echo $act_stat_current; ?></span>
+                        <span class="fact-stat-label">Borrowing now</span>
+                        <?php if ($act_stat_overdue > 0): ?>
+                            <span class="fact-stat-sub is-bad"><?php echo (int) $act_stat_overdue; ?> overdue</span>
+                        <?php else: ?>
+                            <span class="fact-stat-sub"><?php echo $act_stat_current > 0 ? 'All on time' : 'Nothing out'; ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value"><?php echo $act_stat_upcoming; ?></span>
+                        <span class="fact-stat-label">Upcoming equipment</span>
+                        <span class="fact-stat-sub"><?php echo (int) $act_stat_waiting > 0 ? (int) $act_stat_waiting . ' awaiting approval' : 'None waiting'; ?></span>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
+                        <span class="fact-stat-label">Rooms reserved</span>
+                        <span class="fact-stat-sub" data-fact-stat="reserved_sub"><?php echo fact_h($act_room_stats['reserved_sub']); ?></span>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value" data-fact-stat="next"><?php echo fact_h($act_room_stats['next']); ?></span>
+                        <span class="fact-stat-label">Next room booking</span>
+                        <span class="fact-stat-sub" data-fact-stat="next_sub"><?php echo fact_h($act_room_stats['next_sub']); ?></span>
+                    </div>
                 </div>
 
-                <!-- ── Two-column layout: compact rail (left) + stats/ledger (right) ── -->
-                <div class="myact-columns">
+                <!-- ── Right now: Equipment | Room reservations ─────────── -->
+                <div class="fact-grid">
 
-                    <!-- ═══════════ LEFT: at-a-glance rail ═══════════ -->
-                    <div class="myact-rail">
+                    <!-- ═══════════ Equipment ═══════════ -->
+                    <section class="fact-card" id="factEquipment" aria-labelledby="factEquipTitle">
+                        <header class="fact-card-head">
+                            <div class="fact-card-title">
+                                <span class="fact-card-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                                <h3 class="myact-section-title" id="factEquipTitle">Equipment</h3>
+                            </div>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                <span class="material-symbols-outlined">add_shopping_cart</span>Borrow
+                            </button>
+                        </header>
 
-                        <?php if ($act_stat_overdue > 0): ?>
-                            <!-- Gentle notice, not a screaming red box -->
-                            <div class="myact-notice">
-                                <div class="myact-notice-icon"><span class="material-symbols-outlined">info</span></div>
-                                <div class="myact-notice-text">
-                                    <span class="myact-notice-title">Lending Clearance Notice</span>
-                                    <span class="myact-notice-sub"><?php echo (int)$act_stat_overdue; ?> item<?php echo $act_stat_overdue > 1 ? 's' : ''; ?> pending surrender</span>
+                        <div class="fact-card-body">
+
+                            <?php if ($act_stat_overdue > 0): ?>
+                                <!-- Gentle notice, not a screaming red box -->
+                                <div class="fact-notice" role="status">
+                                    <span class="material-symbols-outlined">info</span>
+                                    <div>
+                                        <strong>Lending clearance notice</strong>
+                                        <span><?php echo (int) $act_stat_overdue; ?> item<?php echo $act_stat_overdue > 1 ? 's' : ''; ?> pending surrender. New equipment requests are on hold until it is returned.</span>
+                                    </div>
                                 </div>
-                                <span class="myact-notice-flag">Hold Active</span>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
 
-                        <!-- ── Currently Borrowing ─────────────────────────── -->
-                        <div class="myact-rail-section">
-                            <div class="myact-section-head">
-                                <h3 class="myact-section-title">Currently Borrowing</h3>
-                            </div>
-                            <?php if ($act_current && mysqli_num_rows($act_current) > 0):
-                                $act_current_total = mysqli_num_rows($act_current);
-                            ?>
-                                <div class="myact-rail-list<?php echo $act_current_total > 3 ? ' myact-collapsible' : ''; ?>">
-                                    <?php while ($r = mysqli_fetch_assoc($act_current)):
-                                        $isOverdue = $r['status'] === 'Overdue';
-                                        $icon = actEquipIcon($r['equipment_name']);
-                                        $image = actEquipImage($r['equipment_name']);
-                                        $prog = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
-                                    ?>
-                                        <article class="myact-loan-card<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
-                                            <div class="myact-loan-top">
-                                                <div class="myact-loan-icon">
+                            <!-- Currently borrowing -->
+                            <div class="fact-group">
+                                <h3 class="fact-group-label">Currently borrowing</h3>
+                                <?php if ($act_current && mysqli_num_rows($act_current) > 0):
+                                    $act_current_total = mysqli_num_rows($act_current);
+                                ?>
+                                    <div class="fact-list<?php echo $act_current_total > 3 ? ' is-collapsed' : ''; ?>">
+                                        <?php while ($r = mysqli_fetch_assoc($act_current)):
+                                            $isOverdue = $r['status'] === 'Overdue';
+                                            $icon  = actEquipIcon($r['equipment_name']);
+                                            $image = actEquipImage($r['equipment_name']);
+                                            $prog  = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
+                                            $dueTone = $isOverdue ? 'bad' : (in_array($prog['label'], ['Due today', 'Due tomorrow'], true) ? 'today' : 'soon');
+                                        ?>
+                                            <article class="fact-item fact-loan<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
+                                                <span class="fact-tile fact-tile-lg">
                                                     <?php if ($image): ?>
-                                                        <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
+                                                        <img src="<?php echo $image; ?>" alt="">
                                                     <?php else: ?>
                                                         <span class="material-symbols-outlined"><?php echo $icon; ?></span>
                                                     <?php endif; ?>
+                                                </span>
+                                                <div class="fact-item-main">
+                                                    <div class="fact-item-top">
+                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
+                                                        <?php echo fact_chip($prog['label'], $dueTone); ?>
+                                                    </div>
+                                                    <p class="fact-item-meta">
+                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?> – <?php echo date('M j', strtotime($r['return_date'])); ?>
+                                                    </p>
+                                                    <div class="fact-bar" aria-hidden="true"><i class="<?php echo $isOverdue ? 'is-overdue' : ''; ?>" style="width:<?php echo (int) $prog['pct']; ?>%"></i></div>
                                                 </div>
-                                                <?php if ($isOverdue): ?>
-                                                    <span class="myact-badge myact-badge-error">Overdue</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <p class="myact-loan-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                            <p class="myact-loan-meta">
-                                                Room <?php echo htmlspecialchars($r['room']); ?> ·
-                                                <?php echo date('M j', strtotime($r['borrow_date'])); ?>&ndash;<?php echo date('M j', strtotime($r['return_date'])); ?>
-                                            </p>
-                                            <div class="myact-loan-progress">
-                                                <div class="myact-loan-progress-track">
-                                                    <div class="myact-loan-progress-fill<?php echo $isOverdue ? ' is-overdue' : ''; ?>" style="width:<?php echo $prog['pct']; ?>%"></div>
-                                                </div>
-                                                <span class="myact-loan-due<?php echo $isOverdue ? ' is-overdue' : ''; ?>"><?php echo $prog['label']; ?></span>
-                                            </div>
-                                            <div class="myact-loan-actions">
-                                                <?php if (!$isOverdue): ?>
-                                                    <button class="myact-link-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                                        Extend
+                                                <div class="fact-item-actions">
+                                                    <?php if (!$isOverdue): ?>
+                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">Extend</button>
+                                                    <?php endif; ?>
+                                                    <button type="button" class="fact-btn fact-btn-ghost is-danger"
+                                                        data-action="myact-report-issue"
+                                                        data-request-id="<?php echo (int) $r['id']; ?>"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
+                                                        <span class="material-symbols-outlined">report</span>Report
                                                     </button>
-                                                <?php endif; ?>
-                                                <button class="myact-link-btn myact-link-btn--danger"
-                                                    data-action="myact-report-issue"
-                                                    data-request-id="<?php echo (int)$r['id']; ?>"
-                                                    data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
-                                                    <span class="material-symbols-outlined">report</span>Report Issue
-                                                </button>
-                                            </div>
-                                        </article>
-                                    <?php endwhile; ?>
-                                </div>
-                                <?php if ($act_current_total > 3): ?>
-                                    <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
-                                        Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                    </button>
+                                                </div>
+                                            </article>
+                                        <?php endwhile; ?>
+                                    </div>
+                                    <?php if ($act_current_total > 3): ?>
+                                        <button type="button" class="fact-more" data-fact-more>
+                                            Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <div class="fact-empty is-compact">
+                                        <span class="material-symbols-outlined">check_circle</span>
+                                        <p class="fact-empty-title">Nothing currently borrowed</p>
+                                    </div>
                                 <?php endif; ?>
-                            <?php else: ?>
-                                <div class="myact-empty myact-empty-sm">
-                                    <span class="material-symbols-outlined">check_circle</span>
-                                    <p>Nothing currently borrowed.</p>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- ── Upcoming ─────────────────────────────────────── -->
-                        <div class="myact-rail-section">
-                            <div class="myact-section-head">
-                                <h3 class="myact-section-title">Upcoming</h3>
                             </div>
-                            <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
-                                $act_upcoming_total = mysqli_num_rows($act_upcoming);
-                            ?>
-                                <div class="myact-list<?php echo $act_upcoming_total > 3 ? ' myact-collapsible' : ''; ?>">
-                                    <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
-                                        $bd = strtotime($r['borrow_date']);
-                                        $td = strtotime($today);
-                                        $daysAway = (int) round(($bd - $td) / 86400);
-                                        $awayStr = $daysAway <= 0 ? 'Today' : ($daysAway === 1 ? 'Tomorrow' : "In {$daysAway} days");
-                                        $icon = actEquipIcon($r['equipment_name']);
+
+                            <!-- Upcoming -->
+                            <div class="fact-group">
+                                <h3 class="fact-group-label">Upcoming</h3>
+                                <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
+                                    $act_upcoming_total = mysqli_num_rows($act_upcoming);
+                                ?>
+                                    <div class="fact-list<?php echo $act_upcoming_total > 3 ? ' is-collapsed' : ''; ?>">
+                                        <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
+                                            $bd = strtotime($r['borrow_date']);
+                                            $td = strtotime($today);
+                                            $daysAway = (int) round(($bd - $td) / 86400);
+                                            $awayStr = $daysAway <= 0 ? 'Starts today' : ($daysAway === 1 ? 'Starts tomorrow' : "Starts in {$daysAway} days");
+                                            $icon  = actEquipIcon($r['equipment_name']);
+                                            $image = actEquipImage($r['equipment_name']);
+                                        ?>
+                                            <article class="fact-item">
+                                                <span class="fact-tile fact-tile-lg">
+                                                    <?php if ($image): ?>
+                                                        <img src="<?php echo $image; ?>" alt="">
+                                                    <?php else: ?>
+                                                        <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                                    <?php endif; ?>
+                                                </span>
+                                                <div class="fact-item-main">
+                                                    <div class="fact-item-top">
+                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
+                                                        <?php echo actStatusPill($r['status']); ?>
+                                                    </div>
+                                                    <p class="fact-item-meta">
+                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?> – <?php echo date('M j, Y', strtotime($r['return_date'])); ?>
+                                                    </p>
+                                                    <p class="fact-item-sub"><span><?php echo $awayStr; ?></span></p>
+                                                </div>
+                                            </article>
+                                        <?php endwhile; ?>
+                                    </div>
+                                    <?php if ($act_upcoming_total > 3): ?>
+                                        <button type="button" class="fact-more" data-fact-more>
+                                            Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <div class="fact-empty is-compact">
+                                        <span class="material-symbols-outlined">event_upcoming</span>
+                                        <p class="fact-empty-title">No upcoming requests</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                        </div>
+                    </section><!-- /factEquipment -->
+
+                    <!-- ═══════════ Room reservations ═══════════ -->
+                    <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
+                        <header class="fact-card-head">
+                            <div class="fact-card-title">
+                                <span class="fact-card-icon"><span class="material-symbols-outlined">meeting_room</span></span>
+                                <h3 class="myact-section-title" id="factRoomsTitle">Room reservations</h3>
+                            </div>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="rooms">
+                                <span class="material-symbols-outlined">add</span>Reserve
+                            </button>
+                        </header>
+                        <!-- Filled here on first paint; swapped live by faculty-activity.js -->
+                        <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
+                    </section><!-- /factRooms -->
+
+                </div><!-- /fact-grid -->
+
+                <!-- ═══════════ History (equipment + rooms) ═══════════ -->
+                <section class="fact-card fact-history" id="factHistory" aria-labelledby="factHistTitle">
+                    <header class="fact-card-head">
+                        <div class="fact-card-title">
+                            <span class="fact-card-icon"><span class="material-symbols-outlined">history</span></span>
+                            <h3 class="myact-section-title" id="factHistTitle">History</h3>
+                        </div>
+                        <div class="fact-tools">
+                            <div class="fact-seg" id="factKindTabs" role="group" aria-label="Show">
+                                <button type="button" class="fact-seg-btn is-active" data-fact-kind="all" aria-pressed="true">All</button>
+                                <button type="button" class="fact-seg-btn" data-fact-kind="equipment" aria-pressed="false">Equipment</button>
+                                <button type="button" class="fact-seg-btn" data-fact-kind="room" aria-pressed="false">Rooms</button>
+                            </div>
+                            <label class="fact-search">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="factSearch" placeholder="Search history…" autocomplete="off" aria-label="Search history">
+                            </label>
+                        </div>
+                    </header>
+
+                    <div class="fact-table-wrap">
+                        <table class="fact-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Activity</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">When</th>
+                                    <th scope="col" class="fact-col-status">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="factHistBody">
+                                <?php
+                                if ($act_history) {
+                                    while ($r = mysqli_fetch_assoc($act_history)):
+                                        $isDeclined = $r['status'] === 'Declined';
+                                        $icon  = actEquipIcon($r['equipment_name']);
                                         $image = actEquipImage($r['equipment_name']);
-                                    ?>
-                                        <div class="myact-row">
-                                            <div class="myact-row-icon">
-                                                <?php if ($image): ?>
-                                                    <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
-                                                <?php else: ?>
-                                                    <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="myact-row-main">
-                                                <span class="myact-row-when"><?php echo $awayStr; ?></span>
-                                                <p class="myact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                                <p class="myact-row-sub">
-                                                    Room <?php echo htmlspecialchars($r['room']); ?> ·
-                                                    <?php echo date('M j', strtotime($r['borrow_date'])); ?>&ndash;<?php echo date('M j, Y', strtotime($r['return_date'])); ?>
-                                                </p>
-                                            </div>
-                                            <?php echo actStatusPill($r['status']); ?>
-                                        </div>
-                                    <?php endwhile; ?>
-                                </div>
-                                <?php if ($act_upcoming_total > 3): ?>
-                                    <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
-                                        Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                    </button>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <div class="myact-empty myact-empty-sm">
-                                    <span class="material-symbols-outlined">event_upcoming</span>
-                                    <p>No upcoming requests.</p>
-                                </div>
-                            <?php endif; ?>
+                                        $endRaw = $r['returned_at'] ?: $r['return_date'];
+                                        $dateLine = $isDeclined
+                                            ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
+                                            : (date('M j', strtotime($r['borrow_date'])) . ' – ' . date('M j, Y', strtotime($endRaw)));
+                                        $rowTs = (int) strtotime($isDeclined ? $r['request_date'] : $endRaw);
+                                ?>
+                                        <tr class="fact-row" data-kind="equipment" data-status="<?php echo strtolower($r['status']); ?>" data-ts="<?php echo $rowTs; ?>">
+                                            <td data-label="Activity">
+                                                <div class="fact-cell">
+                                                    <span class="fact-tile">
+                                                        <?php if ($image): ?>
+                                                            <img src="<?php echo $image; ?>" alt="">
+                                                        <?php else: ?>
+                                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                    <div class="fact-cell-text">
+                                                        <span class="fact-kind">Equipment</span>
+                                                        <p class="fact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
+                                                        <?php if ($isDeclined && !empty($r['reason'])): ?>
+                                                            <p class="fact-row-sub"><?php echo htmlspecialchars($r['reason']); ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td data-label="Location"><?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?></td>
+                                            <td data-label="When"><span class="fact-when"><?php echo $dateLine; ?></span></td>
+                                            <td data-label="Status" class="fact-col-status"><?php echo actStatusPill($r['status']); ?></td>
+                                        </tr>
+                                <?php
+                                    endwhile;
+                                }
+                                echo fact_render_room_history_rows($act_rooms);
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="fact-noresults" id="factNoResults" hidden>No records match your search.</p>
+                    <div class="fact-empty" id="factHistEmpty" hidden>
+                        <span class="material-symbols-outlined">history</span>
+                        <p class="fact-empty-title">No history yet</p>
+                        <p class="fact-empty-sub">Returned equipment and past room reservations will show up here.</p>
+                    </div>
+
+                    <div class="fact-pager" id="factPager" hidden>
+                        <span class="fact-pager-info" id="factPagerInfo"></span>
+                        <div class="fact-pager-ctl">
+                            <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
+                            <div class="fact-pager-nums" id="factNums"></div>
+                            <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
                         </div>
-
-                    </div><!-- /myact-rail -->
-
-                    <!-- ═══════════ RIGHT: stats + activity ledger ═══════════ -->
-                    <div class="myact-main">
-
-                        <!-- ── Activity Ledger ─────────────────────────────── -->
-                        <div class="myact-ledger-card">
-                            <div class="myact-ledger-head">
-                                <div>
-                                    <h3 class="myact-section-title">Activity Ledger</h3>
-                                </div>
-                                <?php if ($act_history && mysqli_num_rows($act_history) > 0): ?>
-                                    <div class="myact-ledger-controls">
-                                        <div class="myact-search-wrap">
-                                            <span class="material-symbols-outlined">search</span>
-                                            <input type="text" id="myactHistSearch" placeholder="Filter records…" autocomplete="off">
-                                        </div>
-                                        <div class="myact-filter-tabs" id="myactHistFilterTabs">
-                                            <button type="button" class="myact-filter-tab active" data-status-filter="all">All</button>
-                                            <button type="button" class="myact-filter-tab" data-status-filter="returned">Returned</button>
-                                            <button type="button" class="myact-filter-tab" data-status-filter="declined">Declined</button>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <?php if ($act_history && mysqli_num_rows($act_history) > 0):
-                                $hist_rows = [];
-                                while ($r = mysqli_fetch_assoc($act_history)) $hist_rows[] = $r;
-                                $hist_total = count($hist_rows);
-                            ?>
-                                <div class="myact-ledger-table-wrap">
-                                    <table class="myact-ledger-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Item</th>
-                                                <th>Room</th>
-                                                <th>Date Period</th>
-                                                <th class="myact-ledger-th-status">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="myactHistList">
-                                            <?php foreach ($hist_rows as $hidx => $r):
-                                                $isDeclined = $r['status'] === 'Declined';
-                                                $icon = actEquipIcon($r['equipment_name']);
-                                                $image = actEquipImage($r['equipment_name']);
-                                                $dateLine = $isDeclined
-                                                    ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
-                                                    : (date('M j', strtotime($r['borrow_date'])) . '&ndash;' . date('M j, Y', strtotime($r['returned_at'] ?: $r['return_date'])));
-                                            ?>
-                                                <tr class="myact-history-row" data-hist-idx="<?php echo $hidx; ?>" data-status="<?php echo strtolower($r['status']); ?>">
-                                                    <td>
-                                                        <div class="myact-hist-item">
-                                                            <div class="myact-history-icon">
-                                                                <?php if ($image): ?>
-                                                                    <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
-                                                                <?php else: ?>
-                                                                    <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                            <div class="myact-history-main">
-                                                                <p class="myact-history-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                                                <?php if ($isDeclined && !empty($r['reason'])): ?>
-                                                                    <p class="myact-history-reason"><?php echo htmlspecialchars($r['reason']); ?></p>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="myact-hist-room"><?php echo htmlspecialchars($r['room']); ?></td>
-                                                    <td class="myact-hist-date"><?php echo $dateLine; ?></td>
-                                                    <td class="myact-ledger-th-status"><?php echo actStatusPill($r['status']); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <!-- Pagination — only rendered when more than 10 rows exist;
-                                     JS handles show/hide and page switching. Also used as the
-                                     "N results" indicator while a search/filter is active. -->
-                                <div class="myact-hist-pg" id="myactHistPg"
-                                    <?php echo $hist_total <= 10 ? 'style="display:none;"' : ''; ?>>
-                                    <span class="myact-hist-pg-info" id="myactHistPgInfo"></span>
-                                    <div class="myact-hist-pg-controls" id="myactHistPgControls">
-                                        <button class="myact-hist-pg-btn" id="myactHistPrev" aria-label="Previous page">
-                                            <span class="material-symbols-outlined">chevron_left</span>
-                                        </button>
-                                        <div class="myact-hist-pg-nums" id="myactHistNums"></div>
-                                        <button class="myact-hist-pg-btn" id="myactHistNext" aria-label="Next page">
-                                            <span class="material-symbols-outlined">chevron_right</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="myact-ledger-no-results" id="myactHistNoResults" style="display:none;">
-                                    No records match your search.
-                                </p>
-
-                            <?php else: ?>
-                                <div class="myact-empty">
-                                    <span class="material-symbols-outlined">history</span>
-                                    <p>No completed requests yet.</p>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                    </div><!-- /myact-main -->
-
-                </div><!-- /myact-columns -->
+                    </div>
+                </section><!-- /factHistory -->
 
             </div><!-- /panel-activity -->
 
@@ -4275,6 +4304,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
+    <script src="equipment-booking/assets/js/faculty-activity.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-activity.js'); ?>"></script>
 </body>
 
 </html>

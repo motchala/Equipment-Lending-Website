@@ -925,7 +925,7 @@
         const navDot = document.getElementById('navNotifDot');
         if (navDot) navDot.hidden = unread <= 0;
         const unreadLabel = unread > 0 ? ' \u2014 ' + unread + ' unread' : '';
-        const bell = document.querySelector('.side-nav-subitem[data-action="open-notif-modal"]');
+        const bell = document.querySelector('[data-action="open-notif-modal"]');
         if (bell) bell.setAttribute('aria-label', 'Open notifications' + unreadLabel);
         const acctToggleEl = document.getElementById('navAccountToggle');
         if (acctToggleEl) acctToggleEl.setAttribute('aria-label', 'Account menu' + unreadLabel);
@@ -1759,7 +1759,7 @@
         // Strip any existing image, fallback span, or stray initials text,
         // then prepend fresh initials as a text node — this preserves other
         // element children (e.g. the notification badge) untouched.
-        document.querySelectorAll('.side-nav-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+        document.querySelectorAll('.side-nav-avatar, .avatar-btn, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE) n.remove();
                 if (n.classList && (n.classList.contains('avatar-img') || n.classList.contains('avatar-initials-fallback'))) n.remove();
@@ -1777,7 +1777,7 @@
         let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
         if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
 
-        document.querySelectorAll('.side-nav-avatar, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+        document.querySelectorAll('.side-nav-avatar, .avatar-btn, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
             // Remove text nodes and any existing image/fallback
             [...el.childNodes].forEach(n => {
                 if (n.nodeType === Node.TEXT_NODE && n.textContent.trim()) n.remove();

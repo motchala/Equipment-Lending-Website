@@ -1401,7 +1401,7 @@ main#app-main {
 /* Quick action cards */
 .ps-quick-actions {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -8015,5 +8015,49 @@ body:has(#roomScheduleModal:not(.hidden)) {
     .fac-created-card,
     .fac-created-bar {
         animation: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sidebar footer: signed-in name only (not clickable) + Scan Return card
+   ═══════════════════════════════════════════════════════════════════════ */
+.nav-user {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    color: var(--nav-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: default;
+    user-select: none;
+    pointer-events: none;
+}
+
+.nav-user .nav-account-name {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Scan Return is a <button> styled as a Quick Action card */
+button.ps-qa-card {
+    border: 0;
+    font: inherit;
+    text-align: left;
+    width: 100%;
+}
+
+button.ps-qa-card:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 3px;
+}
+
+/* Icon-rail modes show no labels, so the name has nothing to show there */
+body.sidebar-collapsed .nav-user {
+    display: none;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .nav-user {
+        display: none;
     }
 }

@@ -41,7 +41,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUP Sync | Admin Portal</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
-    <link rel="icon" href="favicon.ico" sizes="32x32">
+    <link rel="icon" href="assets/images/favicon.ico" sizes="32x32">
     <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
     <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
     <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
@@ -143,39 +143,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
 
             <div class="sidebar-footer">
-                <!-- Account group: the toggle shows the avatar + admin name. Clicking it expands
-                     Scan Return, Notifications and Settings inline, directly under the toggle
-                     and above Log Out. -->
-                <div class="nav-account" id="navAccountGroup">
-                    <button type="button" class="nav-item nav-account-toggle" id="navAccountToggle"
-                        aria-expanded="false" aria-controls="navAccountMenu"
-                        aria-label="Account menu<?php echo $notif_unread > 0 ? ' — ' . (int)$notif_unread . ' unread' : ''; ?>"
-                        title="<?php echo htmlspecialchars($admin_role); ?>">
-                        <span class="nav-account-avatar"><?php echo htmlspecialchars($initials); ?></span>
-                        <span class="nav-label nav-account-name"><?php echo htmlspecialchars($admin_name); ?></span>
-                        <b class="nav-account-dot" id="navNotifDot" aria-hidden="true"
-                            <?php if ($notif_unread <= 0) echo 'hidden'; ?>></b>
-                        <span class="material-symbols-outlined nav-account-chevron" aria-hidden="true">expand_more</span>
-                    </button>
-                    <div class="nav-submenu" id="navAccountMenu" role="group" aria-label="Account">
-                        <div class="nav-submenu-inner">
-                            <button type="button" class="nav-item nav-subitem" id="openQrScannerBtn">
-                                <span class="material-symbols-outlined">qr_code_scanner</span>
-                                <span class="nav-label">Scan Return</span>
-                            </button>
-                            <button type="button" class="nav-item nav-subitem" id="navNotifBtn"
-                                data-action="open-notif-modal" aria-label="Open notifications">
-                                <span class="material-symbols-outlined">notifications</span>
-                                <span class="nav-label">Notifications</span>
-                                <span class="nav-badge notif-badge" id="notifBellBadge"
-                                    style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
-                            </button>
-                            <a class="nav-item nav-subitem" data-tab="settings" id="snav-settings" href="#">
-                                <span class="material-symbols-outlined">settings</span>
-                                <span class="nav-label">Settings</span>
-                            </a>
-                        </div>
-                    </div>
+                <!-- Signed-in admin: the name only. Not a button, no avatar. Notifications and Settings
+                     live in the Dashboard's top-right bell / avatar; Scan Return is a Quick Action card
+                     on the Dashboard. (.nav-account-name stays on the span so the live name update in
+                     admin-dashboard.js keeps working.) -->
+                <div class="nav-user" id="navAccountGroup" title="<?php echo htmlspecialchars($admin_role); ?>">
+                    <span class="nav-label nav-account-name"><?php echo htmlspecialchars($admin_name); ?></span>
                 </div>
                 <!-- Log Out — pinned to the very bottom of the sidebar -->
                 <a class="nav-item nav-signout" id="snav-logout" data-action="logout" href="#">
@@ -297,6 +270,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <strong>Add Equipment</strong>
                         <small>Update inventory catalog</small>
                     </div>
+                    <!-- Scan Return (moved here from the sidebar). Keeps id="openQrScannerBtn": initQrScanner() in
+                         admin-dashboard.js binds to it. -->
+                    <button type="button" class="ps-qa-card ps-qa-card--dark" id="openQrScannerBtn">
+                        <span class="material-symbols-outlined">qr_code_scanner</span>
+                        <strong>Scan Return</strong>
+                        <small>Scan a QR code to confirm a return</small>
+                    </button>
                 </div>
 
                 <!-- Two-col: Room Status + Faculty Overview (sits between Quick Actions and the Recent tables) -->
