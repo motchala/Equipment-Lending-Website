@@ -30,6 +30,7 @@ declare(strict_types=1);
  */
 
 date_default_timezone_set('Asia/Manila');
+require_once __DIR__ . '/booking-schedule.php';
 
 class ArbitrationEngine
 {
@@ -48,6 +49,7 @@ class ArbitrationEngine
     public const RULE_5_ID_ORDER       = 'rule_5_id_order';
     public const RULE_OVERRIDE         = 'override';
     public const RULE_ERROR            = 'arbitration_error';
+    public const RULE_SCHEDULE_CONFLICT = 'rule_schedule_conflict';
 
     // ── Public entry point ───────────────────────────────────────────────────
 
@@ -125,6 +127,17 @@ class ArbitrationEngine
             // ── Step 6: Archived item check ──────────────────────────────────
             // Leave as Waiting — do not approve or decline archived items.
             if (isset($request['is_archived']) && (int)$request['is_archived'] === 1) {
+                return;
+            }
+
+            // ── Scheduled bookings (Today / Later) are decided against the SCHEDULE ──
+            // (units already promised for overlapping times), not the shelf count.
+            // Legacy rows (booking_mode NULL) keep the original stock-counter flow below.
+            if (
+                BookingSchedule::ensureSchema($conn)
+                && in_array((string)($request['booking_mode'] ?? ''), ['today', 'future'], true)
+            ) {
+                self::processScheduled($conn, $request_id, $request);
                 return;
             }
 
@@ -900,6 +913,90 @@ class ArbitrationEngine
     }
 
     /**
+     * Decide a Today / Later booking.
+     *
+     *  - Later: approved when enough of the item's TOTAL stock is free for the whole
+     *    window. The shelf count is irrelevant (it will change before the booking
+     *    starts), so an item that is out right now can still be booked ahead.
+     *  - Today: same schedule check, plus at least one unit must be on the shelf now.
+     *  - Approval does NOT touch the shelf unless the booking starts right now; later
+     *    bookings take their units off the shelf when they start (BookingSchedule::tick).
+     */
+    private static function processScheduled(mysqli $conn, int $request_id, array $request): void
+    {
+        $item    = (string)$request['equipment_name'];
+        $qty     = max(1, (int)($request['borrow_qty'] ?? 1));
+        $mode    = (string)$request['booking_mode'];
+        $startTs = $request['borrow_date'] . ' ' . (!empty($request['borrow_time']) ? $request['borrow_time'] : '00:00:00');
+        $endTs   = $request['return_date'] . ' ' . (!empty($request['return_time']) ? $request['return_time'] : '23:59:59');
+
+        $shelf = self::acquireStockLock($conn, $item);   // opens the transaction + locks the inventory row
+        if ($shelf === null) {
+            error_log('ArbitrationEngine: acquireStockLock returned null for equipment=' . $item . ' request_id=' . $request_id);
+            return;
+        }
+
+        try {
+            $total     = BookingSchedule::totalStock($conn, $item);
+            $occupied  = BookingSchedule::occupancy($conn, $item, $startTs, $endTs, $request_id);
+            $free      = $total - $occupied;
+            $immediate = ($mode === 'today')
+                && strtotime($startTs) <= time() + BookingSchedule::IMMEDIATE_GRACE_MIN * 60;
+
+            if ($mode === 'today' && $shelf < 1) {
+                self::writeDecision(
+                    $conn,
+                    $request_id,
+                    'Declined',
+                    self::RULE_OUT_OF_STOCK,
+                    'Out right now – book it for a later date instead.'
+                );
+                $conn->commit();
+                return;
+            }
+
+            if ($free < $qty) {
+                $why = $free <= 0
+                    ? 'Already fully booked for the requested schedule.'
+                    : 'Only ' . $free . ' unit(s) are free for the requested schedule (' . $qty . ' requested).';
+                self::writeDecision($conn, $request_id, 'Declined', self::RULE_SCHEDULE_CONFLICT, $why);
+                $conn->commit();
+                return;
+            }
+
+            self::writeDecision(
+                $conn,
+                $request_id,
+                'Approved',
+                self::RULE_1_FIFO,
+                'Approved: the equipment is free for the requested schedule.'
+            );
+
+            if ($immediate) {
+                $dec = $conn->prepare('UPDATE tbl_inventory SET quantity = quantity - ? WHERE item_name = ? AND quantity >= ?');
+                if ($dec === false) {
+                    throw new \RuntimeException('prepare inventory decrement failed');
+                }
+                $dec->bind_param('isi', $qty, $item, $qty);
+                $dec->execute();
+                $dec->close();
+
+                $mark = $conn->prepare('UPDATE tbl_requests SET stock_applied = 1 WHERE id = ?');
+                if ($mark) {
+                    $mark->bind_param('i', $request_id);
+                    $mark->execute();
+                    $mark->close();
+                }
+            }
+
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
+    }
+
+    /**
      * Decline all remaining Waiting requests for $equipment_name with $reason.
      *
      * Called after an approval causes stock to reach 0.
@@ -915,13 +1012,18 @@ class ArbitrationEngine
     ): void {
         // Step 1: Fetch all Waiting request IDs for this equipment.
         // Join tbl_users so writeDecision() can pull borrower info from the log.
+        // Scheduled (Today / Later) bookings are decided on their own schedule and
+        // must never be swept up by a shelf count that reaches 0.
+        $only_legacy = BookingSchedule::ensureSchema($conn)
+            ? " AND (tbl_requests.booking_mode IS NULL OR tbl_requests.booking_mode = '')"
+            : '';
         $stmt = $conn->prepare(
             "SELECT tbl_requests.id
                FROM tbl_requests
                LEFT JOIN tbl_users
                       ON tbl_requests.faculty_id = tbl_users.faculty_id
               WHERE tbl_requests.equipment_name = ?
-                AND tbl_requests.status = 'Waiting'"
+                AND tbl_requests.status = 'Waiting'" . $only_legacy
         );
 
         if ($stmt === false) {

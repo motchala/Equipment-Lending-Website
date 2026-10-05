@@ -76,6 +76,8 @@ function actEquipIcon(string $name): string
 }
 
 require_once __DIR__ . '/equipment-booking/core/arbitration-engine.php';
+require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
 
 function maskEmail($email)
 {
@@ -86,13 +88,21 @@ function maskEmail($email)
     return $visible . '***@' . htmlspecialchars($parts[1]);
 }
 
+/** Borrow form validation failed: back to the dashboard with a readable message. */
+function bm_fail(string $msg): void
+{
+    header('Location: faculty-dashboard.php?borrow_error=' . rawurlencode($msg));
+    exit();
+}
+
 // ── Auto-decline expired & mark overdue ───────────────────────────────────
 $today = date('Y-m-d');
 $reason_expired = "Request expired – borrow date has already passed";
 $stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
 $stmt_expired->bind_param("ss", $reason_expired, $today);
 $stmt_expired->execute();
-mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
+// Overdue marking is time-aware now (hourly bookings) and Later bookings take their stock when they start
+BookingSchedule::tick($conn);
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($_POST['submitted_as'])) {
@@ -128,14 +138,46 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $faculty_name = $adv_user['fullname'];
         $faculty_id   = $adv_user['faculty_id'];
 
-        // Collect and validate shared fields
-        $borrow_date  = trim($_POST['borrow_date'] ?? '');
-        $return_date  = trim($_POST['return_date'] ?? '');
-        $room         = trim($_POST['room'] ?? '');
-        $instructor   = $faculty_name; // auto-filled from account name
-        $current_date = date('Y-m-d');
-        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
-        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+        // Where + when + which items. Everything is validated BEFORE anything is saved
+        // (including the optional letter), so one bad item never leaves a half-filed batch.
+        $instructor = $faculty_name; // auto-filled from account name
+        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
+        if (!$room_row) bm_fail('Please choose a room from the list.');
+        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
+        $room    = BookingSchedule::roomLabel($room_row);
+        $room_id = (int)$room_row['room_id'];
+
+        $raw_items = $_POST['items'] ?? [];
+        if (!is_array($raw_items) || empty($raw_items)) bm_fail('Please select at least one item.');
+        $qty_post = (isset($_POST['qty']) && is_array($_POST['qty'])) ? $_POST['qty'] : [];
+        $plan = [];
+        $seen = [];
+        foreach ($raw_items as $raw) {
+            $name = trim((string)$raw);
+            if ($name === '' || isset($seen[$name])) continue;
+            $seen[$name] = true;
+            $chk = BookingSchedule::parse($conn, $_POST, true, $name, max(1, (int)($qty_post[$name] ?? 1)));
+            if (!$chk['ok']) bm_fail($name . ': ' . $chk['error']);
+            $bk = $chk['data'];
+            if (BookingSchedule::freeUnits($conn, $name, $bk['start_ts'], $bk['end_ts']) < $bk['qty']) {
+                $next = $bk['mode'] === 'future'
+                    ? BookingSchedule::earliestFreeDate(
+                        $conn,
+                        $name,
+                        $bk['qty'],
+                        substr($bk['borrow_time'], 0, 5),
+                        (int)($_POST['duration'] ?? 1),
+                        date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                    )
+                    : null;
+                bm_fail('"' . $name . '" is already booked for that schedule.'
+                    . ($next ? ' The next free start is ' . date('D, M j', strtotime($next)) . '.' : ''));
+            }
+            $plan[] = ['name' => $name, 'qty' => $bk['qty'], 'bk' => $bk];
+        }
+        if (empty($plan)) bm_fail('Please select at least one item.');
+        $borrow_date = $plan[0]['bk']['borrow_date'];
+        $return_date = $plan[0]['bk']['return_date'];
 
         // The request letter is OPTIONAL for organization requests. If one is attached it is
         // validated and stored; without one the request is filed with no document (it just
@@ -167,9 +209,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $rel_path = 'uploads/request_letters/' . $dest_name;
         }
 
-        // Collect items array (Requirement 4.4, 5.1)
-        $items = $_POST['items'] ?? [];
-        if (empty($items)) die("Error: At least one item must be selected.");
+        // Items were validated above ($plan)
+        $items = array_column($plan, 'name');
 
         // Generate batch UUID (Requirement 4.5)
         $batch_id = sprintf(
@@ -185,19 +226,20 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         );
 
         // Loop: one INSERT per selected item (Requirement 4.5, 3.3)
-        foreach ($items as $item) {
-            $item_name = trim($item);
-            if ($item_name === '') continue;
+        foreach ($plan as $pl) {
+            $item_name = $pl['name'];
+            $bk        = $pl['bk'];
 
             $stmt_ins = $conn->prepare(
                 "INSERT INTO tbl_requests
                  (faculty_name, faculty_id, equipment_name, instructor, room,
-                  borrow_date, return_date, status, request_date,
+                  borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
+                  booking_mode, stock_applied, status, request_date,
                   submitted_as, batch_id, document_path)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'adviser', ?, ?)"
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'adviser', ?, ?)"
             );
             $stmt_ins->bind_param(
-                'sssssssss',
+                'sssssssssiisss',
                 $faculty_name,
                 $faculty_id,
                 $item_name,
@@ -205,6 +247,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
                 $room,
                 $borrow_date,
                 $return_date,
+                $bk['borrow_time'],
+                $bk['return_time'],
+                $bk['qty'],
+                $room_id,
+                $bk['mode'],
                 $batch_id,
                 $rel_path
             );
@@ -253,14 +300,42 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $faculty_name   = $user['fullname'];
         $faculty_id     = $user['faculty_id'];
 
-        $borrow_date    = trim($_POST['borrow_date'] ?? '');
-        $return_date    = trim($_POST['return_date'] ?? '');
         $equipment_name = trim($_POST['equipment_name'] ?? '');
-        $room           = trim($_POST['room'] ?? '');
         $instructor     = $faculty_name; // auto-filled from account name
-        $current_date   = date('Y-m-d');
-        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
-        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+
+        // Where (live room record, same tables as Facilities) and when (Today / Later rules).
+        // Limits follow the account's role, read from the DB, never from the form.
+        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
+        if (!$room_row) bm_fail('Please choose a room from the list.');
+        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
+        $room    = BookingSchedule::roomLabel($room_row);
+        $room_id = (int)$room_row['room_id'];
+
+        $chk = BookingSchedule::parse(
+            $conn,
+            $_POST,
+            BookingSchedule::isAdviserRole((string)($user['role'] ?? '')),
+            $equipment_name,
+            max(1, (int)($_POST['qty'] ?? 1))
+        );
+        if (!$chk['ok']) bm_fail($chk['error']);
+        $bk = $chk['data'];
+        if (BookingSchedule::freeUnits($conn, $equipment_name, $bk['start_ts'], $bk['end_ts']) < $bk['qty']) {
+            $next = $bk['mode'] === 'future'
+                ? BookingSchedule::earliestFreeDate(
+                    $conn,
+                    $equipment_name,
+                    $bk['qty'],
+                    substr($bk['borrow_time'], 0, 5),
+                    (int)($_POST['duration'] ?? 1),
+                    date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                )
+                : null;
+            bm_fail('"' . $equipment_name . '" is already booked for that schedule.'
+                . ($next ? ' The next free start is ' . date('D, M j', strtotime($next)) . '.' : ''));
+        }
+        $borrow_date = $bk['borrow_date'];
+        $return_date = $bk['return_date'];
 
         // ── Document upload validation ─────────────────────────────────────────
         $document_path = null;
@@ -285,18 +360,24 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $stmt_ins_p = $conn->prepare(
             "INSERT INTO tbl_requests
              (faculty_name, faculty_id, equipment_name, instructor, room,
-              borrow_date, return_date, status, request_date, submitted_as)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'personal')"
+              borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
+              booking_mode, stock_applied, status, request_date, submitted_as)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal')"
         );
         $stmt_ins_p->bind_param(
-            'sssssss',
+            'sssssssssiis',
             $faculty_name,
             $faculty_id,
             $equipment_name,
             $instructor,
             $room,
             $borrow_date,
-            $return_date
+            $return_date,
+            $bk['borrow_time'],
+            $bk['return_time'],
+            $bk['qty'],
+            $room_id,
+            $bk['mode']
         );
         if ($stmt_ins_p->execute()) {
             $new_request_id = $conn->insert_id;
@@ -468,12 +549,41 @@ $fid_label = faculty_id_display((string)$_SESSION['faculty_id'], 'Not set');
 $avail_items = [];
 if ($is_dual_mode) {
     $avail_result = $conn->query(
-        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE quantity >= 1 AND is_archived = 0 ORDER BY category, item_name"
+        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE is_archived = 0 ORDER BY category, item_name"
     );
     if ($avail_result) {
         while ($av_row = $avail_result->fetch_assoc()) $avail_items[] = $av_row;
     }
 }
+
+// ── Borrow Request modal data ─────────────────────────────────────────────
+$bk_rooms  = BookingSchedule::roomsTree($conn);
+$bk_totals = BookingSchedule::totalStockMap($conn);
+$bk_items  = [];
+$bk_res    = $conn->query("SELECT item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
+while ($bk_res && ($bk_row = $bk_res->fetch_assoc())) {
+    $bk_items[$bk_row['item_name']] = [
+        'shelf' => (int)$bk_row['quantity'],
+        'total' => (int)($bk_totals[$bk_row['item_name']] ?? $bk_row['quantity']),
+    ];
+}
+$bk_meta_json = json_encode([
+    'items'   => $bk_items,
+    'adviser' => (bool)$is_org_adviser,
+    'today'   => date('Y-m-d'),
+    'nowMin'  => (int)date('G') * 60 + (int)date('i'),
+    'rules'   => [
+        'dayStart'   => BookingSchedule::DAY_START,
+        'dayEnd'     => BookingSchedule::DAY_END,
+        'slot'       => BookingSchedule::SLOT_MINUTES,
+        'maxAhead'   => BookingSchedule::MAX_ADVANCE_DAYS,
+        'todayHours' => BookingSchedule::TODAY_HOURS,
+        'adviserMaxHours' => BookingSchedule::ADVISER_MAX_HOURS,
+        'futureDays' => BookingSchedule::FUTURE_DAYS,
+        'adviserFutureDays' => BookingSchedule::ADVISER_FUTURE_DAYS,
+        'graceMin'   => BookingSchedule::IMMEDIATE_GRACE_MIN,
+    ],
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);
 
 $masked_email       = maskEmail($db_email);
 $masked_backup      = maskEmail($db_backup_email);
@@ -1692,6 +1802,17 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 </div>
             <?php endif; ?>
 
+            <!-- Borrow request could not be filed -->
+            <?php if (!empty($_GET['borrow_error'])): ?>
+                <div class="alert-banner alert-error" id="borrow-error-alert" role="alert">
+                    <span class="material-symbols-outlined">error</span>
+                    <span><strong>Could not submit your request.</strong> <?php echo htmlspecialchars(mb_substr((string)$_GET['borrow_error'], 0, 300)); ?></span>
+                    <button class="alert-close" data-action="dismiss-alert" data-target="borrow-error-alert" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
             <!-- Overdue Toast — bottom-center overlay, doesn't affect layout.
                  Shown once per login session (server-gated below); auto-
                  dismisses after 8s via JS (see checkOverdueState/showOverdueToast). -->
@@ -1932,7 +2053,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
                                 </div>
                                 <div class="active-card-footer">
-                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?></span>
+                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?><?php echo !empty($ai['return_time']) ? ' &middot; ' . BookingSchedule::fmtTime($ai['return_time']) : ''; ?></span>
                                     <div class="active-card-progress">
                                         <div class="active-card-progress-fill" style="width:<?php echo $progress; ?>%;<?php echo $isOverdue ? 'background:#dc2626;' : ''; ?>"></div>
                                     </div>
@@ -2181,10 +2302,16 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     Overdue Block
                                                 </button>
                                             <?php else: ?>
-                                                <button class="btn-borrow" <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
+                                                <?php
+                                                $eq_shelf = (int)$item['quantity'];
+                                                $eq_total = (int)(($bk_items[$item['item_name']]['total'] ?? $eq_shelf));
+                                                $eq_ahead = ($eq_shelf <= 0 && $eq_total > 0);   // out now, but it exists: can be booked for later
+                                                ?>
+                                                <button class="btn-borrow<?php echo $eq_ahead ? ' btn-borrow-ahead' : ''; ?>"
+                                                    <?php if ($eq_shelf <= 0 && !$eq_ahead) echo 'disabled'; ?>
                                                     data-action="open-borrow-form"
                                                     data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                    <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
+                                                    <?php echo ($eq_shelf > 0) ? 'Borrow' : ($eq_ahead ? 'Book ahead' : 'Unavailable'); ?>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -2644,7 +2771,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     </div>
                                                     <p class="fact-item-meta">
                                                         <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
-                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?> – <?php echo date('M j', strtotime($r['return_date'])); ?>
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
                                                     </p>
                                                     <div class="fact-bar" aria-hidden="true"><i class="<?php echo $isOverdue ? 'is-overdue' : ''; ?>" style="width:<?php echo (int) $prog['pct']; ?>%"></i></div>
                                                 </div>
@@ -2705,7 +2832,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     </div>
                                                     <p class="fact-item-meta">
                                                         <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
-                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?> – <?php echo date('M j, Y', strtotime($r['return_date'])); ?>
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j, Y', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
                                                     </p>
                                                     <p class="fact-item-sub"><span><?php echo $awayStr; ?></span></p>
                                                 </div>
@@ -3748,23 +3875,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <?= csrf_field() ?>
                         <input type="hidden" name="equipment_name" id="selectedItem">
                         <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
-                        <div class="form-group">
-                            <label class="form-label" for="borrow_room">Room / Laboratory</label>
-                            <input type="text" name="room" id="borrow_room" class="form-input" placeholder="e.g. Lab 301" required>
-                            <p class="bm-hint">Where the equipment will be used.</p>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label" for="borrow_date">Borrow Date</label>
-                                <input type="date" name="borrow_date" id="borrow_date" class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" for="return_date">Return Date</label>
-                                <input type="date" name="return_date" id="return_date" class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>" required>
-                            </div>
-                        </div>
+                        <?= BookingSchedule::renderRoomSelect('borrow_room', $bk_rooms) ?>
+                        <?= BookingSchedule::renderSchedule('bm1', false) ?>
                         <?php if ($is_org_adviser): ?>
                             <div class="form-group">
                                 <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
@@ -3846,23 +3958,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <input type="hidden" name="equipment_name" id="selectedItem">
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <input type="hidden" name="submitted_as" value="personal">
-                            <div class="form-group">
-                                <label class="form-label" for="borrow_room">Room / Laboratory</label>
-                                <input type="text" name="room" id="borrow_room" class="form-input" placeholder="e.g. Lab 301" required>
-                                <p class="bm-hint">Where the equipment will be used.</p>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label class="form-label" for="borrow_date">Borrow Date</label>
-                                    <input type="date" name="borrow_date" id="borrow_date" class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="return_date">Return Date</label>
-                                    <input type="date" name="return_date" id="return_date" class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>" required>
-                                </div>
-                            </div>
+                            <?= BookingSchedule::renderRoomSelect('bm2Room', $bk_rooms) ?>
+                            <?= BookingSchedule::renderSchedule('bm2', false) ?>
                             <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
                             <div class="bm-actions">
                                 <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
@@ -3887,7 +3984,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 </p>
                                 <div class="adv-checklist-wrap" role="group" aria-label="Available equipment">
                                     <?php if (empty($avail_items)): ?>
-                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;padding:8px;">No available items at this time.</p>
+                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;padding:8px;">No equipment has been set up yet.</p>
                                         <?php else:
                                         $current_category = null;
                                         foreach ($avail_items as $av_item):
@@ -3895,16 +3992,25 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 $current_category = $av_item['category'];
                                         ?>
                                                 <div class="adv-checklist-category"><?= htmlspecialchars($current_category) ?></div>
-                                            <?php endif; ?>
-                                            <label class="adv-checklist-item">
+                                            <?php endif;
+                                            $av_meta = $bk_items[$av_item['item_name']] ?? ['shelf' => (int)$av_item['quantity'], 'total' => (int)$av_item['quantity']];
+                                            ?>
+                                            <label class="adv-checklist-item" data-bm-item="<?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>"
+                                                data-shelf="<?= (int)$av_meta['shelf'] ?>" data-total="<?= (int)$av_meta['total'] ?>">
                                                 <input type="checkbox"
                                                     name="items[]"
                                                     value="<?= htmlspecialchars($av_item['item_name']) ?>"
                                                     data-category="<?= htmlspecialchars($av_item['category']) ?>">
-                                                <?= htmlspecialchars($av_item['item_name']) ?>
-                                                <span class="adv-checklist-qty">
-                                                    (<?= (int)$av_item['quantity'] ?> available)
+                                                <span class="adv-checklist-name"><?= htmlspecialchars($av_item['item_name']) ?></span>
+                                                <span class="adv-checklist-qty" data-bm-stock>
+                                                    <?= (int)$av_meta['shelf'] > 0 ? '(' . (int)$av_meta['shelf'] . ' available)' : '(out now)' ?>
                                                 </span>
+                                                <span class="bm-mini-stepper" data-bm-item-qty hidden>
+                                                    <button type="button" data-bm-iq-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
+                                                    <input type="number" name="qty[<?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>]" value="1" min="1" max="<?= max(1, (int)$av_meta['total']) ?>" inputmode="numeric" disabled aria-label="Quantity for <?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>">
+                                                    <button type="button" data-bm-iq-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
+                                                </span>
+                                                <span class="bm-item-status" data-bm-item-status></span>
                                             </label>
                                     <?php endforeach;
                                     endif; ?>
@@ -3912,23 +4018,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </div>
 
                             <!-- Shared fields -->
-                            <div class="form-group">
-                                <label class="form-label" for="adv_room">Room / Laboratory</label>
-                                <input type="text" name="room" id="adv_room" class="form-input" placeholder="e.g. Lab 301" required>
-                                <p class="bm-hint">Where the equipment will be used.</p>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label class="form-label" for="adv_borrow_date">Borrow Date</label>
-                                    <input type="date" name="borrow_date" id="adv_borrow_date" class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label" for="adv_return_date">Return Date</label>
-                                    <input type="date" name="return_date" id="adv_return_date" class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>" required>
-                                </div>
-                            </div>
+                            <?= BookingSchedule::renderRoomSelect('adv_room', $bk_rooms) ?>
+                            <?= BookingSchedule::renderSchedule('bm3', true) ?>
 
                             <!-- Document upload — optional -->
                             <div class="form-group">
@@ -4026,6 +4117,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     if (returnInp) returnInp.value = '';
                     if (fileInp) fileInp.value = '';
                     if (window.syncBorrowDrops) window.syncBorrowDrops();
+                    if (window.BorrowSchedule) window.BorrowSchedule.resetAll();
                     if (advValidationMsg) advValidationMsg.style.display = 'none';
                 }
 
@@ -4280,6 +4372,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
     <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+        window.BOOKING_META = <?php echo $bk_meta_json; ?>;
         window.FNOTIF_DATA = <?php echo $notif_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;

@@ -22,11 +22,17 @@ foreach ($notifications as $n) {
 // ── CONFIRM RETURN ─────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
     $req_id = intval($_GET['id']);
-    $res = $conn->query("SELECT equipment_name FROM tbl_requests WHERE id = $req_id LIMIT 1");
+    require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+    BookingSchedule::ensureSchema($conn);
+    $res = $conn->query("SELECT equipment_name, borrow_qty, stock_applied FROM tbl_requests WHERE id = $req_id LIMIT 1");
     if ($res && $row_rc = $res->fetch_assoc()) {
         $conn->query("UPDATE tbl_requests SET status = 'Returned', return_token = NULL, returned_at = NOW() WHERE id = $req_id");
         $eq = $conn->real_escape_string($row_rc['equipment_name']);
-        $conn->query("UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name = '$eq'");
+        // only units that actually left the shelf come back (see BookingSchedule)
+        $ret_qty = ((int)($row_rc['stock_applied'] ?? 1) === 1) ? max(1, (int)($row_rc['borrow_qty'] ?? 1)) : 0;
+        if ($ret_qty > 0) {
+            $conn->query("UPDATE tbl_inventory SET quantity = quantity + $ret_qty WHERE item_name = '$eq'");
+        }
     }
     header("Location: admin-dashboard.php?view=return-confirmation");
     exit();

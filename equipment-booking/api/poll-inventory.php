@@ -12,8 +12,16 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
-$result = $conn->query("SELECT item_id, quantity FROM tbl_inventory WHERE is_archived = 0");
+require_once __DIR__ . '/../core/booking-schedule.php';
+// Keeps Overdue marking and "booking has started" stock hand-over current while anyone is online.
+BookingSchedule::tick($conn);
+$totals = BookingSchedule::totalStockMap($conn);
+
+$result = $conn->query("SELECT item_id, item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
 $items = [];
-while ($row = $result->fetch_assoc()) $items[] = $row;
+while ($row = $result->fetch_assoc()) {
+    $row['total'] = $totals[$row['item_name']] ?? (int)$row['quantity'];
+    $items[] = $row;
+}
 
 echo json_encode($items);

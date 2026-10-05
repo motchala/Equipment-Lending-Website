@@ -481,6 +481,297 @@
     }
 
     /* ── Borrow Form ───────────────────────────────────────────────────── */
+    /* ================================================================
+       BORROW SCHEDULE  (Borrow Request modal: when / how long / how many)
+       ----------------------------------------------------------------
+       Today  : start time + 1 / 2 / 3 / 5 hours (advisers: custom hours)
+       Later  : date (tomorrow … 3 weeks ahead) + start time + 1 / 2 / 3 days
+                (advisers: also 5) + quantity (up to the item's TOTAL stock)
+       Items that are out right now can still be booked for a later date.
+       The server re-checks every rule; this is the friendly front end.
+    ================================================================ */
+    const BorrowSchedule = (function () {
+        const loadedAt = Date.now();
+        const pad = n => String(n).padStart(2, '0');
+        const meta = () => window.BOOKING_META || { items: {}, rules: {}, adviser: false, today: todayStr, nowMin: 0 };
+        const rules = () => Object.assign({
+            dayStart: '07:00', dayEnd: '21:00', slot: 30, maxAhead: 21, todayHours: [1, 2, 3, 5],
+            adviserMaxHours: 12, futureDays: [1, 2, 3], adviserFutureDays: [1, 2, 3, 5], graceMin: 15
+        }, meta().rules || {});
+        const toMin = hhmm => { const p = String(hhmm).split(':'); return (+p[0]) * 60 + (+p[1]); };
+        const hhmm = min => pad(Math.floor(min / 60)) + ':' + pad(min % 60);
+        const nowMin = () => Math.floor((meta().nowMin || 0) + (Date.now() - loadedAt) / 60000);
+        const parseYmd = s => { const p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
+        const fmtYmd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+        const addDays = (d, n) => { const x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; };
+        const fmtClock = min => { const h = Math.floor(min / 60) % 24, m = min % 60; return ((h % 12) || 12) + ':' + pad(m) + ' ' + (h < 12 ? 'AM' : 'PM'); };
+        const fmtDay = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const itemMeta = name => (meta().items || {})[name] || null;
+        const q = (root, sel) => root.querySelector(sel);
+
+        function setup(root) {
+            const st = {
+                root: root, mode: 'today', length: null, custom: false, item: null, timer: null, ok: null, forcedOff: false,
+                multi: root.dataset.bmMulti === '1', adviser: !!meta().adviser,
+                form: root.closest('form'),
+                els: {
+                    modeInput: q(root, '[data-bm-mode-input]'), durInput: q(root, '[data-bm-duration-input]'),
+                    modeBtns: root.querySelectorAll('[data-bm-mode]'), outRow: q(root, '[data-bm-outnow]'),
+                    outToggle: q(root, '[data-bm-outnow-toggle]'), fields: q(root, '[data-bm-fields]'),
+                    date: q(root, '[data-bm-date]'), dateHint: q(root, '[data-bm-date-hint]'),
+                    time: q(root, '[data-bm-time]'), chips: q(root, '[data-bm-chips]'), lengthLabel: q(root, '[data-bm-length-label]'),
+                    custom: q(root, '[data-bm-custom]'), customInput: q(root, '[data-bm-custom-input]'),
+                    qty: q(root, '[data-bm-qty]'), qtyHint: q(root, '[data-bm-qty-hint]'),
+                    summary: q(root, '[data-bm-summary]'), avail: q(root, '[data-bm-avail]'),
+                    futureOnly: root.querySelectorAll('[data-bm-future-only]')
+                }
+            };
+            root._bm = st;
+
+            st.els.modeBtns.forEach(b => b.addEventListener('click', () => { if (!b.disabled) setMode(st, b.dataset.bmMode); }));
+            st.els.time.addEventListener('change', () => { buildChips(st); refresh(st); });
+            if (st.els.date) st.els.date.addEventListener('change', () => refresh(st));
+            st.els.chips.addEventListener('click', e => {
+                const c = e.target.closest('[data-len]'); if (!c || c.disabled) return;
+                if (c.dataset.len === 'custom') { st.custom = true; st.length = parseInt(st.els.customInput.value, 10) || null; if (!st.length) { st.els.customInput.value = Math.min(6, maxCustomHours(st)); st.length = parseInt(st.els.customInput.value, 10); } }
+                else { st.custom = false; st.length = parseInt(c.dataset.len, 10); }
+                buildChips(st); refresh(st);
+            });
+            if (st.els.customInput) st.els.customInput.addEventListener('input', () => { st.length = parseInt(st.els.customInput.value, 10) || null; refresh(st); });
+            if (st.els.qty) {
+                root.querySelector('[data-bm-qty-dec]').addEventListener('click', () => stepQty(st, -1));
+                root.querySelector('[data-bm-qty-inc]').addEventListener('click', () => stepQty(st, 1));
+                st.els.qty.addEventListener('input', () => { clampQty(st); refresh(st); });
+            }
+            if (st.els.outToggle) st.els.outToggle.addEventListener('change', () => {
+                st.forcedOff = !st.els.outToggle.checked;
+                st.els.fields.classList.toggle('is-off', st.forcedOff);
+                st.els.fields.querySelectorAll('input,select,button').forEach(x => { if (x !== st.els.outToggle) x.disabled = st.forcedOff && !x.closest('[data-bm-chips]') ? true : x.disabled; });
+                if (!st.forcedOff) { setMode(st, 'future'); }
+                refresh(st);
+            });
+            if (st.multi && st.form) {
+                st.form.addEventListener('change', e => {
+                    if (e.target.matches('input[name="items[]"]')) { syncRows(st); refresh(st); }
+                });
+                st.form.addEventListener('click', e => {
+                    const dec = e.target.closest('[data-bm-iq-dec]'), inc = e.target.closest('[data-bm-iq-inc]');
+                    if (!dec && !inc) return;
+                    e.preventDefault();
+                    const inp = (dec || inc).closest('[data-bm-item-qty]').querySelector('input');
+                    inp.value = Math.max(+inp.min || 1, Math.min(+inp.max || 1, (parseInt(inp.value, 10) || 1) + (inc ? 1 : -1)));
+                    refresh(st);
+                });
+                st.form.addEventListener('input', e => {
+                    if (e.target.closest('[data-bm-item-qty]')) { const i = e.target; i.value = Math.max(+i.min || 1, Math.min(+i.max || 1, parseInt(i.value, 10) || 1)); refresh(st); }
+                });
+            }
+            if (st.form) st.form.addEventListener('submit', e => {
+                const err = validate(st);
+                if (err) { e.preventDefault(); e.stopImmediatePropagation(); showError(st, err); }
+            }, true);
+            reset(st);
+        }
+
+        /* ---- item + state helpers ------------------------------------ */
+        function singleItem(st) { return st.item; }
+        function selectedItems(st) {
+            if (!st.multi) return st.item ? [{ name: st.item, qty: currentQty(st) }] : [];
+            return Array.from(st.form.querySelectorAll('input[name="items[]"]:checked')).map(cb => {
+                const row = cb.closest('[data-bm-item]'); const qi = row && row.querySelector('[data-bm-item-qty] input');
+                return { name: cb.value, qty: st.mode === 'future' && qi ? (parseInt(qi.value, 10) || 1) : 1 };
+            });
+        }
+        function currentQty(st) { return st.mode === 'future' && st.els.qty ? (parseInt(st.els.qty.value, 10) || 1) : 1; }
+        function maxCustomHours(st) {
+            const start = toMin(st.els.time.value || rules().dayStart);
+            return Math.max(1, Math.min(rules().adviserMaxHours, Math.floor((toMin(rules().dayEnd) - start) / 60)));
+        }
+
+        /* ---- mode ----------------------------------------------------- */
+        function setMode(st, mode) {
+            st.mode = mode; st.length = null; st.custom = false; st.ok = null;
+            st.els.modeInput.value = mode;
+            st.els.modeBtns.forEach(b => { const on = b.dataset.bmMode === mode; b.classList.toggle('active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+            st.els.futureOnly.forEach(el => { el.hidden = mode !== 'future'; });
+            const r = rules(), today = parseYmd(meta().today || todayStr);
+            if (st.els.date) {
+                st.els.date.min = fmtYmd(addDays(today, 1));
+                st.els.date.max = fmtYmd(addDays(today, r.maxAhead));
+                st.els.date.required = mode === 'future';
+                if (mode === 'today') st.els.date.value = '';
+                if (st.els.dateHint) st.els.dateHint.textContent = 'Tomorrow up to ' + Math.round(r.maxAhead / 7) + ' weeks ahead (latest ' + fmtDay(addDays(today, r.maxAhead)) + ').';
+            }
+            st.els.lengthLabel.textContent = mode === 'today' ? 'For how long?' : 'For how many days?';
+            buildTimes(st); buildChips(st);
+            if (st.multi) syncRows(st);
+            if (st.els.qty) clampQty(st, true);
+            refresh(st);
+        }
+
+        function buildTimes(st) {
+            const r = rules(), sel = st.els.time, prev = sel.value;
+            let start = toMin(r.dayStart); const end = toMin(r.dayEnd), step = +r.slot || 30;
+            const opts = [];
+            if (st.mode === 'today') {
+                const now = nowMin();
+                if (now >= start && now < end - 30) opts.push({ v: hhmm(now), t: 'Now (' + fmtClock(now) + ')' });
+                start = Math.max(start, Math.ceil((now + 1) / step) * step);
+            }
+            for (let m = start; m < end; m += step) opts.push({ v: hhmm(m), t: fmtClock(m) });
+            sel.innerHTML = '';
+            if (!opts.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'No start times left today'; o.disabled = true; o.selected = true; sel.appendChild(o); return; }
+            opts.forEach(o => { const e = document.createElement('option'); e.value = o.v; e.textContent = o.t; sel.appendChild(e); });
+            const keep = opts.find(o => o.v === prev);
+            sel.value = keep ? keep.v : (st.mode === 'future' ? (opts.find(o => o.v === '09:00') || opts[0]).v : opts[0].v);
+        }
+
+        function buildChips(st) {
+            const r = rules(), box = st.els.chips; box.innerHTML = '';
+            const startMin = st.els.time.value ? toMin(st.els.time.value) : toMin(r.dayStart);
+            const list = st.mode === 'today' ? r.todayHours : (st.adviser ? r.adviserFutureDays : r.futureDays);
+            list.forEach(n => {
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip'; b.dataset.len = n;
+                b.textContent = st.mode === 'today' ? n + (n === 1 ? ' hr' : ' hrs') : n + (n === 1 ? ' day' : ' days');
+                const tooLong = st.mode === 'today' && (startMin + n * 60 > toMin(r.dayEnd));
+                b.disabled = tooLong; if (tooLong && st.length === n && !st.custom) st.length = null;
+                const on = !st.custom && st.length === n;
+                b.classList.toggle('active', on); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', on ? 'true' : 'false');
+                box.appendChild(b);
+            });
+            if (st.mode === 'today' && st.adviser) {
+                const b = document.createElement('button'); b.type = 'button'; b.className = 'bm-chip bm-chip-custom'; b.dataset.len = 'custom'; b.textContent = 'Custom';
+                b.classList.toggle('active', st.custom); b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', st.custom ? 'true' : 'false');
+                box.appendChild(b);
+            }
+            st.els.custom.hidden = !(st.custom && st.mode === 'today');
+            if (st.custom) { st.els.customInput.max = maxCustomHours(st); if (st.length > maxCustomHours(st)) { st.length = maxCustomHours(st); st.els.customInput.value = st.length; } }
+        }
+
+        /* ---- quantity (Later bookings) -------------------------------- */
+        function itemTotal(st) { const m = itemMeta(st.item); return m ? Math.max(0, m.total) : 0; }
+        function clampQty(st, silent) {
+            if (!st.els.qty) return;
+            const max = Math.max(1, itemTotal(st));
+            st.els.qty.max = max; if (!st.els.qty.value || +st.els.qty.value < 1) st.els.qty.value = 1;
+            if (+st.els.qty.value > max) st.els.qty.value = max;
+            if (st.els.qtyHint) st.els.qtyHint.textContent = st.item ? 'Up to ' + itemTotal(st) + ' in stock — counted from total stock, not what is on the shelf today.' : '';
+            const wrap = st.root.querySelector('[data-bm-qty-wrap]');
+            if (wrap) { wrap.querySelector('[data-bm-qty-dec]').disabled = +st.els.qty.value <= 1; wrap.querySelector('[data-bm-qty-inc]').disabled = +st.els.qty.value >= max; }
+        }
+        function stepQty(st, d) { st.els.qty.value = (parseInt(st.els.qty.value, 10) || 1) + d; clampQty(st); refresh(st); }
+
+        /* ---- adviser checklist rows ----------------------------------- */
+        function syncRows(st) {
+            st.form.querySelectorAll('[data-bm-item]').forEach(row => {
+                const cb = row.querySelector('input[name="items[]"]'), shelf = +row.dataset.shelf, total = +row.dataset.total;
+                const blocked = (st.mode === 'today' && shelf < 1) || total < 1;
+                if (blocked && cb.checked) cb.checked = false;
+                cb.disabled = blocked; row.classList.toggle('is-out', blocked);
+                const stat = row.querySelector('[data-bm-stock]');
+                if (stat) stat.textContent = total < 1 ? '(no stock)' : (blocked ? '(out now – use Later date)' : (shelf > 0 ? '(' + shelf + ' available)' : '(out now)'));
+                const qw = row.querySelector('[data-bm-item-qty]'), qi = qw && qw.querySelector('input');
+                const show = cb.checked && st.mode === 'future';
+                if (qw) { qw.hidden = !show; qi.disabled = !show; qi.max = Math.max(1, total); if (+qi.value > +qi.max) qi.value = qi.max; }
+            });
+        }
+
+        /* ---- summary + live availability ------------------------------ */
+        function windowOf(st) {
+            if (!st.length || !st.els.time.value) return null;
+            const startMin = toMin(st.els.time.value);
+            if (st.mode === 'today') {
+                const d = parseYmd(meta().today || todayStr);
+                return { start: d, startMin: startMin, endDate: d, endMin: startMin + st.length * 60 };
+            }
+            if (!st.els.date.value) return null;
+            const d = parseYmd(st.els.date.value);
+            return { start: d, startMin: startMin, endDate: addDays(d, st.length), endMin: startMin };
+        }
+        function refresh(st) {
+            const w = windowOf(st);
+            st.els.durInput.value = st.length || '';
+            if (st.els.qty) clampQty(st);
+            if (!w) { st.els.summary.textContent = ''; st.els.summary.classList.remove('has'); setAvail(st, '', ''); st.ok = null; return; }
+            const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
+            st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin)) + '</strong></span>';
+            st.els.summary.classList.add('has');
+            clearTimeout(st.timer); st.timer = setTimeout(() => check(st, w), 350);
+        }
+        function setAvail(st, msg, cls) { st.els.avail.textContent = msg; st.els.avail.className = 'bm-avail' + (cls ? ' ' + cls : ''); }
+
+        function check(st, w) {
+            const items = selectedItems(st); if (!items.length) { setAvail(st, '', ''); st.ok = null; return; }
+            if (st.mode === 'future' && !st.els.date.value) return;
+            const params = new URLSearchParams({ mode: st.mode, date: st.mode === 'future' ? st.els.date.value : '', time: st.els.time.value, duration: String(st.length), items: JSON.stringify(items.map(i => ({ n: i.name, q: i.qty }))) });
+            setAvail(st, 'Checking availability…', 'busy');
+            const token = st._tok = (st._tok || 0) + 1;
+            fetch('equipment-booking/api/check-booking-availability.php?' + params.toString(), { credentials: 'same-origin' })
+                .then(r => r.json()).then(j => {
+                    if (token !== st._tok) return;
+                    if (!j || j.ok !== true) { st.ok = false; setAvail(st, (j && j.error) || 'That schedule is not allowed.', 'bad'); return; }
+                    const bad = (j.results || []).filter(x => !x.ok);
+                    st.ok = bad.length === 0;
+                    if (st.multi) {
+                        (j.results || []).forEach(x => {
+                            const row = Array.from(st.form.querySelectorAll('[data-bm-item]')).find(r => r.dataset.bmItem === x.name);
+                            const s = row && row.querySelector('[data-bm-item-status]');
+                            if (s) { s.textContent = x.ok ? '✓' : '✗'; s.title = x.message; s.className = 'bm-item-status ' + (x.ok ? 'ok' : 'bad'); }
+                        });
+                        setAvail(st, st.ok ? 'All selected items are free for that schedule.' : bad.map(x => x.name + ': ' + x.message).join('  '), st.ok ? 'ok' : 'bad');
+                    } else {
+                        setAvail(st, (j.results[0] || {}).message || '', st.ok ? 'ok' : 'bad');
+                    }
+                }).catch(() => { st.ok = null; setAvail(st, '', ''); });
+        }
+
+        /* ---- validation + errors -------------------------------------- */
+        function validate(st) {
+            const items = selectedItems(st);
+            if (!items.length) return st.multi ? 'Please select at least one item.' : 'No equipment selected.';
+            if (st.forcedOff) return 'Turn on “Out right now” to book this item for a later date.';
+            if (st.mode === 'future') {
+                if (!st.els.date.value) return 'Please choose a borrow date.';
+                if (st.els.date.min && st.els.date.value < st.els.date.min) return 'Later bookings start tomorrow or after. Use “Today” for same-day use.';
+                if (st.els.date.max && st.els.date.value > st.els.date.max) return 'You can only book up to ' + Math.round(rules().maxAhead / 7) + ' weeks ahead.';
+            }
+            if (!st.els.time.value) return 'Please choose a start time.';
+            if (!st.length) return st.mode === 'today' ? 'Please choose how long you need it.' : 'Please choose how many days.';
+            if (st.custom && (st.length < 1 || st.length > maxCustomHours(st))) return 'Custom length must be between 1 and ' + maxCustomHours(st) + ' hours.';
+            if (st.ok === false) return st.els.avail.textContent || 'That schedule is not available.';
+            return null;
+        }
+        function showError(st, msg) { setAvail(st, msg, 'bad'); if (typeof showToast === 'function') showToast(msg, 'error'); st.els.avail.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+
+        /* ---- public --------------------------------------------------- */
+        function reset(st) {
+            st.length = null; st.custom = false; st.forcedOff = false; st.ok = null;
+            if (st.els.customInput) st.els.customInput.value = '';
+            if (st.els.qty) st.els.qty.value = 1;
+            if (st.els.outToggle) st.els.outToggle.checked = true;
+            st.els.fields.classList.remove('is-off');
+            st.els.fields.querySelectorAll('input,select,button').forEach(x => { x.disabled = false; });
+            if (st.els.date) st.els.date.value = '';
+            const allowToday = !st.item || (itemMeta(st.item) || {}).shelf > 0 || st.multi;
+            const outNow = !st.multi && st.item && !allowToday;
+            if (st.els.outRow) st.els.outRow.hidden = !outNow;
+            st.els.modeBtns.forEach(b => { if (b.dataset.bmMode === 'today') b.disabled = outNow; });
+            if (st.multi) { st.form.querySelectorAll('input[name="items[]"]').forEach(cb => { cb.checked = false; }); st.form.querySelectorAll('[data-bm-item-status]').forEach(s => { s.textContent = ''; s.className = 'bm-item-status'; }); }
+            setMode(st, outNow ? 'future' : 'today');
+            setAvail(st, '', '');
+        }
+
+        return {
+            init: function () { document.querySelectorAll('[data-bm-sched]').forEach(setup); },
+            open: function (itemName) {
+                document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (!st) return; if (!st.multi) st.item = itemName; reset(st); });
+            },
+            resetAll: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st) reset(st); }); },
+            setItemMeta: function () { document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (st && !st.multi) { clampQty(st); } }); }
+        };
+    })();
+    window.BorrowSchedule = BorrowSchedule;
+
     function openBorrowForm(itemName) {
         document.getElementById('selectedItem').value = itemName;
         document.getElementById('selectedItemLabel').textContent = itemName;
@@ -490,16 +781,14 @@
             // Reset the form fields each time the modal opens
             const form = document.getElementById('borrowForm');
             if (form) {
-                const roomInput = form.querySelector('input[name="room"]');
-                if (roomInput) roomInput.value = '';
-                const borrowInp = document.getElementById('borrow_date');
-                const returnInp = document.getElementById('return_date');
-                if (borrowInp) borrowInp.value = '';
-                if (returnInp) returnInp.value = '';
+                const roomSel = form.querySelector('select[name="room_id"]');
+                if (roomSel) roomSel.selectedIndex = 0;
                 const fileInp = document.getElementById('request_document');
                 if (fileInp) fileInp.value = '';
                 syncBorrowDrops();
             }
+            // when / how long / how many (also decides Today vs "Later date only" for items that are out)
+            BorrowSchedule.open(itemName);
         }
     }
 
@@ -1864,6 +2153,14 @@
     let _reqCurrentFilter = 'All';
     let _reqSortOrder = 'desc'; // desc = latest first
 
+    /* "13:30:00" -> " · 1:30 PM" (empty when the request has no time, e.g. older requests) */
+    function _whenTime(t) {
+        if (!t) return '';
+        const p = String(t).split(':'), h = +p[0], m = +p[1];
+        if (isNaN(h) || isNaN(m)) return '';
+        return ' &middot; ' + ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM');
+    }
+
     function _escHtml(str) {
         if (!str) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1927,7 +2224,7 @@
                         <td><strong>${_escHtml(r.equipment_name)}</strong></td>
                         <td>${_escHtml(r.instructor)}</td>
                         <td>${_escHtml(r.room)}</td>
-                        <td>${_escHtml(r.borrow_date)}</td>
+                        <td>${_escHtml(r.borrow_date)}${_whenTime(r.borrow_time)}</td>
                         <td>${_escHtml(r.return_date)}</td>
                         <td>${_statusPill(r.status)}</td>
                         <td>${noteCol}</td>
@@ -1989,32 +2286,14 @@
 
     /* ── Borrow Form Init ──────────────────────────────────────────────── */
     function initBorrowForm() {
+        // Schedule rules (Today / Later, hours, days, quantity) are enforced by BorrowSchedule's own
+        // submit listener, which runs first and stops the submit when something is wrong.
+        BorrowSchedule.init();
+
         const form = document.getElementById('borrowForm');
-        const borrowInp = document.getElementById('borrow_date');
-        const returnInp = document.getElementById('return_date');
-        if (!form || !borrowInp || !returnInp) return;
-
-        borrowInp.min = todayStr;
-        returnInp.min = todayStr;
-
-        borrowInp.addEventListener('change', function () {
-            returnInp.min = this.value;
-            if (returnInp.value && returnInp.value < this.value) returnInp.value = this.value;
-        });
+        if (!form) return;
 
         form.addEventListener('submit', function (e) {
-            const bv = borrowInp.value;
-            const rv = returnInp.value;
-            if (bv < todayStr) {
-                e.preventDefault();
-                alert('The borrow date cannot be in the past.');
-                return;
-            }
-            if (rv < bv) {
-                e.preventDefault();
-                alert('The return date cannot be earlier than the borrow date.');
-                return;
-            }
             e.preventDefault();
             document.getElementById('loading-overlay').classList.add('active');
             const hidden = document.createElement('input');
@@ -3432,6 +3711,10 @@
                         const card = document.querySelector('.item-node[data-item-id="' + item.item_id + '"]');
                         if (!card) return;
                         const qty = parseInt(item.quantity, 10);
+                        const total = parseInt(item.total, 10);
+                        if (window.BOOKING_META && window.BOOKING_META.items && item.item_name) {
+                            window.BOOKING_META.items[item.item_name] = { shelf: qty, total: isNaN(total) ? qty : total };
+                        }
 
                         // Update availability badge
                         const badge = card.querySelector('.stock-badge');
@@ -3448,8 +3731,11 @@
                         // Update borrow button
                         const btn = card.querySelector('.btn-borrow[data-action="open-borrow-form"]');
                         if (btn) {
-                            btn.disabled = qty <= 0;
-                            btn.textContent = qty > 0 ? 'Borrow' : 'Unavailable';
+                            // Out right now but it exists in stock: it can still be booked for a later date
+                            const canBookAhead = qty <= 0 && (isNaN(total) ? false : total > 0);
+                            btn.disabled = qty <= 0 && !canBookAhead;
+                            btn.classList.toggle('btn-borrow-ahead', canBookAhead);
+                            btn.textContent = qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable');
                         }
                     });
                 })
