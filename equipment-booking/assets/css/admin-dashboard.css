@@ -8061,3 +8061,11 @@ body.sidebar-collapsed .nav-user {
         display: none;
     }
 }
+
+/* Faculty tab: small hint under a field (e.g. "Permanent" under Faculty ID) */
+.fac-field-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-light);
+}

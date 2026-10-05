@@ -1977,13 +1977,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <label for="fac-email">PUPSync email <span class="req-star">*</span></label>
                                     <input type="email" id="fac-email" name="pupsync_email"
                                         class="form-control-custom" maxlength="254" required
-                                        placeholder="faculty@example.com">
+                                        autocomplete="off" placeholder="name@pupsync.edu">
                                 </div>
                                 <div class="form-group">
-                                    <label for="fac-backup">Backup email <span class="fac-edit-opt">(optional)</span></label>
-                                    <input type="email" id="fac-backup" name="backup_email"
-                                        class="form-control-custom" maxlength="254"
-                                        placeholder="backup@gmail.com">
+                                    <label for="fac-faculty-id">Faculty ID <span class="req-star">*</span></label>
+                                    <input type="text" id="fac-faculty-id" name="faculty_id"
+                                        class="form-control-custom" maxlength="30" required
+                                        autocomplete="off" autocapitalize="characters" spellcheck="false"
+                                        placeholder="2023-00123-BN-0">
+                                    <small class="fac-field-hint">Permanent. It can&rsquo;t be changed after the account is created.</small>
                                 </div>
 
                                 <div class="fac-edit-section">Name</div>
@@ -1998,11 +2000,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <input type="text" id="fac-last" name="last_name"
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="fac-middle">Middle name <span class="fac-edit-opt">(optional)</span></label>
-                                    <input type="text" id="fac-middle" name="middle_name"
-                                        class="form-control-custom" maxlength="100" placeholder="Middle">
                                 </div>
 
                                 <div class="fac-edit-section">Password</div>
@@ -2048,18 +2045,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <div class="form-group">
                                             <label for="fac-org">Organization</label>
                                             <?php
-                                            $org_opts_res = $conn->query(
-                                                "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                                            );
-                                            if ($org_opts_res && $org_opts_res->num_rows > 0): ?>
+                                            // Organizations are grouped (Academic / Non-academic, then uncategorised);
+                                            // one that already has an adviser is disabled and marked "(taken)".
+                                            $orgs_grouped     = orgs_load_grouped($conn);
+                                            $orgs_adviser_map = orgs_adviser_map($conn);
+                                            $orgs_total = count($orgs_grouped[ORG_CATEGORY_ACADEMIC])
+                                                + count($orgs_grouped[ORG_CATEGORY_NON_ACADEMIC])
+                                                + count($orgs_grouped['']);
+                                            if ($orgs_total > 0): ?>
                                                 <select id="fac-org" name="organization_id"
                                                     class="form-control-custom">
                                                     <option value="">&#8212; Select Organization &#8212;</option>
-                                                    <?php while ($org_row = $org_opts_res->fetch_assoc()): ?>
-                                                        <option value="<?= (int)$org_row['id'] ?>">
-                                                            <?= htmlspecialchars($org_row['name']) ?>
-                                                        </option>
-                                                    <?php endwhile; ?>
+                                                    <?= orgs_render_options($orgs_grouped, $orgs_adviser_map, true) ?>
                                                 </select>
                                             <?php else: ?>
                                                 <select id="fac-org" name="organization_id"
@@ -4730,17 +4727,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="form-group">
                             <label for="fac-edit-org">Organization</label>
                             <?php
-                            $edit_org_opts_res = $conn->query(
-                                "SELECT id, name FROM tbl_organizations ORDER BY name ASC"
-                            );
-                            if ($edit_org_opts_res && $edit_org_opts_res->num_rows > 0): ?>
-                                <select id="fac-edit-org" class="form-control-custom">
+                            $orgs_grouped     = orgs_load_grouped($conn);
+                            $orgs_adviser_map = $orgs_adviser_map ?? orgs_adviser_map($conn);
+                            $orgs_total = count($orgs_grouped[ORG_CATEGORY_ACADEMIC])
+                                + count($orgs_grouped[ORG_CATEGORY_NON_ACADEMIC])
+                                + count($orgs_grouped['']);
+                            if ($orgs_total > 0): ?>
+                                <select id="fac-edit-org" class="form-control-custom"
+                                    data-advisers="<?= htmlspecialchars(json_encode($orgs_adviser_map, JSON_FORCE_OBJECT), ENT_QUOTES, 'UTF-8') ?>">
                                     <option value="">&#8212; Select Organization &#8212;</option>
-                                    <?php while ($edit_org_row = $edit_org_opts_res->fetch_assoc()): ?>
-                                        <option value="<?= (int)$edit_org_row['id'] ?>">
-                                            <?= htmlspecialchars($edit_org_row['name']) ?>
-                                        </option>
-                                    <?php endwhile; ?>
+                                    <?= orgs_render_options($orgs_grouped) ?>
                                 </select>
                             <?php else: ?>
                                 <select id="fac-edit-org" class="form-control-custom" disabled>
@@ -4896,6 +4892,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 box.textContent = '';
             }
 
+            /* One adviser per organization. Which organization has which adviser
+               (organization id -> {faculty_id, name}) is seeded by the server and kept in
+               step with the edits and deletes made on this page. It only drives the UI:
+               the server re-checks every save, so a stale page can never break the rule. */
+            var _facAdvisers = {};
+            (function() {
+                var s = document.getElementById('fac-edit-org');
+                if (!s) return;
+                try {
+                    _facAdvisers = JSON.parse(s.getAttribute('data-advisers') || '{}') || {};
+                } catch (e) {
+                    _facAdvisers = {};
+                }
+            })();
+
+            /* Disable the organizations that already have an adviser (except the one belonging
+               to exceptFacultyId, so an adviser can keep their own organization). */
+            function _facApplyOrgAvailability(sel, exceptFacultyId) {
+                if (!sel) return;
+                Array.prototype.forEach.call(sel.options, function(opt) {
+                    if (!opt.value) return;
+                    var holder = _facAdvisers[opt.value];
+                    var taken = !!holder && holder.faculty_id !== exceptFacultyId;
+                    var name = opt.getAttribute('data-name') || opt.textContent;
+                    opt.disabled = taken;
+                    opt.textContent = taken ? name + ' (taken)' : name;
+                });
+            }
+
+            function _facAdvisersForget(facultyId) {
+                Object.keys(_facAdvisers).forEach(function(k) {
+                    if (_facAdvisers[k].faculty_id === facultyId) delete _facAdvisers[k];
+                });
+                _facApplyOrgAvailability(document.getElementById('fac-org'), '');
+            }
+
             /* Edit modal: open on row edit-button click */
             document.addEventListener('click', function(e) {
                 var btn = e.target.closest('.fac-edit-btn');
@@ -4931,6 +4963,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 document.getElementById('fac-edit-backup').value = backupEmail;
                 document.getElementById('fac-edit-adviser').checked = isAdviser;
                 var orgSel = document.getElementById('fac-edit-org');
+                _facApplyOrgAvailability(orgSel, facId);
                 if (orgSel) orgSel.value = (isAdviser && orgId) ? orgId : '';
                 document.getElementById('fac-delete-name').textContent = fullname;
 
@@ -5132,6 +5165,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         _showFacEditAlert('An organization must be selected for an adviser.', true);
                         return;
                     }
+                    /* A new or changed email must end in @pupsync.edu (an unchanged older email is left alone). */
+                    var originalEmail = (_facEditRow.dataset.email || '').toLowerCase();
+                    if (email.toLowerCase() !== originalEmail && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
+                        _showFacEditAlert('Use a PUPSync email ending in @pupsync.edu.', true);
+                        return;
+                    }
+                    /* One adviser per organization (only when the organization is new for this person). */
+                    var holder = (isAdviser === '1') ? _facAdvisers[orgId] : null;
+                    var orgUnchanged = _facEditRow.dataset.role === 'Organization Adviser' &&
+                        String(_facEditRow.dataset.orgId || '') === String(orgId);
+                    if (holder && holder.faculty_id !== facultyId && !orgUnchanged) {
+                        var heldOpt = document.getElementById('fac-edit-org').querySelector('option[value="' + orgId + '"]');
+                        _showFacEditAlert(((heldOpt && heldOpt.getAttribute('data-name')) || 'That organization') +
+                            ' already has an adviser: ' + holder.name + '.', true);
+                        return;
+                    }
 
                     var savedLabel = facEditSaveBtn.innerHTML;
                     facEditSaveBtn.disabled = true;
@@ -5164,10 +5213,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 var fullname = [firstName, lastName].join(' ').trim();
                                 var role = isAdviser === '1' ? 'Organization Adviser' : 'Regular Faculty';
                                 var orgSelEl = document.getElementById('fac-edit-org');
-                                var orgName = (isAdviser === '1' && orgSelEl) ?
-                                    ((orgSelEl.options[orgSelEl.selectedIndex] || {}).text || '') :
+                                var selOpt = orgSelEl ? orgSelEl.options[orgSelEl.selectedIndex] : null;
+                                var orgName = (isAdviser === '1' && selOpt) ?
+                                    (selOpt.getAttribute('data-name') || selOpt.text || '') :
                                     '';
                                 var orgNameSafe = (orgId && isAdviser === '1') ? orgName : '';
+
+                                // Keep the "who advises what" map in step with this save
+                                _facAdvisersForget(facultyId);
+                                if (isAdviser === '1' && orgId) {
+                                    _facAdvisers[orgId] = {
+                                        faculty_id: facultyId,
+                                        name: fullname
+                                    };
+                                    _facApplyOrgAvailability(document.getElementById('fac-org'), '');
+                                }
 
                                 // Re-render the row (name, email, role, organization) from the saved values
                                 if (typeof window.psFacRender === 'function') {
@@ -5255,6 +5315,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         if (data.status === 'success') {
                             rowToRemove.remove();
                             _facEditRow = null;
+                            _facAdvisersForget(params.faculty_id);
 
                             /* Table is now empty -> show the empty state again */
                             if (_facTbody && !_facTbody.querySelector('tr[data-faculty-id]')) {

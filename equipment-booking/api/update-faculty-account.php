@@ -51,24 +51,32 @@ if ($faculty_id === '' || strlen($faculty_id) > 255) {
     send_json(422, 'error', 'Faculty account not found.');
 }
 
-// ── Confirm the account exists ────────────────────────────────────────────────
-$exists_stmt = $conn->prepare("SELECT faculty_id FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+// -- Confirm the account exists (and remember what it is today) ---------------
+$exists_stmt = $conn->prepare("SELECT email, role, organization_id FROM tbl_users WHERE faculty_id = ? LIMIT 1");
 if (!$exists_stmt) {
     error_log('[update-faculty-account] existence check prepare failed: ' . $conn->error);
     send_json(500, 'error', 'Could not save changes. Please try again.');
 }
 $exists_stmt->bind_param('s', $faculty_id);
 $exists_stmt->execute();
-$exists_stmt->store_result();
-if ($exists_stmt->num_rows === 0) {
-    $exists_stmt->close();
+$exists_res = $exists_stmt->get_result();
+$current = $exists_res ? $exists_res->fetch_assoc() : null;
+$exists_stmt->close();
+if (!$current) {
     send_json(404, 'error', 'Faculty account not found.');
 }
-$exists_stmt->close();
+$current_email = strtolower((string)$current['email']);
+$was_adviser_of = ($current['role'] === 'Organization Adviser' && $current['organization_id'] !== null)
+    ? (int)$current['organization_id'] : 0;
 
 // ── Validation: pupsync_email ─────────────────────────────────────────────────
 if ($pupsync_email === '' || strlen($pupsync_email) > 254 || !filter_var($pupsync_email, FILTER_VALIDATE_EMAIL)) {
     send_json(422, 'error', 'A valid PUPSync email is required.');
+}
+// A new or changed email must end in @pupsync.edu. An account whose existing email was set
+// before this rule keeps working: it is only checked when someone actually changes it.
+if ($pupsync_email !== $current_email && faculty_email_normalize($pupsync_email) === null) {
+    send_json(422, 'error', 'Use a PUPSync email ending in @' . FACULTY_EMAIL_DOMAIN . '.');
 }
 
 // ── Validation: backup_email (optional, but must be valid if provided) ───────
@@ -99,28 +107,18 @@ if ($dup_stmt->num_rows > 0) {
 }
 $dup_stmt->close();
 
-// ── Adviser + organization validation ─────────────────────────────────────────
+// -- Adviser + organization -----------------------------------------------------
+// One adviser per organization (checked below under a lock). If this account is already the
+// adviser of the organization it keeps, nothing is re-checked, so an older duplicate never
+// blocks an unrelated edit.
 $organization_id = null;
 if ($is_org_adviser === 1) {
     if ($organization_id_raw <= 0) {
         send_json(422, 'error', 'An organization must be selected for an adviser.');
     }
-    $org_stmt = $conn->prepare("SELECT id FROM tbl_organizations WHERE id = ? LIMIT 1");
-    if (!$org_stmt) {
-        error_log('[update-faculty-account] Organization check prepare failed: ' . $conn->error);
-        send_json(500, 'error', 'Could not save changes. Please try again.');
-    }
-    $org_stmt->bind_param('i', $organization_id_raw);
-    $org_stmt->execute();
-    $org_stmt->store_result();
-    if ($org_stmt->num_rows === 0) {
-        $org_stmt->close();
-        send_json(422, 'error', 'An organization must be selected for an adviser.');
-    }
-    $org_stmt->close();
     $organization_id = $organization_id_raw;
 }
-// If is_org_adviser is 0, organization_id remains NULL — same convention as create-faculty-account.php
+// If is_org_adviser is 0, organization_id remains NULL (same convention as create-faculty-account.php)
 
 // ── Fullname concatenation (first + last only — this edit form has no middle
 //    name field; any existing middle name lives inside the row's "first name"
@@ -131,34 +129,62 @@ $fullname = trim($first_name . ' ' . $last_name);
 $role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
 $backup_val = ($backup_email === '') ? null : $backup_email;
 
-// ── Update ───────────────────────────────────────────────────────────────────
-$upd_stmt = $conn->prepare(
-    "UPDATE tbl_users
-        SET fullname = ?, email = ?, backup_email = ?, role = ?,
-            is_org_adviser = ?, organization_id = ?, allow_org_borrowing = ?
-      WHERE faculty_id = ?"
-);
-if (!$upd_stmt) {
-    error_log('[update-faculty-account] UPDATE prepare failed: ' . $conn->error);
-    send_json(500, 'error', 'Could not save changes. Please try again.');
-}
-$upd_stmt->bind_param(
-    'ssssiiis',
-    $fullname,
-    $pupsync_email,
-    $backup_val,
-    $role,
-    $is_org_adviser,
-    $organization_id,
-    $allow_org_borrowing,
-    $faculty_id
-);
-if (!$upd_stmt->execute()) {
-    error_log('[update-faculty-account] UPDATE execute failed: ' . $upd_stmt->error);
+// -- Update -----------------------------------------------------------------------
+$in_tx = false;
+try {
+    if ($is_org_adviser === 1) {
+        $conn->begin_transaction();
+        $in_tx = true;
+        if (!orgs_lock($conn, $organization_id)) {
+            $conn->rollback();
+            send_json(422, 'error', 'An organization must be selected for an adviser.');
+        }
+        if ($was_adviser_of !== $organization_id) {
+            $conflict = orgs_adviser_conflict($conn, $organization_id, $faculty_id);
+            if ($conflict) {
+                $conn->rollback();
+                send_json(409, 'error', orgs_adviser_conflict_message($conflict));
+            }
+        }
+    }
+
+    $upd_stmt = $conn->prepare(
+        "UPDATE tbl_users
+            SET fullname = ?, email = ?, backup_email = ?, role = ?,
+                is_org_adviser = ?, organization_id = ?, allow_org_borrowing = ?
+          WHERE faculty_id = ?"
+    );
+    if (!$upd_stmt) {
+        throw new RuntimeException('UPDATE prepare failed: ' . $conn->error);
+    }
+    $upd_stmt->bind_param(
+        'ssssiiis',
+        $fullname,
+        $pupsync_email,
+        $backup_val,
+        $role,
+        $is_org_adviser,
+        $organization_id,
+        $allow_org_borrowing,
+        $faculty_id
+    );
+    if (!$upd_stmt->execute()) {
+        $err = $upd_stmt->error;
+        $upd_stmt->close();
+        throw new RuntimeException('UPDATE execute failed: ' . $err);
+    }
     $upd_stmt->close();
+
+    if ($in_tx) {
+        $conn->commit();
+    }
+} catch (Throwable $e) {
+    if ($in_tx) {
+        $conn->rollback();
+    }
+    error_log('[update-faculty-account] ' . $e->getMessage());
     send_json(500, 'error', 'Could not save changes. Please try again.');
 }
-$upd_stmt->close();
 
 // ── Success ──────────────────────────────────────────────────────────────────
 http_response_code(200);

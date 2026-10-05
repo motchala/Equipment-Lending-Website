@@ -1559,7 +1559,7 @@
 
         // Empty the form right away so no browser can restore typed values (the password
         // included) after the reload.
-        ['fac-email', 'fac-backup', 'fac-first', 'fac-middle', 'fac-last', 'fac-password', 'fac-confirm']
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password', 'fac-confirm']
             .forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -1594,9 +1594,8 @@
             _clearFacAlert();
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
-            const backup = (document.getElementById('fac-backup')?.value || '').trim();
+            const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
             const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const middleName = (document.getElementById('fac-middle')?.value || '').trim();
             const lastName = (document.getElementById('fac-last')?.value || '').trim();
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
@@ -1606,6 +1605,16 @@
             // Client-side pre-checks (mirror server validation for immediate UX feedback)
             if (!email) {
                 _showFacAlert('PUPSync email is required.', true); return;
+            }
+            if (!/^[^\s@]+@pupsync\.edu$/i.test(email)) {
+                _showFacAlert('Use a PUPSync email ending in @pupsync.edu.', true); return;
+            }
+            if (!facultyId) {
+                _showFacAlert('Faculty ID is required.', true); return;
+            }
+            // letters/digits in hyphen-separated groups, 5-30 characters, at least one digit (same rule as the server)
+            if (facultyId.length < 5 || facultyId.length > 30 || !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(facultyId) || !/\d/.test(facultyId)) {
+                _showFacAlert('Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).', true); return;
             }
             if (!firstName) {
                 _showFacAlert('First name is required.', true); return;
@@ -1633,9 +1642,8 @@
             const body = new URLSearchParams({
                 csrf_token: getCsrfToken(),
                 pupsync_email: email,
-                backup_email: backup,
+                faculty_id: facultyId,
                 first_name: firstName,
-                middle_name: middleName,
                 last_name: lastName,
                 password: password,
                 confirm_password: confirm,
@@ -1651,7 +1659,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        _facAccountCreated([firstName, middleName, lastName].filter(Boolean).join(' '));
+                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '));
                     } else {
                         _showFacAlert(data.message || 'An error occurred.', true);
                     }

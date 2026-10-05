@@ -35,33 +35,45 @@ if (!admin_is_super_admin($conn)) {
     send_json(403, 'error', 'Only a Super Admin can create faculty accounts.');
 }
 
-// ── Input collection ──────────────────────────────────────────────────────────
-$pupsync_email = strtolower(trim($_POST['pupsync_email'] ?? ''));
-$backup_email  = strtolower(trim($_POST['backup_email'] ?? ''));
+// -- Input collection --------------------------------------------------------
+$pupsync_email_raw = (string)($_POST['pupsync_email'] ?? '');
+$faculty_id_raw    = (string)($_POST['faculty_id'] ?? '');
 $first_name    = trim($_POST['first_name'] ?? '');
-$middle_name   = trim($_POST['middle_name'] ?? '');
 $last_name     = trim($_POST['last_name'] ?? '');
 $password_raw  = $_POST['password'] ?? '';
 $confirm_raw   = $_POST['confirm_password'] ?? '';
 $is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
 
-// ── Validation: pupsync_email ─────────────────────────────────────────────────
-if ($pupsync_email === '' || strlen($pupsync_email) > 254 || !filter_var($pupsync_email, FILTER_VALIDATE_EMAIL)) {
+// -- Validation: PUPSync email (must end in @pupsync.edu) ---------------------
+if (trim($pupsync_email_raw) === '') {
     send_json(422, 'error', 'PUPSync email is required.');
 }
+$pupsync_email = faculty_email_normalize($pupsync_email_raw);
+if ($pupsync_email === null) {
+    send_json(422, 'error', 'Use a PUPSync email ending in @' . FACULTY_EMAIL_DOMAIN . '.');
+}
 
-// ── Validation: first_name ────────────────────────────────────────────────────
+// -- Validation: Faculty ID (entered here; permanent, admins cannot edit it later) --
+if (trim($faculty_id_raw) === '') {
+    send_json(422, 'error', 'Faculty ID is required.');
+}
+$faculty_id = faculty_id_normalize($faculty_id_raw);
+if ($faculty_id === null) {
+    send_json(422, 'error', 'Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).');
+}
+
+// -- Validation: first_name ---------------------------------------------------
 if ($first_name === '' || strlen($first_name) > 100) {
     send_json(422, 'error', 'First name is required.');
 }
 
-// ── Validation: last_name ─────────────────────────────────────────────────────
+// -- Validation: last_name ----------------------------------------------------
 if ($last_name === '' || strlen($last_name) > 100) {
     send_json(422, 'error', 'Last name is required.');
 }
 
-// ── Validation: password ──────────────────────────────────────────────────────
+// -- Validation: password -----------------------------------------------------
 if ($password_raw === '') {
     send_json(422, 'error', 'Password is required.');
 }
@@ -72,7 +84,7 @@ if ($password_raw !== $confirm_raw) {
     send_json(422, 'error', 'Passwords do not match.');
 }
 
-// ── Duplicate email check ─────────────────────────────────────────────────────
+// -- Duplicate checks: email and Faculty ID -------------------------------------
 $dup_stmt = $conn->prepare("SELECT faculty_id FROM tbl_users WHERE email = ? LIMIT 1");
 if (!$dup_stmt) {
     error_log('[create-faculty-account] Duplicate check prepare failed: ' . $conn->error);
@@ -87,98 +99,120 @@ if ($dup_stmt->num_rows > 0) {
 }
 $dup_stmt->close();
 
-// ── Adviser + organization validation ─────────────────────────────────────────
+$dup_stmt = $conn->prepare("SELECT 1 FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+if (!$dup_stmt) {
+    error_log('[create-faculty-account] Faculty ID check prepare failed: ' . $conn->error);
+    send_json(500, 'error', 'Could not create account. Please try again.');
+}
+$dup_stmt->bind_param('s', $faculty_id);
+$dup_stmt->execute();
+$dup_stmt->store_result();
+if ($dup_stmt->num_rows > 0) {
+    $dup_stmt->close();
+    send_json(409, 'error', 'That Faculty ID is already registered to another account.');
+}
+$dup_stmt->close();
+
+// -- Adviser + organization -----------------------------------------------------
+// The organization must exist and (checked below, under a lock) must not already have an adviser.
 $organization_id = null;
 if ($is_org_adviser === 1) {
     if ($organization_id_raw <= 0) {
         send_json(422, 'error', 'An organization must be selected for an adviser.');
     }
-    // Confirm organization exists
-    $org_stmt = $conn->prepare("SELECT id FROM tbl_organizations WHERE id = ? LIMIT 1");
-    if (!$org_stmt) {
-        error_log('[create-faculty-account] Organization check prepare failed: ' . $conn->error);
-        send_json(500, 'error', 'Could not create account. Please try again.');
-    }
-    $org_stmt->bind_param('i', $organization_id_raw);
-    $org_stmt->execute();
-    $org_stmt->store_result();
-    if ($org_stmt->num_rows === 0) {
-        $org_stmt->close();
-        send_json(422, 'error', 'An organization must be selected for an adviser.');
-    }
-    $org_stmt->close();
     $organization_id = $organization_id_raw;
 }
-// If is_org_adviser is 0, organization_id remains NULL (Requirement 4.8)
+// If is_org_adviser is 0, organization_id remains NULL.
 
-// ── Fullname concatenation ───────────────────────────────────────────────────
-if ($middle_name === '') {
-    $fullname = $first_name . ' ' . $last_name;
-} else {
-    $fullname = $first_name . ' ' . $middle_name . ' ' . $last_name;
-}
+// -- Full name (first + last) ---------------------------------------------------
+$fullname = $first_name . ' ' . $last_name;
 
-// ── Password & role ──────────────────────────────────────────────────────────
+// -- Password & role --------------------------------------------------------------
 $password_hash = password_hash($password_raw, PASSWORD_BCRYPT);
 $role = ($is_org_adviser === 1) ? 'Organization Adviser' : 'Regular Faculty';
-// Org privileges are automatic: being an Organization Adviser is what grants them.
+// Org privileges are automatic, and identical for every organization: being an
+// Organization Adviser is what grants them.
 $allow_org_borrowing = $is_org_adviser;
-$backup_val = ($backup_email === '') ? null : $backup_email;
+$backup_val = null;   // the backup email is no longer collected here
 
-// ── Insert ───────────────────────────────────────────────────────────────────────
-// The Faculty ID is NOT generated here: the faculty member sets their own after
-// signing in. faculty_id is the table's primary key, so the row is stored under a
-// unique internal placeholder that the UI shows as "Not set yet" (see
-// config/faculty-id.php). It is replaced by the real id when they set it.
-$faculty_id = '';
-$inserted   = false;
-for ($attempt = 0; $attempt < 5 && !$inserted; $attempt++) {
-    $faculty_id = faculty_id_make_placeholder();
-    $errno = 0;
-    $errmsg = '';
-    try {
-        $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        if (!$ins_stmt) {
-            throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
+// -- Insert -----------------------------------------------------------------------
+$in_tx = false;
+try {
+    if ($is_org_adviser === 1) {
+        // One adviser per organization. Lock the organization row first so two admins cannot
+        // both pass the check and give the same organization two advisers.
+        $conn->begin_transaction();
+        $in_tx = true;
+        if (!orgs_lock($conn, $organization_id)) {
+            $conn->rollback();
+            send_json(422, 'error', 'An organization must be selected for an adviser.');
         }
-        $ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
-        if ($ins_stmt->execute()) {
-            $inserted = true;
-        } else {
-            $errno  = (int)$ins_stmt->errno;
-            $errmsg = (string)$ins_stmt->error;
+        $conflict = orgs_adviser_conflict($conn, $organization_id, '');
+        if ($conflict) {
+            $conn->rollback();
+            send_json(409, 'error', orgs_adviser_conflict_message($conflict));
         }
-        $ins_stmt->close();
-    } catch (mysqli_sql_exception $e) {
-        // mysqli throws instead of returning false on newer PHP versions
-        $errno  = (int)$e->getCode();
-        $errmsg = $e->getMessage();
-    } catch (Throwable $e) {
-        error_log('[create-faculty-account] ' . $e->getMessage());
-        send_json(500, 'error', 'Could not create account. Please try again.');
     }
 
+    $inserted = false;
+    $errno = 0;
+    $errmsg = '';
+    $ins_stmt = $conn->prepare("INSERT INTO tbl_users (fullname, faculty_id, email, backup_email, password, role, is_org_adviser, organization_id, allow_org_borrowing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    if (!$ins_stmt) {
+        throw new RuntimeException('INSERT prepare failed: ' . $conn->error);
+    }
+    $ins_stmt->bind_param('ssssssiii', $fullname, $faculty_id, $pupsync_email, $backup_val, $password_hash, $role, $is_org_adviser, $organization_id, $allow_org_borrowing);
+    if ($ins_stmt->execute()) {
+        $inserted = true;
+    } else {
+        $errno  = (int)$ins_stmt->errno;
+        $errmsg = (string)$ins_stmt->error;
+    }
+    $ins_stmt->close();
+
     if (!$inserted) {
-        if ($errno === 1062 && stripos($errmsg, 'email') !== false) {
-            send_json(409, 'error', 'A faculty account with this email already exists.');
+        if ($in_tx) {
+            $conn->rollback();
         }
-        if ($errno === 1062) {
-            continue; // the placeholder collided (practically impossible): try another
+        if ($errno === 1062) {   // lost a race with another admin on the unique email / Faculty ID
+            if (stripos($errmsg, 'email') !== false) {
+                send_json(409, 'error', 'A faculty account with this email already exists.');
+            }
+            send_json(409, 'error', 'That Faculty ID is already registered to another account.');
         }
         error_log('[create-faculty-account] INSERT failed: ' . $errmsg);
         send_json(500, 'error', 'Could not create account. Please try again.');
     }
-}
-if (!$inserted) {
+
+    if ($in_tx) {
+        $conn->commit();
+    }
+} catch (mysqli_sql_exception $e) {
+    // mysqli throws instead of returning false on newer PHP versions
+    if ($in_tx) {
+        $conn->rollback();
+    }
+    if ((int)$e->getCode() === 1062) {
+        if (stripos($e->getMessage(), 'email') !== false) {
+            send_json(409, 'error', 'A faculty account with this email already exists.');
+        }
+        send_json(409, 'error', 'That Faculty ID is already registered to another account.');
+    }
+    error_log('[create-faculty-account] ' . $e->getMessage());
+    send_json(500, 'error', 'Could not create account. Please try again.');
+} catch (Throwable $e) {
+    if ($in_tx) {
+        $conn->rollback();
+    }
+    error_log('[create-faculty-account] ' . $e->getMessage());
     send_json(500, 'error', 'Could not create account. Please try again.');
 }
 
-// ── Success ──────────────────────────────────────────────────────────────────
+// -- Success ------------------------------------------------------------------------
 http_response_code(201);
 echo json_encode([
     'status' => 'success',
-    'faculty_id' => $faculty_id,        // internal key (placeholder) the admin table needs for edit/delete
-    'faculty_id_pending' => true,       // the faculty member sets the real Faculty ID themselves
+    'faculty_id' => $faculty_id,
     'message' => 'Faculty account created successfully.'
 ]);
 exit;

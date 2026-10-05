@@ -1,4 +1,5 @@
 <?php
+
 /**
  * faculty-id.php - rules for the "Faculty ID" a faculty member sets for themselves.
  *
@@ -57,4 +58,25 @@ function faculty_id_normalize(string $raw): ?string
         return null;
     }
     return $id;
+}
+
+/** Faculty accounts must use a PUPSync address. */
+const FACULTY_EMAIL_DOMAIN = 'pupsync.edu';
+
+/**
+ * Clean up and validate a faculty PUPSync email: trimmed and lower-cased.
+ * Returns null unless it is a valid address whose domain is exactly @pupsync.edu
+ * (so "a@pupsync.edu.evil.com" and "a@mail.pupsync.edu" are both refused).
+ */
+function faculty_email_normalize(string $raw): ?string
+{
+    $email = strtolower(trim($raw));
+    if ($email === '' || strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+    $suffix = '@' . FACULTY_EMAIL_DOMAIN;
+    if (substr($email, -strlen($suffix)) !== $suffix) {
+        return null;
+    }
+    return $email;
 }
