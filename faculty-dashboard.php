@@ -658,7 +658,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
     <!-- facilities tab portal -->
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-activity.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-activity.css'); ?>">
 
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
@@ -2414,10 +2413,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                      • Upcoming            : Waiting, or Approved that hasn't started yet
                      • History             : Returned or Declined
 
-                   Rooms are loaded by room-reservation/core/faculty-activity-rooms.php, the
-                   same code the live-refresh endpoint (api/get-activity-rooms.php) uses.
+                   Rooms are loaded by the fact_* functions in room-reservation/core/faculty-room-quota.php,
+                   the same code the live-refresh feed (api/poll-reservations.php?view=activity) uses.
                 ─────────────────────────────────────────────────────────────── */
-                require_once __DIR__ . '/room-reservation/core/faculty-activity-rooms.php';
+                require_once __DIR__ . '/room-reservation/core/faculty-room-quota.php';
 
                 $act_current = mysqli_query(
                     $conn,
@@ -2704,7 +2703,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 <span class="material-symbols-outlined">add</span>Reserve
                             </button>
                         </header>
-                        <!-- Filled here on first paint; swapped live by faculty-activity.js -->
+                        <!-- Filled here on first paint; swapped live by the My Activity block at the end of faculty-dashboard.js -->
                         <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
                     </section><!-- /factRooms -->
 
@@ -4235,7 +4234,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
-    <script src="equipment-booking/assets/js/faculty-activity.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-activity.js'); ?>"></script>
 </body>
 
 </html>

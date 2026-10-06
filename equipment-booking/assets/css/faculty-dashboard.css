@@ -10159,3 +10159,1001 @@ body .side-nav .side-nav-user .side-nav-user-name {
         flex-wrap: wrap;
     }
 }
+
+
+/* ── MY ACTIVITY (faculty) ─────────────────────────────────────────────
+   Layout, top to bottom:
+     1. Summary strip   4 numbers (2 equipment, 2 rooms)
+     2. Right now       Equipment card | Room reservations card
+     3. History         one table, filtered All / Equipment / Rooms
+   Everything is prefixed .fact- so it cannot collide with the older .myact-*
+   rules (only .myact-title and .myact-download-btn are still used, for the
+   shared page-title scale and the print button). Colours come from the theme
+   tokens, so Light / Dark / High Contrast need no overrides.
+   Phone / reduced-motion / print rules are in faculty-dashboard-responsive.css.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Page header ─────────────────────────────────────────────── */
+#panel-activity .fact-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+#panel-activity .fact-sub {
+    margin: 4px 0 0;
+    font-size: 0.875rem;
+    color: var(--color-secondary);
+}
+
+/* ── Summary strip ───────────────────────────────────────────── */
+#panel-activity .fact-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+#panel-activity .fact-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: 16px 20px;
+}
+
+#panel-activity .fact-stat+.fact-stat {
+    border-left: 1px solid var(--color-outline-variant);
+}
+
+#panel-activity .fact-stat-value {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--color-on-surface);
+    font-variant-numeric: tabular-nums;
+}
+
+#panel-activity .fact-stat-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+}
+
+#panel-activity .fact-stat-sub {
+    overflow: hidden;
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-stat-sub.is-bad {
+    font-weight: 600;
+    color: var(--color-error);
+}
+
+/* ── Cards (same gold-framed card as the Home tab) ───────────── */
+#panel-activity .fact-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
+    margin-bottom: 20px;
+}
+
+#panel-activity .fact-card {
+    position: relative;
+    min-width: 0;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+}
+
+#panel-activity .fact-card::before {
+    content: '';
+    position: absolute;
+    border: 3px solid transparent;
+    border-bottom: 0;
+    background:
+        linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+        linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+    background-origin: border-box;
+    -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    top: 0;
+    left: -1px;
+    right: -1px;
+    height: 30px;
+    border-top-left-radius: inherit;
+    border-top-right-radius: inherit;
+    z-index: 1;
+}
+
+#panel-activity .fact-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 18px 20px 14px;
+}
+
+#panel-activity .fact-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+#panel-activity .fact-card-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+#panel-activity .fact-card-icon .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#panel-activity .fact-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 0 20px 20px;
+}
+
+/* ── Groups & rows inside a card ─────────────────────────────── */
+#panel-activity .fact-group {
+    min-width: 0;
+}
+
+#panel-activity .fact-group-label {
+    margin: 0 0 8px;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#panel-activity .fact-list.is-collapsed>.fact-item:nth-child(n+4) {
+    display: none;
+}
+
+#panel-activity .fact-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 12px;
+    box-shadow: inset 3px 0 0 var(--color-primary-container);
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+#panel-activity .fact-item:hover {
+    border-color: var(--color-outline);
+}
+
+#panel-activity .fact-item.is-overdue {
+    box-shadow: inset 3px 0 0 var(--color-error);
+}
+
+#panel-activity .fact-item.is-live {
+    background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+#panel-activity .fact-item.is-waitlist {
+    box-shadow: inset 3px 0 0 var(--color-outline-variant);
+    background: transparent;
+    border-style: dashed;
+}
+
+#panel-activity .fact-item-main {
+    flex: 1 1 180px;
+    min-width: 0;
+}
+
+#panel-activity .fact-item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#panel-activity .fact-item-title {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-on-surface);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-item-meta {
+    margin: 2px 0 0;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface-variant);
+}
+
+#panel-activity .fact-item-sub {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin: 4px 0 0;
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+/* Borrowed items carry two actions: give them their own row, aligned under the text */
+#panel-activity .fact-loan .fact-item-actions {
+    flex: 0 0 100%;
+    margin: -2px 0 0;
+    padding-left: 56px;
+}
+
+/* Icon tile + calendar date tile */
+#panel-activity .fact-tile {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 10px;
+    color: var(--color-primary);
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-tile .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#panel-activity .fact-tile-lg {
+    width: 44px;
+    height: 44px;
+}
+
+#panel-activity .fact-tile-lg .material-symbols-outlined {
+    font-size: 22px;
+}
+
+#panel-activity .fact-tile img {
+    width: 100%;
+    height: 100%;
+    padding: 4px;
+    object-fit: contain;
+}
+
+#panel-activity .fact-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: var(--color-surface-container);
+    border: 1px solid var(--color-outline-variant);
+    line-height: 1;
+}
+
+#panel-activity .fact-date-day {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+#panel-activity .fact-date-mon {
+    margin-top: 3px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-item.is-live .fact-date {
+    background: var(--color-primary-container);
+    border-color: var(--color-primary-container);
+}
+
+#panel-activity .fact-item.is-live .fact-date-day,
+#panel-activity .fact-item.is-live .fact-date-mon {
+    color: var(--color-on-primary);
+}
+
+/* Progress bar */
+#panel-activity .fact-bar {
+    height: 6px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-highest);
+}
+
+#panel-activity .fact-bar>i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary-container);
+}
+
+#panel-activity .fact-bar>i.is-overdue {
+    background: var(--color-error);
+}
+
+/* ── Chips (status / timing) ─────────────────────────────────── */
+#panel-activity .fact-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 3px 9px;
+    border-radius: var(--radius-sm);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    color: var(--color-on-surface-variant);
+    background: var(--color-surface-high);
+}
+
+#panel-activity .fact-chip .material-symbols-outlined {
+    font-size: 14px;
+}
+
+#panel-activity .fact-chip.is-live {
+    color: var(--color-on-primary);
+    background: var(--color-primary-container);
+}
+
+#panel-activity .fact-chip.is-live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: factPulse 1.8s ease-in-out infinite;
+}
+
+#panel-activity .fact-chip.is-today {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+#panel-activity .fact-chip.is-soon,
+#panel-activity .fact-chip.is-muted {
+    color: var(--color-on-surface-variant);
+    background: var(--color-surface-high);
+}
+
+#panel-activity .fact-chip.is-ok {
+    color: var(--color-success);
+    background: var(--color-success-container);
+}
+
+#panel-activity .fact-chip.is-wait,
+#panel-activity .fact-chip.is-warn {
+    color: var(--color-warning);
+    background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+}
+
+#panel-activity .fact-chip.is-bad {
+    color: var(--color-error);
+    background: var(--color-error-container);
+}
+
+@keyframes factPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.35;
+    }
+}
+
+#panel-activity .fact-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 7px 1px 4px;
+    border-radius: var(--radius-full);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+#panel-activity .fact-tag .material-symbols-outlined {
+    font-size: 13px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+#panel-activity .fact-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+#panel-activity .fact-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+#panel-activity .fact-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+#panel-activity .fact-btn-ghost {
+    color: var(--color-on-surface);
+    background: var(--color-surface-lowest);
+    border-color: var(--color-outline-variant);
+}
+
+#panel-activity .fact-btn-ghost:hover:not(:disabled) {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+}
+
+#panel-activity .fact-btn-ghost.is-danger {
+    color: var(--color-error);
+}
+
+#panel-activity .fact-btn-ghost.is-danger:hover:not(:disabled) {
+    background: var(--color-error-container);
+    border-color: var(--color-error);
+}
+
+#panel-activity .fact-btn-primary {
+    color: var(--color-on-primary);
+    background: var(--color-primary-container);
+}
+
+#panel-activity .fact-btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-primary-container) 85%, #000);
+}
+
+#panel-activity .fact-btn:focus-visible,
+#panel-activity .fact-seg-btn:focus-visible,
+#panel-activity .fact-pager-btn:focus-visible,
+#panel-activity .fact-more:focus-visible,
+#panel-activity .fact-linkbtn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+#panel-activity .fact-linkbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    cursor: pointer;
+}
+
+#panel-activity .fact-linkbtn:hover:not(.is-done) {
+    text-decoration: underline;
+}
+
+#panel-activity .fact-linkbtn.is-done {
+    color: var(--color-success);
+    cursor: default;
+}
+
+#panel-activity .fact-linkbtn .material-symbols-outlined {
+    font-size: 14px;
+}
+
+#panel-activity .fact-lock {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    color: var(--color-secondary);
+    opacity: 0.7;
+    cursor: help;
+}
+
+#panel-activity .fact-lock .material-symbols-outlined {
+    font-size: 16px;
+}
+
+#panel-activity .fact-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 6px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    cursor: pointer;
+}
+
+#panel-activity .fact-more:hover {
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-more .material-symbols-outlined {
+    font-size: 18px;
+    transition: transform 0.2s ease;
+}
+
+#panel-activity .fact-more.is-open .material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+/* ── Room-limit meter + notices + empty states ───────────────── */
+#panel-activity .fact-quota {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface-lowest));
+}
+
+#panel-activity .fact-quota-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface-variant);
+}
+
+#panel-activity .fact-quota-main {
+    margin: 0;
+}
+
+#panel-activity .fact-quota-text strong {
+    font-size: 0.9375rem;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-quota-text span {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-pips {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+#panel-activity .fact-pip {
+    width: 22px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-surface-highest);
+}
+
+#panel-activity .fact-pip.is-on {
+    background: var(--color-primary-container);
+}
+
+#panel-activity .fact-quota.is-full {
+    border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-outline-variant));
+    background: color-mix(in srgb, var(--color-warning) 9%, var(--color-surface-lowest));
+}
+
+#panel-activity .fact-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 12px;
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-notice>.material-symbols-outlined {
+    margin-top: 1px;
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+#panel-activity .fact-notice strong {
+    display: block;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-notice span:not(.material-symbols-outlined) {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--color-on-surface-variant);
+}
+
+#panel-activity .fact-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 28px 16px;
+    border: 1px dashed var(--color-outline-variant);
+    border-radius: 12px;
+    text-align: center;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-empty[hidden] {
+    display: none;
+}
+
+#panel-activity .fact-empty>.material-symbols-outlined {
+    font-size: 28px;
+    opacity: 0.75;
+}
+
+#panel-activity .fact-empty-title {
+    margin: 4px 0 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-empty-sub {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+}
+
+#panel-activity .fact-empty .fact-btn {
+    margin-top: 8px;
+}
+
+#panel-activity .fact-empty.is-compact {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+}
+
+#panel-activity .fact-empty.is-compact>.material-symbols-outlined {
+    font-size: 20px;
+}
+
+#panel-activity .fact-empty.is-compact .fact-empty-title {
+    margin: 0;
+    font-weight: 500;
+    color: var(--color-on-surface-variant);
+}
+
+/* ── History ─────────────────────────────────────────────────── */
+#panel-activity .fact-history {
+    overflow: visible;
+}
+
+#panel-activity .fact-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#panel-activity .fact-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-seg-btn {
+    height: 30px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#panel-activity .fact-seg-btn:hover {
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-seg-btn.is-active {
+    color: var(--color-primary);
+    background: var(--color-surface-lowest);
+    box-shadow: var(--shadow-sm);
+}
+
+#panel-activity .fact-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 10px;
+    background: var(--color-surface-lowest);
+    color: var(--color-secondary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#panel-activity .fact-search:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+#panel-activity .fact-search .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#panel-activity .fact-search input {
+    width: 170px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-table-wrap {
+    overflow-x: auto;
+}
+
+#panel-activity .fact-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#panel-activity .fact-table thead th {
+    padding: 10px 16px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--color-on-surface-variant);
+    background: var(--color-surface-low);
+    border-top: 1px solid var(--color-outline-variant);
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+#panel-activity .fact-table thead th:first-child {
+    width: 38%;
+}
+
+#panel-activity .fact-table td {
+    padding: 12px 16px;
+    font-size: 0.8125rem;
+    vertical-align: middle;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-table tbody tr {
+    border-bottom: 1px solid color-mix(in srgb, var(--color-outline-variant) 55%, transparent);
+    transition: background 0.12s ease;
+}
+
+#panel-activity .fact-table tbody tr:last-child {
+    border-bottom: 0;
+}
+
+#panel-activity .fact-table tbody tr:hover {
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-table tbody tr.is-paged-out,
+#panel-activity .fact-table tbody tr.is-filtered-out {
+    display: none;
+}
+
+#panel-activity .fact-col-status {
+    text-align: right;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-table thead th.fact-col-status {
+    text-align: right;
+}
+
+#panel-activity .fact-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+#panel-activity .fact-cell-text {
+    min-width: 0;
+}
+
+#panel-activity .fact-kind {
+    display: block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-row-title {
+    margin: 1px 0 0;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-on-surface);
+}
+
+#panel-activity .fact-row-sub {
+    display: block;
+    margin: 2px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-when {
+    display: block;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-noresults {
+    margin: 0;
+    padding: 28px 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-noresults[hidden] {
+    display: none;
+}
+
+#panel-activity .fact-history>.fact-empty {
+    margin: 0 20px 20px;
+}
+
+/* Pager */
+#panel-activity .fact-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+#panel-activity .fact-pager[hidden] {
+    display: none;
+}
+
+#panel-activity .fact-pager-info {
+    font-size: 0.78rem;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-pager-ctl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#panel-activity .fact-pager-nums {
+    display: flex;
+    gap: 4px;
+}
+
+#panel-activity .fact-pager-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#panel-activity .fact-pager-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+#panel-activity .fact-pager-btn:hover:not(:disabled) {
+    background: var(--color-surface-container);
+}
+
+#panel-activity .fact-pager-btn.is-active {
+    color: var(--color-on-primary);
+    background: var(--color-primary-container);
+}
+
+#panel-activity .fact-pager-gap {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 32px;
+    color: var(--color-secondary);
+}
+
+#panel-activity .fact-pager-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

@@ -1069,3 +1069,182 @@ html {
 #panel-activity .fact-item-actions {
     flex-wrap: wrap;
 }
+
+
+/* ── MY ACTIVITY (faculty): phone, reduced-motion and print ───────────────
+   Base styles for this screen are in the MY ACTIVITY section at the end of faculty-dashboard.css.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+    #panel-activity .fact-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+    #panel-activity .fact-head {
+        flex-direction: column;
+    }
+
+    #panel-activity .fact-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #panel-activity .fact-stat:nth-child(3) {
+        border-left: 0;
+    }
+
+    #panel-activity .fact-stat:nth-child(n+3) {
+        border-top: 1px solid var(--color-outline-variant);
+    }
+
+    #panel-activity .fact-card-head {
+        padding: 16px 16px 12px;
+    }
+
+    #panel-activity .fact-card-body {
+        padding: 0 16px 16px;
+    }
+
+    #panel-activity .fact-tools {
+        width: 100%;
+    }
+
+    #panel-activity .fact-search {
+        flex: 1;
+    }
+
+    #panel-activity .fact-search input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* History: turn table rows into stacked cards */
+    #panel-activity .fact-table thead {
+        display: none;
+    }
+
+    #panel-activity .fact-table,
+    #panel-activity .fact-table tbody,
+    #panel-activity .fact-table td {
+        display: block;
+    }
+
+    #panel-activity .fact-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 12px;
+        padding: 14px 16px;
+    }
+
+    #panel-activity .fact-table tbody tr.is-paged-out,
+    #panel-activity .fact-table tbody tr.is-filtered-out {
+        display: none;
+    }
+
+    #panel-activity .fact-table td {
+        padding: 0;
+    }
+
+    #panel-activity .fact-table td:nth-child(1) {
+        grid-column: 1 / -1;
+        margin-bottom: 4px;
+    }
+
+    #panel-activity .fact-table td:nth-child(2),
+    #panel-activity .fact-table td:nth-child(3) {
+        grid-column: 1;
+        font-size: 0.78rem;
+        color: var(--color-on-surface-variant);
+    }
+
+    #panel-activity .fact-table td.fact-col-status {
+        grid-column: 2;
+        grid-row: 2 / span 2;
+        align-self: center;
+    }
+
+    #panel-activity .fact-pager {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* Let long equipment names wrap instead of being cut off next to their chip */
+    #panel-activity .fact-item-top {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    #panel-activity .fact-item-title {
+        white-space: normal;
+    }
+
+    #panel-activity .fact-item-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    #panel-activity .fact-item-actions .fact-btn {
+        flex: 1;
+    }
+
+    #panel-activity .fact-loan .fact-item-actions {
+        padding-left: 0;
+    }
+
+    #panel-activity .fact-stat {
+        padding: 14px 16px;
+    }
+
+    #panel-activity .fact-stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #panel-activity .fact-chip.is-live::before {
+        animation: none;
+    }
+
+    #panel-activity * {
+        transition: none !important;
+    }
+}
+
+/* ── Print: the whole record, no controls, no paging ─────────── */
+@media print {
+
+    #panel-activity .fact-btn,
+    #panel-activity .fact-linkbtn,
+    #panel-activity .fact-lock,
+    #panel-activity .fact-more,
+    #panel-activity .fact-tools,
+    #panel-activity .fact-pager,
+    #panel-activity .fact-item-actions,
+    #panel-activity .myact-download-btn {
+        display: none !important;
+    }
+
+    #panel-activity .fact-list.is-collapsed>.fact-item:nth-child(n+4) {
+        display: flex !important;
+    }
+
+    #panel-activity .fact-table tbody tr.is-paged-out {
+        display: table-row !important;
+    }
+
+    #panel-activity .fact-card,
+    #panel-activity .fact-item,
+    #panel-activity .fact-table tbody tr {
+        box-shadow: none;
+        break-inside: avoid;
+    }
+
+    #panel-activity .fact-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
