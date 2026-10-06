@@ -1047,3 +1047,25 @@ html {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+
+/* ================================================================
+   § 39  SMALL SCREENS: Active Now card + My Activity item actions
+================================================================ */
+
+/* The "compact horizontal card" rule in § 12 was written before the card got
+   its thumbnail-and-chip row and a footer. Laid out in a row, those three
+   children are wider than the card on phones, so it stays stacked. */
+@media (max-width: 480px) {
+    #panel-home .active-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+    }
+}
+
+/* A borrowed item can now carry three buttons (Return QR, Extend, Report);
+   let them wrap instead of pushing past the screen edge. */
+#panel-activity .fact-item-actions {
+    flex-wrap: wrap;
+}

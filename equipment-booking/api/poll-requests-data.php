@@ -40,11 +40,11 @@ foreach (
     [
         'waiting'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Waiting'",
         'approved'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Approved'",
-        'declined'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined'",
+        'declined'  => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override'",
         'overdue'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'",
         'inv_total' => "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0",
         'inv_low'   => "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0",
-        'total_req' => "SELECT COUNT(*) c FROM tbl_requests",
+        'total_req' => "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')",
     ] as $key => $sql
 ) {
     $stats[$key] = (int) mysqli_fetch_assoc(mysqli_query($conn, $sql))['c'];
@@ -80,7 +80,7 @@ while ($row = mysqli_fetch_assoc($r)) {
 
 // ── Declined ───────────────────────────────────────────────────────────────
 $declined = [];
-$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Declined' ORDER BY request_date DESC");
+$r = mysqli_query($conn, "SELECT id, faculty_name, faculty_id, equipment_name, instructor, room, borrow_date, return_date, return_token, returned_at, status, request_date, reason, document_path, arbitration_rule, submitted_by_name, submitted_by_id{$_extra_cols} FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override' ORDER BY request_date DESC");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     if (!$_has_bid) $row['batch_id'] = null;
@@ -90,7 +90,7 @@ while ($row = mysqli_fetch_assoc($r)) {
 // ── Recent activity (dashboard feed) ──────────────────────────────────────
 $activity = [];
 $_sa_activity = $_has_sa ? ', submitted_as' : '';
-$r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date{$_sa_activity} FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
+$r = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date{$_sa_activity} FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
 while ($row = mysqli_fetch_assoc($r)) {
     if (!$_has_sa) $row['submitted_as'] = null;
     $activity[] = $row;

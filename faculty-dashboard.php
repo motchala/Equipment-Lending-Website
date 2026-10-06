@@ -226,6 +226,8 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         );
 
         // Loop: one INSERT per selected item (Requirement 4.5, 3.3)
+        $declined_items = [];
+        $kept_items     = 0;
         foreach ($plan as $pl) {
             $item_name = $pl['name'];
             $bk        = $pl['bk'];
@@ -259,6 +261,13 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $new_request_id = $conn->insert_id;
             $stmt_ins->close();
             ArbitrationEngine::process($conn, $new_request_id);
+            // A declined request is never kept: drop it and report the reason on the spot.
+            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
+            if ($why_declined !== null) {
+                $declined_items[] = '"' . $item_name . '": ' . $why_declined;
+                continue;
+            }
+            $kept_items++;
 
             // ── Generate return token if engine approved this item ────────────
             $chk = $conn->prepare(
@@ -283,6 +292,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             }
         }
 
+        if ($declined_items) {
+            // Nothing is logged for the declined items: say why, right here.
+            bm_fail('Not booked – ' . implode(' | ', $declined_items)
+                . ($kept_items > 0 ? ' (The other items in your request were submitted.)' : ''));
+        }
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else {
@@ -403,6 +417,12 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             }
 
             ArbitrationEngine::process($conn, $new_request_id);
+
+            // A declined request is never kept: drop it and report the reason on the spot.
+            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
+            if ($why_declined !== null) {
+                bm_fail($why_declined);
+            }
 
             // ── Generate return token if engine approved the request ──────────
             $check_approved = $conn->prepare(
@@ -978,6 +998,15 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             background: #fdf1f1;
             border-color: #c0a0a0;
             color: #570000;
+        }
+
+        /* ── Sub headers: same look as the My Activity one (.fact-sub) ─── */
+        #panel-home .dash-flat-sub,
+        #panel-lending .page-subtitle,
+        #panel-rooms .page-subtitle {
+            margin: 4px 0 0;
+            font-size: 0.875rem;
+            color: var(--color-secondary);
         }
 
         /* ── Page Header ──────────────────────────────────────────── */
@@ -1742,9 +1771,15 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <!-- Signed-in faculty: the name only. Not a button, no avatar. Notifications and Settings
                  live in the Dashboard's top-right bell / avatar. (.side-nav-user-name stays on the span:
                  faculty-dashboard.js reads and updates it.) -->
-            <div class="side-nav-user" id="navAccountGroup">
+            <div class="side-nav-user" id="navAccountGroup" hidden aria-hidden="true" style="display:none;">
                 <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
             </div>
+            <!-- Settings: just under the divider line, directly above Log Out (opens the Settings overlay,
+                 same as the Dashboard avatar). #nav-settings is what _openOverlayDOM() highlights. -->
+            <a class="side-nav-item" id="nav-settings" href="#" data-action="open-overlay" data-target="settingsOverlay">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Settings</span>
+            </a>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
                 <span class="material-symbols-outlined">logout</span>
@@ -1833,10 +1868,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
                 <!-- ── Flat Header ──────────────────────────────────── -->
                 <div class="dash-flat-header">
-                    <h1 class="dash-flat-title">Good <?php
-                                                        $h = (int)date('H');
-                                                        echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
-                                                        ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                    <div class="dash-flat-titles">
+                        <h1 class="dash-flat-title">Good <?php
+                                                            $h = (int)date('H');
+                                                            echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
+                                                            ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                        <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> &mdash; Your loans, reservations and reminders at a glance.</p>
+                    </div>
                     <!-- Dashboard-only shortcuts (same as the admin Dashboard). They live inside #panel-home, so
                          they only show on this tab. The badge keeps id="notifBadge": the notification code in
                          faculty-dashboard.js updates it. The avatar has .avatar-btn so name / photo changes reach it. -->
@@ -1863,18 +1901,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <!-- Stats -->
                         <div class="dash-stats" id="dashStats">
                             <button type="button" class="stat-tile" data-stat="approved"
-                                data-action="filter-requests" data-status="Approved">
+                                data-action="go-tab" data-tab="activity">
                                 <span class="stat-tile-value"><?php echo $stat_approved; ?></span>
                                 <span class="stat-tile-label">Active Borrowings</span>
                             </button>
-                            <button type="button" class="stat-tile" data-stat="waiting"
-                                data-action="filter-requests" data-status="Waiting">
-                                <span class="stat-tile-value"><?php echo $stat_waiting; ?></span>
-                                <span class="stat-tile-label">Pending Requests</span>
-                            </button>
                             <?php if ($stat_overdue > 0): ?>
                                 <button type="button" class="stat-tile stat-tile--overdue" data-stat="overdue"
-                                    data-action="filter-requests" data-status="Overdue">
+                                    data-action="go-tab" data-tab="activity">
                                     <span class="stat-tile-value" id="statOverdueVal"><?php echo $stat_overdue; ?></span>
                                     <span class="stat-tile-label">Overdue</span>
                                 </button>
@@ -2073,20 +2106,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     ============================================================ -->
             <div class="tab-panel" id="panel-lending">
 
-                <!-- Lending Sub-Nav -->
-                <div class="lending-subnav">
-                    <button class="lending-nav-btn active" data-lending-nav="browse">
-                        <span class="material-symbols-outlined">inventory_2</span> Browse Equipment
-                    </button>
-                    <button class="lending-nav-btn" data-lending-nav="requests">
-                        <span class="material-symbols-outlined">receipt_long</span> My Requests
-                    </button>
-                </div>
 
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Equipment</h2>
+                        <p class="page-subtitle">Browse the catalog, check availability and request equipment for your class.</p>
                     </div>
 
                     <!-- ── Featured Section ────────────────────────────────── -->
@@ -2345,55 +2370,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 </div><!-- /lending-browse -->
 
                 <!-- ── Sub: Borrow Form (now a modal — this sub-panel is kept as an
-                     empty shell so lending-nav references don't break) ── -->
+                     empty shell so existing references to it don't break) ── -->
                 <div class="lending-sub" id="lending-form"></div><!-- /lending-form -->
 
-                <!-- ── Sub: My Requests ────────────────────────────────── -->
-                <div class="lending-sub" id="lending-requests">
-                    <div class="page-header-block">
-                        <h2 class="page-title-sm">My Requests</h2>
-                    </div>
-                    <div class="table-surface">
-                        <div class="table-toolbar">
-                            <div class="table-toolbar-actions">
-                                <div class="req-filter-wrap">
-                                    <span class="material-symbols-outlined"
-                                        style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
-                                    <select id="reqStatusFilter" class="req-filter-select"
-                                        data-action="filter-requests-dd">
-                                        <option value="All">All Statuses</option>
-                                        <option value="Waiting">Pending</option>
-                                        <option value="Approved">Approved</option>
-                                        <option value="Declined">Declined</option>
-                                        <option value="Overdue">Overdue</option>
-                                        <option value="Returned">Returned</option>
-                                    </select>
-                                </div>
-                                <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort">
-                                    <span class="material-symbols-outlined" style="font-size:16px">sort</span>
-                                    <span id="reqSortLabel">Latest First</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table class="requests-table" id="requestsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Equipment</th>
-                                        <th>Requested By</th>
-                                        <th>Room</th>
-                                        <th>Borrow Date</th>
-                                        <th>Return Date</th>
-                                        <th>Status</th>
-                                        <th>Notes</th>
-                                        <th>Return QR</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="requestsTbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /lending-requests -->
 
             </div><!-- /panel-lending -->
 
@@ -2402,161 +2381,18 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     ============================================================ -->
             <div class="tab-panel" id="panel-rooms">
 
-                <!-- Rooms Sub-Nav — Browse | My Reservations -->
-                <div class="lending-subnav">
-                    <button class="lending-nav-btn active" data-rooms-nav="browse">
-                        <span class="material-symbols-outlined">meeting_room</span> Browse Facilities
-                    </button>
-                    <button class="lending-nav-btn" data-rooms-nav="history">
-                        <span class="material-symbols-outlined">receipt_long</span> My Reservations
-                        <?php if (!empty($room_reservations)): ?>
-                            <span class="lnb-badge"><?php echo count($room_reservations); ?></span>
-                        <?php endif; ?>
-                    </button>
-                </div>
 
                 <!-- ── Sub: Browse Facilities ─────────────────────────────── -->
                 <div class="lending-sub active" id="rooms-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Facilities</h2>
+                        <p class="page-subtitle">Find a room, check its weekly schedule and reserve it for your class or event.</p>
                     </div>
                     <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
                 </div><!-- /rooms-browse -->
 
-                <!-- ── Sub: My Reservations ───────────────────────────────── -->
-                <div class="lending-sub" id="rooms-history">
-                    <div class="page-header-block">
-                        <h2 class="page-title-sm">My Room Reservations</h2>
-                    </div>
-                    <div class="table-surface">
-                        <div class="table-toolbar">
-                            <div class="table-toolbar-actions">
-                                <div class="req-filter-wrap">
-                                    <span class="material-symbols-outlined"
-                                        style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
-                                    <select id="roomResStatusFilter" class="req-filter-select"
-                                        data-action="filter-room-reservations">
-                                        <option value="All">All Statuses</option>
-                                        <option value="Approved" selected>Approved</option>
-                                        <option value="Declined">Declined</option>
-                                        <option value="Cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table class="requests-table" id="roomReservationsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Room</th>
-                                        <th>Location</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Purpose</th>
-                                        <th>Submitted As</th>
-                                        <th>Status</th>
-                                        <th>Reason</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="roomReservationsTbody">
-                                    <?php if (empty($room_reservations)): ?>
-                                        <tr>
-                                            <td colspan="9" style="text-align:center;padding:2.5rem;color:var(--color-on-surface-variant);font-size:.875rem;">
-                                                No room reservations yet.
-                                            </td>
-                                        </tr>
-                                        <?php else: foreach ($room_reservations as $rr):
-                                            $rr_pill = 'pill-waiting';
-                                            if ($rr['status'] === 'Approved')   $rr_pill = 'pill-approved';
-                                            if ($rr['status'] === 'Declined')   $rr_pill = 'pill-declined';
-                                            if ($rr['status'] === 'Cancelled')  $rr_pill = 'pill-cancelled';
 
-                                            // Submitted-as label
-                                            $rr_submitted = match ($rr['submitted_as']) {
-                                                'adviser'  => 'Adviser',
-                                                'student'  => 'Student (via code)',
-                                                default    => 'Personal',
-                                            };
-
-                                            // Time display  08:00:00 → 8:00 AM
-                                            $fmt_time = function (string $t): string {
-                                                return date('g:i A', strtotime('1970-01-01 ' . $t));
-                                            };
-                                        ?>
-                                            <tr data-rr-status="<?php echo htmlspecialchars($rr['status']); ?>"
-                                                data-rr-id="<?php echo (int)$rr['id']; ?>"
-                                                data-rr-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
-                                                data-rr-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
-                                                data-rr-start="<?php echo htmlspecialchars($rr['start_time']); ?>"
-                                                data-rr-end="<?php echo htmlspecialchars($rr['end_time']); ?>">
-                                                <td class="fw-bold"><?php echo htmlspecialchars($rr['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($rr['floor_label'] . ', ' . $rr['building_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($rr['reservation_date'])); ?></td>
-                                                <td style="white-space:nowrap;">
-                                                    <?php echo $fmt_time($rr['start_time']) . ' – ' . $fmt_time($rr['end_time']); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($rr['purpose']); ?></td>
-                                                <td><?php echo htmlspecialchars($rr_submitted); ?></td>
-                                                <td>
-                                                    <span class="status-pill <?php echo $rr_pill; ?>">
-                                                        <?php echo htmlspecialchars($rr['status']); ?>
-                                                    </span>
-                                                </td>
-                                                <td style="color:var(--color-on-surface-variant);font-size:.8rem;">
-                                                    <?php echo $rr['reason'] ? htmlspecialchars($rr['reason']) : '—'; ?>
-                                                </td>
-                                                <td>
-                                                    <?php
-                                                    // Cancel button: only for Approved, > 1h before start
-                                                    if ($rr['status'] === 'Approved') {
-                                                        date_default_timezone_set('Asia/Manila');
-                                                        $resStart = new DateTime(
-                                                            $rr['reservation_date'] . ' ' . $rr['start_time'],
-                                                            new DateTimeZone('Asia/Manila')
-                                                        );
-                                                        $nowPhp = new DateTime('now', new DateTimeZone('Asia/Manila'));
-                                                        $canCancel = ($resStart->getTimestamp() - $nowPhp->getTimestamp()) > 3600;
-                                                        if ($canCancel): ?>
-                                                            <button class="btn-action btn-cancel-rr"
-                                                                data-action="cancel-reservation"
-                                                                data-rr-id="<?php echo (int)$rr['id']; ?>"
-                                                                data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
-                                                                title="Cancel this reservation">
-                                                                <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
-                                                                Cancel
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <span style="color:var(--color-on-surface-variant);font-size:.75rem;" title="Cannot cancel within 1 hour of start time">—</span>
-                                                        <?php endif;
-                                                    } elseif ($rr['status'] === 'Declined') {
-                                                        // Offer waitlist join for Declined reservations
-                                                        ?>
-                                                        <button class="btn-action btn-waitlist-rr"
-                                                            data-action="join-waitlist"
-                                                            data-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
-                                                            data-res-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
-                                                            data-start-time="<?php echo htmlspecialchars($rr['start_time']); ?>"
-                                                            data-end-time="<?php echo htmlspecialchars($rr['end_time']); ?>"
-                                                            title="Join waitlist for this slot">
-                                                            <span class="material-symbols-outlined" style="font-size:15px;">notifications</span>
-                                                            Waitlist
-                                                        </button>
-                                                    <?php } else { ?>
-                                                        <span style="color:var(--color-on-surface-variant);font-size:.75rem;">—</span>
-                                                    <?php } ?>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rooms-history -->
-
-            </div><!-- /panel-rooms (wraps both sub-panels) -->
+            </div><!-- /panel-rooms -->
 
             <!-- ============================================================
                  TAB: MY ACTIVITY
@@ -2612,11 +2448,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 $act_stat_current = $act_current ? (int) mysqli_num_rows($act_current) : 0;
                 $act_stat_upcoming = $act_upcoming ? (int) mysqli_num_rows($act_upcoming) : 0;
 
-                $act_stat_waiting = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe' AND status='Waiting'"
-                ))['c'] ?? 0;
 
                 $act_stat_overdue = mysqli_fetch_assoc(mysqli_query(
                     $conn,
@@ -2700,7 +2531,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <div class="fact-stat">
                         <span class="fact-stat-value"><?php echo $act_stat_upcoming; ?></span>
                         <span class="fact-stat-label">Upcoming equipment</span>
-                        <span class="fact-stat-sub"><?php echo (int) $act_stat_waiting > 0 ? (int) $act_stat_waiting . ' awaiting approval' : 'None waiting'; ?></span>
+                        <span class="fact-stat-sub"><?php echo $act_stat_upcoming > 0 ? 'Not started yet' : 'None scheduled'; ?></span>
                     </div>
                     <div class="fact-stat">
                         <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
@@ -2776,6 +2607,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     <div class="fact-bar" aria-hidden="true"><i class="<?php echo $isOverdue ? 'is-overdue' : ''; ?>" style="width:<?php echo (int) $prog['pct']; ?>%"></i></div>
                                                 </div>
                                                 <div class="fact-item-actions">
+                                                    <?php if (!empty($r['return_token'])): ?>
+                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"
+                                                            data-token="<?php echo htmlspecialchars($r['return_token'], ENT_QUOTES); ?>"
+                                                            data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
+                                                            <span class="material-symbols-outlined">qr_code_2</span>Return QR
+                                                        </button>
+                                                    <?php endif; ?>
                                                     <?php if (!$isOverdue): ?>
                                                         <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">Extend</button>
                                                     <?php endif; ?>

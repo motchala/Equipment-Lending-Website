@@ -342,6 +342,10 @@
 
     /* ── Lending Sub-Sections ──────────────────────────────────────────── */
     function switchLendingSub(subName) {
+        /* Equipment now has a single view. An old bookmark, history entry or
+           link that still names a removed section (e.g. "requests") falls back
+           to it, so the panel can never end up blank. */
+        if (subName !== 'browse') subName = 'browse';
         const sub = document.getElementById('lending-' + subName);
         if (sub) sub.classList.add('active');
         /* Scope to #panel-lending only — prevents wiping the active state of
@@ -1058,12 +1062,17 @@
     function goToNotifLink(n) {
         const l = n && n.link;
         if (!l || !l.tab) return;
+        let tab = l.tab;
+        let sub = l.sub || null;
+        // My Requests / My Reservations are no longer inner tabs; links that
+        // used to open them now open My Activity.
+        if ((tab === 'lending' && sub === 'requests') || (tab === 'rooms' && sub === 'history')) {
+            tab = 'activity';
+            sub = null;
+        }
         closeNotifModal();
-        // Only the lending tab records its sub-section in the history state
-        // (that's all _restoreNav understands); rooms sub-tabs are switched directly.
-        switchTab(l.tab, l.tab === 'lending' ? (l.sub || null) : null);
-        if (l.tab === 'lending' && l.sub) switchLendingSub(l.sub);
-        if (l.tab === 'rooms' && l.sub) switchRoomsSub(l.sub);
+        switchTab(tab, tab === 'lending' ? sub : null);
+        if (tab === 'lending' && sub) switchLendingSub(sub);
     }
 
     /* ── Rendering ────────────────────────────────────────────────── */
@@ -2149,107 +2158,9 @@
         }
     });
 
-    /* ── Requests Table — Client-Side Render ───────────────────────────── */
-    let _reqCurrentFilter = 'All';
-    let _reqSortOrder = 'desc'; // desc = latest first
-
-    /* "13:30:00" -> " · 1:30 PM" (empty when the request has no time, e.g. older requests) */
-    function _whenTime(t) {
-        if (!t) return '';
-        const p = String(t).split(':'), h = +p[0], m = +p[1];
-        if (isNaN(h) || isNaN(m)) return '';
-        return ' &middot; ' + ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + ' ' + (h < 12 ? 'AM' : 'PM');
-    }
-
     function _escHtml(str) {
         if (!str) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function _statusPill(status) {
-        const map = {
-            'Waiting': { cls: 'status-waiting', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', label: 'Pending' },
-            'Approved': { cls: 'status-approved', icon: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', label: 'Approved' },
-            'Declined': { cls: 'status-declined', icon: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>', label: 'Declined' },
-            'Overdue': { cls: 'status-overdue', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', label: 'Overdue' },
-            'Returned': { cls: 'status-returned', icon: '<polyline points="20 6 9 17 4 12"/>', label: 'Returned' },
-        };
-        const d = map[status] || map['Waiting'];
-        const sa = `xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle;"`;
-        return `<span class="status-pill ${d.cls}"><svg ${sa}>${d.icon}</svg>${d.label}</span>`;
-    }
-
-    function renderRequestsTable() {
-        const tbody = document.getElementById('requestsTbody');
-        if (!tbody) return;
-        const data = (window.REQUESTS_DATA || []).slice();
-
-        // Sort
-        data.sort((a, b) => {
-            const da = new Date(a.request_date || a.borrow_date || '2000-01-01');
-            const db = new Date(b.request_date || b.borrow_date || '2000-01-01');
-            return _reqSortOrder === 'desc' ? db - da : da - db;
-        });
-
-        // Filter
-        const filtered = _reqCurrentFilter === 'All' ? data : data.filter(r => {
-            const s = (r.status || '').trim();
-            if (_reqCurrentFilter === 'Waiting') return s === 'Waiting';
-            return s === _reqCurrentFilter;
-        });
-
-        if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8"><div class="table-empty"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36" style="width:36px;height:36px;display:block;margin:0 auto 8px;opacity:0.7;"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>No requests found for this filter.</div></td></tr>`;
-            return;
-        }
-
-        tbody.innerHTML = filtered.map(r => {
-            const noteCol = r.status === 'Declined'
-                ? `<span style="font-size:0.8rem;color:var(--text-light);">${_escHtml(r.reason)}</span>`
-                : r.status === 'Overdue'
-                    ? `<span style="font-size:0.8rem;color:var(--color-warning);font-weight:600;">Past due: ${_escHtml(r.return_date)}</span>`
-                    : '—';
-
-            // Dedicated Return QR column — shown for Approved/Overdue rows with a token
-            const qrBtn = (r.status === 'Approved' || r.status === 'Overdue') && r.return_token
-                ? `<button class="btn-show-qr" data-action="show-return-qr"
-                       data-token="${_escHtml(r.return_token)}"
-                       data-equipment="${_escHtml(r.equipment_name)}"
-                       title="Show return QR code">
-                       <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">qr_code_2</span>Return QR
-                   </button>`
-                : '—';
-
-            return `<tr class="${r.status === 'Overdue' ? 'row-overdue' : ''}">
-                        <td><strong>${_escHtml(r.equipment_name)}</strong></td>
-                        <td>${_escHtml(r.instructor)}</td>
-                        <td>${_escHtml(r.room)}</td>
-                        <td>${_escHtml(r.borrow_date)}${_whenTime(r.borrow_time)}</td>
-                        <td>${_escHtml(r.return_date)}</td>
-                        <td>${_statusPill(r.status)}</td>
-                        <td>${noteCol}</td>
-                        <td>${qrBtn}</td>
-                    </tr>`;
-        }).join('');
-    }
-
-    function setRequestsFilter(status) {
-        _reqCurrentFilter = status;
-        const dd = document.getElementById('reqStatusFilter');
-        if (dd) dd.value = status === 'Waiting' ? 'Waiting' : status;
-        renderRequestsTable();
-    }
-
-    function toggleReqSort() {
-        _reqSortOrder = _reqSortOrder === 'desc' ? 'asc' : 'desc';
-        const lbl = document.getElementById('reqSortLabel');
-        const btn = document.getElementById('reqSortBtn');
-        if (lbl) lbl.textContent = _reqSortOrder === 'desc' ? 'Latest First' : 'Oldest First';
-        if (btn) {
-            const svg = btn.querySelector('svg');
-            if (svg) svg.style.transform = _reqSortOrder === 'asc' ? 'rotate(180deg)' : '';
-        }
-        renderRequestsTable();
     }
 
     let _prevOverdueCount = null; // null = baseline not yet established
@@ -2331,18 +2242,6 @@
                     if (t) t.style.display = 'none';
                     break;
                 }
-                case 'filter-requests':
-                    // From stat card click — go to My Requests tab with filter
-                    switchTab('lending', 'requests');
-                    switchLendingSub('requests');
-                    setRequestsFilter(el.dataset.status);
-                    break;
-                case 'filter-requests-dd':
-                    setRequestsFilter(el.value);
-                    break;
-                case 'toggle-sort':
-                    toggleReqSort();
-                    break;
                 case 'go-tab':
                     switchTab(el.dataset.tab, el.dataset.lending || null);
                     if (el.dataset.lending) switchLendingSub(el.dataset.lending);
@@ -2687,39 +2586,6 @@
         });
     });
 
-    /* ── Lending sub-nav ──────────────────────────────────────────────── */
-    document.querySelectorAll('.lending-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            switchLendingSub(this.dataset.lendingNav);
-        });
-    });
-
-    /* ── Rooms sub-nav (Browse Facilities | My Reservations) ─────────── */
-    function switchRoomsSub(subName) {
-        const sub = document.getElementById('rooms-' + subName);
-        if (sub) sub.classList.add('active');
-        document.querySelectorAll('[data-rooms-nav]').forEach(b => b.classList.remove('active'));
-        const btn = document.querySelector('[data-rooms-nav="' + subName + '"]');
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('#panel-rooms .lending-sub').forEach(s => {
-            if (s !== sub) s.classList.remove('active');
-        });
-    }
-
-    document.querySelectorAll('[data-rooms-nav]').forEach(btn => {
-        btn.addEventListener('click', function () {
-            switchRoomsSub(this.dataset.roomsNav);
-        });
-    });
-
-    /* ── Room reservations status filter ─────────────────────────────── */
-    const roomResFilter = document.getElementById('roomResStatusFilter');
-    if (roomResFilter) {
-        roomResFilter.addEventListener('change', function () {
-            _applyResFilter();
-        });
-    }
-
     /* ── Account sub-nav — removed in unified settings card layout ──────── */
     // document.querySelectorAll('.acc-nav-btn').forEach(btn => {
     //     btn.addEventListener('click', function () { switchAccTab(this.dataset.accTab); });
@@ -2765,12 +2631,6 @@
         });
     });
 
-    /* ── Requests status filter dropdown ──────────────────────────────── */
-    const reqStatusFilter = document.getElementById('reqStatusFilter');
-    if (reqStatusFilter) reqStatusFilter.addEventListener('change', function () {
-        setRequestsFilter(this.value);
-    });
-
     /* ── Equipment search/filter ──────────────────────────────────────── */
     const eqSearch = document.getElementById('equipmentSearch');
     const eqCat = document.getElementById('categoryFilter');
@@ -2785,9 +2645,7 @@
     const globalSearch = GLOBAL_SEARCH_ENABLED ? document.getElementById('globalSearch') : null;
     const globalSearchSelector = [
         '#panel-lending .item-node',
-        '#panel-lending #requestsTbody tr',
         '#panel-rooms .fcty-campus-card',
-        '#panel-rooms #roomReservationsTable tbody tr',
         '#panel-activity #myactHistList .myact-history-row'
     ].join(',');
 
@@ -2900,7 +2758,6 @@
             }, 5000);
         }
         initBorrowForm();
-        renderRequestsTable();
         checkOverdueState();
         const overdueToastEl = document.getElementById('overdue-alert');
         if (overdueToastEl && overdueToastEl.dataset.shouldShow === '1') showOverdueToast();
@@ -3687,7 +3544,6 @@
     function _updateFacultyStatCards(data) {
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
-            waiting: data.filter(r => r.status === 'Waiting').length,
             overdue: data.filter(r => r.status === 'Overdue').length,
             total: data.length,
         };
@@ -3779,10 +3635,6 @@
                             if (prev !== undefined) {
                                 if (r.status === 'Returned') {
                                     showToast(r.equipment_name + ' has been marked as Returned.', 'success');
-                                } else if (r.status === 'Approved') {
-                                    showToast(r.equipment_name + ' request has been Approved!', 'success');
-                                } else if (r.status === 'Declined') {
-                                    showToast(r.equipment_name + ' request was Declined.', 'error');
                                 }
                             }
                         }
@@ -3792,7 +3644,6 @@
                         // Update the global data and re-render
                         window.REQUESTS_DATA = fresh;
                         window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
-                        renderRequestsTable();
                         checkOverdueState();
                         _updateFacultyStatCards(fresh);
                     }
@@ -3801,136 +3652,15 @@
         }, INTERVAL);
     }
 
-    /* ── Room Reservations Live Polling ────────────────────────────────── */
-
-    /**
-     * Format a "HH:MM:SS" or "HH:MM" time string to "h:mm AM/PM".
-     * Mirrors the PHP $fmt_time closure used when rendering server-side.
-     */
-    function _fmtResTime(t) {
-        if (!t) return '';
-        var parts = t.split(':');
-        var h = parseInt(parts[0], 10);
-        var m = parts[1] || '00';
-        var period = h >= 12 ? 'PM' : 'AM';
-        var h12 = h % 12 || 12;
-        return h12 + ':' + m + ' ' + period;
-    }
-
-    /** Build a single <tr> string from a reservation row object. */
-    function _buildResRow(rr) {
-        var pillClass = 'pill-waiting';
-        if (rr.status === 'Approved') pillClass = 'pill-approved';
-        if (rr.status === 'Declined') pillClass = 'pill-declined';
-        if (rr.status === 'Cancelled') pillClass = 'pill-cancelled';
-
-        var submittedLabel = 'Personal';
-        if (rr.submitted_as === 'adviser') submittedLabel = 'Adviser';
-        if (rr.submitted_as === 'student') submittedLabel = 'Student (via code)';
-
-        // Format date: "2025-07-19" → "Jul 19, 2025"
-        var dateStr = rr.reservation_date || '';
-        try {
-            var dp = dateStr.split('-');
-            if (dp.length === 3) {
-                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                dateStr = months[parseInt(dp[1], 10) - 1] + ' '
-                    + parseInt(dp[2], 10) + ', ' + dp[0];
-            }
-        } catch (e) { /* keep raw string */ }
-
-        var timeStr = _fmtResTime(rr.start_time) + ' \u2013 ' + _fmtResTime(rr.end_time);
-        var location = _escHtml((rr.floor_label || '') + ', ' + (rr.building_name || ''));
-        var reason = rr.reason ? _escHtml(rr.reason) : '\u2014';
-
-        // Actions cell
-        var actionCell = '\u2014';
-        if (rr.status === 'Approved' && rr.can_cancel) {
-            actionCell = '<button class="btn-action btn-cancel-rr"'
-                + ' data-action="cancel-reservation"'
-                + ' data-rr-id="' + _escHtml(String(rr.id)) + '"'
-                + ' data-room-name="' + _escHtml(rr.room_name) + '"'
-                + ' title="Cancel this reservation">'
-                + '<span class="material-symbols-outlined" style="font-size:15px;">cancel</span> Cancel'
-                + '</button>';
-        } else if (rr.status === 'Approved' && !rr.can_cancel) {
-            actionCell = '<span style="color:var(--color-on-surface-variant);font-size:.75rem;"'
-                + ' title="Cannot cancel within 1 hour of start time">\u2014</span>';
-        } else if (rr.status === 'Declined') {
-            actionCell = '<button class="btn-action btn-waitlist-rr"'
-                + ' data-action="join-waitlist"'
-                + ' data-room-id="' + _escHtml(String(rr.room_id || '')) + '"'
-                + ' data-room-name="' + _escHtml(rr.room_name) + '"'
-                + ' data-res-date="' + _escHtml(rr.reservation_date) + '"'
-                + ' data-start-time="' + _escHtml(rr.start_time) + '"'
-                + ' data-end-time="' + _escHtml(rr.end_time) + '"'
-                + ' title="Join waitlist for this slot">'
-                + '<span class="material-symbols-outlined" style="font-size:15px;">notifications</span> Waitlist'
-                + '</button>';
-        }
-
-        return '<tr data-rr-status="' + _escHtml(rr.status) + '">'
-            + '<td class="fw-bold">' + _escHtml(rr.room_name) + '</td>'
-            + '<td>' + location + '</td>'
-            + '<td>' + _escHtml(dateStr) + '</td>'
-            + '<td style="white-space:nowrap;">' + _escHtml(timeStr) + '</td>'
-            + '<td>' + _escHtml(rr.purpose) + '</td>'
-            + '<td>' + _escHtml(submittedLabel) + '</td>'
-            + '<td><span class="status-pill ' + pillClass + '">'
-            + _escHtml(rr.status) + '</span></td>'
-            + '<td style="color:var(--color-on-surface-variant);font-size:.8rem;">'
-            + reason + '</td>'
-            + '<td>' + actionCell + '</td>'
-            + '</tr>';
-    }
-
-    /**
-     * Re-render the reservations tbody from a fresh array of row objects.
-     * Respects the current status-filter selection.
-     */
-    function renderReservationsTable(rows) {
-        var tbody = document.getElementById('roomReservationsTbody');
-        if (!tbody) return;
-
-        if (!rows || rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;'
-                + 'padding:2.5rem;color:var(--color-on-surface-variant);'
-                + 'font-size:.875rem;">No room reservations yet.</td></tr>';
-            _applyResFilter();
-            return;
-        }
-
-        tbody.innerHTML = rows.map(_buildResRow).join('');
-        _applyResFilter();
-
-        // Keep the badge count on the "My Reservations" nav button in sync
-        var badge = document.querySelector('[data-rooms-nav="history"] .lnb-badge');
-        if (badge) {
-            badge.textContent = rows.length;
-            badge.style.display = rows.length ? '' : 'none';
-        }
-    }
-
-    /** Apply the current dropdown filter to visible rows (non-destructive). */
-    function _applyResFilter() {
-        var filter = document.getElementById('roomResStatusFilter');
-        var val = filter ? filter.value : 'All';
-        document.querySelectorAll('#roomReservationsTbody tr[data-rr-status]').forEach(function (row) {
-            row.style.display = (val === 'All' || row.dataset.rrStatus === val) ? '' : 'none';
-        });
-    }
-
-    /**
-     * Poll room-reservation/api/poll-reservations.php every 10 seconds.
-     * Shows a toast when a reservation status changes (e.g. Approved→Declined
-     * after a conflict is detected by a later admin action).
-     * Runs an immediate fetch on call so the table is populated before the
-     * first interval fires.
-     */
+    /* -- Room Reservation Notices ---------------------------------------- */
+    /* Reservations are accepted on the spot, and My Activity refreshes its own
+       room list (faculty-activity.js), so there is no table to keep in sync
+       here any more. This only watches for one thing: an admin cancelling a
+       reservation, which is reported with a toast. */
     function startReservationsPolling() {
-        const INTERVAL = 10000; // 10 seconds — reservations change less often than equipment requests
+        const INTERVAL = 10000; // 10 seconds
         var lastStatuses = {};
+        var primed = false;
 
         function doPoll() {
             fetch('room-reservation/api/poll-reservations.php', {
@@ -3940,45 +3670,23 @@
                 .then(function (r) { if (!r.ok) return null; return r.json(); })
                 .then(function (rows) {
                     if (!Array.isArray(rows)) return;
-
-                    var changed = false;
-
                     rows.forEach(function (rr) {
                         var prev = lastStatuses[rr.id];
-                        if (prev !== rr.status) {
-                            changed = true;
-                            if (prev !== undefined) {
-                                // Status transitioned after initial load — notify user
-                                if (rr.status === 'Approved') {
-                                    showToast('Room reservation for ' + rr.room_name + ' was Approved!', 'success');
-                                } else if (rr.status === 'Declined') {
-                                    showToast('Room reservation for ' + rr.room_name + ' was Declined.', 'error');
-                                } else if (rr.status === 'Cancelled') {
-                                    showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
-                                }
-                            }
-                            lastStatuses[rr.id] = rr.status;
+                        if (primed && prev !== undefined && prev !== rr.status && rr.status === 'Cancelled') {
+                            showToast('Your reservation for ' + rr.room_name + ' was cancelled by admin.', 'error');
                         }
+                        lastStatuses[rr.id] = rr.status;
                     });
-
-                    // Always re-render on first poll (prev is empty) so the table
-                    // reflects server state even if PHP rendered stale data on page load.
-                    if (changed || Object.keys(lastStatuses).length === 0) {
-                        // Populate initial snapshot on the very first pass
-                        if (Object.keys(lastStatuses).length === 0) {
-                            rows.forEach(function (rr) { lastStatuses[rr.id] = rr.status; });
-                        }
-                        renderReservationsTable(rows);
-                    }
+                    primed = true;
                 })
                 .catch(function () { /* silently ignore network errors */ });
         }
 
-        doPoll();                       // fire immediately on call
+        doPoll();                       // establish the baseline immediately
         setInterval(doPoll, INTERVAL);  // then every 10 seconds
 
-        /* Immediate refresh when the user submits a reservation — fired by
-           fcty-facilities.js after a successful submit-faculty-reserve call. */
+        /* Re-baseline right after the user submits or cancels a reservation so
+           the change is never mistaken for an admin action. */
         document.addEventListener('pupsync:reservation-submitted', doPoll);
     }
 

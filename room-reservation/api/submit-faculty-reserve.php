@@ -269,6 +269,14 @@ $ins->close();
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
 ArbitrationEngine::processRoomReservation($conn, $reservation_id);
 
+// ── A declined reservation is never kept: tell the user on the spot ───────
+$declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
+if ($declined_reason !== null) {
+    fcty_quota_unlock($conn, $faculty_id);
+    echo json_encode(['error' => $declined_reason]);
+    exit();
+}
+
 // ── Read final status ─────────────────────────────────────────────────────
 $status_stmt = $conn->prepare(
     "SELECT status, reason FROM tbl_room_reservations WHERE id = ? LIMIT 1"

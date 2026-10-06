@@ -489,6 +489,7 @@
             const itemId = card.dataset.linkItemId;
             if (!itemId) return;
             setTimeout(() => {
+                if (typeof window.psInventoryRevealRow === 'function') window.psInventoryRevealRow(itemId);
                 const row = document.querySelector('.inv-row-item[data-item-id="' + itemId + '"]');
                 if (!row) return;
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1251,29 +1252,141 @@
         });
     }
 
-    /* ── Equipment search (client-side) ──────────────────────────
+    /* ── Equipment list: client-side search + pagination ─────────
        NOTE: this intentionally does NOT use setupLiveSearch(). That
        helper replaces the container's innerHTML with whatever
-       live-search.php's ?section=inventory case returns — old
-       Bootstrap <tr>/<td> markup, meant for a <table>. #inventory-body
-       is a plain <div> of .inv-row-item cards, not a table, so that
-       swap produced invalid/garbled HTML (and it stayed garbled after
-       clearing the search, since an empty query still replaces the
-       real card markup with the old table-row markup). Filtering the
-       cards that are already in the DOM avoids all of that — nothing
-       is ever replaced, so there's nothing to garble. ── */
-    function setupInventorySearch() {
-        const input = document.getElementById('inventorySearch');
+       live-search.php's ?section=inventory case returns (old
+       Bootstrap markup), which garbled the list. Instead every
+       <tr.inv-row-item> is rendered once by PHP and this function only
+       shows/hides them: filter by the search box, then show 10 rows
+       per page. Nothing is ever replaced, so there's nothing to garble. */
+    function setupInventoryList() {
+        const PAGE_SIZE = 10;
         const body = document.getElementById('inventory-body');
-        if (!input || !body) return;
-        input.addEventListener('input', function () {
-            const q = this.value.trim().toLowerCase();
-            body.querySelectorAll('.inv-row-item').forEach(function (row) {
-                const name = (row.dataset.itemName || '').toLowerCase();
-                const cat = (row.dataset.itemCategory || '').toLowerCase();
-                row.style.display = (!q || name.includes(q) || cat.includes(q)) ? '' : 'none';
-            });
+        if (!body) return;
+
+        const input = document.getElementById('inventorySearch');
+        const rows = Array.from(body.querySelectorAll('tr.inv-row-item'));
+        const noMatch = document.getElementById('inv-nomatch-row');
+        const pager = document.getElementById('inv-pager');
+        const info = document.getElementById('inv-pager-info');
+        const ctl = document.getElementById('inv-pager-ctl');
+        const nums = document.getElementById('inv-pg-nums');
+        const prevBtn = document.getElementById('inv-pg-prev');
+        const nextBtn = document.getElementById('inv-pg-next');
+        let query = '';
+        let page = 1;
+
+        // Thumbnail fallback (replaces the old inline onerror handler).
+        rows.forEach(function (row) {
+            const img = row.querySelector('.inv-thumb img');
+            if (!img) return;
+            const thumb = img.closest('.inv-thumb');
+            const broken = function () { if (thumb) thumb.classList.add('is-broken'); };
+            img.addEventListener('error', broken);
+            if (img.complete && img.naturalWidth === 0) broken();
         });
+
+        function matches(row) {
+            if (!query) return true;
+            const d = row.dataset;
+            return [d.itemName, d.itemCategory, d.itemCondition].some(function (v) {
+                return (v || '').toLowerCase().includes(query);
+            });
+        }
+
+        // 1 … 4 5 6 … 12 — always first, last and the current page ±1.
+        function pageList(total, current) {
+            const keep = new Set([1, total, current - 1, current, current + 1]);
+            const list = [];
+            let last = 0;
+            Array.from(keep).filter(function (n) { return n >= 1 && n <= total; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function render() {
+            const hits = rows.filter(matches);
+            const total = hits.length;
+            const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            page = Math.min(Math.max(page, 1), pages);
+            const start = (page - 1) * PAGE_SIZE;
+            const end = Math.min(start + PAGE_SIZE, total);
+            const visible = new Set(hits.slice(start, end));
+
+            rows.forEach(function (row) {
+                row.classList.toggle('inv-row-hidden', !visible.has(row));
+            });
+            if (noMatch) noMatch.classList.toggle('inv-row-hidden', !(rows.length > 0 && total === 0));
+
+            if (!pager) return;
+            pager.hidden = rows.length === 0;
+            if (info) {
+                info.textContent = total
+                    ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
+                    : 'No results';
+            }
+            if (ctl) ctl.hidden = pages <= 1;
+            if (prevBtn) prevBtn.disabled = page <= 1;
+            if (nextBtn) nextBtn.disabled = page >= pages;
+            if (nums) {
+                nums.textContent = '';
+                pageList(pages, page).forEach(function (n) {
+                    if (n === 'gap') {
+                        const gap = document.createElement('span');
+                        gap.className = 'inv-pager-gap';
+                        gap.textContent = '\u2026';
+                        nums.appendChild(gap);
+                        return;
+                    }
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.dataset.page = String(n);
+                    btn.textContent = String(n);
+                    btn.setAttribute('aria-label', 'Page ' + n);
+                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    nums.appendChild(btn);
+                });
+            }
+        }
+
+        if (input) {
+            input.addEventListener('input', function () {
+                query = this.value.trim().toLowerCase();
+                page = 1;
+                render();
+            });
+        }
+        if (prevBtn) prevBtn.addEventListener('click', function () { page--; render(); });
+        if (nextBtn) nextBtn.addEventListener('click', function () { page++; render(); });
+        if (nums) {
+            nums.addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-page]');
+                if (!btn) return;
+                page = parseInt(btn.dataset.page, 10) || 1;
+                render();
+            });
+        }
+
+        // Lets notification deep-links open the page that holds a given item
+        // (clears any search so the row is guaranteed to be listed).
+        window.psInventoryRevealRow = function (itemId) {
+            query = '';
+            if (input) input.value = '';
+            const pos = rows.findIndex(function (r) { return r.dataset.itemId === String(itemId); });
+            if (pos < 0) return null;
+            page = Math.floor(pos / PAGE_SIZE) + 1;
+            render();
+            return rows[pos];
+        };
+
+        render();
     }
 
     /* ── Master event delegation ─────────────────────────────── */
@@ -2705,7 +2818,7 @@
         restoreState();
 
         initView();
-        initImageUpload(); // Add-equipment form (right column)
+        initImageUpload(); // Add-equipment form (left column)
         initImageUpload({ // Edit-equipment modal
             dropZone: 'eqm-dropZone',
             fileInput: 'eqm-itemImageInput',
@@ -2735,7 +2848,7 @@
         setupLiveSearch('returnSearch', 'return-body', 'approved');
         setupLiveSearch('approvedSearch', 'approved-list', 'approved');
         setupLiveSearch('declinedSearch', 'declined-list', 'declined');
-        setupInventorySearch(); // client-side filter — see note near its definition
+        setupInventoryList(); // client-side search + 10-per-page pagination — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
         // ── Arbitration log search (server-side, reload with query param) ──

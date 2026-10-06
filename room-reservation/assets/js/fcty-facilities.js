@@ -9,7 +9,6 @@
           room-reservation/api/poll-room-status.php    (live status)
           room-reservation/api/check-room-availability.php
           room-reservation/api/submit-faculty-reserve.php
-          room-reservation/api/join-waitlist.php
           room-reservation/api/submit-room-issue.php
    Icons: Material Symbols Outlined only.
 ================================================================ */
@@ -780,19 +779,11 @@
             btnSubmit.title = 'Room limit reached';
             setAlert(lim, 'warn', 'warning',
                 '<strong>Room limit reached</strong><br>You already have ' + quota.max +
-                ' active room reservations. Cancel one or wait until it ends to reserve another room.' +
+                ' active room reservations. Wait until one ends to reserve another room.' +
                 '<ul class="fcty-limit-list">' + (quota.reservations || []).map(function (r) {
                     return '<li>' + esc(r.room_name) + ' \u00b7 ' + longDate(parseYmd(r.date)) + ' \u00b7 ' +
                         minToLabel(timeToMin(r.start)) + ' \u2013 ' + minToLabel(timeToMin(r.end)) + '</li>';
-                }).join('') + '</ul>' +
-                '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-lim-history">' +
-                icon('receipt_long') + 'My reservations</button>');
-            var h = $('fcty-lim-history');
-            if (h) h.addEventListener('click', function () {
-                closeOverlay(formOverlay);
-                var tab = document.querySelector('[data-rooms-nav="history"]');
-                if (tab) tab.click();
-            });
+                }).join('') + '</ul>');
         }
 
         function loadQuota() {
@@ -925,7 +916,7 @@
                 noteEl.innerHTML = icon('schedule') + 'Checking the schedule\u2026';
             } else if (clash.length) {
                 noteEl.className = 'fcty-tl-note is-clash';
-                noteEl.innerHTML = icon('warning') + 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. You can still request it and join the waitlist.';
+                noteEl.innerHTML = icon('warning') + 'Overlaps ' + timeRange(clash[0].start, clash[0].end) + '. Pick another time.';
             } else {
                 noteEl.className = 'fcty-tl-note';
                 noteEl.innerHTML = icon('check_circle') + 'This time is free.';
@@ -1069,15 +1060,9 @@
                     document.dispatchEvent(new CustomEvent('pupsync:reservation-submitted'));
 
                     if (data.status === 'Declined') {
-                        setAlert(elMsg, 'error', 'cancel',
-                            '<strong>Not approved</strong>' + (data.reason ? '<br>' + esc(data.reason) : '') +
-                            '<br><button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-waitlist">' +
-                            icon('notifications') + 'Notify me if it opens up</button>');
-                        var wl = $('fcty-waitlist');
-                        if (wl) wl.addEventListener('click', function () {
-                            joinWaitlist(wl, room, st.date, minToHHMM(st.start), minToHHMM(st.end));
-                        });
-                        elMsg.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                        /* Nothing is queued or declined any more; if the server still
+                           refuses a slot, just say why and refresh the week view. */
+                        fail(data.reason || 'This room could not be reserved for that time.');
                         loadWeek();
                         return;
                     }
@@ -1091,57 +1076,31 @@
         });
 
         function showDone(data) {
-            var approved = data.status === 'Approved';
+            /* Every reservation is accepted immediately -- no "waiting" state. */
             $('fcty-tl-pick').classList.remove('is-clash');
             $('fcty-tl-note').className = 'fcty-tl-note';
-            $('fcty-tl-note').innerHTML = approved ? icon('check_circle') + 'Booked for you.' : icon('hourglass_top') + 'Waiting for approval.';
+            $('fcty-tl-note').innerHTML = icon('check_circle') + 'Booked for you.';
             $('fcty-res-main').innerHTML =
                 '<div class="fcty-done">' +
-                '<div class="fcty-done-badge' + (approved ? '' : ' is-wait') + '">' + icon(approved ? 'check_circle' : 'hourglass_top') + '</div>' +
-                '<h4>' + (approved ? 'You\u2019re all set' : 'Request received') + '</h4>' +
+                '<div class="fcty-done-badge">' + icon('check_circle') + '</div>' +
+                '<h4>You\u2019re all set</h4>' +
                 '<p>' + esc(data.room_name || room.name) + ' \u00b7 ' + longDate(parseYmd(st.date)) + '<br>' +
                 minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
                 (data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
                 (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Supporting letter attached</p>' : '') +
-                (approved && data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +
+                (data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +
                 '<div class="fcty-done-actions">' +
-                '<button type="button" class="fcty-btn fcty-btn-ghost" id="fcty-done-history">' + icon('receipt_long') + 'My reservations</button>' +
                 '<button type="button" class="fcty-btn fcty-btn-primary" id="fcty-done-close">Done</button>' +
                 '</div></div>';
             $('fcty-done-close').addEventListener('click', function () { closeOverlay(formOverlay); });
-            $('fcty-done-history').addEventListener('click', function () {
-                closeOverlay(formOverlay);
-                var tab = document.querySelector('[data-rooms-nav="history"]');
-                if (tab) tab.click();
-            });
             $('fcty-done-close').focus();
-            if (approved && quota) { quota.active = data.active; quota.remaining = Math.max(0, data.max - data.active); renderQuota(); }
+            if (quota && data.max) { quota.active = data.active; quota.remaining = Math.max(0, data.max - data.active); renderQuota(); }
         }
 
         refresh();
         loadWeek();
         serverCheck();
         loadQuota();
-    }
-
-    function joinWaitlist(btn, room, date, s, e) {
-        var label = icon('notifications') + 'Notify me if it opens up';
-        btn.disabled = true;
-        btn.textContent = 'Joining\u2026';
-        fetch(apiBase() + 'room-reservation/api/join-waitlist.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({
-                room_id: room.room_id, reservation_date: date, start_time: s, end_time: e, csrf_token: csrf()
-            })
-        })
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                if (d.error) { btn.disabled = false; btn.innerHTML = label; return; }
-                btn.innerHTML = icon('notifications_active') + (d.already ? 'Already on the waitlist' : 'You\u2019re on the waitlist');
-            })
-            .catch(function () { btn.disabled = false; btn.innerHTML = label; });
     }
 
     /* ══════════════════════════════════════════════════════════

@@ -1371,6 +1371,93 @@ class ArbitrationEngine
     }
 
     /**
+     * "Declined" is never kept for a NEW submission.
+     *
+     * Call right after process(). If the engine declined the request that was just inserted
+     * (stock, schedule clash, overdue borrower, duplicate, missing document ...), the row, its
+     * arbitration-log entries and its uploaded letter are removed and the decline reason is
+     * returned so the caller can tell the user on the spot. Returns null when the row was kept
+     * (Approved / Waiting), so callers carry on as before.
+     */
+    public static function discardIfDeclined(mysqli $conn, int $request_id): ?string
+    {
+        $s = $conn->prepare("SELECT status, reason, document_path FROM tbl_requests WHERE id = ? LIMIT 1");
+        if ($s === false) return null;
+        $s->bind_param('i', $request_id);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc();
+        $s->close();
+        if (!$row || (string)$row['status'] !== 'Declined') return null;
+
+        $reason = trim((string)($row['reason'] ?? ''));
+        if ($reason === '') $reason = 'This request could not be accepted.';
+
+        foreach (
+            [
+                'DELETE FROM tbl_arbitration_log WHERE request_id = ?',
+                'DELETE FROM tbl_requests WHERE id = ?',
+            ] as $sql
+        ) {
+            $d = $conn->prepare($sql);
+            if ($d === false) continue;
+            $d->bind_param('i', $request_id);
+            $d->execute();
+            $d->close();
+        }
+        self::discardUpload($conn, 'tbl_requests', (string)($row['document_path'] ?? ''));
+        return $reason;
+    }
+
+    /**
+     * Room version of discardIfDeclined(): call right after processRoomReservation().
+     * Returns the decline reason (row removed) or null (row kept).
+     */
+    public static function discardRoomIfDeclined(mysqli $conn, int $reservation_id): ?string
+    {
+        $s = $conn->prepare("SELECT status, reason, document_path FROM tbl_room_reservations WHERE id = ? LIMIT 1");
+        if ($s === false) return null;
+        $s->bind_param('i', $reservation_id);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc();
+        $s->close();
+        if (!$row || (string)$row['status'] !== 'Declined') return null;
+
+        $reason = trim((string)($row['reason'] ?? ''));
+        if ($reason === '') $reason = 'This room could not be reserved for that time.';
+
+        foreach (
+            [
+                'DELETE FROM tbl_room_arbitration_log WHERE reservation_id = ?',
+                'DELETE FROM tbl_room_reservations WHERE id = ?',
+            ] as $sql
+        ) {
+            $d = $conn->prepare($sql);
+            if ($d === false) continue;
+            $d->bind_param('i', $reservation_id);
+            $d->execute();
+            $d->close();
+        }
+        self::discardUpload($conn, 'tbl_room_reservations', (string)($row['document_path'] ?? ''));
+        return $reason;
+    }
+
+    /** Remove an uploaded letter once no remaining row points at it (batch requests share one file). */
+    private static function discardUpload(mysqli $conn, string $table, string $rel): void
+    {
+        if ($rel === '' || strpos($rel, '..') !== false || strpos($rel, 'uploads/') !== 0) return;
+        $c = $conn->prepare("SELECT COUNT(*) AS n FROM {$table} WHERE document_path = ?");
+        if ($c === false) return;
+        $c->bind_param('s', $rel);
+        $c->execute();
+        $n = (int)($c->get_result()->fetch_assoc()['n'] ?? 0);
+        $c->close();
+        if ($n === 0) {
+            $abs = dirname(__DIR__, 2) . '/' . $rel;
+            if (is_file($abs)) @unlink($abs);
+        }
+    }
+
+    /**
      * Return true if both times fall within operating hours (07:00–20:00).
      * Uses string comparison — valid for 'HH:MM' or 'HH:MM:SS' TIME values.
      *

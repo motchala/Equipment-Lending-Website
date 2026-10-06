@@ -153,9 +153,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      live in the Dashboard's top-right bell / avatar; Scan Return is a Quick Action card
                      on the Dashboard. (.nav-account-name stays on the span so the live name update in
                      admin-dashboard.js keeps working.) -->
-                <div class="nav-user" id="navAccountGroup" title="<?php echo htmlspecialchars($admin_role); ?>">
+                <div class="nav-user" id="navAccountGroup" hidden aria-hidden="true" style="display:none;" title="<?php echo htmlspecialchars($admin_role); ?>">
                     <span class="nav-label nav-account-name"><?php echo htmlspecialchars($admin_name); ?></span>
                 </div>
+                <!-- Settings: just under the divider line, directly above Log Out. data-tab="settings" is picked
+                     up by the generic .nav-item[data-tab] handler in admin-dashboard.js (same tab the Dashboard
+                     avatar opens). -->
+                <a class="nav-item" data-tab="settings" id="snav-settings" href="#">
+                    <span class="material-symbols-outlined">settings</span>
+                    <span class="nav-label">Settings</span>
+                </a>
                 <!-- Log Out — pinned to the very bottom of the sidebar -->
                 <a class="nav-item nav-signout" id="snav-logout" data-action="logout" href="#">
                     <span class="material-symbols-outlined">logout</span>
@@ -298,7 +305,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
                             $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
                             $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE()");
+                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE() AND status <> 'Declined'");
                             $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
                             ?>
                             <div class="ps-mini-stats">
@@ -373,7 +380,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </thead>
                                     <tbody>
                                         <?php
-                                        $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests ORDER BY request_date DESC LIMIT 5");
+                                        $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 5");
                                         if ($recent_req && mysqli_num_rows($recent_req) > 0):
                                             while ($rr = mysqli_fetch_assoc($recent_req)):
                                                 $badge = match ($rr['status']) {
@@ -411,7 +418,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="ps-card-body">
                             <?php
-                            $recent_act = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests ORDER BY request_date DESC LIMIT 6");
+                            $recent_act = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
                             if ($recent_act && mysqli_num_rows($recent_act) > 0):
                                 while ($ra = mysqli_fetch_assoc($recent_act)):
                                     $dot_active = in_array($ra['status'], ['Approved', 'Returned']) ? '' : 'ps-feed-dot--gray';
@@ -2206,218 +2213,245 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
 
-                    <!-- Split Layout -->
-                    <div class="inv-split-layout">
+                    <!-- Equipment layout: Add form (left) + All Equipment list (right).
+                         Same two-column pattern as the Faculty tab (.faculty-layout). -->
+                    <div class="faculty-layout inv-layout">
 
-                        <!-- LEFT: Equipment List -->
-                        <div class="inv-list-col">
-                            <div class="eq-card inv-list-card" id="inv-table-card">
-                                <div class="inv-list-header">
-                                    <h3 class="inv-list-title">
-                                        <span class="material-symbols-outlined">inventory_2</span>
-                                        All Equipment (<?php echo mysqli_num_rows($inventory_result); ?>)
-                                    </h3>
-                                    <input type="text" id="inventorySearch" class="inv-search-ctrl"
-                                        placeholder="Search...">
-                                </div>
-                                <div class="inv-list-body" id="inventory-body">
-                                    <?php
-                                    mysqli_data_seek($inventory_result, 0);
-                                    if (mysqli_num_rows($inventory_result) === 0): ?>
-                                        <div class="inv-empty-state">
-                                            <span class="material-symbols-outlined">inventory_2</span>
-                                            <p>Inventory is empty.</p>
-                                        </div>
-                                        <?php else: while ($item = mysqli_fetch_assoc($inventory_result)): ?>
-                                            <div class="inv-row-item"
-                                                data-item-id="<?php echo (int)$item['item_id']; ?>"
-                                                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
-                                                data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
-                                                data-item-quantity="<?php echo (int)$item['quantity']; ?>"
-                                                data-item-condition="<?php echo htmlspecialchars($item['condition'] ?? 'Good', ENT_QUOTES); ?>"
-                                                data-item-description="<?php echo htmlspecialchars($item['description'] ?? '', ENT_QUOTES); ?>"
-                                                data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
-                                                data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
-                                                <div class="inv-row-thumb">
-                                                    <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                        alt="<?php echo htmlspecialchars($item['item_name']); ?>"
-                                                        onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
-                                                    <div class="inv-thumb-ph">
-                                                        <span class="material-symbols-outlined">inventory_2</span>
-                                                    </div>
-                                                </div>
-                                                <div class="inv-row-info">
-                                                    <div class="i-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                                    <div class="i-cat"><?php echo htmlspecialchars($item['category']); ?></div>
-                                                </div>
-                                                <div class="inv-row-qty">
-                                                    <div class="q-val<?php
-                                                                        if ($item['quantity'] == 0)     echo ' q-none';
-                                                                        elseif ($item['quantity'] <= 2) echo ' q-low';
-                                                                        ?>">
-                                                        <?php echo $item['quantity']; ?>
-                                                    </div>
-                                                    <div class="q-lbl"><?php
-                                                                        if ($item['quantity'] > 2)     echo 'in stock';
-                                                                        elseif ($item['quantity'] > 0) echo 'low stock';
-                                                                        else                           echo 'no stock';
-                                                                        ?></div>
-                                                </div>
-                                                <div class="inv-row-actions">
-                                                    <button type="button" class="btn-inv-edit" title="Edit item"
-                                                        data-action="eq-open-edit">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                            fill="none" stroke="currentColor" stroke-width="2"
-                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                            width="14" height="14">
-                                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                    <?php endwhile;
-                                    endif; ?>
-                                </div>
+                        <!-- ADD EQUIPMENT FORM -->
+                        <div class="eq-card inv-form-card" id="item-form-wrap">
+                            <div class="eq-card-header">
+                                <h2>
+                                    <span class="material-symbols-outlined inv-head-icon">add_box</span>
+                                    <span id="form-title"><?php echo $edit_item ? 'Edit Equipment' : 'Add Equipment'; ?></span>
+                                </h2>
                             </div>
-                        </div><!-- /inv-list-col -->
+                            <div class="eq-card-body">
+                                <form method="POST" enctype="multipart/form-data" id="itemForm">
+                                    <?= csrf_field() ?>
+                                    <?php if ($edit_item): ?>
+                                        <input type="hidden" name="item_id"
+                                            value="<?php echo $edit_item['item_id']; ?>">
+                                        <input type="hidden" name="old_image"
+                                            value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
+                                    <?php endif; ?>
 
-                        <!-- RIGHT: Add / Edit Form -->
-                        <div class="inv-form-col">
-                            <div class="eq-card inv-form-card" id="item-form-wrap">
-                                <div class="inv-form-header">
-                                    <h3>
-                                        <span class="material-symbols-outlined">add_box</span>
-                                        <span id="form-title">
-                                            <?php echo $edit_item ? 'Edit Equipment' : 'Add / Edit Equipment'; ?>
-                                        </span>
-                                    </h3>
-                                </div>
-                                <div class="inv-form-body">
-                                    <form method="POST" enctype="multipart/form-data" id="itemForm">
-                                        <?= csrf_field() ?>
-                                        <?php if ($edit_item): ?>
-                                            <input type="hidden" name="item_id"
-                                                value="<?php echo $edit_item['item_id']; ?>">
-                                            <input type="hidden" name="old_image"
-                                                value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
-                                        <?php endif; ?>
+                                    <div class="fac-edit-section inv-section--first">Details</div>
 
+                                    <div class="form-group">
+                                        <label for="inv-item-name">Item name <span class="req-star">*</span></label>
+                                        <input type="text" id="inv-item-name" name="item_name"
+                                            class="form-control-custom" maxlength="150"
+                                            value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
+                                            placeholder="e.g. Extension Cord" required>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="inv-category">Category <span class="req-star">*</span></label>
+                                        <select id="inv-category" name="category"
+                                            class="form-control-custom inv-category-select" required>
+                                            <option value="">Select category...</option>
+                                            <?php
+                                            $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
+                                            foreach ($cats as $c) {
+                                                $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                                echo '<option value="' . htmlspecialchars($c) . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="fac-edit-section">Stock</div>
+
+                                    <div class="form-row">
                                         <div class="form-group">
-                                            <label>Item Name <span class="inv-req">*</span></label>
-                                            <input type="text" name="item_name" class="form-control-custom"
-                                                value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                                placeholder="e.g. Extension Cord" required>
+                                            <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
+                                            <input type="number" id="inv-quantity" name="quantity"
+                                                class="form-control-custom" min="0"
+                                                value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
+                                                required>
                                         </div>
-
                                         <div class="form-group">
-                                            <label>Category <span class="inv-req">*</span></label>
-                                            <select name="category" class="form-control-custom" required>
-                                                <option value="">Select category...</option>
+                                            <label for="inv-condition">Condition</label>
+                                            <select id="inv-condition" name="condition" class="form-control-custom">
                                                 <?php
-                                                $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
-                                                foreach ($cats as $c) {
-                                                    $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                    echo "<option value=\"$c\" $sel>$c</option>";
+                                                $cur_condition = $edit_item['condition'] ?? 'Good';
+                                                foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
+                                                    $sel = ($cur_condition === $condOpt) ? 'selected' : '';
+                                                    echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
                                                 }
                                                 ?>
                                             </select>
                                         </div>
+                                    </div>
 
-                                        <div class="form-group">
-                                            <label>Description</label>
-                                            <textarea name="description" class="form-control-custom" rows="3"
-                                                placeholder="Short description of the item..."></textarea>
+                                    <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
+
+                                    <div class="form-group">
+                                        <div class="drop-zone inv-drop" id="dropZone">
+                                            <span class="material-symbols-outlined">add_photo_alternate</span>
+                                            <p>Click, drag &amp; drop, or paste an image</p>
+                                            <p class="inv-drop-sub">JPG or PNG, up to 2 MB</p>
+                                            <input type="file" name="item_image" id="itemImageInput"
+                                                accept="image/jpeg,image/png" hidden>
+                                            <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
+                                                <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
+                                                    class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
+                                            <?php else: ?>
+                                                <img id="imagePreview" class="drop-zone-preview" alt="">
+                                            <?php endif; ?>
                                         </div>
+                                        <button type="button" id="removeImageBtn"
+                                            class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
+                                            &#x2715; Remove image
+                                        </button>
+                                    </div>
 
-                                        <div class="inv-form-row">
-                                            <div class="form-group">
-                                                <label>Quantity <span class="inv-req">*</span></label>
-                                                <input type="number" name="quantity" class="form-control-custom"
-                                                    min="0"
-                                                    value="<?php echo $edit_item ? $edit_item['quantity'] : '1'; ?>"
-                                                    required>
-                                            </div>
-                                            <div class="form-group">
-                                                <label>Condition</label>
-                                                <select name="condition" class="form-control-custom">
-                                                    <?php
-                                                    $cur_condition = $edit_item['condition'] ?? 'Good';
-                                                    foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
-                                                        $sel = ($cur_condition === $condOpt) ? 'selected' : '';
-                                                        echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
-                                                    }
-                                                    ?>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label>Item Image</label>
-                                            <div class="drop-zone" id="dropZone">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                    fill="none" stroke="currentColor" stroke-width="2"
-                                                    stroke-linecap="round" stroke-linejoin="round"
-                                                    width="32" height="32" style="color:var(--text-light)">
-                                                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                                                    <circle cx="8.5" cy="8.5" r="1.5" />
-                                                    <polyline points="21 15 16 10 5 21" />
-                                                </svg>
-                                                <p>Click to upload, drag &amp; drop, or paste an image</p>
-                                                <input type="file" name="item_image" id="itemImageInput"
-                                                    accept="image/jpeg,image/png" style="display:none;">
-                                                <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                                    <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
-                                                        class="drop-zone-preview" id="imagePreview" style="display:block;">
-                                                <?php else: ?>
-                                                    <img id="imagePreview" class="drop-zone-preview" style="display:none;">
-                                                <?php endif; ?>
-                                            </div>
-                                            <button type="button" id="removeImageBtn"
-                                                class="<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : 'hidden'; ?>"
-                                                style="margin-top:6px;font-size:0.75rem;color:var(--danger);background:none;border:none;cursor:pointer;">
-                                                &#x2715; Remove image
-                                            </button>
-                                        </div>
-
-                                        <div class="inv-form-actions">
-                                            <button type="submit"
-                                                name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
-                                                class="btn-inv-save">
+                                    <div class="inv-form-actions">
+                                        <button type="submit"
+                                            name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                                            class="ps-btn ps-btn--primary inv-submit">
+                                            <span class="material-symbols-outlined">save</span>
+                                            <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
+                                        </button>
+                                        <?php if ($edit_item): ?>
+                                            <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
+                                                class="btn-inv-delete" title="Archive item"
+                                                onclick="return confirm('Archive this item? It will no longer be available for lending, but borrow history is preserved.');">
                                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                     fill="none" stroke="currentColor" stroke-width="2"
                                                     stroke-linecap="round" stroke-linejoin="round"
                                                     width="15" height="15">
-                                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                    <polyline points="17 21 17 13 7 13 7 21" />
-                                                    <polyline points="7 3 7 8 15 8" />
+                                                    <polyline points="3 6 5 6 21 6" />
+                                                    <path d="M19 6l-1 14H6L5 6" />
+                                                    <path d="M10 11v6" />
+                                                    <path d="M14 11v6" />
+                                                    <path d="M9 6V4h6v2" />
                                                 </svg>
-                                                <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
-                                            </button>
-                                            <?php if ($edit_item): ?>
-                                                <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
-                                                    class="btn-inv-delete" title="Archive item"
-                                                    onclick="return confirm('Archive this item? It will no longer be available for lending, but borrow history is preserved.');">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                        width="15" height="15">
-                                                        <polyline points="3 6 5 6 21 6" />
-                                                        <path d="M19 6l-1 14H6L5 6" />
-                                                        <path d="M10 11v6" />
-                                                        <path d="M14 11v6" />
-                                                        <path d="M9 6V4h6v2" />
-                                                    </svg>
-                                                </a>
-                                            <?php endif; ?>
-                                        </div>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
 
-                                    </form>
+                                </form>
+                            </div><!-- /eq-card-body -->
+                        </div><!-- /inv-form-card -->
+
+
+                        <!-- ALL EQUIPMENT LIST -->
+                        <div class="eq-card inv-list-card" id="inv-table-card">
+                            <div class="eq-card-header fac-list-head">
+                                <h2>
+                                    <span class="material-symbols-outlined inv-head-icon">inventory_2</span>
+                                    All Equipment
+                                    <span class="fac-count-badge" id="inv-count-badge">(<?php echo (int)mysqli_num_rows($inventory_result); ?>)</span>
+                                </h2>
+                                <div class="fac-search">
+                                    <span class="material-symbols-outlined">search</span>
+                                    <input type="text" id="inventorySearch" class="form-control-custom"
+                                        placeholder="Search name or category" autocomplete="off">
                                 </div>
                             </div>
-                        </div><!-- /inv-form-col -->
+                            <div class="tbl-wrap">
+                                <table class="admin-table fac-table inv-table" id="inv-list-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Equipment</th>
+                                            <th>Category</th>
+                                            <th>Condition</th>
+                                            <th>Stock</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventory-body">
+                                        <?php
+                                        mysqli_data_seek($inventory_result, 0);
+                                        if (mysqli_num_rows($inventory_result) === 0): ?>
+                                            <tr id="inv-empty-row">
+                                                <td colspan="5" class="inv-empty-cell">
+                                                    <span class="material-symbols-outlined">inventory_2</span>
+                                                    No equipment yet. Add your first item using the form.
+                                                </td>
+                                            </tr>
+                                            <?php else:
+                                            while ($item = mysqli_fetch_assoc($inventory_result)):
+                                                $inv_qty        = (int)$item['quantity'];
+                                                $inv_cond       = $item['condition'] ?? 'Good';
+                                                $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
+                                                if ($inv_qty === 0) {
+                                                    $inv_stockClass = 'none';
+                                                    $inv_stockLabel = 'No stock';
+                                                } elseif ($inv_qty <= 2) {
+                                                    $inv_stockClass = 'low';
+                                                    $inv_stockLabel = 'Low stock';
+                                                } else {
+                                                    $inv_stockClass = 'ok';
+                                                    $inv_stockLabel = 'In stock';
+                                                }
+                                                $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
+                                            ?>
+                                                <tr class="inv-row-item"
+                                                    data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                                    data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                                    data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
+                                                    data-item-quantity="<?php echo $inv_qty; ?>"
+                                                    data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
+                                                    data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
+                                                    data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                                                    <td>
+                                                        <div class="fac-person">
+                                                            <span class="inv-thumb">
+                                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                                    loading="lazy">
+                                                                <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
+                                                            </span>
+                                                            <div class="fac-person-text">
+                                                                <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                                                <?php if ($inv_addedTs): ?>
+                                                                    <div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
+                                                    <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
+                                                    <td>
+                                                        <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
+                                                    </td>
+                                                    <td class="fac-actions">
+                                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
+                                                            data-action="eq-open-edit" aria-label="Edit equipment">
+                                                            <span class="material-symbols-outlined">edit</span>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            <?php endwhile; ?>
+                                            <tr id="inv-nomatch-row" class="inv-row-hidden">
+                                                <td colspan="5" class="inv-empty-cell">
+                                                    <span class="material-symbols-outlined">search_off</span>
+                                                    No equipment matches your search.
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
 
-                    </div><!-- /inv-split-layout -->
+                            <!-- Pagination (10 per page, client-side; works together with the search box) -->
+                            <div class="inv-pager" id="inv-pager" hidden>
+                                <span class="inv-pager-info" id="inv-pager-info"></span>
+                                <div class="inv-pager-ctl" id="inv-pager-ctl">
+                                    <button type="button" class="inv-pager-btn" id="inv-pg-prev" aria-label="Previous page">
+                                        <span class="material-symbols-outlined">chevron_left</span>
+                                    </button>
+                                    <div class="inv-pager-nums" id="inv-pg-nums"></div>
+                                    <button type="button" class="inv-pager-btn" id="inv-pg-next" aria-label="Next page">
+                                        <span class="material-symbols-outlined">chevron_right</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div><!-- /inv-list-card -->
+
+                    </div><!-- /faculty-layout inv-layout -->
 
                     <!-- Archived Items -->
                     <div class="inv-archived-wrap">
@@ -4463,12 +4497,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
 
                     <div class="form-group">
-                        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Description</label>
-                        <textarea name="description" id="eqm-description" class="form-control-custom" rows="3"
-                            placeholder="Short description of the item..."></textarea>
-                    </div>
-
-                    <div class="form-group">
                         <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Image</label>
                         <div class="drop-zone" id="eqm-dropZone">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4585,7 +4613,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             document.getElementById('eqm-category').value = d.itemCategory;
             document.getElementById('eqm-quantity').value = d.itemQuantity;
             document.getElementById('eqm-condition').value = d.itemCondition || 'Good';
-            document.getElementById('eqm-description').value = d.itemDescription || '';
 
             var preview = document.getElementById('eqm-imagePreview');
             var removeBtn = document.getElementById('eqm-removeImageBtn');
@@ -4930,7 +4957,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             /* Edit modal: open on row edit-button click */
             document.addEventListener('click', function(e) {
-                var btn = e.target.closest('.fac-edit-btn');
+                var btn = e.target.closest('#fac-list-table .fac-edit-btn');
                 if (!btn) return;
                 var row = btn.closest('tr');
                 if (!row) return;

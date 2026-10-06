@@ -57,14 +57,15 @@ switch ($section) {
     case 'approved':
     case 'declined':
         $status = ($section === 'approved') ? 'Approved' : 'Declined';
+        // Auto-declined requests are never listed; only an admin's manual decline ('override') is.
         $sql = "SELECT * FROM tbl_requests 
-                WHERE status=? AND (
+                WHERE status=? AND (? <> 'Declined' OR COALESCE(arbitration_rule,'')='override') AND (
                     faculty_id LIKE ? OR
                     faculty_name LIKE ? OR
                     equipment_name LIKE ?
                 ) ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssss", $status, $search, $search, $search);
+        $stmt->bind_param("sssss", $status, $status, $search, $search, $search);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -121,7 +122,8 @@ switch ($section) {
     case 'raw':
         $sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date 
                 FROM tbl_requests 
-                WHERE faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ? 
+                WHERE (faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ?)
+                  AND NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')
                 ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sss", $search, $search, $search);
