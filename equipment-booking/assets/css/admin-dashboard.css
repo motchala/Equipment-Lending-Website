@@ -3,6 +3,9 @@
     --primary-white: #ffffff;
     --secondary-cream: #f9f7f2;
     --accent-maroon: #600302;
+    --accent-gold-deep: #b8913a;
+    --accent-gold: #dcb862;
+    --accent-gold-light: #ecd48f;
     --accent-dark: #4a0f15;
     --accent-light: #f3e5e6;
     --sidebar-red-1: #c0392b;
@@ -1398,7 +1401,7 @@ main#app-main {
 /* Quick action cards */
 .ps-quick-actions {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
@@ -1456,20 +1459,18 @@ main#app-main {
 /* ── Container header accent ──────────────────────────────────────
    Every "table/list container" header across the app (Requests,
    Equipment, Rooms, Faculty, Settings info-cards, Settings Preferences
-   and Borrowing Rules cards) shares one small maroon-gradient accent
-   stripe along its top edge. This is deliberately independent of each
+   and Borrowing Rules cards) shares one curved gold-gradient accent
+   that hugs the card's rounded top corners and fades down the sides. This is deliberately independent of each
    header's background/text styling — it's the one consistent visual
    marker that says "a container starts here", so the header reads as
    clearly separated from the body below it even though the header
    itself stays light. The outer card's overflow:hidden + border-radius
-   (already shared by every card wrapper) clips this automatically to
-   match each card's rounded top corners, so no per-card radius
-   handling is needed here.
+   (already shared by every card wrapper) clips it, and the ring's own
+   top radii match that clip so the band follows the curve.
    NOTE: modal dialog headers (.ps-modal-head, .form-card-header) are a
    different UI pattern (popups, not page containers) and intentionally
    excluded, matching the header-consolidation pass earlier. */
 .ps-card-header,
-.inv-list-header,
 #panel-rooms .pr-card-header,
 .eq-card-header,
 .info-card-head,
@@ -1478,18 +1479,30 @@ main#app-main {
 }
 
 .ps-card-header::before,
-.inv-list-header::before,
 #panel-rooms .pr-card-header::before,
 .eq-card-header::before,
 .info-card-head::before,
 .sett-card-head::before {
     content: '';
     position: absolute;
+    border: 3px solid transparent;
+    border-bottom: 0;
+    background:
+        linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+        linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+    background-origin: border-box;
+    -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent-maroon), var(--accent-dark));
+    height: min(30px, 100%);
+    /* matches the card's clipped inner corner (card radius minus its 1px border) */
+    border-top-left-radius: calc(var(--radius) - 1px);
+    border-top-right-radius: calc(var(--radius) - 1px);
 }
 
 .ps-card-header {
@@ -3618,23 +3631,59 @@ input[type="range"] {
     max-height: 85vh;
 }
 
-.notif-toolbar {
+/* Head: icon + title + unread line + close (same layout as the faculty modal) */
+.anotif-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 1rem 1.25rem 0;
+    gap: 12px;
+    padding: 1.1rem 1.25rem 0.85rem;
     flex-shrink: 0;
 }
 
-.notif-unread-line {
-    font-size: 12.5px;
-    color: var(--text-light);
-    margin: 0;
+.anotif-head-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
 }
 
-.notif-unread-line strong {
+.anotif-head-icon .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.anotif-head-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.anotif-head-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.anotif-count-text {
+    margin: 2px 0 0;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+.anotif-count-text strong {
     color: var(--accent-maroon);
+}
+
+.anotif-box .notif-filter-chips {
+    padding-top: 0;
+    padding-bottom: 0.85rem;
+}
+
+.anotif-body {
+    border-top: 1px solid var(--khaki-border);
 }
 
 .notif-filter-chips {
@@ -3993,6 +4042,216 @@ input[type="range"] {
 
 .notif-delete-btn:hover {
     background: #fdecea !important;
+}
+
+/* Expanded card: "Mark as read / unread" sits right, Delete stays beside it */
+.notif-card-actions .notif-delete-btn {
+    margin-left: 0;
+}
+
+/* A read notification shows no dot (the dot used to be hidden by script only) */
+.notif-item:not(.unread) .unread-dot {
+    display: none;
+}
+
+/* -- NOTIFICATIONS: footer, select mode, bulk actions ------------------- */
+.anotif-footer {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--khaki-border);
+    background: var(--primary-white);
+}
+
+.anotif-footer [hidden] {
+    display: none !important;
+}
+
+.anotif-footer-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.anotif-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.anotif-footer .ps-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.anotif-footer .ps-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.anotif-footer .ps-btn .material-symbols-outlined {
+    font-size: 17px;
+}
+
+.anotif-footer .anotif-danger {
+    color: var(--danger);
+}
+
+.anotif-footer .anotif-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+/* Selection bar -- only while selecting */
+.anotif-selbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+}
+
+.anotif-selall {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+}
+
+.anotif-selall input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-maroon);
+    cursor: pointer;
+}
+
+.anotif-sel-count {
+    margin-right: auto;
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.anotif-sel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Inline delete confirmation */
+.anotif-confirm {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--danger) 9%, var(--primary-white));
+    border: 1px solid var(--danger);
+    font-size: 12.5px;
+    color: var(--text-dark);
+}
+
+.anotif-confirm>.material-symbols-outlined {
+    font-size: 20px;
+    color: var(--danger);
+}
+
+.anotif-confirm-text {
+    flex: 1;
+    min-width: 160px;
+    font-weight: 600;
+}
+
+/* Select mode: a checkbox slides in at the left of each row, details fold away */
+.anotif-check {
+    display: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 8px;
+    border-radius: 6px;
+    border: 2px solid var(--text-light);
+    background: var(--primary-white);
+    color: transparent;
+    flex-shrink: 0;
+    place-items: center;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.anotif-check .material-symbols-outlined {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.notif-modal-body.is-selecting .anotif-check {
+    display: grid;
+}
+
+.notif-modal-body.is-selecting .notif-item {
+    user-select: none;
+}
+
+.notif-modal-body.is-selecting .notif-chevron {
+    display: none;
+}
+
+.notif-modal-body.is-selecting .notif-card-detail {
+    display: none !important;
+}
+
+.notif-item.is-selected {
+    border-color: var(--accent-maroon);
+    background: var(--hover-bg);
+}
+
+.notif-item.is-selected .anotif-check {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #ffffff;
+}
+
+@media (max-width: 600px) {
+    .anotif-footer {
+        padding: 0.65rem 1rem;
+    }
+
+    .anotif-head {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .anotif-sel-word {
+        display: none;
+    }
+
+    .anotif-sel-actions {
+        width: 100%;
+        flex-wrap: nowrap;
+    }
+
+    .anotif-sel-actions .ps-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .anotif-sel-count {
+        margin-right: 0;
+    }
 }
 
 /* Card removal (delete) — brief collapse instead of an abrupt disappear */
@@ -4906,291 +5165,16 @@ input[type="range"] {
     margin-top: 3px;
 }
 
-/* ── Split Layout ────────────────────────────────────────────────── */
-.inv-split-layout {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 1.25rem;
-    align-items: start;
-}
-
-.inv-list-col,
-.inv-form-col {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
-/* JS-conflict fix: _enterEditMode() adds .hidden to #inv-table-card and
-   .hidden/.edit-mode to #item-form-wrap. We override those here so the
-   always-visible split panels cannot be collapsed by existing JS.        */
-.inv-list-col #inv-table-card,
-.inv-list-col #inv-table-card.hidden,
-.inv-form-col #item-form-wrap,
-.inv-form-col #item-form-wrap.hidden,
-.inv-form-col #item-form-wrap.edit-mode {
-    display: block !important;
-}
-
-/* ── Left Panel Header ───────────────────────────────────────────── */
-.inv-list-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--khaki-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.inv-list-title {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text-dark);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-    margin: 0;
-}
-
-.inv-list-title .material-symbols-outlined {
-    font-size: 18px;
-    color: var(--accent-maroon);
-}
-
-.inv-search-ctrl {
-    width: 155px;
-    padding: 0.45rem 0.85rem;
-    border: 1.5px solid var(--khaki-border);
-    border-radius: 8px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 12px;
-    color: var(--text-dark);
-    background: var(--secondary-cream);
-    outline: none;
-    transition: border-color 0.15s, background 0.15s;
-}
-
-.inv-search-ctrl:focus {
-    border-color: var(--accent-maroon);
-    background: var(--primary-white);
-}
-
-/* ── Item rows ───────────────────────────────────────────────────── */
-.inv-list-body {
-    padding: 0 1.25rem;
-}
-
-.inv-row-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 0.85rem 0;
-    border-bottom: 1px solid var(--khaki-border);
-}
-
-.inv-row-item:last-child {
-    border-bottom: none;
-}
-
-.inv-row-thumb {
-    width: 48px;
-    height: 48px;
-    background: var(--secondary-cream);
-    border-radius: 10px;
-    border: 1px solid var(--khaki-border);
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-}
-
-.inv-row-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 10px;
-}
-
-.inv-thumb-ph {
-    display: none;
-    place-items: center;
-    width: 100%;
-    height: 100%;
-}
-
-.inv-thumb-ph .material-symbols-outlined {
-    font-size: 22px;
-    color: var(--accent-maroon);
-}
-
-.inv-row-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.inv-row-info .i-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text-dark);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.inv-row-info .i-cat {
-    font-size: 11.5px;
-    color: var(--text-light);
-    margin-top: 1px;
-}
-
-.inv-row-qty {
-    text-align: center;
-    flex-shrink: 0;
-    width: 72px;
-}
-
-.inv-row-qty .q-val {
-    font-size: 1.3rem;
-    font-weight: 700;
-    color: var(--text-dark);
-    line-height: 1;
-}
-
-.inv-row-qty .q-val.q-low {
-    color: var(--warning);
-}
-
-.inv-row-qty .q-val.q-none {
-    color: var(--danger);
-}
-
-.inv-row-qty .q-lbl {
-    font-size: 11px;
-    color: var(--text-light);
-    margin-top: 2px;
-    white-space: nowrap;
-}
-
-.inv-row-actions {
-    flex-shrink: 0;
-}
-
-.btn-inv-edit {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: 1.5px solid var(--khaki-border);
-    background: transparent;
-    color: var(--text-light);
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.15s;
-}
-
-.btn-inv-edit:hover {
-    background: var(--hover-bg);
-    color: var(--accent-maroon);
-    border-color: var(--accent-maroon);
-}
-
-.inv-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 3rem 1rem;
-    color: var(--text-light);
-    gap: 0.5rem;
-    text-align: center;
-}
-
-.inv-empty-state .material-symbols-outlined {
-    font-size: 40px;
-    opacity: .35;
-}
-
-.inv-empty-state p {
-    font-size: 13px;
-}
-
-/* ── Right Panel: Form ───────────────────────────────────────────── */
-.inv-form-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--khaki-border);
-}
-
-.inv-form-header h3 {
-    font-size: 13.5px;
-    font-weight: 600;
-    color: var(--text-dark);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-}
-
-.inv-form-header h3 .material-symbols-outlined {
-    font-size: 18px;
-    color: var(--accent-maroon);
-}
-
-.inv-form-body {
-    padding: 1.25rem;
-}
-
-.inv-form-body .form-group {
-    margin-bottom: 1rem;
-}
-
-.inv-form-body .form-group label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin-bottom: 4px;
-}
-
+/* Required-field asterisk used by the Edit Equipment modal */
 .inv-req {
     color: var(--danger);
-}
-
-.inv-form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
 }
 
 .inv-form-actions {
     display: flex;
     gap: 8px;
-    margin-top: 0.5rem;
+    margin-top: 1.1rem;
     align-items: center;
-}
-
-.btn-inv-save {
-    flex: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 0.6rem 1rem;
-    background: var(--accent-maroon);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.btn-inv-save:hover {
-    background: var(--accent-dark);
 }
 
 .btn-inv-delete {
@@ -5228,21 +5212,6 @@ input[type="range"] {
    leaving every other lending sub-panel (Requests, History, etc.) unaffected. */
 #panel-lending:has(#lending-inventory.active) .lending-nav {
     display: none;
-}
-
-/* ── Responsive ──────────────────────────────────────────────────── */
-@media (max-width: 960px) {
-    .inv-split-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .inv-search-ctrl {
-        width: 120px;
-    }
-
-    .inv-form-row {
-        grid-template-columns: 1fr;
-    }
 }
 
 /* ── Page header row ─────────────────────────────────────── */
@@ -6584,12 +6553,17 @@ body:has(#roomScheduleModal:not(.hidden)) {
     font-weight: 600;
 }
 
-/* ── Profile Hero — dark wine card matching screenshot ──────────── */
+/* ── Profile Hero — maroon-to-gold card (same gradient as the faculty Settings banner) ──
+   Deep maroon where the name sits, melting into gold on the right, with a soft
+   light bloom in the top-right corner. Fixed colours: the hero never follows the
+   site theme. */
 .ov-profile-hero {
     display: flex;
     align-items: center;
     gap: 1.35rem;
-    background: linear-gradient(135deg, #4a0010 0%, #2c0008 100%);
+    background:
+        radial-gradient(120% 150% at 100% 0%, rgba(255, 233, 160, 0.55) 0%, rgba(255, 233, 160, 0) 52%),
+        linear-gradient(100deg, #570000 0%, #800000 34%, #a63d0f 62%, #d99a1e 84%, #fbbf24 100%);
     border: none;
     border-radius: 14px;
     padding: 1.5rem 1.75rem;
@@ -6597,25 +6571,59 @@ body:has(#roomScheduleModal:not(.hidden)) {
     flex-wrap: wrap;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 6px 20px rgba(87, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* Two faint concentric rings in the gold corner — decorative only */
+.ov-profile-hero::before,
 .ov-profile-hero::after {
     content: '';
     position: absolute;
-    right: -60px;
-    top: -60px;
-    width: 200px;
-    height: 200px;
-    background: rgba(255, 255, 255, 0.04);
     border-radius: 50%;
     pointer-events: none;
+}
+
+.ov-profile-hero::before {
+    width: 260px;
+    height: 260px;
+    right: -70px;
+    top: -120px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.ov-profile-hero::after {
+    width: 400px;
+    height: 400px;
+    right: -150px;
+    top: -170px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+}
+
+.ov-profile-hero>* {
+    position: relative;
+    z-index: 1;
+}
+
+/* Stacked layouts (the Settings panel measures its own width): run the gradient
+   top-to-bottom so the text stays on maroon and the buttons land on gold. */
+#panel-settings[data-sett-size="narrow"] .ov-profile-hero,
+#panel-settings[data-sett-size="tiny"] .ov-profile-hero {
+    background:
+        radial-gradient(130% 90% at 100% 100%, rgba(255, 233, 160, 0.5) 0%, rgba(255, 233, 160, 0) 55%),
+        linear-gradient(165deg, #570000 0%, #800000 46%, #a63d0f 74%, #e0a21f 100%);
+}
+
+#panel-settings[data-sett-size="narrow"] .ov-profile-hero::after,
+#panel-settings[data-sett-size="tiny"] .ov-profile-hero::after {
+    display: none;
 }
 
 .ov-av-lg {
     width: 60px;
     height: 60px;
     background: rgba(255, 255, 255, 0.18);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.18);
     border-radius: 50%;
     display: grid;
     place-items: center;
@@ -6659,6 +6667,7 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 .ov-hero-badge .material-symbols-outlined {
     font-size: 13px;
+    color: #fbbf24;
 }
 
 .ov-hero-actions {
@@ -6680,8 +6689,9 @@ body:has(#roomScheduleModal:not(.hidden)) {
     align-items: center;
     gap: 6px;
     padding: 0.45rem 0.9rem;
-    background: transparent;
-    border: 1.5px solid rgba(255, 255, 255, 0.45);
+    background: #570000;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 2px 8px rgba(87, 0, 0, 0.35);
     border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
@@ -6696,8 +6706,8 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-edit-acc:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.7);
+    background: #6e0606;
+    border-color: rgba(255, 255, 255, 0.6);
 }
 
 .ov-profile-hero .btn-save-acc {
@@ -6725,16 +6735,20 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-cancel-acc {
-    padding: 0.45rem 0.75rem;
-    background: transparent;
-    border: none;
+    padding: 0.45rem 0.9rem;
+    background: rgba(87, 0, 0, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
     font-family: 'Poppins', sans-serif;
     font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+    color: #fff;
     cursor: pointer;
+    transition: background 0.15s;
 }
 
 .ov-profile-hero .btn-cancel-acc:hover {
+    background: rgba(87, 0, 0, 0.85);
     color: #fff;
 }
 
@@ -7314,4 +7328,798 @@ body:has(#roomScheduleModal:not(.hidden)) {
     .ps-modal-foot.fac-foot-split {
         flex-wrap: wrap;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FACULTY TAB — Create form + Faculty list
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Create form: same compact look as the edit modal ──────── */
+.faculty-form-card .form-group {
+    margin-bottom: 0.8rem;
+}
+
+.faculty-form-card .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 5px;
+}
+
+.faculty-form-card .fac-edit-opt {
+    font-weight: 400;
+    color: var(--text-light);
+}
+
+.faculty-form-card .fac-edit-section {
+    margin-top: 1.1rem;
+}
+
+.faculty-form-card .fac-edit-section:first-of-type {
+    margin-top: 0;
+}
+
+.fac-form-hint {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin: 0.6rem 0 0;
+}
+
+/* ── Faculty list ──────────────────────────────────────────── */
+.fac-list-head {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.fac-search {
+    position: relative;
+    margin-left: auto;
+}
+
+.fac-search .material-symbols-outlined {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 17px;
+    color: var(--text-light);
+    pointer-events: none;
+}
+
+.fac-search input {
+    width: 220px;
+    max-width: 100%;
+    padding-left: 34px;
+    font-size: 12px;
+}
+
+.fac-table td {
+    vertical-align: middle;
+}
+
+.fac-table th:last-child,
+.fac-actions {
+    text-align: right;
+}
+
+.fac-actions {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.fac-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.fac-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.fac-person-name {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--text-dark);
+}
+
+.fac-person-sub {
+    font-size: 11.5px;
+    color: var(--text-light);
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+}
+
+.fac-role+.fac-person-sub {
+    margin-top: 4px;
+}
+
+.fac-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-dark);
+    white-space: nowrap;
+}
+
+.fac-id-pending,
+.fac-role {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+.fac-id-pending {
+    color: #8a5a00;
+    background: #fef6e4;
+    border: 1px solid #f3dca6;
+}
+
+.fac-role {
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    border: 1px solid var(--khaki-border);
+}
+
+.fac-role--adviser {
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+    border-color: transparent;
+}
+
+@media (max-width: 520px) {
+    .fac-search {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .fac-search input {
+        width: 100%;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EQUIPMENT TAB — Add form (left) + All Equipment list (right)
+   Same two-column shell as the Faculty tab (.faculty-layout);
+   the list reuses the Faculty list's search box, avatar-style
+   cell, pills and action button so both tabs read as one system.
+   ══════════════════════════════════════════════════════════════ */
+
+/* JS-conflict fix: _enterEditMode() adds .hidden to #inv-table-card and
+   .hidden/.edit-mode to #item-form-wrap. Both panels are always visible
+   in this layout, so keep them from being collapsed by that legacy JS. */
+.inv-layout #inv-table-card,
+.inv-layout #inv-table-card.hidden,
+.inv-layout #item-form-wrap,
+.inv-layout #item-form-wrap.hidden,
+.inv-layout #item-form-wrap.edit-mode {
+    display: block !important;
+}
+
+.inv-head-icon {
+    font-size: 18px;
+    color: var(--accent-maroon);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* ── Add form: same compact look as the Faculty create form ── */
+.inv-form-card .eq-card-body {
+    padding: 1.5rem;
+}
+
+.inv-form-card .form-group {
+    margin-bottom: 0.8rem;
+}
+
+.inv-form-card .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 5px;
+}
+
+.inv-form-card .fac-edit-section {
+    margin-top: 1.1rem;
+}
+
+.inv-form-card .fac-edit-section.inv-section--first {
+    margin-top: 0;
+}
+
+.inv-opt {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* Category: full width of the form with a roomier control, so the longest
+   option ("Cables & Connectors") is never cramped or clipped. */
+.inv-form-card .inv-category-select {
+    width: 100%;
+    min-height: 42px;
+    padding-right: 36px;
+    text-overflow: ellipsis;
+}
+
+/* Image drop zone — compact, same dashed look as before */
+.inv-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 1.1rem 1rem;
+}
+
+.inv-drop .material-symbols-outlined {
+    font-size: 30px;
+    color: var(--accent-maroon);
+    opacity: 0.75;
+}
+
+.inv-drop p {
+    margin: 0;
+    font-size: 12px;
+}
+
+.inv-drop .inv-drop-sub {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+.inv-drop .drop-zone-preview {
+    display: none;
+    width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+    margin-top: 10px;
+}
+
+.inv-remove-img {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--danger);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.inv-form-card .ps-btn.inv-submit {
+    flex: 1;
+    width: 100%;
+    justify-content: center;
+}
+
+/* ── List ─────────────────────────────────────────────────── */
+/* Tighter side padding than the base table so the Equipment name gets the room;
+   pills never wrap, so "Cables & Connectors" always sits on one line. */
+.inv-table thead th,
+.inv-table tbody td {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.inv-table thead th:first-child,
+.inv-table tbody td:first-child {
+    padding-left: 1rem;
+}
+
+.inv-table thead th:last-child,
+.inv-table tbody td:last-child {
+    padding-right: 1rem;
+}
+
+.inv-table .fac-person-sub {
+    white-space: nowrap;
+}
+
+/* A slightly slimmer form column on desktop gives the 5-column list room to
+   breathe. Below 992px the shared .faculty-layout rules stack the two cards. */
+@media (min-width: 992px) {
+    .inv-layout {
+        grid-template-columns: 360px minmax(0, 1fr);
+    }
+}
+
+.inv-thumb {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid var(--khaki-border);
+    background: var(--secondary-cream);
+}
+
+.inv-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.inv-thumb .inv-thumb-ph {
+    display: none;
+    font-size: 22px;
+    color: var(--accent-maroon);
+}
+
+.inv-thumb.is-broken img {
+    display: none;
+}
+
+.inv-thumb.is-broken .inv-thumb-ph {
+    display: block;
+}
+
+.inv-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.inv-pill--cat {
+    color: var(--text-light);
+    background: var(--secondary-cream);
+    border-color: var(--khaki-border);
+}
+
+.inv-pill--good,
+.inv-pill--ok {
+    color: #1e7e45;
+    background: #e8f6ee;
+    border-color: #bfe6cf;
+}
+
+.inv-pill--fair,
+.inv-pill--low {
+    color: #8a5a00;
+    background: #fef6e4;
+    border-color: #f3dca6;
+}
+
+.inv-pill--repair,
+.inv-pill--none {
+    color: #a32a1f;
+    background: #fdecea;
+    border-color: #f3c4be;
+}
+
+.inv-pill--stock::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.inv-pill--stock strong {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.inv-empty-cell {
+    text-align: center;
+    padding: 3rem 1rem !important;
+    color: var(--text-light);
+}
+
+.inv-empty-cell .material-symbols-outlined {
+    display: block;
+    margin: 0 auto 10px;
+    font-size: 40px;
+    opacity: 0.3;
+}
+
+.inv-row-hidden {
+    display: none !important;
+}
+
+/* ── Pagination footer ────────────────────────────────────── */
+.inv-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 1.25rem;
+    border-top: 1px solid var(--khaki-border);
+}
+
+.inv-pager[hidden] {
+    display: none;
+}
+
+.inv-pager-info {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.inv-pager-ctl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.inv-pager-ctl[hidden] {
+    display: none;
+}
+
+.inv-pager-nums {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.inv-pager-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--khaki-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-dark);
+    font-family: 'Poppins', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.inv-pager-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.inv-pager-btn:hover:not(:disabled):not(.is-active) {
+    background: var(--hover-bg);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+.inv-pager-btn.is-active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+    cursor: default;
+}
+
+.inv-pager-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.inv-pager-gap {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 32px;
+    color: var(--text-light);
+    user-select: none;
+}
+
+@media (max-width: 520px) {
+    .inv-pager {
+        justify-content: center;
+    }
+
+    .inv-pager-info {
+        width: 100%;
+        text-align: center;
+    }
+
+    .inv-pager-ctl {
+        margin-left: 0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Dashboard header shortcuts (bell + avatar, top-right of the Dashboard tab only)
+   ═══════════════════════════════════════════════════════════════════════ */
+#panel-dashboard .ps-page-header-row {
+    gap: 1rem;
+}
+
+.ps-dash-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-shrink: 0;
+}
+
+.ps-dash-top-actions .notif-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: var(--primary-white);
+    border: 1.5px solid var(--khaki-border, rgba(96, 3, 2, 0.18));
+    color: var(--accent-maroon);
+    box-shadow: 0 1px 3px rgba(96, 3, 2, 0.06);
+}
+
+.ps-dash-top-actions .notif-btn:hover {
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+}
+
+.ps-dash-top-actions .notif-btn .material-symbols-outlined {
+    font-size: 21px;
+}
+
+.ps-dash-top-actions .notif-btn-badge {
+    top: -5px;
+    right: -5px;
+}
+
+/* Same gold-ringed avatar as the Settings profile bar — a size up from the 40px bell */
+.ps-dash-top-actions .avatar-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1rem;
+    border-color: rgba(251, 191, 36, 0.95);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18);
+    font-family: inherit;
+}
+
+.ps-dash-top-actions .avatar-btn:hover {
+    border-color: #fbbf24;
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.32);
+}
+
+.ps-dash-top-actions .avatar-btn:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 3px;
+}
+
+/* Phones / tablets (hamburger is showing): the icons become a slim top row, right-aligned */
+@media (max-width: 768px) {
+    #panel-dashboard .ps-page-header-row {
+        flex-direction: column-reverse;
+        align-items: stretch;
+        gap: 0.9rem;
+    }
+
+    .ps-dash-top-actions {
+        justify-content: flex-end;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Notification modal — focus backdrop
+   The page behind goes soft and out of focus while the modal is open, so the
+   modal is the only sharp thing on screen. Blur + a plain dim, nothing else.
+   ═══════════════════════════════════════════════════════════════════════ */
+#notifOverlay {
+    background: rgba(22, 8, 10, 0.38);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+#notifOverlay.ps-modal-open {
+    animation: anotifFocusIn 0.28s ease-out both;
+}
+
+#notifOverlay.ps-modal-open>.ps-modal {
+    animation: anotifBoxIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes anotifFocusIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes anotifBoxIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+[data-theme="dark"] #notifOverlay {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #notifOverlay.ps-modal-open,
+    #notifOverlay.ps-modal-open>.ps-modal {
+        animation: none;
+    }
+}
+
+/* ── Faculty tab: "Account created" overlay (shown ~2s, then the page reloads) ── */
+.fac-created-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.45);
+    animation: fac-created-fade 0.18s ease-out;
+}
+
+.fac-created-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    max-width: 280px;
+    padding: 1.6rem 1.5rem 1.5rem;
+    text-align: center;
+    background: var(--primary-white);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    animation: fac-created-pop 0.22s ease-out;
+}
+
+.fac-created-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    margin: 0 auto 0.8rem;
+    display: grid;
+    place-items: center;
+    background: #eafaf2;
+    color: var(--success);
+}
+
+.fac-created-icon .material-symbols-outlined {
+    font-size: 28px;
+}
+
+.fac-created-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.fac-created-sub {
+    font-size: 12.5px;
+    color: var(--text-light);
+    margin-top: 3px;
+    overflow-wrap: anywhere;
+}
+
+/* Thin bar that drains while the overlay is up (2s = FAC_CREATED_OVERLAY_MS in admin-dashboard.js) */
+.fac-created-bar {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--success);
+    transform-origin: left;
+    animation: fac-created-bar 2s linear forwards;
+}
+
+@keyframes fac-created-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fac-created-pop {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes fac-created-bar {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .fac-created-overlay,
+    .fac-created-card,
+    .fac-created-bar {
+        animation: none;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sidebar footer: signed-in name only (not clickable) + Scan Return card
+   ═══════════════════════════════════════════════════════════════════════ */
+.nav-user {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    color: var(--nav-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: default;
+    user-select: none;
+    pointer-events: none;
+}
+
+.nav-user .nav-account-name {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Scan Return is a <button> styled as a Quick Action card */
+button.ps-qa-card {
+    border: 0;
+    font: inherit;
+    text-align: left;
+    width: 100%;
+}
+
+button.ps-qa-card:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 3px;
+}
+
+/* Icon-rail modes show no labels, so the name has nothing to show there */
+body.sidebar-collapsed .nav-user {
+    display: none;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .nav-user {
+        display: none;
+    }
+}
+
+/* Faculty tab: small hint under a field (e.g. "Permanent" under Faculty ID) */
+.fac-field-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-light);
 }

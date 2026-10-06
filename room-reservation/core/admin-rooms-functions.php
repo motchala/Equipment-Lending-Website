@@ -576,6 +576,7 @@ $admin_room_reservations_result = $conn->query(
        JOIN tbl_rooms     r ON r.room_id     = rr.room_id
        JOIN tbl_buildings b ON b.building_id = r.building_id
        JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
+      WHERE rr.status <> 'Declined'
       ORDER BY rr.reservation_date DESC, rr.start_time ASC"
 );
 $admin_room_reservations = [];

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/submit-student-reserve.php
  * Student submits a room reservation via faculty code.
@@ -37,15 +38,20 @@ $attendees    = max(1, intval($body['attendees']  ?? 1));
 $notes        = trim($body['notes']               ?? '');
 
 // ── Input validation ──────────────────────────────────────────────────────
-if (!$code_db_id || !$faculty_id || !$student_name || !$student_id ||
-    !$room_id || !$res_date || !$start_time || !$end_time || !$purpose) {
+if (
+    !$code_db_id || !$faculty_id || !$student_name || !$student_id ||
+    !$room_id || !$res_date || !$start_time || !$end_time || !$purpose
+) {
     echo json_encode(['error' => 'All required fields must be filled in.']);
     exit();
 }
 // Past datetime check — compare full date+time in Asia/Manila timezone
 $now_manila   = new DateTime('now', new DateTimeZone('Asia/Manila'));
-$req_datetime = DateTime::createFromFormat('Y-m-d H:i', $res_date . ' ' . $start_time,
-                    new DateTimeZone('Asia/Manila'));
+$req_datetime = DateTime::createFromFormat(
+    'Y-m-d H:i',
+    $res_date . ' ' . $start_time,
+    new DateTimeZone('Asia/Manila')
+);
 if ($req_datetime === false || $req_datetime <= $now_manila) {
     echo json_encode(['error' => 'Reservation date and time cannot be in the past.']);
     exit();
@@ -104,9 +110,16 @@ $ins = $conn->prepare(
 );
 $ins->bind_param(
     'isssssissss',
-    $room_id, $faculty_id, $faculty_name,
-    $student_name, $student_id,
-    $purpose, $attendees, $res_date, $start_time, $end_time,
+    $room_id,
+    $faculty_id,
+    $faculty_name,
+    $student_name,
+    $student_id,
+    $purpose,
+    $attendees,
+    $res_date,
+    $start_time,
+    $end_time,
     $notes_val
 );
 
@@ -122,6 +135,14 @@ $ins->close();
 // ── Run Arbitration Engine ────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
 ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+
+// ── A declined reservation is never kept: tell the student on the spot ────
+// (the code is NOT marked used, so they can pick another slot with the same code)
+$declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
+if ($declined_reason !== null) {
+    echo json_encode(['error' => $declined_reason]);
+    exit();
+}
 
 // ── Read final status written by engine ───────────────────────────────────
 $status_stmt = $conn->prepare(

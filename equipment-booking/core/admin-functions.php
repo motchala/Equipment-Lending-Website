@@ -271,7 +271,6 @@ if (isset($_POST['update_item'])) {
     $category = $_POST['category'];
     $qty = intval($_POST['quantity']);
     $condition = in_array($_POST['condition'] ?? '', ['Good', 'Fair', 'For Repair']) ? $_POST['condition'] : 'Good';
-    $description = trim($_POST['description'] ?? '');
 
     $image_path = $_POST['old_image'];
 
@@ -311,18 +310,18 @@ if (isset($_POST['update_item'])) {
         $image_path = 'uploads/default.png';
     }
 
-    $description_val = ($description === '') ? null : $description;
+    // NOTE: description is intentionally not part of this UPDATE. The admin
+    // forms no longer have a Description field, so existing values are left as-is.
     $stmt = $conn->prepare(
         "UPDATE tbl_inventory
          SET item_name = ?,
              category = ?,
              quantity = ?,
              image_path = ?,
-             `condition` = ?,
-             description = ?
+             `condition` = ?
          WHERE item_id = ?"
     );
-    $stmt->bind_param("ssisssi", $name, $category, $qty, $image_path, $condition, $description_val, $item_id);
+    $stmt->bind_param("ssissi", $name, $category, $qty, $image_path, $condition, $item_id);
     $stmt->execute();
     $stmt->close();
 
@@ -424,7 +423,8 @@ if (!empty($_GET['approved_search'])) {
 }
 
 
-$declined_sql = "SELECT * FROM tbl_requests WHERE status='Declined'";
+// Auto-declined requests are not shown; only an admin's own manual decline (arbitration_rule='override') is.
+$declined_sql = "SELECT * FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override'";
 if (!empty($_GET['declined_search'])) {
     $search = "%" . $_GET['declined_search'] . "%";
     $declined_sql .= " AND (
@@ -473,7 +473,7 @@ $archive_sql = "
 $archive_result = mysqli_query($conn, $archive_sql);
 
 
-$raw_data_sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests";
+$raw_data_sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')";
 
 if (!empty($_GET['raw_search'])) {
     $search = "%" . $_GET['raw_search'] . "%";
@@ -492,11 +492,11 @@ if (!empty($_GET['raw_search'])) {
 
 $stat_waiting   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Waiting'"))['c'];
 $stat_approved  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Approved'"))['c'];
-$stat_declined  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined'"))['c'];
+$stat_declined  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Declined' AND COALESCE(arbitration_rule,'')='override'"))['c'];
 $stat_overdue   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'"))['c'];
 $stat_inv_total = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0"))['c'];
 $stat_inv_low   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0"))['c'];
-$stat_total_req = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests"))['c'];
+$stat_total_req = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')"))['c'];
 
 
 // ================= EDIT ITEM FETCH =================

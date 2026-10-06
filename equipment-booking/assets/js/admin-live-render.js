@@ -27,6 +27,12 @@
             .replace(/"/g, '&quot;');
     }
 
+    // A faculty who has not set their Faculty ID yet is stored under an internal
+    // NOTSET-... placeholder (see config/faculty-id.php): never show it.
+    function fid(id) {
+        return (!id || String(id).indexOf('NOTSET-') === 0) ? 'Not set' : id;
+    }
+
     function fmtDate(dateStr) {
         // "2025-06-01" → "Jun 01, 2025"
         if (!dateStr) return '—';
@@ -83,7 +89,7 @@
             const pastLabel = past ? '<br><small style="font-size:0.68rem;">(Date Passed)</small>' : '';
             return `
             <tr>
-                <td>${esc(r.faculty_id)}</td>
+                <td>${esc(fid(r.faculty_id))}</td>
                 <td class="fw-bold">${esc(r.faculty_name)}</td>
                 <td>${esc(r.equipment_name)}</td>
                 <td style="${dateStyle}">${fmtDate(r.borrow_date)}${pastLabel}</td>
@@ -109,7 +115,7 @@
 
             return `
             <tr>
-                <td>${esc(r.faculty_id)}</td>
+                <td>${esc(fid(r.faculty_id))}</td>
                 <td class="fw-bold">${esc(r.faculty_name)}</td>
                 <td>${esc(r.equipment_name)}</td>
                 <td>${fmtDate(r.borrow_date)}</td>
@@ -142,7 +148,7 @@
 
         return rows.map(r => `
             <tr>
-                <td>${esc(r.faculty_id)}</td>
+                <td>${esc(fid(r.faculty_id))}</td>
                 <td class="fw-bold">${esc(r.faculty_name)}</td>
                 <td>${esc(r.equipment_name)}</td>
                 <td>${fmtDate(r.borrow_date)}</td>
@@ -159,7 +165,7 @@
 
         return rows.map(r => `
             <tr>
-                <td>${esc(r.faculty_id)}</td>
+                <td>${esc(fid(r.faculty_id))}</td>
                 <td class="fw-bold">${esc(r.faculty_name)}</td>
                 <td>${esc(r.equipment_name)}</td>
                 <td>${fmtDate(r.borrow_date)}</td>
@@ -290,7 +296,7 @@
 
                     window._adminLastStats = curr;
                 })
-                .catch(function () {});
+                .catch(function () { });
         }
 
         doPoll();              // ← fire immediately on page load

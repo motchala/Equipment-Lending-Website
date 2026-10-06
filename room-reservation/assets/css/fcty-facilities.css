@@ -61,12 +61,15 @@
 .fcty-overlay .fcty-fact .material-symbols-outlined,
 .fcty-overlay .fcty-ticket .material-symbols-outlined,
 .fcty-overlay .fcty-tl-note .material-symbols-outlined,
-.fcty-overlay .fcty-link-btn .material-symbols-outlined {
+.fcty-overlay .fcty-link-btn .material-symbols-outlined,
+.fcty-overlay .fcty-done-note .material-symbols-outlined,
+.fcty-overlay .fcty-seats .material-symbols-outlined {
     font-size: 18px;
 }
 
 #rooms-browse .fcty-tile-icon .material-symbols-outlined,
-.fcty-overlay .fcty-tile-icon .material-symbols-outlined {
+.fcty-overlay .fcty-tile-icon .material-symbols-outlined,
+.fcty-overlay .fcty-drop .material-symbols-outlined {
     font-size: 24px;
 }
 
@@ -221,16 +224,6 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 8px 12px;
-}
-
-#rooms-browse .fcty-title {
-    margin: 0;
-    font-family: var(--font-display, 'Hanken Grotesk', sans-serif);
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -.01em;
-    line-height: 1.2;
-    color: var(--fcty-ink);
 }
 
 #rooms-browse .fcty-landing-head {
@@ -1347,63 +1340,6 @@ textarea.fcty-input {
     font-weight: 600;
 }
 
-/* Stepper */
-.fcty-stepper {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    border: 1px solid var(--fcty-line);
-    border-radius: 10px;
-    background: var(--fcty-card);
-    overflow: hidden;
-}
-
-.fcty-stepper button {
-    width: 40px;
-    height: 40px;
-    border: 0;
-    background: transparent;
-    color: var(--fcty-ink);
-    cursor: pointer;
-    display: grid;
-    place-items: center;
-}
-
-.fcty-stepper button:hover:not(:disabled) {
-    background: var(--fcty-soft);
-}
-
-.fcty-stepper button:disabled {
-    opacity: .4;
-    cursor: not-allowed;
-}
-
-.fcty-stepper input {
-    width: 56px;
-    height: 40px;
-    border: 0;
-    border-left: 1px solid var(--fcty-line);
-    border-right: 1px solid var(--fcty-line);
-    background: transparent;
-    color: var(--fcty-ink);
-    font: inherit;
-    font-weight: 700;
-    text-align: center;
-    -moz-appearance: textfield;
-    appearance: textfield;
-}
-
-.fcty-stepper input::-webkit-outer-spin-button,
-.fcty-stepper input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-.fcty-stepper input:focus {
-    outline: none;
-    background: var(--fcty-soft);
-}
-
 .fcty-link-btn {
     display: inline-flex;
     align-items: center;
@@ -1997,4 +1933,130 @@ textarea.fcty-input {
         animation: none !important;
         transition: none !important;
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOM LIMIT + ADVISER LETTER
+═══════════════════════════════════════════════════════════════ */
+.fcty-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.fcty-chip-row .fcty-seats {
+    margin-top: 0;
+}
+
+.fcty-chip-row .fcty-seats[hidden] {
+    display: none;
+}
+
+.fcty-limit-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-weight: 600;
+}
+
+.fcty-hint.is-over {
+    color: var(--fcty-maintenance);
+    font-weight: 600;
+}
+
+.fcty-sub[hidden] {
+    display: none;
+}
+
+.fcty-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Drop zone */
+.fcty-drop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 1.5px dashed var(--fcty-line);
+    border-radius: 12px;
+    background: var(--fcty-card);
+    color: var(--fcty-muted);
+    cursor: pointer;
+    transition: border-color .18s, background .18s, color .18s;
+}
+
+.fcty-drop[hidden],
+.fcty-file[hidden] {
+    display: none;
+}
+
+.fcty-drop strong {
+    display: block;
+    font-size: .875rem;
+    color: var(--fcty-ink);
+}
+
+.fcty-drop small {
+    display: block;
+    margin-top: 2px;
+    font-size: .75rem;
+}
+
+.fcty-drop:hover,
+.fcty-drop.is-drag,
+.fcty-sr-only:focus-visible~.fcty-drop,
+.fcty-drop:focus-within {
+    border-color: var(--fcty-brand);
+    background: color-mix(in srgb, var(--fcty-brand) 6%, var(--fcty-card));
+    color: var(--color-primary, #800000);
+}
+
+/* Chosen file */
+.fcty-file {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 8px 8px 16px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 12px;
+    background: var(--fcty-card);
+    color: var(--color-primary, #800000);
+}
+
+.fcty-file-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .875rem;
+    font-weight: 600;
+    color: var(--fcty-ink);
+}
+
+.fcty-file-size {
+    font-size: .75rem;
+    color: var(--fcty-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.fcty-done-note {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
 }

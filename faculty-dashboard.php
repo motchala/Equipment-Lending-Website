@@ -76,6 +76,8 @@ function actEquipIcon(string $name): string
 }
 
 require_once __DIR__ . '/equipment-booking/core/arbitration-engine.php';
+require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
 
 function maskEmail($email)
 {
@@ -86,13 +88,21 @@ function maskEmail($email)
     return $visible . '***@' . htmlspecialchars($parts[1]);
 }
 
+/** Borrow form validation failed: back to the dashboard with a readable message. */
+function bm_fail(string $msg): void
+{
+    header('Location: faculty-dashboard.php?borrow_error=' . rawurlencode($msg));
+    exit();
+}
+
 // ── Auto-decline expired & mark overdue ───────────────────────────────────
 $today = date('Y-m-d');
 $reason_expired = "Request expired – borrow date has already passed";
 $stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
 $stmt_expired->bind_param("ss", $reason_expired, $today);
 $stmt_expired->execute();
-mysqli_query($conn, "UPDATE tbl_requests SET status='Overdue' WHERE status='Approved' AND return_date < '$today'");
+// Overdue marking is time-aware now (hourly bookings) and Later bookings take their stock when they start
+BookingSchedule::tick($conn);
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($_POST['submitted_as'])) {
@@ -103,18 +113,14 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
     // ── ADVISER BRANCH ────────────────────────────────────────────────────
     if ($submitted_as_post === 'adviser') {
 
-        // Re-read allow_org_borrowing from DB — server-side gate (Requirement 1.5, 1.6)
-        // Guard: if migration hasn't run yet the column may not exist; treat as 0.
-        $_gate_col = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-        if (!$_gate_col || $_gate_col->num_rows === 0) {
-            die("Error: Organisation borrowing not permitted for this account.");
-        }
-        $stmt_gate = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
+        // Org privileges come from the adviser role itself (read fresh from the DB here,
+        // never from a form field): only an Organization Adviser may submit for an organization.
+        $stmt_gate = $conn->prepare("SELECT role FROM tbl_users WHERE faculty_id = ? LIMIT 1");
         $stmt_gate->bind_param('s', $_SESSION['faculty_id']);
         $stmt_gate->execute();
         $gate_row = $stmt_gate->get_result()->fetch_assoc();
         $stmt_gate->close();
-        if ((int)($gate_row['allow_org_borrowing'] ?? 0) !== 1) {
+        if (($gate_row['role'] ?? '') !== 'Organization Adviser') {
             die("Error: Organisation borrowing not permitted for this account.");
         }
 
@@ -132,49 +138,79 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $faculty_name = $adv_user['fullname'];
         $faculty_id   = $adv_user['faculty_id'];
 
-        // Collect and validate shared fields
-        $borrow_date  = trim($_POST['borrow_date'] ?? '');
-        $return_date  = trim($_POST['return_date'] ?? '');
-        $room         = trim($_POST['room'] ?? '');
-        $instructor   = $faculty_name; // auto-filled from account name
-        $current_date = date('Y-m-d');
-        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
-        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+        // Where + when + which items. Everything is validated BEFORE anything is saved
+        // (including the optional letter), so one bad item never leaves a half-filed batch.
+        $instructor = $faculty_name; // auto-filled from account name
+        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
+        if (!$room_row) bm_fail('Please choose a room from the list.');
+        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
+        $room    = BookingSchedule::roomLabel($room_row);
+        $room_id = (int)$room_row['room_id'];
 
-        // Validate document is present (Requirement 4.6)
-        if (!isset($_FILES['request_document']) || $_FILES['request_document']['error'] === UPLOAD_ERR_NO_FILE) {
-            die("Error: A signed request letter is required for organisation borrowing.");
+        $raw_items = $_POST['items'] ?? [];
+        if (!is_array($raw_items) || empty($raw_items)) bm_fail('Please select at least one item.');
+        $qty_post = (isset($_POST['qty']) && is_array($_POST['qty'])) ? $_POST['qty'] : [];
+        $plan = [];
+        $seen = [];
+        foreach ($raw_items as $raw) {
+            $name = trim((string)$raw);
+            if ($name === '' || isset($seen[$name])) continue;
+            $seen[$name] = true;
+            $chk = BookingSchedule::parse($conn, $_POST, true, $name, max(1, (int)($qty_post[$name] ?? 1)));
+            if (!$chk['ok']) bm_fail($name . ': ' . $chk['error']);
+            $bk = $chk['data'];
+            if (BookingSchedule::freeUnits($conn, $name, $bk['start_ts'], $bk['end_ts']) < $bk['qty']) {
+                $next = $bk['mode'] === 'future'
+                    ? BookingSchedule::earliestFreeDate(
+                        $conn,
+                        $name,
+                        $bk['qty'],
+                        substr($bk['borrow_time'], 0, 5),
+                        (int)($_POST['duration'] ?? 1),
+                        date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                    )
+                    : null;
+                bm_fail('"' . $name . '" is already booked for that schedule.'
+                    . ($next ? ' The next free start is ' . date('D, M j', strtotime($next)) . '.' : ''));
+            }
+            $plan[] = ['name' => $name, 'qty' => $bk['qty'], 'bk' => $bk];
+        }
+        if (empty($plan)) bm_fail('Please select at least one item.');
+        $borrow_date = $plan[0]['bk']['borrow_date'];
+        $return_date = $plan[0]['bk']['return_date'];
+
+        // The request letter is OPTIONAL for organization requests. If one is attached it is
+        // validated and stored; without one the request is filed with no document (it just
+        // gets no letter-based priority from the arbitration engine).
+        $rel_path = null;
+        if (isset($_FILES['request_document']) && $_FILES['request_document']['error'] !== UPLOAD_ERR_NO_FILE) {
+            if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
+                die("File upload error. Please try again.");
+            }
+            if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
+                die("File too large. Maximum size is 5 MB.");
+            }
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
+            finfo_close($finfo);
+            $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+            if (!in_array($mime, $allowed_mimes, true)) {
+                die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
+            }
+
+            $orig_name = basename($_FILES['request_document']['name']);
+            $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
+            $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
+            $dest_dir  = __DIR__ . '/uploads/request_letters/';
+            $dest_path = $dest_dir . $dest_name;
+            if (!move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
+                die("Error: Could not save uploaded document.");
+            }
+            $rel_path = 'uploads/request_letters/' . $dest_name;
         }
 
-        // File upload validation (Requirement 10.6)
-        if ($_FILES['request_document']['error'] !== UPLOAD_ERR_OK) {
-            die("File upload error. Please try again.");
-        }
-        if ($_FILES['request_document']['size'] > 5 * 1024 * 1024) {
-            die("File too large. Maximum size is 5 MB.");
-        }
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime  = finfo_file($finfo, $_FILES['request_document']['tmp_name']);
-        finfo_close($finfo);
-        $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-        if (!in_array($mime, $allowed_mimes, true)) {
-            die("Unsupported file type. Please upload a PDF, JPG, PNG, or WEBP file.");
-        }
-
-        // Move uploaded file to uploads/request_letters/ (Requirement 10.7)
-        $orig_name = basename($_FILES['request_document']['name']);
-        $safe_name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $orig_name);
-        $dest_name = time() . '_' . $faculty_id . '_' . $safe_name;
-        $dest_dir  = __DIR__ . '/uploads/request_letters/';
-        $dest_path = $dest_dir . $dest_name;
-        $rel_path  = 'uploads/request_letters/' . $dest_name;
-        if (!move_uploaded_file($_FILES['request_document']['tmp_name'], $dest_path)) {
-            die("Error: Could not save uploaded document.");
-        }
-
-        // Collect items array (Requirement 4.4, 5.1)
-        $items = $_POST['items'] ?? [];
-        if (empty($items)) die("Error: At least one item must be selected.");
+        // Items were validated above ($plan)
+        $items = array_column($plan, 'name');
 
         // Generate batch UUID (Requirement 4.5)
         $batch_id = sprintf(
@@ -190,19 +226,22 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         );
 
         // Loop: one INSERT per selected item (Requirement 4.5, 3.3)
-        foreach ($items as $item) {
-            $item_name = trim($item);
-            if ($item_name === '') continue;
+        $declined_items = [];
+        $kept_items     = 0;
+        foreach ($plan as $pl) {
+            $item_name = $pl['name'];
+            $bk        = $pl['bk'];
 
             $stmt_ins = $conn->prepare(
                 "INSERT INTO tbl_requests
                  (faculty_name, faculty_id, equipment_name, instructor, room,
-                  borrow_date, return_date, status, request_date,
+                  borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
+                  booking_mode, stock_applied, status, request_date,
                   submitted_as, batch_id, document_path)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'adviser', ?, ?)"
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'adviser', ?, ?)"
             );
             $stmt_ins->bind_param(
-                'sssssssss',
+                'sssssssssiisss',
                 $faculty_name,
                 $faculty_id,
                 $item_name,
@@ -210,6 +249,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
                 $room,
                 $borrow_date,
                 $return_date,
+                $bk['borrow_time'],
+                $bk['return_time'],
+                $bk['qty'],
+                $room_id,
+                $bk['mode'],
                 $batch_id,
                 $rel_path
             );
@@ -217,6 +261,13 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $new_request_id = $conn->insert_id;
             $stmt_ins->close();
             ArbitrationEngine::process($conn, $new_request_id);
+            // A declined request is never kept: drop it and report the reason on the spot.
+            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
+            if ($why_declined !== null) {
+                $declined_items[] = '"' . $item_name . '": ' . $why_declined;
+                continue;
+            }
+            $kept_items++;
 
             // ── Generate return token if engine approved this item ────────────
             $chk = $conn->prepare(
@@ -241,6 +292,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             }
         }
 
+        if ($declined_items) {
+            // Nothing is logged for the declined items: say why, right here.
+            bm_fail('Not booked – ' . implode(' | ', $declined_items)
+                . ($kept_items > 0 ? ' (The other items in your request were submitted.)' : ''));
+        }
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else {
@@ -258,14 +314,42 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $faculty_name   = $user['fullname'];
         $faculty_id     = $user['faculty_id'];
 
-        $borrow_date    = trim($_POST['borrow_date'] ?? '');
-        $return_date    = trim($_POST['return_date'] ?? '');
         $equipment_name = trim($_POST['equipment_name'] ?? '');
-        $room           = trim($_POST['room'] ?? '');
         $instructor     = $faculty_name; // auto-filled from account name
-        $current_date   = date('Y-m-d');
-        if ($borrow_date < $current_date) die("Error: You cannot select a borrow date in the past.");
-        if ($return_date < $borrow_date)  die("Error: Return date cannot be before the borrow date.");
+
+        // Where (live room record, same tables as Facilities) and when (Today / Later rules).
+        // Limits follow the account's role, read from the DB, never from the form.
+        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
+        if (!$room_row) bm_fail('Please choose a room from the list.');
+        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
+        $room    = BookingSchedule::roomLabel($room_row);
+        $room_id = (int)$room_row['room_id'];
+
+        $chk = BookingSchedule::parse(
+            $conn,
+            $_POST,
+            BookingSchedule::isAdviserRole((string)($user['role'] ?? '')),
+            $equipment_name,
+            max(1, (int)($_POST['qty'] ?? 1))
+        );
+        if (!$chk['ok']) bm_fail($chk['error']);
+        $bk = $chk['data'];
+        if (BookingSchedule::freeUnits($conn, $equipment_name, $bk['start_ts'], $bk['end_ts']) < $bk['qty']) {
+            $next = $bk['mode'] === 'future'
+                ? BookingSchedule::earliestFreeDate(
+                    $conn,
+                    $equipment_name,
+                    $bk['qty'],
+                    substr($bk['borrow_time'], 0, 5),
+                    (int)($_POST['duration'] ?? 1),
+                    date('Y-m-d', strtotime($bk['borrow_date'] . ' +1 day'))
+                )
+                : null;
+            bm_fail('"' . $equipment_name . '" is already booked for that schedule.'
+                . ($next ? ' The next free start is ' . date('D, M j', strtotime($next)) . '.' : ''));
+        }
+        $borrow_date = $bk['borrow_date'];
+        $return_date = $bk['return_date'];
 
         // ── Document upload validation ─────────────────────────────────────────
         $document_path = null;
@@ -290,18 +374,24 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         $stmt_ins_p = $conn->prepare(
             "INSERT INTO tbl_requests
              (faculty_name, faculty_id, equipment_name, instructor, room,
-              borrow_date, return_date, status, request_date, submitted_as)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'Waiting', NOW(), 'personal')"
+              borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
+              booking_mode, stock_applied, status, request_date, submitted_as)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal')"
         );
         $stmt_ins_p->bind_param(
-            'sssssss',
+            'sssssssssiis',
             $faculty_name,
             $faculty_id,
             $equipment_name,
             $instructor,
             $room,
             $borrow_date,
-            $return_date
+            $return_date,
+            $bk['borrow_time'],
+            $bk['return_time'],
+            $bk['qty'],
+            $room_id,
+            $bk['mode']
         );
         if ($stmt_ins_p->execute()) {
             $new_request_id = $conn->insert_id;
@@ -327,6 +417,12 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             }
 
             ArbitrationEngine::process($conn, $new_request_id);
+
+            // A declined request is never kept: drop it and report the reason on the spot.
+            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
+            if ($why_declined !== null) {
+                bm_fail($why_declined);
+            }
 
             // ── Generate return token if engine approved the request ──────────
             $check_approved = $conn->prepare(
@@ -461,31 +557,53 @@ $db_emergency_rel     = $profile_row['emergency_relationship'] ?? '';
 $db_emergency_phone   = $profile_row['emergency_phone']       ?? '';
 $is_org_adviser       = ($profile_row['role'] ?? '') === 'Organization Adviser';
 
-// ── Dual-mode gate — read allow_org_borrowing fresh on every page load ────
-// (Requirements 1.3, 1.4, 1.5 — never sourced from a hidden field)
-// Guard: if the migration hasn't been run yet the column may not exist;
-// fall back to 0 (single-mode) so the dashboard doesn't crash.
-$is_dual_mode = false;
-$_col_check = $conn->query("SHOW COLUMNS FROM tbl_users LIKE 'allow_org_borrowing'");
-if ($_col_check && $_col_check->num_rows > 0) {
-    $stmt_dm = $conn->prepare("SELECT allow_org_borrowing FROM tbl_users WHERE faculty_id = ? LIMIT 1");
-    $stmt_dm->bind_param('s', $uid_safe);
-    $stmt_dm->execute();
-    $dm_row = $stmt_dm->get_result()->fetch_assoc();
-    $stmt_dm->close();
-    $is_dual_mode = (int)($dm_row['allow_org_borrowing'] ?? 0) === 1;
-}
+// Dual-mode (personal + organization) borrowing is automatic for Organization Advisers.
+$is_dual_mode = $is_org_adviser;
+
+// Faculty ID: set by the faculty member themselves (once). Until then the account is stored
+// under an internal placeholder that must never be shown (see config/faculty-id.php).
+$fid_unset = faculty_id_is_unset((string)$_SESSION['faculty_id']);
+$fid_label = faculty_id_display((string)$_SESSION['faculty_id'], 'Not set');
 
 // ── Adviser-mode inventory checklist — only loaded if dual mode active ────
 $avail_items = [];
 if ($is_dual_mode) {
     $avail_result = $conn->query(
-        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE quantity >= 1 AND is_archived = 0 ORDER BY category, item_name"
+        "SELECT item_id, item_name, category, quantity FROM tbl_inventory WHERE is_archived = 0 ORDER BY category, item_name"
     );
     if ($avail_result) {
         while ($av_row = $avail_result->fetch_assoc()) $avail_items[] = $av_row;
     }
 }
+
+// ── Borrow Request modal data ─────────────────────────────────────────────
+$bk_rooms  = BookingSchedule::roomsTree($conn);
+$bk_totals = BookingSchedule::totalStockMap($conn);
+$bk_items  = [];
+$bk_res    = $conn->query("SELECT item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
+while ($bk_res && ($bk_row = $bk_res->fetch_assoc())) {
+    $bk_items[$bk_row['item_name']] = [
+        'shelf' => (int)$bk_row['quantity'],
+        'total' => (int)($bk_totals[$bk_row['item_name']] ?? $bk_row['quantity']),
+    ];
+}
+$bk_meta_json = json_encode([
+    'items'   => $bk_items,
+    'adviser' => (bool)$is_org_adviser,
+    'today'   => date('Y-m-d'),
+    'nowMin'  => (int)date('G') * 60 + (int)date('i'),
+    'rules'   => [
+        'dayStart'   => BookingSchedule::DAY_START,
+        'dayEnd'     => BookingSchedule::DAY_END,
+        'slot'       => BookingSchedule::SLOT_MINUTES,
+        'maxAhead'   => BookingSchedule::MAX_ADVANCE_DAYS,
+        'todayHours' => BookingSchedule::TODAY_HOURS,
+        'adviserMaxHours' => BookingSchedule::ADVISER_MAX_HOURS,
+        'futureDays' => BookingSchedule::FUTURE_DAYS,
+        'adviserFutureDays' => BookingSchedule::ADVISER_FUTURE_DAYS,
+        'graceMin'   => BookingSchedule::IMMEDIATE_GRACE_MIN,
+    ],
+], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_INVALID_UTF8_SUBSTITUTE);
 
 $masked_email       = maskEmail($db_email);
 $masked_backup      = maskEmail($db_backup_email);
@@ -509,6 +627,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token()); ?>">
     <title>PUPSync | Faculty Dashboard</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="assets/images/favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
     <!-- Google Fonts: Hanken Grotesk + Inter (matches new design system) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -532,7 +655,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
 
     <!-- Dashboard Redesign v3 — Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
     <!-- facilities tab portal -->
     <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
@@ -581,7 +703,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         .dash-hero-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 800;
             color: #fff;
@@ -645,7 +767,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         .dash-stats-row-layout .stat-card-value {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 800;
             line-height: 1;
@@ -745,7 +867,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .bento-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-size: 1.05rem;
             font-weight: 700;
             letter-spacing: -0.01em;
@@ -781,7 +903,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .active-card:hover {
-            border-top-color: var(--color-primary);
+            border-top-color: var(--accent-gold-deep);
             transform: translateY(-2px);
         }
 
@@ -795,7 +917,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-home .active-card-title {
-            font-family: 'Syne', var(--font-display);
+            font-family: var(--font-display);
             font-weight: 700;
         }
 
@@ -848,7 +970,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border-radius: 8px;
             border: 1.5px solid #e5e7eb;
             background: #ffffff;
-            color: #374151;
+            color: var(--color-on-surface-variant);
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
@@ -877,6 +999,15 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: #570000;
         }
 
+        /* ── Sub headers: same look as the My Activity one (.fact-sub) ─── */
+        #panel-home .dash-flat-sub,
+        #panel-lending .page-subtitle,
+        #panel-rooms .page-subtitle {
+            margin: 4px 0 0;
+            font-size: 0.875rem;
+            color: var(--color-secondary);
+        }
+
         /* ── Page Header ──────────────────────────────────────────── */
         #panel-lending .page-header-block {
             display: block !important;
@@ -887,21 +1018,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             box-shadow: none;
         }
 
-        #panel-lending .page-title-sm {
-            font-family: 'Hanken Grotesk', var(--font-display);
-            font-size: 1.875rem !important;
-            font-weight: 700 !important;
-            color: #111827 !important;
-            letter-spacing: -0.4px;
-            margin-bottom: 4px;
-            line-height: 1.15;
-        }
-
-        #panel-lending .page-subtitle {
-            font-size: 0.875rem !important;
-            color: #6b7280 !important;
-            font-weight: 400 !important;
-        }
 
         /* ── Featured Banner ──────────────────────────────────────── */
         #panel-lending .featured-section {
@@ -915,7 +1031,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             margin-bottom: 16px;
             letter-spacing: -0.1px;
         }
@@ -1001,7 +1117,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1.45rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             letter-spacing: -0.3px;
             margin-bottom: 6px;
             line-height: 1.25;
@@ -1009,7 +1125,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .feat-hero-desc {
             font-size: 0.835rem;
-            color: #6b7280;
+            color: var(--color-secondary);
             line-height: 1.55;
             margin-bottom: 0;
             flex: 1;
@@ -1083,7 +1199,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display);
             font-size: 1rem;
             font-weight: 700;
-            color: #111827;
+            color: var(--color-on-surface);
             letter-spacing: -0.15px;
             margin-bottom: 3px;
         }
@@ -1091,7 +1207,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .feat-secondary-cat {
             font-size: 0.72rem;
             font-weight: 600;
-            color: #9ca3af;
+            color: var(--color-secondary);
             text-transform: uppercase;
             letter-spacing: 0.07em;
             display: flex;
@@ -1113,18 +1229,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             margin-bottom: 16px;
         }
 
-        #panel-lending .catalog-section-title {
-            font-family: 'Hanken Grotesk', var(--font-display);
-            font-size: 1rem;
-            font-weight: 700;
-            color: #111827;
-            letter-spacing: -0.1px;
-        }
 
         #panel-lending .catalog-count-chip {
             font-size: 0.72rem;
             font-weight: 600;
-            color: #6b7280;
+            color: var(--color-secondary);
             background: #f3f4f6;
             border-radius: 20px;
             padding: 3px 10px;
@@ -1136,6 +1245,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             backdrop-filter: blur(14px);
             -webkit-backdrop-filter: blur(14px);
             border: 1px solid rgba(240, 224, 224, .7) !important;
+            /* Top accent is the curved gold ::before in faculty-dashboard.css */
+            border-top: 0 !important;
             border-radius: 16px !important;
             padding: 24px !important;
             box-shadow: 0 4px 24px rgba(87, 0, 0, .05) !important;
@@ -1170,7 +1281,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .catalog-search-wrap .material-symbols-outlined {
             font-size: 18px;
-            color: #9ca3af;
+            color: var(--color-secondary);
             flex-shrink: 0;
         }
 
@@ -1180,12 +1291,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             outline: none;
             font-family: var(--font-sans);
             font-size: 0.875rem;
-            color: #111827;
+            color: var(--color-on-surface);
             width: 100%;
         }
 
         #panel-lending .catalog-search-wrap input::placeholder {
-            color: #9ca3af;
+            color: var(--color-secondary);
         }
 
         #panel-lending .catalog-filter-select {
@@ -1193,7 +1304,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border: 1.5px solid #e5e7eb !important;
             border-radius: 10px !important;
             background: #f9fafb !important;
-            color: #374151 !important;
+            color: var(--color-on-surface-variant) !important;
             font-family: var(--font-sans);
             font-size: 0.875rem !important;
             font-weight: 500;
@@ -1231,16 +1342,27 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .eq-item-card::after,
         #panel-lending .item-node::after {
+            /* hover accent: same curved gold band as the cards */
             content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #570000, #a00000);
+            height: 30px;
+            border: 3px solid transparent;
+            border-bottom: 0;
+            border-top-left-radius: 13px;
+            border-top-right-radius: 13px;
+            background:
+                linear-gradient(90deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) top / 100% 3px no-repeat,
+                linear-gradient(180deg, var(--accent-gold-deep) 0%, transparent 100%);
+            background-origin: border-box;
+            -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
             opacity: 0;
             transition: opacity .25s;
-            border-radius: 14px 14px 0 0;
             pointer-events: none;
             z-index: 2;
         }
@@ -1315,7 +1437,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-family: 'Hanken Grotesk', var(--font-display) !important;
             font-weight: 700 !important;
             font-size: 0.975rem !important;
-            color: #111827 !important;
+            color: var(--color-on-surface) !important;
             margin-bottom: 4px !important;
             letter-spacing: -0.1px;
             line-height: 1.3;
@@ -1330,7 +1452,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .eq-item-cat {
             font-size: 0.69rem !important;
             font-weight: 600 !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             text-transform: uppercase;
             letter-spacing: 0.07em;
             display: flex;
@@ -1407,7 +1529,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .btn-borrow:disabled,
         #panel-lending .btn-borrow[disabled] {
             background: #f3f4f6 !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
             border: 1px solid #e5e7eb !important;
@@ -1415,7 +1537,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .btn-borrow-blocked {
             background: transparent !important;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
             border: 1px solid #e5e7eb !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
@@ -1430,7 +1552,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border: 1.5px solid #e5e7eb;
             border-radius: 9px;
             background: transparent;
-            color: #374151;
+            color: var(--color-on-surface-variant);
             font-size: 0.82rem;
             font-weight: 600;
             font-family: var(--font-sans);
@@ -1474,7 +1596,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .btn-borrow-primary:disabled {
             background: #f3f4f6;
-            color: #9ca3af;
+            color: var(--color-secondary);
             box-shadow: none;
             cursor: not-allowed;
         }
@@ -1501,7 +1623,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .eq-empty p {
             font-size: 0.9rem;
             font-weight: 500;
-            color: #9ca3af !important;
+            color: var(--color-secondary) !important;
         }
 
         /* ── Dark theme ───────────────────────────────────────────── */
@@ -1528,6 +1650,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         [data-theme="dark"] #panel-lending .catalog-card {
             background: rgba(35, 21, 21, .85) !important;
             border-color: var(--color-outline-variant) !important;
+            border-top-color: #570000 !important;
         }
 
         [data-theme="dark"] #panel-lending .catalog-search-wrap,
@@ -1551,9 +1674,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: #fff !important;
         }
 
-        [data-theme="dark"] #panel-lending .page-title-sm {
-            color: var(--color-on-surface) !important;
-        }
 
         [data-theme="dark"] #panel-lending .btn-borrow:not(:disabled),
         [data-theme="dark"] #panel-lending .btn-borrow-primary:not(:disabled) {
@@ -1568,8 +1688,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         [data-theme="dark"] #panel-lending .feat-hero-title,
         [data-theme="dark"] #panel-lending .feat-secondary-title,
-        [data-theme="dark"] #panel-lending .featured-label,
-        [data-theme="dark"] #panel-lending .catalog-section-title {
+        [data-theme="dark"] #panel-lending .featured-label {
             color: var(--color-on-surface) !important;
         }
 
@@ -1648,36 +1767,18 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-footer">
-            <!-- Account group: the toggle shows the avatar + faculty name. Clicking it expands
-                 Settings + Notifications inline, directly under the toggle and above Log Out. -->
-            <div class="side-nav-group" id="navAccountGroup">
-                <button type="button" class="side-nav-item side-nav-group-toggle" id="navAccountToggle"
-                    aria-expanded="false" aria-controls="navAccountMenu"
-                    aria-label="Account menu<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                    <span class="side-nav-avatar"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></span>
-                    <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
-                    <b class="side-nav-notif-dot" id="navNotifDot" aria-hidden="true"
-                        <?php if ($notif_count <= 0) echo 'hidden'; ?>></b>
-                    <span class="material-symbols-outlined side-nav-chevron" aria-hidden="true">expand_more</span>
-                </button>
-                <div class="side-nav-submenu" id="navAccountMenu" role="group" aria-label="Account">
-                    <div class="side-nav-submenu-inner">
-                        <a class="side-nav-item side-nav-subitem" id="nav-settings" data-action="open-overlay"
-                            data-target="settingsOverlay" href="#">
-                            <span class="material-symbols-outlined">settings</span>
-                            <span>Settings</span>
-                        </a>
-                        <button type="button" class="side-nav-item side-nav-subitem" id="nav-notifications"
-                            data-action="open-notif-modal"
-                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>">
-                            <span class="material-symbols-outlined">notifications</span>
-                            <span>Notifications</span>
-                            <b class="side-nav-badge" id="notifBadge"
-                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
-                        </button>
-                    </div>
-                </div>
+            <!-- Signed-in faculty: the name only. Not a button, no avatar. Notifications and Settings
+                 live in the Dashboard's top-right bell / avatar. (.side-nav-user-name stays on the span:
+                 faculty-dashboard.js reads and updates it.) -->
+            <div class="side-nav-user" id="navAccountGroup" hidden aria-hidden="true" style="display:none;">
+                <span class="side-nav-user-name"><?php echo htmlspecialchars($fullname); ?></span>
             </div>
+            <!-- Settings: just under the divider line, directly above Log Out (opens the Settings overlay,
+                 same as the Dashboard avatar). #nav-settings is what _openOverlayDOM() highlights. -->
+            <a class="side-nav-item" id="nav-settings" href="#" data-action="open-overlay" data-target="settingsOverlay">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Settings</span>
+            </a>
             <!-- Log Out — pinned to the very bottom of the sidebar -->
             <a class="side-nav-item side-nav-signout" id="nav-signout" href="#" data-action="logout">
                 <span class="material-symbols-outlined">logout</span>
@@ -1735,6 +1836,17 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 </div>
             <?php endif; ?>
 
+            <!-- Borrow request could not be filed -->
+            <?php if (!empty($_GET['borrow_error'])): ?>
+                <div class="alert-banner alert-error" id="borrow-error-alert" role="alert">
+                    <span class="material-symbols-outlined">error</span>
+                    <span><strong>Could not submit your request.</strong> <?php echo htmlspecialchars(mb_substr((string)$_GET['borrow_error'], 0, 300)); ?></span>
+                    <button class="alert-close" data-action="dismiss-alert" data-target="borrow-error-alert" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            <?php endif; ?>
+
             <!-- Overdue Toast — bottom-center overlay, doesn't affect layout.
                  Shown once per login session (server-gated below); auto-
                  dismisses after 8s via JS (see checkOverdueState/showOverdueToast). -->
@@ -1755,11 +1867,28 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
                 <!-- ── Flat Header ──────────────────────────────────── -->
                 <div class="dash-flat-header">
-                    <h1 class="dash-flat-title">Good <?php
-                                                        $h = (int)date('H');
-                                                        echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
-                                                        ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
-                    <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> — Here is an overview of your active equipment and requests.</p>
+                    <div class="dash-flat-titles">
+                        <h1 class="dash-flat-title">Good <?php
+                                                            $h = (int)date('H');
+                                                            echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
+                                                            ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                        <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> &mdash; Your loans, reservations and reminders at a glance.</p>
+                    </div>
+                    <!-- Dashboard-only shortcuts (same as the admin Dashboard). They live inside #panel-home, so
+                         they only show on this tab. The badge keeps id="notifBadge": the notification code in
+                         faculty-dashboard.js updates it. The avatar has .avatar-btn so name / photo changes reach it. -->
+                    <div class="fd-dash-top-actions">
+                        <button type="button" class="fd-top-btn" id="dashNotifBtn" data-action="open-notif-modal"
+                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>"
+                            title="Notifications">
+                            <span class="material-symbols-outlined">notifications</span>
+                            <b class="fd-top-badge" id="notifBadge"
+                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
+                        </button>
+                        <button type="button" class="avatar-btn fd-top-avatar" id="dashAvatarBtn"
+                            data-action="open-overlay" data-target="settingsOverlay"
+                            aria-label="Open my account" title="My account"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></button>
+                    </div>
                 </div>
 
                 <!-- ── Top Two-Column: [Stats+Bentos] | [Code Card] ── -->
@@ -1771,18 +1900,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <!-- Stats -->
                         <div class="dash-stats" id="dashStats">
                             <button type="button" class="stat-tile" data-stat="approved"
-                                data-action="filter-requests" data-status="Approved">
+                                data-action="go-tab" data-tab="activity">
                                 <span class="stat-tile-value"><?php echo $stat_approved; ?></span>
                                 <span class="stat-tile-label">Active Borrowings</span>
                             </button>
-                            <button type="button" class="stat-tile" data-stat="waiting"
-                                data-action="filter-requests" data-status="Waiting">
-                                <span class="stat-tile-value"><?php echo $stat_waiting; ?></span>
-                                <span class="stat-tile-label">Pending Requests</span>
-                            </button>
                             <?php if ($stat_overdue > 0): ?>
                                 <button type="button" class="stat-tile stat-tile--overdue" data-stat="overdue"
-                                    data-action="filter-requests" data-status="Overdue">
+                                    data-action="go-tab" data-tab="activity">
                                     <span class="stat-tile-value" id="statOverdueVal"><?php echo $stat_overdue; ?></span>
                                     <span class="stat-tile-label">Overdue</span>
                                 </button>
@@ -1961,7 +2085,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
                                 </div>
                                 <div class="active-card-footer">
-                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?></span>
+                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?><?php echo !empty($ai['return_time']) ? ' &middot; ' . BookingSchedule::fmtTime($ai['return_time']) : ''; ?></span>
                                     <div class="active-card-progress">
                                         <div class="active-card-progress-fill" style="width:<?php echo $progress; ?>%;<?php echo $isOverdue ? 'background:#dc2626;' : ''; ?>"></div>
                                     </div>
@@ -1981,21 +2105,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     ============================================================ -->
             <div class="tab-panel" id="panel-lending">
 
-                <!-- Lending Sub-Nav -->
-                <div class="lending-subnav">
-                    <button class="lending-nav-btn active" data-lending-nav="browse">
-                        <span class="material-symbols-outlined">search</span> Browse Equipment
-                    </button>
-                    <button class="lending-nav-btn" data-lending-nav="requests">
-                        <span class="material-symbols-outlined">receipt_long</span> My Requests
-                    </button>
-                </div>
 
                 <!-- ── Sub: Browse ─────────────────────────────────────── -->
                 <div class="lending-sub active" id="lending-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Equipment</h2>
-                        <p class="page-subtitle">Search and select equipment to submit a borrow request.</p>
+                        <p class="page-subtitle">Browse the catalog, check availability and request equipment for your class.</p>
                     </div>
 
                     <!-- ── Featured Section ────────────────────────────────── -->
@@ -2187,12 +2302,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                             <!-- Stock badge overlay on image -->
                                             <div class="eq-stock-overlay">
                                                 <?php if ($item['quantity'] > 0): ?>
-                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(209,250,229,.9) !important;">
+                                                    <span class="stock-badge stock-avail" style="margin-bottom:0;backdrop-filter:blur(4px);background:var(--color-success-container) !important;">
                                                         <span class="material-symbols-outlined" style="font-size:12px;">check_circle</span>
                                                         <?php echo (int)$item['quantity']; ?> available
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="stock-badge stock-unavail" style="margin-bottom:0;backdrop-filter:blur(4px);background:rgba(254,226,226,.9) !important;">
+                                                    <span class="stock-badge stock-unavail" style="margin-bottom:0;backdrop-filter:blur(4px);background:var(--color-error-container) !important;">
                                                         <span class="material-symbols-outlined" style="font-size:12px;">cancel</span>
                                                         Out of stock
                                                     </span>
@@ -2211,10 +2326,16 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     Overdue Block
                                                 </button>
                                             <?php else: ?>
-                                                <button class="btn-borrow" <?php if ($item['quantity'] <= 0) echo 'disabled'; ?>
+                                                <?php
+                                                $eq_shelf = (int)$item['quantity'];
+                                                $eq_total = (int)(($bk_items[$item['item_name']]['total'] ?? $eq_shelf));
+                                                $eq_ahead = ($eq_shelf <= 0 && $eq_total > 0);   // out now, but it exists: can be booked for later
+                                                ?>
+                                                <button class="btn-borrow<?php echo $eq_ahead ? ' btn-borrow-ahead' : ''; ?>"
+                                                    <?php if ($eq_shelf <= 0 && !$eq_ahead) echo 'disabled'; ?>
                                                     data-action="open-borrow-form"
                                                     data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                    <?php echo ($item['quantity'] > 0) ? 'Borrow' : 'Unavailable'; ?>
+                                                    <?php echo ($eq_shelf > 0) ? 'Borrow' : ($eq_ahead ? 'Book ahead' : 'Unavailable'); ?>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -2248,57 +2369,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 </div><!-- /lending-browse -->
 
                 <!-- ── Sub: Borrow Form (now a modal — this sub-panel is kept as an
-                     empty shell so lending-nav references don't break) ── -->
+                     empty shell so existing references to it don't break) ── -->
                 <div class="lending-sub" id="lending-form"></div><!-- /lending-form -->
 
-                <!-- ── Sub: My Requests ────────────────────────────────── -->
-                <div class="lending-sub" id="lending-requests">
-                    <div class="page-header-block">
-                        <h2 class="page-title-sm">My Requests</h2>
-                        <p class="page-subtitle">Track and manage all submitted borrow requests.</p>
-                    </div>
-                    <div class="table-surface">
-                        <div class="table-toolbar">
-                            <h3 class="table-toolbar-title">Request History</h3>
-                            <div class="table-toolbar-actions">
-                                <div class="req-filter-wrap">
-                                    <span class="material-symbols-outlined"
-                                        style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
-                                    <select id="reqStatusFilter" class="req-filter-select"
-                                        data-action="filter-requests-dd">
-                                        <option value="All">All Statuses</option>
-                                        <option value="Waiting">Pending</option>
-                                        <option value="Approved">Approved</option>
-                                        <option value="Declined">Declined</option>
-                                        <option value="Overdue">Overdue</option>
-                                        <option value="Returned">Returned</option>
-                                    </select>
-                                </div>
-                                <button class="req-sort-btn" id="reqSortBtn" data-action="toggle-sort">
-                                    <span class="material-symbols-outlined" style="font-size:16px">sort</span>
-                                    <span id="reqSortLabel">Latest First</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table class="requests-table" id="requestsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Equipment</th>
-                                        <th>Requested By</th>
-                                        <th>Room</th>
-                                        <th>Borrow Date</th>
-                                        <th>Return Date</th>
-                                        <th>Status</th>
-                                        <th>Notes</th>
-                                        <th>Return QR</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="requestsTbody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /lending-requests -->
 
             </div><!-- /panel-lending -->
 
@@ -2307,164 +2380,18 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     ============================================================ -->
             <div class="tab-panel" id="panel-rooms">
 
-                <!-- Rooms Sub-Nav — Browse | My Reservations -->
-                <div class="lending-subnav">
-                    <button class="lending-nav-btn active" data-rooms-nav="browse">
-                        <span class="material-symbols-outlined">search</span> Browse Facilities
-                    </button>
-                    <button class="lending-nav-btn" data-rooms-nav="history">
-                        <span class="material-symbols-outlined">receipt_long</span> My Reservations
-                        <?php if (!empty($room_reservations)): ?>
-                            <span class="lnb-badge"><?php echo count($room_reservations); ?></span>
-                        <?php endif; ?>
-                    </button>
-                </div>
 
                 <!-- ── Sub: Browse Facilities ─────────────────────────────── -->
                 <div class="lending-sub active" id="rooms-browse">
                     <div class="page-header-block">
                         <h2 class="page-title-sm">Browse Facilities</h2>
-                        <p class="page-subtitle">Explore available rooms and submit a reservation.</p>
+                        <p class="page-subtitle">Find a room, check its weekly schedule and reserve it for your class or event.</p>
                     </div>
                     <?php include __DIR__ . '/room-reservation/fcty-facilities.php'; ?>
                 </div><!-- /rooms-browse -->
 
-                <!-- ── Sub: My Reservations ───────────────────────────────── -->
-                <div class="lending-sub" id="rooms-history">
-                    <div class="page-header-block">
-                        <h2 class="page-title-sm">My Room Reservations</h2>
-                        <p class="page-subtitle">All room reservations you or your students have submitted.</p>
-                    </div>
-                    <div class="table-surface">
-                        <div class="table-toolbar">
-                            <h3 class="table-toolbar-title">Reservation History</h3>
-                            <div class="table-toolbar-actions">
-                                <div class="req-filter-wrap">
-                                    <span class="material-symbols-outlined"
-                                        style="font-size:16px;color:var(--color-on-surface-variant)">filter_list</span>
-                                    <select id="roomResStatusFilter" class="req-filter-select"
-                                        data-action="filter-room-reservations">
-                                        <option value="All">All Statuses</option>
-                                        <option value="Approved" selected>Approved</option>
-                                        <option value="Declined">Declined</option>
-                                        <option value="Cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table class="requests-table" id="roomReservationsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Room</th>
-                                        <th>Location</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Purpose</th>
-                                        <th>Submitted As</th>
-                                        <th>Status</th>
-                                        <th>Reason</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="roomReservationsTbody">
-                                    <?php if (empty($room_reservations)): ?>
-                                        <tr>
-                                            <td colspan="9" style="text-align:center;padding:2.5rem;color:var(--color-on-surface-variant);font-size:.875rem;">
-                                                No room reservations yet.
-                                            </td>
-                                        </tr>
-                                        <?php else: foreach ($room_reservations as $rr):
-                                            $rr_pill = 'pill-waiting';
-                                            if ($rr['status'] === 'Approved')   $rr_pill = 'pill-approved';
-                                            if ($rr['status'] === 'Declined')   $rr_pill = 'pill-declined';
-                                            if ($rr['status'] === 'Cancelled')  $rr_pill = 'pill-cancelled';
 
-                                            // Submitted-as label
-                                            $rr_submitted = match ($rr['submitted_as']) {
-                                                'adviser'  => 'Adviser',
-                                                'student'  => 'Student (via code)',
-                                                default    => 'Personal',
-                                            };
-
-                                            // Time display  08:00:00 → 8:00 AM
-                                            $fmt_time = function (string $t): string {
-                                                return date('g:i A', strtotime('1970-01-01 ' . $t));
-                                            };
-                                        ?>
-                                            <tr data-rr-status="<?php echo htmlspecialchars($rr['status']); ?>"
-                                                data-rr-id="<?php echo (int)$rr['id']; ?>"
-                                                data-rr-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
-                                                data-rr-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
-                                                data-rr-start="<?php echo htmlspecialchars($rr['start_time']); ?>"
-                                                data-rr-end="<?php echo htmlspecialchars($rr['end_time']); ?>">
-                                                <td class="fw-bold"><?php echo htmlspecialchars($rr['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($rr['floor_label'] . ', ' . $rr['building_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($rr['reservation_date'])); ?></td>
-                                                <td style="white-space:nowrap;">
-                                                    <?php echo $fmt_time($rr['start_time']) . ' – ' . $fmt_time($rr['end_time']); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($rr['purpose']); ?></td>
-                                                <td><?php echo htmlspecialchars($rr_submitted); ?></td>
-                                                <td>
-                                                    <span class="status-pill <?php echo $rr_pill; ?>">
-                                                        <?php echo htmlspecialchars($rr['status']); ?>
-                                                    </span>
-                                                </td>
-                                                <td style="color:var(--color-on-surface-variant);font-size:.8rem;">
-                                                    <?php echo $rr['reason'] ? htmlspecialchars($rr['reason']) : '—'; ?>
-                                                </td>
-                                                <td>
-                                                    <?php
-                                                    // Cancel button: only for Approved, > 1h before start
-                                                    if ($rr['status'] === 'Approved') {
-                                                        date_default_timezone_set('Asia/Manila');
-                                                        $resStart = new DateTime(
-                                                            $rr['reservation_date'] . ' ' . $rr['start_time'],
-                                                            new DateTimeZone('Asia/Manila')
-                                                        );
-                                                        $nowPhp = new DateTime('now', new DateTimeZone('Asia/Manila'));
-                                                        $canCancel = ($resStart->getTimestamp() - $nowPhp->getTimestamp()) > 3600;
-                                                        if ($canCancel): ?>
-                                                            <button class="btn-action btn-cancel-rr"
-                                                                data-action="cancel-reservation"
-                                                                data-rr-id="<?php echo (int)$rr['id']; ?>"
-                                                                data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
-                                                                title="Cancel this reservation">
-                                                                <span class="material-symbols-outlined" style="font-size:15px;">cancel</span>
-                                                                Cancel
-                                                            </button>
-                                                        <?php else: ?>
-                                                            <span style="color:var(--color-on-surface-variant);font-size:.75rem;" title="Cannot cancel within 1 hour of start time">—</span>
-                                                        <?php endif;
-                                                    } elseif ($rr['status'] === 'Declined') {
-                                                        // Offer waitlist join for Declined reservations
-                                                        ?>
-                                                        <button class="btn-action btn-waitlist-rr"
-                                                            data-action="join-waitlist"
-                                                            data-room-id="<?php echo (int)($rr['room_id'] ?? 0); ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($rr['room_name']); ?>"
-                                                            data-res-date="<?php echo htmlspecialchars($rr['reservation_date']); ?>"
-                                                            data-start-time="<?php echo htmlspecialchars($rr['start_time']); ?>"
-                                                            data-end-time="<?php echo htmlspecialchars($rr['end_time']); ?>"
-                                                            title="Join waitlist for this slot">
-                                                            <span class="material-symbols-outlined" style="font-size:15px;">notifications</span>
-                                                            Waitlist
-                                                        </button>
-                                                    <?php } else { ?>
-                                                        <span style="color:var(--color-on-surface-variant);font-size:.75rem;">—</span>
-                                                    <?php } ?>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rooms-history -->
-
-            </div><!-- /panel-rooms (wraps both sub-panels) -->
+            </div><!-- /panel-rooms -->
 
             <!-- ============================================================
                  TAB: MY ACTIVITY
@@ -2472,15 +2399,24 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <div class="tab-panel" id="panel-activity">
 
                 <?php
-                /* ── Activity panel data & helpers ───────────────────────────
-                   Status lifecycle: Waiting -> Approved -> Overdue -> Returned
-                                              \-> Declined
-                   Every request maps to exactly ONE of the three sections below
-                   (no overlaps, no gaps):
-                     • Currently Borrowing : Overdue, or Approved that already started
+                /* ── My Activity: data & helpers ─────────────────────────────
+                   The screen has three layers, top to bottom:
+
+                     1. Summary strip   four numbers, two for equipment, two for rooms
+                     2. Right now       Equipment card | Room reservations card
+                     3. History         one table for both, filtered All / Equipment / Rooms
+
+                   Equipment status lifecycle: Waiting -> Approved -> Overdue -> Returned
+                                                          \-> Declined
+                   Every equipment request lands in exactly ONE place:
+                     • Currently borrowing : Overdue, or Approved that already started
                      • Upcoming            : Waiting, or Approved that hasn't started yet
                      • History             : Returned or Declined
+
+                   Rooms are loaded by the fact_* functions in room-reservation/core/faculty-room-quota.php,
+                   the same code the live-refresh feed (api/poll-reservations.php?view=activity) uses.
                 ─────────────────────────────────────────────────────────────── */
+                require_once __DIR__ . '/room-reservation/core/faculty-room-quota.php';
 
                 $act_current = mysqli_query(
                     $conn,
@@ -2508,18 +2444,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 );
 
                 /* ── Stat counters ─────────────────────────────────────────── */
-                $act_stat_current = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe'
-                     AND (status='Overdue' OR (status='Approved' AND borrow_date <= '$today'))"
-                ))['c'] ?? 0;
+                $act_stat_current = $act_current ? (int) mysqli_num_rows($act_current) : 0;
+                $act_stat_upcoming = $act_upcoming ? (int) mysqli_num_rows($act_upcoming) : 0;
 
-                $act_stat_waiting = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe' AND status='Waiting'"
-                ))['c'] ?? 0;
 
                 $act_stat_overdue = mysqli_fetch_assoc(mysqli_query(
                     $conn,
@@ -2527,18 +2454,11 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                      WHERE faculty_id='$uid_safe' AND status='Overdue'"
                 ))['c'] ?? 0;
 
-                $act_stat_completed = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe' AND status='Returned'"
-                ))['c'] ?? 0;
+                /* ── Room reservations (shared with the live-refresh endpoint) ── */
+                $act_rooms      = fact_load_rooms($conn, (string) $_SESSION['faculty_id']);
+                $act_room_stats = fact_room_stats($act_rooms);
 
-                /* actEquipIcon() moved to the shared helpers near the top of this
-                   file, so both "Active Now" (Home tab) and My Activity can use
-                   it — see actEquipIcon()/actEquipImage() near $equip_image_map. */
-
-                /* ── Loan progress — linear (matches "Active Now" on the
-                       Home tab) instead of the old SVG ring ─────────────────── */
+                /* ── Loan progress — linear (matches "Active Now" on the Home tab) ── */
                 function actLoanProgress(string $borrowDate, string $returnDate, string $today, bool $isOverdue): array
                 {
                     $bd      = strtotime($borrowDate);
@@ -2562,280 +2482,324 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     return ['pct' => max(4, min(100, $pct)), 'label' => $label];
                 }
 
-                /* ── Status pill — shared by the Upcoming and History rows ── */
+                /* ── Equipment status pill (uses the same chip as the room side) ── */
                 function actStatusPill(string $status): string
                 {
                     $map = [
-                        'Waiting'  => ['cls' => 'myact-pill-waiting',  'icon' => 'schedule',     'label' => 'Pending'],
-                        'Approved' => ['cls' => 'myact-pill-approved', 'icon' => 'check_circle', 'label' => 'Approved'],
-                        'Declined' => ['cls' => 'myact-pill-declined', 'icon' => 'cancel',       'label' => 'Declined'],
-                        'Overdue'  => ['cls' => 'myact-pill-overdue',  'icon' => 'warning',      'label' => 'Overdue'],
-                        'Returned' => ['cls' => 'myact-pill-returned', 'icon' => 'task_alt',     'label' => 'Returned'],
+                        'Waiting'  => ['Pending',  'wait',  'schedule'],
+                        'Approved' => ['Approved', 'ok',    'check_circle'],
+                        'Declined' => ['Declined', 'bad',   'cancel'],
+                        'Overdue'  => ['Overdue',  'warn',  'warning'],
+                        'Returned' => ['Returned', 'muted', 'task_alt'],
                     ];
                     $d = $map[$status] ?? $map['Waiting'];
-                    return '<span class="myact-pill ' . $d['cls'] . '">'
-                        . '<span class="material-symbols-outlined" style="font-size:13px;">' . $d['icon'] . '</span>'
-                        . htmlspecialchars($d['label']) . '</span>';
+                    return fact_chip($d[0], $d[1], $d[2]);
+                }
+
+                /* "Room 201" for a bare room number, otherwise as typed */
+                function actRoomLabel(string $room): string
+                {
+                    $room = trim($room);
+                    return stripos($room, 'room') === 0 ? $room : 'Room ' . $room;
                 }
                 ?>
 
                 <!-- ── Header ───────────────────────────────────────────── -->
-                <div class="myact-header">
+                <header class="fact-head">
                     <div>
                         <h2 class="myact-title">My Activity</h2>
-                        <p class="myact-subtitle">What you're borrowing, what's coming up, and what you've returned.</p>
+                        <p class="fact-sub">Your equipment loans and room reservations, all in one place.</p>
                     </div>
-                    <button class="myact-download-btn" onclick="window.print()">
+                    <button type="button" class="myact-download-btn" data-fact-print>
                         <span class="material-symbols-outlined">download</span>
                         <span class="myact-download-label">Download Report</span>
                     </button>
+                </header>
+
+                <!-- ── Summary strip: 2 equipment numbers + 2 room numbers ── -->
+                <div class="fact-stats" role="group" aria-label="Activity summary">
+                    <div class="fact-stat">
+                        <span class="fact-stat-value"><?php echo $act_stat_current; ?></span>
+                        <span class="fact-stat-label">Borrowing now</span>
+                        <?php if ($act_stat_overdue > 0): ?>
+                            <span class="fact-stat-sub is-bad"><?php echo (int) $act_stat_overdue; ?> overdue</span>
+                        <?php else: ?>
+                            <span class="fact-stat-sub"><?php echo $act_stat_current > 0 ? 'All on time' : 'Nothing out'; ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value"><?php echo $act_stat_upcoming; ?></span>
+                        <span class="fact-stat-label">Upcoming equipment</span>
+                        <span class="fact-stat-sub"><?php echo $act_stat_upcoming > 0 ? 'Not started yet' : 'None scheduled'; ?></span>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
+                        <span class="fact-stat-label">Rooms reserved</span>
+                        <span class="fact-stat-sub" data-fact-stat="reserved_sub"><?php echo fact_h($act_room_stats['reserved_sub']); ?></span>
+                    </div>
+                    <div class="fact-stat">
+                        <span class="fact-stat-value" data-fact-stat="next"><?php echo fact_h($act_room_stats['next']); ?></span>
+                        <span class="fact-stat-label">Next room booking</span>
+                        <span class="fact-stat-sub" data-fact-stat="next_sub"><?php echo fact_h($act_room_stats['next_sub']); ?></span>
+                    </div>
                 </div>
 
-                <!-- ── Two-column layout: compact rail (left) + stats/ledger (right) ── -->
-                <div class="myact-columns">
+                <!-- ── Right now: Equipment | Room reservations ─────────── -->
+                <div class="fact-grid">
 
-                    <!-- ═══════════ LEFT: at-a-glance rail ═══════════ -->
-                    <div class="myact-rail">
+                    <!-- ═══════════ Equipment ═══════════ -->
+                    <section class="fact-card" id="factEquipment" aria-labelledby="factEquipTitle">
+                        <header class="fact-card-head">
+                            <div class="fact-card-title">
+                                <span class="fact-card-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                                <h3 class="myact-section-title" id="factEquipTitle">Equipment</h3>
+                            </div>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                <span class="material-symbols-outlined">add_shopping_cart</span>Borrow
+                            </button>
+                        </header>
 
-                        <?php if ($act_stat_overdue > 0): ?>
-                            <!-- Gentle notice, not a screaming red box -->
-                            <div class="myact-notice">
-                                <div class="myact-notice-icon"><span class="material-symbols-outlined">info</span></div>
-                                <div class="myact-notice-text">
-                                    <span class="myact-notice-title">Lending Clearance Notice</span>
-                                    <span class="myact-notice-sub"><?php echo (int)$act_stat_overdue; ?> item<?php echo $act_stat_overdue > 1 ? 's' : ''; ?> pending surrender</span>
+                        <div class="fact-card-body">
+
+                            <?php if ($act_stat_overdue > 0): ?>
+                                <!-- Gentle notice, not a screaming red box -->
+                                <div class="fact-notice" role="status">
+                                    <span class="material-symbols-outlined">info</span>
+                                    <div>
+                                        <strong>Lending clearance notice</strong>
+                                        <span><?php echo (int) $act_stat_overdue; ?> item<?php echo $act_stat_overdue > 1 ? 's' : ''; ?> pending surrender. New equipment requests are on hold until it is returned.</span>
+                                    </div>
                                 </div>
-                                <span class="myact-notice-flag">Hold Active</span>
-                            </div>
-                        <?php endif; ?>
+                            <?php endif; ?>
 
-                        <!-- ── Currently Borrowing ─────────────────────────── -->
-                        <div class="myact-rail-section">
-                            <div class="myact-section-head">
-                                <h3 class="myact-section-title">Currently Borrowing</h3>
-                            </div>
-                            <?php if ($act_current && mysqli_num_rows($act_current) > 0):
-                                $act_current_total = mysqli_num_rows($act_current);
-                            ?>
-                                <div class="myact-rail-list<?php echo $act_current_total > 3 ? ' myact-collapsible' : ''; ?>">
-                                    <?php while ($r = mysqli_fetch_assoc($act_current)):
-                                        $isOverdue = $r['status'] === 'Overdue';
-                                        $icon = actEquipIcon($r['equipment_name']);
-                                        $image = actEquipImage($r['equipment_name']);
-                                        $prog = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
-                                    ?>
-                                        <article class="myact-loan-card<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
-                                            <div class="myact-loan-top">
-                                                <div class="myact-loan-icon">
+                            <!-- Currently borrowing -->
+                            <div class="fact-group">
+                                <h3 class="fact-group-label">Currently borrowing</h3>
+                                <?php if ($act_current && mysqli_num_rows($act_current) > 0):
+                                    $act_current_total = mysqli_num_rows($act_current);
+                                ?>
+                                    <div class="fact-list<?php echo $act_current_total > 3 ? ' is-collapsed' : ''; ?>">
+                                        <?php while ($r = mysqli_fetch_assoc($act_current)):
+                                            $isOverdue = $r['status'] === 'Overdue';
+                                            $icon  = actEquipIcon($r['equipment_name']);
+                                            $image = actEquipImage($r['equipment_name']);
+                                            $prog  = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
+                                            $dueTone = $isOverdue ? 'bad' : (in_array($prog['label'], ['Due today', 'Due tomorrow'], true) ? 'today' : 'soon');
+                                        ?>
+                                            <article class="fact-item fact-loan<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
+                                                <span class="fact-tile fact-tile-lg">
                                                     <?php if ($image): ?>
-                                                        <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
+                                                        <img src="<?php echo $image; ?>" alt="">
                                                     <?php else: ?>
                                                         <span class="material-symbols-outlined"><?php echo $icon; ?></span>
                                                     <?php endif; ?>
+                                                </span>
+                                                <div class="fact-item-main">
+                                                    <div class="fact-item-top">
+                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
+                                                        <?php echo fact_chip($prog['label'], $dueTone); ?>
+                                                    </div>
+                                                    <p class="fact-item-meta">
+                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
+                                                    </p>
+                                                    <div class="fact-bar" aria-hidden="true"><i class="<?php echo $isOverdue ? 'is-overdue' : ''; ?>" style="width:<?php echo (int) $prog['pct']; ?>%"></i></div>
                                                 </div>
-                                                <?php if ($isOverdue): ?>
-                                                    <span class="myact-badge myact-badge-error">Overdue</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <p class="myact-loan-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                            <p class="myact-loan-meta">
-                                                Room <?php echo htmlspecialchars($r['room']); ?> ·
-                                                <?php echo date('M j', strtotime($r['borrow_date'])); ?>&ndash;<?php echo date('M j', strtotime($r['return_date'])); ?>
-                                            </p>
-                                            <div class="myact-loan-progress">
-                                                <div class="myact-loan-progress-track">
-                                                    <div class="myact-loan-progress-fill<?php echo $isOverdue ? ' is-overdue' : ''; ?>" style="width:<?php echo $prog['pct']; ?>%"></div>
-                                                </div>
-                                                <span class="myact-loan-due<?php echo $isOverdue ? ' is-overdue' : ''; ?>"><?php echo $prog['label']; ?></span>
-                                            </div>
-                                            <div class="myact-loan-actions">
-                                                <?php if (!$isOverdue): ?>
-                                                    <button class="myact-link-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                                        Extend
+                                                <div class="fact-item-actions">
+                                                    <?php if (!empty($r['return_token'])): ?>
+                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"
+                                                            data-token="<?php echo htmlspecialchars($r['return_token'], ENT_QUOTES); ?>"
+                                                            data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
+                                                            <span class="material-symbols-outlined">qr_code_2</span>Return QR
+                                                        </button>
+                                                    <?php endif; ?>
+                                                    <?php if (!$isOverdue): ?>
+                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">Extend</button>
+                                                    <?php endif; ?>
+                                                    <button type="button" class="fact-btn fact-btn-ghost is-danger"
+                                                        data-action="myact-report-issue"
+                                                        data-request-id="<?php echo (int) $r['id']; ?>"
+                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
+                                                        <span class="material-symbols-outlined">report</span>Report
                                                     </button>
-                                                <?php endif; ?>
-                                                <button class="myact-link-btn myact-link-btn--danger"
-                                                    data-action="myact-report-issue"
-                                                    data-request-id="<?php echo (int)$r['id']; ?>"
-                                                    data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
-                                                    <span class="material-symbols-outlined">report</span>Report Issue
-                                                </button>
-                                            </div>
-                                        </article>
-                                    <?php endwhile; ?>
-                                </div>
-                                <?php if ($act_current_total > 3): ?>
-                                    <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
-                                        Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                    </button>
+                                                </div>
+                                            </article>
+                                        <?php endwhile; ?>
+                                    </div>
+                                    <?php if ($act_current_total > 3): ?>
+                                        <button type="button" class="fact-more" data-fact-more>
+                                            Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <div class="fact-empty is-compact">
+                                        <span class="material-symbols-outlined">check_circle</span>
+                                        <p class="fact-empty-title">Nothing currently borrowed</p>
+                                    </div>
                                 <?php endif; ?>
-                            <?php else: ?>
-                                <div class="myact-empty myact-empty-sm">
-                                    <span class="material-symbols-outlined">check_circle</span>
-                                    <p>Nothing currently borrowed.</p>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- ── Upcoming ─────────────────────────────────────── -->
-                        <div class="myact-rail-section">
-                            <div class="myact-section-head">
-                                <h3 class="myact-section-title">Upcoming</h3>
                             </div>
-                            <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
-                                $act_upcoming_total = mysqli_num_rows($act_upcoming);
-                            ?>
-                                <div class="myact-list<?php echo $act_upcoming_total > 3 ? ' myact-collapsible' : ''; ?>">
-                                    <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
-                                        $bd = strtotime($r['borrow_date']);
-                                        $td = strtotime($today);
-                                        $daysAway = (int) round(($bd - $td) / 86400);
-                                        $awayStr = $daysAway <= 0 ? 'Today' : ($daysAway === 1 ? 'Tomorrow' : "In {$daysAway} days");
-                                        $icon = actEquipIcon($r['equipment_name']);
+
+                            <!-- Upcoming -->
+                            <div class="fact-group">
+                                <h3 class="fact-group-label">Upcoming</h3>
+                                <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
+                                    $act_upcoming_total = mysqli_num_rows($act_upcoming);
+                                ?>
+                                    <div class="fact-list<?php echo $act_upcoming_total > 3 ? ' is-collapsed' : ''; ?>">
+                                        <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
+                                            $bd = strtotime($r['borrow_date']);
+                                            $td = strtotime($today);
+                                            $daysAway = (int) round(($bd - $td) / 86400);
+                                            $awayStr = $daysAway <= 0 ? 'Starts today' : ($daysAway === 1 ? 'Starts tomorrow' : "Starts in {$daysAway} days");
+                                            $icon  = actEquipIcon($r['equipment_name']);
+                                            $image = actEquipImage($r['equipment_name']);
+                                        ?>
+                                            <article class="fact-item">
+                                                <span class="fact-tile fact-tile-lg">
+                                                    <?php if ($image): ?>
+                                                        <img src="<?php echo $image; ?>" alt="">
+                                                    <?php else: ?>
+                                                        <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                                    <?php endif; ?>
+                                                </span>
+                                                <div class="fact-item-main">
+                                                    <div class="fact-item-top">
+                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
+                                                        <?php echo actStatusPill($r['status']); ?>
+                                                    </div>
+                                                    <p class="fact-item-meta">
+                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
+                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j, Y', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
+                                                    </p>
+                                                    <p class="fact-item-sub"><span><?php echo $awayStr; ?></span></p>
+                                                </div>
+                                            </article>
+                                        <?php endwhile; ?>
+                                    </div>
+                                    <?php if ($act_upcoming_total > 3): ?>
+                                        <button type="button" class="fact-more" data-fact-more>
+                                            Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <div class="fact-empty is-compact">
+                                        <span class="material-symbols-outlined">event_upcoming</span>
+                                        <p class="fact-empty-title">No upcoming requests</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                        </div>
+                    </section><!-- /factEquipment -->
+
+                    <!-- ═══════════ Room reservations ═══════════ -->
+                    <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
+                        <header class="fact-card-head">
+                            <div class="fact-card-title">
+                                <span class="fact-card-icon"><span class="material-symbols-outlined">meeting_room</span></span>
+                                <h3 class="myact-section-title" id="factRoomsTitle">Room reservations</h3>
+                            </div>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="rooms">
+                                <span class="material-symbols-outlined">add</span>Reserve
+                            </button>
+                        </header>
+                        <!-- Filled here on first paint; swapped live by the My Activity block at the end of faculty-dashboard.js -->
+                        <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
+                    </section><!-- /factRooms -->
+
+                </div><!-- /fact-grid -->
+
+                <!-- ═══════════ History (equipment + rooms) ═══════════ -->
+                <section class="fact-card fact-history" id="factHistory" aria-labelledby="factHistTitle">
+                    <header class="fact-card-head">
+                        <div class="fact-card-title">
+                            <span class="fact-card-icon"><span class="material-symbols-outlined">history</span></span>
+                            <h3 class="myact-section-title" id="factHistTitle">History</h3>
+                        </div>
+                        <div class="fact-tools">
+                            <div class="fact-seg" id="factKindTabs" role="group" aria-label="Show">
+                                <button type="button" class="fact-seg-btn is-active" data-fact-kind="all" aria-pressed="true">All</button>
+                                <button type="button" class="fact-seg-btn" data-fact-kind="equipment" aria-pressed="false">Equipment</button>
+                                <button type="button" class="fact-seg-btn" data-fact-kind="room" aria-pressed="false">Rooms</button>
+                            </div>
+                            <label class="fact-search">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="factSearch" placeholder="Search history…" autocomplete="off" aria-label="Search history">
+                            </label>
+                        </div>
+                    </header>
+
+                    <div class="fact-table-wrap">
+                        <table class="fact-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Activity</th>
+                                    <th scope="col">Location</th>
+                                    <th scope="col">When</th>
+                                    <th scope="col" class="fact-col-status">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="factHistBody">
+                                <?php
+                                if ($act_history) {
+                                    while ($r = mysqli_fetch_assoc($act_history)):
+                                        $isDeclined = $r['status'] === 'Declined';
+                                        $icon  = actEquipIcon($r['equipment_name']);
                                         $image = actEquipImage($r['equipment_name']);
-                                    ?>
-                                        <div class="myact-row">
-                                            <div class="myact-row-icon">
-                                                <?php if ($image): ?>
-                                                    <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
-                                                <?php else: ?>
-                                                    <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="myact-row-main">
-                                                <span class="myact-row-when"><?php echo $awayStr; ?></span>
-                                                <p class="myact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                                <p class="myact-row-sub">
-                                                    Room <?php echo htmlspecialchars($r['room']); ?> ·
-                                                    <?php echo date('M j', strtotime($r['borrow_date'])); ?>&ndash;<?php echo date('M j, Y', strtotime($r['return_date'])); ?>
-                                                </p>
-                                            </div>
-                                            <?php echo actStatusPill($r['status']); ?>
-                                        </div>
-                                    <?php endwhile; ?>
-                                </div>
-                                <?php if ($act_upcoming_total > 3): ?>
-                                    <button type="button" class="myact-show-more-btn" onclick="this.previousElementSibling.classList.remove('myact-collapsible'); this.remove();">
-                                        Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                    </button>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <div class="myact-empty myact-empty-sm">
-                                    <span class="material-symbols-outlined">event_upcoming</span>
-                                    <p>No upcoming requests.</p>
-                                </div>
-                            <?php endif; ?>
+                                        $endRaw = $r['returned_at'] ?: $r['return_date'];
+                                        $dateLine = $isDeclined
+                                            ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
+                                            : (date('M j', strtotime($r['borrow_date'])) . ' – ' . date('M j, Y', strtotime($endRaw)));
+                                        $rowTs = (int) strtotime($isDeclined ? $r['request_date'] : $endRaw);
+                                ?>
+                                        <tr class="fact-row" data-kind="equipment" data-status="<?php echo strtolower($r['status']); ?>" data-ts="<?php echo $rowTs; ?>">
+                                            <td data-label="Activity">
+                                                <div class="fact-cell">
+                                                    <span class="fact-tile">
+                                                        <?php if ($image): ?>
+                                                            <img src="<?php echo $image; ?>" alt="">
+                                                        <?php else: ?>
+                                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
+                                                        <?php endif; ?>
+                                                    </span>
+                                                    <div class="fact-cell-text">
+                                                        <span class="fact-kind">Equipment</span>
+                                                        <p class="fact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
+                                                        <?php if ($isDeclined && !empty($r['reason'])): ?>
+                                                            <p class="fact-row-sub"><?php echo htmlspecialchars($r['reason']); ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td data-label="Location"><?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?></td>
+                                            <td data-label="When"><span class="fact-when"><?php echo $dateLine; ?></span></td>
+                                            <td data-label="Status" class="fact-col-status"><?php echo actStatusPill($r['status']); ?></td>
+                                        </tr>
+                                <?php
+                                    endwhile;
+                                }
+                                echo fact_render_room_history_rows($act_rooms);
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="fact-noresults" id="factNoResults" hidden>No records match your search.</p>
+                    <div class="fact-empty" id="factHistEmpty" hidden>
+                        <span class="material-symbols-outlined">history</span>
+                        <p class="fact-empty-title">No history yet</p>
+                        <p class="fact-empty-sub">Returned equipment and past room reservations will show up here.</p>
+                    </div>
+
+                    <div class="fact-pager" id="factPager" hidden>
+                        <span class="fact-pager-info" id="factPagerInfo"></span>
+                        <div class="fact-pager-ctl">
+                            <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
+                            <div class="fact-pager-nums" id="factNums"></div>
+                            <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
                         </div>
-
-                    </div><!-- /myact-rail -->
-
-                    <!-- ═══════════ RIGHT: stats + activity ledger ═══════════ -->
-                    <div class="myact-main">
-
-                        <!-- ── Activity Ledger ─────────────────────────────── -->
-                        <div class="myact-ledger-card">
-                            <div class="myact-ledger-head">
-                                <div>
-                                    <h3 class="myact-section-title">Activity Ledger</h3>
-                                    <p class="myact-ledger-sub">Historical facility requisitions and item returns</p>
-                                </div>
-                                <?php if ($act_history && mysqli_num_rows($act_history) > 0): ?>
-                                    <div class="myact-ledger-controls">
-                                        <div class="myact-search-wrap">
-                                            <span class="material-symbols-outlined">search</span>
-                                            <input type="text" id="myactHistSearch" placeholder="Filter records…" autocomplete="off">
-                                        </div>
-                                        <div class="myact-filter-tabs" id="myactHistFilterTabs">
-                                            <button type="button" class="myact-filter-tab active" data-status-filter="all">All</button>
-                                            <button type="button" class="myact-filter-tab" data-status-filter="returned">Returned</button>
-                                            <button type="button" class="myact-filter-tab" data-status-filter="declined">Declined</button>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <?php if ($act_history && mysqli_num_rows($act_history) > 0):
-                                $hist_rows = [];
-                                while ($r = mysqli_fetch_assoc($act_history)) $hist_rows[] = $r;
-                                $hist_total = count($hist_rows);
-                            ?>
-                                <div class="myact-ledger-table-wrap">
-                                    <table class="myact-ledger-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Item</th>
-                                                <th>Room</th>
-                                                <th>Date Period</th>
-                                                <th class="myact-ledger-th-status">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="myactHistList">
-                                            <?php foreach ($hist_rows as $hidx => $r):
-                                                $isDeclined = $r['status'] === 'Declined';
-                                                $icon = actEquipIcon($r['equipment_name']);
-                                                $image = actEquipImage($r['equipment_name']);
-                                                $dateLine = $isDeclined
-                                                    ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
-                                                    : (date('M j', strtotime($r['borrow_date'])) . '&ndash;' . date('M j, Y', strtotime($r['returned_at'] ?: $r['return_date'])));
-                                            ?>
-                                                <tr class="myact-history-row" data-hist-idx="<?php echo $hidx; ?>" data-status="<?php echo strtolower($r['status']); ?>">
-                                                    <td>
-                                                        <div class="myact-hist-item">
-                                                            <div class="myact-history-icon">
-                                                                <?php if ($image): ?>
-                                                                    <img src="<?php echo $image; ?>" alt="<?php echo htmlspecialchars($r['equipment_name']); ?>">
-                                                                <?php else: ?>
-                                                                    <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                            <div class="myact-history-main">
-                                                                <p class="myact-history-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                                                <?php if ($isDeclined && !empty($r['reason'])): ?>
-                                                                    <p class="myact-history-reason"><?php echo htmlspecialchars($r['reason']); ?></p>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="myact-hist-room"><?php echo htmlspecialchars($r['room']); ?></td>
-                                                    <td class="myact-hist-date"><?php echo $dateLine; ?></td>
-                                                    <td class="myact-ledger-th-status"><?php echo actStatusPill($r['status']); ?></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <!-- Pagination — only rendered when more than 10 rows exist;
-                                     JS handles show/hide and page switching. Also used as the
-                                     "N results" indicator while a search/filter is active. -->
-                                <div class="myact-hist-pg" id="myactHistPg"
-                                    <?php echo $hist_total <= 10 ? 'style="display:none;"' : ''; ?>>
-                                    <span class="myact-hist-pg-info" id="myactHistPgInfo"></span>
-                                    <div class="myact-hist-pg-controls" id="myactHistPgControls">
-                                        <button class="myact-hist-pg-btn" id="myactHistPrev" aria-label="Previous page">
-                                            <span class="material-symbols-outlined">chevron_left</span>
-                                        </button>
-                                        <div class="myact-hist-pg-nums" id="myactHistNums"></div>
-                                        <button class="myact-hist-pg-btn" id="myactHistNext" aria-label="Next page">
-                                            <span class="material-symbols-outlined">chevron_right</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="myact-ledger-no-results" id="myactHistNoResults" style="display:none;">
-                                    No records match your search.
-                                </p>
-
-                            <?php else: ?>
-                                <div class="myact-empty">
-                                    <span class="material-symbols-outlined">history</span>
-                                    <p>No completed requests yet.</p>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                    </div><!-- /myact-main -->
-
-                </div><!-- /myact-columns -->
+                    </div>
+                </section><!-- /factHistory -->
 
             </div><!-- /panel-activity -->
 
@@ -2962,9 +2926,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <h2>
                                 <?php echo htmlspecialchars($fullname); ?>
                             </h2>
-                            <p>ID:
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </p>
+                            <p>ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
                             <span class="acc-badge">
                                 <span
                                     style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
@@ -2997,9 +2959,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Faculty ID</span>
-                            <span class="info-val">
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="info-card">
@@ -3049,9 +3012,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Faculty ID</span>
-                            <span class="info-val">
-                                <?php echo htmlspecialchars($_SESSION['faculty_id']); ?>
-                            </span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
                         </div>
                         <div class="info-row">
                             <span class="info-lbl">Full Name</span>
@@ -3172,7 +3136,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <!-- ── Page heading ──────────────────────────────────── -->
             <div class="sov-pagehead">
                 <h1 class="sov-pagehead-title">Settings</h1>
-                <p class="sov-pagehead-sub">Manage your profile, appearance, and account preferences.</p>
             </div>
 
             <!-- ── Body ─────────────────────────────────────────── -->
@@ -3189,7 +3152,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <div class="acct-banner-avatar"><?php echo htmlspecialchars($initials); ?></div>
                         <div class="acct-banner-text">
                             <h2 class="acct-banner-name"><?php echo htmlspecialchars($fullname); ?></h2>
-                            <p class="acct-banner-meta"><?php echo $acct_meta; ?> &middot; ID: <?php echo htmlspecialchars($_SESSION['faculty_id']); ?></p>
+                            <p class="acct-banner-meta"><?php echo $acct_meta; ?> &middot; ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
                             <span class="acct-banner-badge">
                                 <span class="material-symbols-outlined">check_circle</span>
                                 Active Faculty Account
@@ -3247,8 +3210,13 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <div class="acct-row">
                                         <span class="acct-row-label">Faculty ID</span>
                                         <div class="acct-row-value">
-                                            <span class="acct-row-static" id="sovFacultyId"><?php echo htmlspecialchars($_SESSION['faculty_id']); ?></span>
+                                            <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
                                         </div>
+                                        <?php if ($fid_unset): ?>
+                                            <button class="sov-btn-outline" data-action="open-faculty-id-modal">Add</button>
+                                        <?php else: ?>
+                                            <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="acct-row">
                                         <span class="acct-row-label">Email Address</span>
@@ -3722,63 +3690,51 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         <!-- SINGLE-MODE: existing form unchanged (Requirement 4.1, 11.4) -->
         <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
             <div class="modal-box borrow-modal-box">
-                <div class="modal-header">
-                    <h3 id="borrowModalTitle">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
-                        Borrow Request
-                    </h3>
+                <div class="modal-header bm-head">
+                    <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">inventory_2</span></span>
+                    <div class="bm-heading">
+                        <h3 id="borrowModalTitle">Borrow Request</h3>
+                        <p class="bm-sub">Tell us where and when you need the equipment.</p>
+                    </div>
                     <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
-                        <span class="material-symbols-outlined">inventory_2</span>
-                        <span id="selectedItemLabel">No item selected</span>
+                    <div class="bm-item" id="selectedItemBanner">
+                        <span class="bm-item-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                        <div class="bm-item-text">
+                            <span class="bm-item-cap">Selected equipment</span>
+                            <span class="bm-item-name" id="selectedItemLabel">No item selected</span>
+                        </div>
                     </div>
-                    <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                    <form id="borrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                         <?= csrf_field() ?>
                         <input type="hidden" name="equipment_name" id="selectedItem">
                         <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
-                        <div class="form-group">
-                            <label class="form-label">Room / Laboratory</label>
-                            <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="form-group">
-                                <label class="form-label">Borrow Date</label>
-                                <input type="date"
-                                    name="borrow_date"
-                                    id="borrow_date"
-                                    class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>"
-                                    required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Return Date</label>
-                                <input type="date"
-                                    name="return_date"
-                                    id="return_date"
-                                    class="form-input"
-                                    min="<?php echo date('Y-m-d'); ?>"
-                                    required>
-                            </div>
-                        </div>
+                        <?= BookingSchedule::renderRoomSelect('borrow_room', $bk_rooms) ?>
+                        <?= BookingSchedule::renderSchedule('bm1', false) ?>
                         <?php if ($is_org_adviser): ?>
                             <div class="form-group">
-                                <label for="request_document">Request Letter
-                                    <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
+                                <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
+                                <label class="bm-drop" for="request_document">
+                                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                                    <span class="bm-drop-text">
+                                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
+                                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                                    </span>
+                                    <input type="file" id="request_document" name="request_document"
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp">
                                 </label>
-                                <input type="file" id="request_document" name="request_document"
-                                    accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
-                                <small id="documentError" role="alert" style="color:var(--color-error);font-size:0.75rem;display:none;">
-                                    Please attach a signed request letter before submitting.
-                                </small>
+                                <p class="bm-hint">A signed letter may help prioritise your request.</p>
                             </div>
                         <?php endif; ?>
-                        <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                            <span class="material-symbols-outlined">send</span> Submit Borrow Request
-                        </button>
+                        <div class="bm-actions">
+                            <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                            <button type="submit" class="btn-save-acc">
+                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -3786,44 +3742,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <?php else: ?>
         <!-- DUAL-MODE: two-tab layout (Requirement 4.2, 4.3, 4.4) -->
         <style nonce="<?= $csp_nonce ?>">
-            /* ── Dual-mode borrow modal sub-tabs ─────────────────────────── */
-            .borrow-subtab-bar {
-                display: flex;
-                gap: 6px;
-                margin-bottom: 18px;
-                border-bottom: 2px solid var(--color-outline-variant);
-                padding-bottom: 0;
-            }
-
-            .borrow-subtab-btn {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 6px;
-                padding: 9px 14px;
-                font-size: 0.85rem;
-                font-weight: 600;
-                color: var(--color-secondary);
-                background: transparent;
-                border: none;
-                border-bottom: 3px solid transparent;
-                border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-                cursor: pointer;
-                transition: color var(--transition), border-bottom-color var(--transition), background var(--transition);
-                margin-bottom: -2px;
-            }
-
-            .borrow-subtab-btn:hover {
-                color: var(--color-primary);
-                background: color-mix(in srgb, var(--color-primary) 6%, transparent);
-            }
-
-            .borrow-subtab-btn.active {
-                color: var(--color-primary);
-                border-bottom-color: var(--color-primary);
-            }
-
+            /* Panel switching for the dual-mode tabs. Visual styling of the tabs,
+               checklist and form lives in faculty-dashboard.css (Borrow Request modal). */
             .borrow-subtab-panel {
                 display: none;
             }
@@ -3831,62 +3751,15 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             .borrow-subtab-panel.active {
                 display: block;
             }
-
-            /* ── Adviser checklist ───────────────────────────────────────── */
-            .adv-checklist-wrap {
-                max-height: 220px;
-                overflow-y: auto;
-                border: 1px solid var(--color-outline-variant);
-                border-radius: var(--radius-md);
-                padding: 10px 14px;
-                margin-bottom: 14px;
-                background: var(--color-surface-container);
-            }
-
-            .adv-checklist-category {
-                font-size: 0.7rem;
-                font-weight: 700;
-                letter-spacing: 0.8px;
-                text-transform: uppercase;
-                color: var(--color-secondary);
-                margin: 10px 0 4px;
-            }
-
-            .adv-checklist-category:first-child {
-                margin-top: 0;
-            }
-
-            .adv-checklist-item {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 5px 2px;
-                font-size: 0.875rem;
-                color: var(--color-on-surface);
-            }
-
-            .adv-checklist-item input[type="checkbox"] {
-                width: 16px;
-                height: 16px;
-                accent-color: var(--color-primary);
-                cursor: pointer;
-                flex-shrink: 0;
-            }
-
-            .adv-validation-msg {
-                font-size: 0.8rem;
-                color: var(--color-error);
-                margin-bottom: 8px;
-                display: none;
-            }
         </style>
         <div class="modal-backdrop" id="borrowModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="borrowModalTitle">
             <div class="modal-box borrow-modal-box">
-                <div class="modal-header">
-                    <h3 id="borrowModalTitle">
-                        <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:8px;">inventory_2</span>
-                        Borrow Request
-                    </h3>
+                <div class="modal-header bm-head">
+                    <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">inventory_2</span></span>
+                    <div class="bm-heading">
+                        <h3 id="borrowModalTitle">Borrow Request</h3>
+                        <p class="bm-sub">Tell us where and when you need the equipment.</p>
+                    </div>
                     <button class="modal-close-btn" data-action="close-borrow-modal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -3910,61 +3783,45 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
                     <!-- ── Personal Tab ──────────────────────────────────── -->
                     <div class="borrow-subtab-panel active" id="subtab-personal" role="tabpanel" aria-labelledby="subtab-personal-btn">
-                        <div class="selected-item-banner" id="selectedItemBanner" style="margin-bottom:18px;">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                            <span id="selectedItemLabel">No item selected</span>
+                        <div class="bm-item" id="selectedItemBanner">
+                            <span class="bm-item-icon"><span class="material-symbols-outlined">inventory_2</span></span>
+                            <div class="bm-item-text">
+                                <span class="bm-item-cap">Selected equipment</span>
+                                <span class="bm-item-name" id="selectedItemLabel">No item selected</span>
+                            </div>
                         </div>
-                        <form id="borrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <form id="borrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                             <?= csrf_field() ?>
                             <input type="hidden" name="equipment_name" id="selectedItem">
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <input type="hidden" name="submitted_as" value="personal">
-                            <div class="form-group">
-                                <label class="form-label">Room / Laboratory</label>
-                                <input type="text" name="room" class="form-input" placeholder="e.g. Lab 301" required>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label class="form-label">Borrow Date</label>
-                                    <input type="date"
-                                        name="borrow_date"
-                                        id="borrow_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Return Date</label>
-                                    <input type="date"
-                                        name="return_date"
-                                        id="return_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
-                                </div>
-                            </div>
+                            <?= BookingSchedule::renderRoomSelect('bm2Room', $bk_rooms) ?>
+                            <?= BookingSchedule::renderSchedule('bm2', false) ?>
                             <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
-                            <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                                <span class="material-symbols-outlined">send</span> Submit Borrow Request
-                            </button>
+                            <div class="bm-actions">
+                                <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                                <button type="submit" class="btn-save-acc">
+                                    <span class="material-symbols-outlined">send</span> Submit Borrow Request
+                                </button>
+                            </div>
                         </form>
                     </div><!-- /subtab-personal -->
 
                     <!-- ── Adviser Tab ───────────────────────────────────── -->
                     <div class="borrow-subtab-panel" id="subtab-adviser" role="tabpanel" aria-labelledby="subtab-adviser-btn">
-                        <form id="adviserBorrowForm" method="POST" action="" enctype="multipart/form-data">
+                        <form id="adviserBorrowForm" class="bm-form" method="POST" action="" enctype="multipart/form-data">
                             <?= csrf_field() ?>
                             <input type="hidden" name="submitted_as" value="adviser">
 
                             <!-- Multi-item checklist (Requirement 4.4, 5.1) -->
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label class="form-label" style="margin-bottom:6px;">Select Equipment Items</label>
+                            <div class="form-group">
+                                <span class="form-label">Select Equipment Items</span>
                                 <p id="advChecklistValidation" class="adv-validation-msg" role="alert">
                                     Please select at least one item before submitting.
                                 </p>
                                 <div class="adv-checklist-wrap" role="group" aria-label="Available equipment">
                                     <?php if (empty($avail_items)): ?>
-                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;">No available items at this time.</p>
+                                        <p style="font-size:0.85rem;color:var(--color-secondary);margin:0;padding:8px;">No equipment has been set up yet.</p>
                                         <?php else:
                                         $current_category = null;
                                         foreach ($avail_items as $av_item):
@@ -3972,16 +3829,25 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 $current_category = $av_item['category'];
                                         ?>
                                                 <div class="adv-checklist-category"><?= htmlspecialchars($current_category) ?></div>
-                                            <?php endif; ?>
-                                            <label class="adv-checklist-item">
+                                            <?php endif;
+                                            $av_meta = $bk_items[$av_item['item_name']] ?? ['shelf' => (int)$av_item['quantity'], 'total' => (int)$av_item['quantity']];
+                                            ?>
+                                            <label class="adv-checklist-item" data-bm-item="<?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>"
+                                                data-shelf="<?= (int)$av_meta['shelf'] ?>" data-total="<?= (int)$av_meta['total'] ?>">
                                                 <input type="checkbox"
                                                     name="items[]"
                                                     value="<?= htmlspecialchars($av_item['item_name']) ?>"
                                                     data-category="<?= htmlspecialchars($av_item['category']) ?>">
-                                                <?= htmlspecialchars($av_item['item_name']) ?>
-                                                <span style="font-size:0.75rem;color:var(--color-secondary);margin-left:auto;">
-                                                    (<?= (int)$av_item['quantity'] ?> available)
+                                                <span class="adv-checklist-name"><?= htmlspecialchars($av_item['item_name']) ?></span>
+                                                <span class="adv-checklist-qty" data-bm-stock>
+                                                    <?= (int)$av_meta['shelf'] > 0 ? '(' . (int)$av_meta['shelf'] . ' available)' : '(out now)' ?>
                                                 </span>
+                                                <span class="bm-mini-stepper" data-bm-item-qty hidden>
+                                                    <button type="button" data-bm-iq-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
+                                                    <input type="number" name="qty[<?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>]" value="1" min="1" max="<?= max(1, (int)$av_meta['total']) ?>" inputmode="numeric" disabled aria-label="Quantity for <?= htmlspecialchars($av_item['item_name'], ENT_QUOTES) ?>">
+                                                    <button type="button" data-bm-iq-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
+                                                </span>
+                                                <span class="bm-item-status" data-bm-item-status></span>
                                             </label>
                                     <?php endforeach;
                                     endif; ?>
@@ -3989,43 +3855,30 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </div>
 
                             <!-- Shared fields -->
-                            <div class="form-group" style="margin-top:14px;">
-                                <label class="form-label">Room / Laboratory</label>
-                                <input type="text" name="room" id="adv_room" class="form-input" placeholder="e.g. Lab 301" required>
-                            </div>
-                            <div class="form-row-2">
-                                <div class="form-group">
-                                    <label class="form-label">Borrow Date</label>
-                                    <input type="date"
-                                        name="borrow_date"
-                                        id="adv_borrow_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Return Date</label>
-                                    <input type="date"
-                                        name="return_date"
-                                        id="adv_return_date"
-                                        class="form-input"
-                                        min="<?php echo date('Y-m-d'); ?>"
-                                        required>
-                                </div>
-                            </div>
+                            <?= BookingSchedule::renderRoomSelect('adv_room', $bk_rooms) ?>
+                            <?= BookingSchedule::renderSchedule('bm3', true) ?>
 
-                            <!-- Document upload — required for adviser mode (Requirement 4.6) -->
+                            <!-- Document upload — optional -->
                             <div class="form-group">
-                                <label for="adv_request_document">Request Letter
-                                    <span style="font-size:0.8em;color:var(--color-error);">Required — PDF, JPG, PNG, WEBP; max 5 MB</span>
+                                <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
+                                <label class="bm-drop" for="adv_request_document">
+                                    <span class="material-symbols-outlined bm-drop-icon" aria-hidden="true">upload_file</span>
+                                    <span class="bm-drop-text">
+                                        <strong data-bm-drop-title>Choose a file or drag it here</strong>
+                                        <small>PDF, JPG, PNG or WEBP &middot; max 5 MB</small>
+                                    </span>
+                                    <input type="file" id="adv_request_document" name="request_document"
+                                        accept=".pdf,.jpg,.jpeg,.png,.webp">
                                 </label>
-                                <input type="file" id="adv_request_document" name="request_document"
-                                    accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-control-custom" required>
+                                <p class="bm-hint">A signed letter may help prioritise your request.</p>
                             </div>
 
-                            <button type="submit" class="btn-submit-form" style="width:100%;justify-content:center;margin-top:8px;">
-                                <span class="material-symbols-outlined">send</span> Submit Adviser Request
-                            </button>
+                            <div class="bm-actions">
+                                <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
+                                <button type="submit" class="btn-save-acc">
+                                    <span class="material-symbols-outlined">send</span> Submit Adviser Request
+                                </button>
+                            </div>
                         </form>
                     </div><!-- /subtab-adviser -->
 
@@ -4100,6 +3953,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     if (borrowInp) borrowInp.value = '';
                     if (returnInp) returnInp.value = '';
                     if (fileInp) fileInp.value = '';
+                    if (window.syncBorrowDrops) window.syncBorrowDrops();
+                    if (window.BorrowSchedule) window.BorrowSchedule.resetAll();
                     if (advValidationMsg) advValidationMsg.style.display = 'none';
                 }
 
@@ -4147,9 +4002,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     changes you're about to make:</p>
                 <div class="changes-summary" id="changesSummary"></div>
                 <div class="warning-box">
-                    <span class="material-symbols-outlined" style="color:#856404;flex-shrink:0;">warning</span>
-                    <div><strong style="color:#856404;display:block;margin-bottom:4px;">Important Notice</strong>
-                        <p style="color:#856404;margin:0;font-size:0.875rem;" id="warningMessage">Some changes cannot be
+                    <span class="material-symbols-outlined" style="color:var(--color-on-warning-container);flex-shrink:0;">warning</span>
+                    <div><strong style="color:var(--color-on-warning-container);display:block;margin-bottom:4px;">Important Notice</strong>
+                        <p style="color:var(--color-on-warning-container);margin:0;font-size:0.875rem;" id="warningMessage">Some changes cannot be
                             reversed once saved.</p>
                     </div>
                 </div>
@@ -4219,6 +4074,54 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">check</span>Save
                     Backup Email
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Faculty ID Modal: set once, permanent -->
+    <div class="modal-backdrop" id="facultyIdModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="facultyIdTitle">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="facultyIdTitle"><span class="material-symbols-outlined"
+                        style="font-size:18px;vertical-align:middle;margin-right:8px;">badge</span>Faculty ID</h3>
+                <button class="modal-close-btn" data-action="close-faculty-id-modal" aria-label="Close"><span
+                        class="material-symbols-outlined">close</span></button>
+            </div>
+
+            <!-- Step 1: enter -->
+            <div id="facultyIdStepEnter">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label" for="facultyIdInput">Your Faculty ID</label>
+                        <input type="text" id="facultyIdInput" class="form-input" placeholder="e.g. 2023-00123-BN-0"
+                            maxlength="30" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                    </div>
+                    <p class="modal-error" id="facultyIdError" style="display:none;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel-acc" data-action="close-faculty-id-modal">Cancel</button>
+                    <button class="btn-save-acc" id="facultyIdContinueBtn" data-action="faculty-id-continue">Continue</button>
+                </div>
+            </div>
+
+            <!-- Step 2: confirm (permanent) -->
+            <div id="facultyIdStepConfirm" style="display:none;">
+                <div class="modal-body">
+                    <div class="fid-confirm-id" id="facultyIdConfirmValue"></div>
+                    <div class="warning-box">
+                        <span class="material-symbols-outlined" style="color:#856404;flex-shrink:0;">lock</span>
+                        <div><strong style="color:#856404;display:block;margin-bottom:2px;">This is permanent</strong>
+                            <p style="color:#856404;margin:0;font-size:0.875rem;">You can&rsquo;t change your Faculty ID after saving it, and neither can an admin.</p>
+                        </div>
+                    </div>
+                    <p class="modal-error" id="facultyIdConfirmError" style="display:none;"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-cancel-acc" data-action="faculty-id-back">Go Back</button>
+                    <button class="btn-save-acc" id="facultyIdConfirmBtn" data-action="faculty-id-confirm">
+                        <span class="material-symbols-outlined" style="font-size:14px;margin-right:4px;">lock</span>Confirm &amp; Lock ID
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -4306,6 +4209,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
     <script nonce="<?php echo $csp_nonce; ?>">
         window.REQUESTS_DATA = <?php echo $requests_json; ?>;
+        window.BOOKING_META = <?php echo $bk_meta_json; ?>;
         window.FNOTIF_DATA = <?php echo $notif_json; ?>;
         window.USER_SLUG = '<?php echo $user_slug; ?>';
         window.OVERDUE_COUNT = <?php echo (int)$stat_overdue; ?>;

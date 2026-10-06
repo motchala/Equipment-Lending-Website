@@ -16,6 +16,8 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 
 require_once __DIR__ . '/../config/db.php';
 $conn = getDB();
+require_once __DIR__ . '/core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
 
 $token = trim($_GET['token'] ?? '');
 $message = '';
@@ -26,7 +28,7 @@ if ($token) {
     $conn->begin_transaction();
     try {
         $stmt = $conn->prepare(
-            "SELECT id, faculty_name, equipment_name, status, return_token
+            "SELECT id, faculty_name, equipment_name, status, return_token, borrow_qty, stock_applied
                FROM tbl_requests
               WHERE return_token = ? AND status IN ('Approved','Overdue')
               LIMIT 1 FOR UPDATE"
@@ -50,13 +52,17 @@ if ($token) {
             $upd->execute();
             $upd->close();
 
-            // Restore inventory
-            $inc = $conn->prepare(
-                "UPDATE tbl_inventory SET quantity = quantity + 1 WHERE item_name = ?"
-            );
-            $inc->bind_param('s', $eq_name);
-            $inc->execute();
-            $inc->close();
+            // Restore inventory: only units that actually left the shelf come back
+            // (a booking scheduled for later that has not started yet never took any).
+            $ret_qty = ((int)($row['stock_applied'] ?? 1) === 1) ? max(1, (int)($row['borrow_qty'] ?? 1)) : 0;
+            if ($ret_qty > 0) {
+                $inc = $conn->prepare(
+                    "UPDATE tbl_inventory SET quantity = quantity + ? WHERE item_name = ?"
+                );
+                $inc->bind_param('is', $ret_qty, $eq_name);
+                $inc->execute();
+                $inc->close();
+            }
 
             // Log it
             $admin_name = $_SESSION['admin_name'] ?? 'Admin';
@@ -95,6 +101,11 @@ if ($is_ajax) {
 <head>
     <meta charset="UTF-8">
     <title>Return Confirmation</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="../assets/images/favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="../assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style nonce="<?php echo $csp_nonce; ?>">
         body {

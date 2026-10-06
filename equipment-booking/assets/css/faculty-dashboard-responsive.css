@@ -165,39 +165,9 @@ table,
     margin-bottom: 20px;
 }
 
-.dash-flat-title {
-    font-family: 'Syne', var(--font-display);
-    font-size: clamp(1.35rem, 4vw, 1.9rem);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--color-on-surface);
-    line-height: 1.15;
-    margin-bottom: 4px;
-}
-
-.dash-flat-sub {
-    font-size: 0.85rem;
-    color: var(--color-on-surface-variant);
-    font-weight: 400;
-}
-
 @media (max-width: 768px) {
     .dash-flat-header {
         margin-bottom: 14px;
-    }
-
-    .dash-flat-title {
-        font-size: clamp(1.15rem, 5.5vw, 1.5rem);
-    }
-
-    .dash-flat-sub {
-        font-size: 0.78rem;
-    }
-}
-
-@media (max-width: 480px) {
-    .dash-flat-title {
-        font-size: 1.15rem;
     }
 }
 
@@ -791,28 +761,6 @@ table,
     .page-header-block {
         margin-bottom: 16px;
     }
-
-    .page-title {
-        font-size: 1.35rem !important;
-    }
-
-    .page-title-sm {
-        font-size: 1.15rem !important;
-    }
-
-    .page-subtitle {
-        font-size: 0.8rem !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .page-title {
-        font-size: 1.2rem !important;
-    }
-
-    .page-title-sm {
-        font-size: 1.05rem !important;
-    }
 }
 
 /* Hero block (legacy, used by older panel-home) */
@@ -1063,5 +1011,240 @@ html {
 @media (min-width: 1600px) {
     .app-main {
         padding: 40px 52px;
+    }
+}
+
+
+/* ================================================================
+   § 27  ACTIVE NOW CARDS — a long equipment name never widens a column
+   `1fr` tracks refuse to shrink below their content, so one long
+   name pushed the card past the screen edge on phones and past its
+   own border on desktop. minmax(0, 1fr) lets the track shrink and the
+   name truncates instead.
+================================================================ */
+#panel-home .active-cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+    #panel-home .active-cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    #panel-home .active-cards-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+#panel-home .active-card {
+    min-width: 0;
+}
+
+#panel-home .active-card-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ================================================================
+   § 39  SMALL SCREENS: Active Now card + My Activity item actions
+================================================================ */
+
+/* The "compact horizontal card" rule in § 12 was written before the card got
+   its thumbnail-and-chip row and a footer. Laid out in a row, those three
+   children are wider than the card on phones, so it stays stacked. */
+@media (max-width: 480px) {
+    #panel-home .active-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+    }
+}
+
+/* A borrowed item can now carry three buttons (Return QR, Extend, Report);
+   let them wrap instead of pushing past the screen edge. */
+#panel-activity .fact-item-actions {
+    flex-wrap: wrap;
+}
+
+
+/* ── MY ACTIVITY (faculty): phone, reduced-motion and print ───────────────
+   Base styles for this screen are in the MY ACTIVITY section at the end of faculty-dashboard.css.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+    #panel-activity .fact-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+    #panel-activity .fact-head {
+        flex-direction: column;
+    }
+
+    #panel-activity .fact-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #panel-activity .fact-stat:nth-child(3) {
+        border-left: 0;
+    }
+
+    #panel-activity .fact-stat:nth-child(n+3) {
+        border-top: 1px solid var(--color-outline-variant);
+    }
+
+    #panel-activity .fact-card-head {
+        padding: 16px 16px 12px;
+    }
+
+    #panel-activity .fact-card-body {
+        padding: 0 16px 16px;
+    }
+
+    #panel-activity .fact-tools {
+        width: 100%;
+    }
+
+    #panel-activity .fact-search {
+        flex: 1;
+    }
+
+    #panel-activity .fact-search input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* History: turn table rows into stacked cards */
+    #panel-activity .fact-table thead {
+        display: none;
+    }
+
+    #panel-activity .fact-table,
+    #panel-activity .fact-table tbody,
+    #panel-activity .fact-table td {
+        display: block;
+    }
+
+    #panel-activity .fact-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 12px;
+        padding: 14px 16px;
+    }
+
+    #panel-activity .fact-table tbody tr.is-paged-out,
+    #panel-activity .fact-table tbody tr.is-filtered-out {
+        display: none;
+    }
+
+    #panel-activity .fact-table td {
+        padding: 0;
+    }
+
+    #panel-activity .fact-table td:nth-child(1) {
+        grid-column: 1 / -1;
+        margin-bottom: 4px;
+    }
+
+    #panel-activity .fact-table td:nth-child(2),
+    #panel-activity .fact-table td:nth-child(3) {
+        grid-column: 1;
+        font-size: 0.78rem;
+        color: var(--color-on-surface-variant);
+    }
+
+    #panel-activity .fact-table td.fact-col-status {
+        grid-column: 2;
+        grid-row: 2 / span 2;
+        align-self: center;
+    }
+
+    #panel-activity .fact-pager {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+
+    /* Let long equipment names wrap instead of being cut off next to their chip */
+    #panel-activity .fact-item-top {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    #panel-activity .fact-item-title {
+        white-space: normal;
+    }
+
+    #panel-activity .fact-item-actions {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    #panel-activity .fact-item-actions .fact-btn {
+        flex: 1;
+    }
+
+    #panel-activity .fact-loan .fact-item-actions {
+        padding-left: 0;
+    }
+
+    #panel-activity .fact-stat {
+        padding: 14px 16px;
+    }
+
+    #panel-activity .fact-stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #panel-activity .fact-chip.is-live::before {
+        animation: none;
+    }
+
+    #panel-activity * {
+        transition: none !important;
+    }
+}
+
+/* ── Print: the whole record, no controls, no paging ─────────── */
+@media print {
+
+    #panel-activity .fact-btn,
+    #panel-activity .fact-linkbtn,
+    #panel-activity .fact-lock,
+    #panel-activity .fact-more,
+    #panel-activity .fact-tools,
+    #panel-activity .fact-pager,
+    #panel-activity .fact-item-actions,
+    #panel-activity .myact-download-btn {
+        display: none !important;
+    }
+
+    #panel-activity .fact-list.is-collapsed>.fact-item:nth-child(n+4) {
+        display: flex !important;
+    }
+
+    #panel-activity .fact-table tbody tr.is-paged-out {
+        display: table-row !important;
+    }
+
+    #panel-activity .fact-card,
+    #panel-activity .fact-item,
+    #panel-activity .fact-table tbody tr {
+        box-shadow: none;
+        break-inside: avoid;
+    }
+
+    #panel-activity .fact-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

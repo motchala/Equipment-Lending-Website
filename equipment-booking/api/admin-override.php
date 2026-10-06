@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -87,6 +88,8 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 $conn->set_charset('utf8mb4');
+require_once __DIR__ . '/../core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
 
 // ── Task 7.2d: Verify request exists and fetch its data ──────────────────────
 $fetch_stmt = $conn->prepare(
@@ -94,7 +97,10 @@ $fetch_stmt = $conn->prepare(
             r.faculty_id,
             faculty_name,
             equipment_name,
-            status
+            status,
+            booking_mode,
+            borrow_qty,
+            stock_applied
        FROM tbl_requests r
       WHERE r.id = ?
       LIMIT 1"
@@ -123,6 +129,8 @@ $borrower_id     = (string)$request['faculty_id'];
 $borrower_name   = (string)($request['faculty_name'] ?? '');
 $equipment_name  = (string)$request['equipment_name'];
 $current_status  = (string)$request['status'];
+// Today / Later bookings are judged against the schedule, not the shelf count
+$is_scheduled    = in_array((string)($request['booking_mode'] ?? ''), ['today', 'future'], true);
 
 // ── Enforce direction rules ───────────────────────────────────────────────────
 // Approved/Overdue → only Declined is allowed (item is out on loan)
@@ -144,7 +152,7 @@ $conn->begin_transaction();
 
 try {
     // ── Task 7.3: If approving, check inventory quantity > 0 ─────────────────
-    if ($new_status === 'Approved') {
+    if ($new_status === 'Approved' && !$is_scheduled) {
         $inv_stmt = $conn->prepare(
             "SELECT quantity
                FROM tbl_inventory
@@ -210,7 +218,16 @@ try {
     }
 
     // ── If approving, decrement tbl_inventory.quantity by 1 ──────────────────
-    if ($new_status === 'Approved') {
+    if ($new_status === 'Approved' && $is_scheduled) {
+        // stock is taken when the booking starts (BookingSchedule::tick)
+        $sa = $conn->prepare('UPDATE tbl_requests SET stock_applied = 0 WHERE id = ?');
+        if ($sa) {
+            $sa->bind_param('i', $request_id);
+            $sa->execute();
+            $sa->close();
+        }
+    }
+    if ($new_status === 'Approved' && !$is_scheduled) {
         $dec_stmt = $conn->prepare(
             "UPDATE tbl_inventory
                 SET quantity = quantity - 1
@@ -234,17 +251,21 @@ try {
 
     // ── If declining a previously Approved/Overdue request, return 1 unit to stock ───
     if ($new_status === 'Declined' && in_array($current_status, ['Approved', 'Overdue'], true)) {
+        // Give back exactly what left the shelf: legacy rows = 1; scheduled rows = their
+        // quantity, and nothing at all if the booking had not started yet.
+        $give_back = ((int)($request['stock_applied'] ?? 1) === 1) ? max(1, (int)($request['borrow_qty'] ?? 1)) : 0;
         $inc_stmt = $conn->prepare(
             "UPDATE tbl_inventory
-                SET quantity = quantity + 1
-              WHERE item_name = ?"
+                SET quantity = quantity + ?
+              WHERE item_name = ?
+                AND ? > 0"
         );
 
         if ($inc_stmt === false) {
             throw new RuntimeException('Failed to prepare inventory increment.');
         }
 
-        $inc_stmt->bind_param('s', $equipment_name);
+        $inc_stmt->bind_param('isi', $give_back, $equipment_name, $give_back);
 
         if (!$inc_stmt->execute()) {
             $inc_stmt->close();

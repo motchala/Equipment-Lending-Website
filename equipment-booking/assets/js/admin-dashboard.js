@@ -311,6 +311,15 @@
        filtering the visible list, navigating to the right screen when
        a notification is opened, and short-polling for new ones.
     ════════════════════════════════════════════════════════════════ */
+    /* Select / bulk-action state for the Notifications modal (see the
+       NOTIF-SELECT region below). Declared up here so every helper in this
+       section can safely read it. */
+    let _anSelectMode = false;   // "Select" mode on: rows toggle a checkbox instead of expanding
+    let _anPending = null;       // { keys, text } while the inline delete confirmation is open
+    let _anLastAnchor = null;    // last row clicked, for shift-click range select
+    let _anBusy = 0;             // in-flight bulk requests (polling pauses while > 0)
+    const _anSelected = new Set();
+
     function _getUnreadCount() {
         return document.querySelectorAll('#notifList .notif-item.unread').length;
     }
@@ -318,6 +327,8 @@
     function _updateBadges(count) {
         const uc = document.getElementById('unreadCount');
         if (uc) uc.textContent = count + ' unread';
+        const up = document.getElementById('unreadPlural');
+        if (up) up.textContent = count === 1 ? '' : 's';
         const markAllBtn = document.querySelector('[data-action="mark-all-read"]');
         if (markAllBtn) markAllBtn.disabled = (count === 0);
         const navDot = document.getElementById('navNotifDot');
@@ -350,34 +361,40 @@
             .catch(() => null);
     }
 
-    /* Cheap, local recount of the chip badges (no network round-trip) —
-       called after any instant local action (read/delete/mark-all-read)
-       so the numbers never lag behind what's actually in the list. Chip
-       add/remove (a category appearing/disappearing entirely) is handled
-       by the next poll via _syncFilterChips. */
+    /* Cheap, local recount of the filter-pill numbers (no network round-trip).
+       Called after any local action (read / unread / delete / mark-all-read) and
+       after every poll, so the numbers never lag behind what is in the list.
+       Cards that are mid-removal, or in a category muted under Settings ->
+       Notification Preferences, are not counted. */
+    function _anMutedCats() {
+        const hidden = [];
+        if (LS.get('notifPrefRequests') === 'false') hidden.push('request');
+        if (LS.get('notifPrefOverdue') === 'false') hidden.push('overdue');
+        return hidden;
+    }
+
     function _updateChipCounts() {
         const bar = document.getElementById('notifFilterChips');
         if (!bar) return;
-        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
-        let unread = 0;
-        document.querySelectorAll('#notifList .notif-item[data-notif-key]').forEach(item => {
+        const muted = _anMutedCats();
+        const counts = { all: 0, unread: 0, request: 0, overdue: 0, room: 0, system: 0 };
+        document.querySelectorAll('#notifList .notif-item[data-notif-key]:not(.notif-removing)').forEach(item => {
+            if (muted.indexOf(item.dataset.cat) !== -1) return;
+            counts.all++;
+            if (item.classList.contains('unread')) counts.unread++;
             if (counts.hasOwnProperty(item.dataset.cat)) counts[item.dataset.cat]++;
-            if (item.classList.contains('unread')) unread++;
         });
-        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
-        Object.keys(counts).forEach(cat => {
+        const labels = { all: 'All', unread: 'Unread', request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        Object.keys(labels).forEach(cat => {
             const chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
             if (chip) chip.innerHTML = _esc(labels[cat]) + (counts[cat] > 0 ? ' <span class="notif-chip-count">' + counts[cat] + '</span>' : '');
         });
-        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
-        if (unreadChip) unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
+        _anRefreshChrome();
     }
 
     function _markCardRead(card) {
         if (!card.classList.contains('unread')) return;
-        card.classList.remove('unread');
-        const dot = card.querySelector('.unread-dot');
-        if (dot) dot.style.display = 'none';
+        _anApplyReadState(card, true);   // class + dot + the "Mark as read/unread" button label
         _updateBadges(_getUnreadCount());
         _updateChipCounts();
         const key = card.dataset.notifKey;
@@ -387,6 +404,7 @@
     function _deleteCard(card) {
         const key = card.dataset.notifKey;
         const wasUnread = card.classList.contains('unread');
+        _anSelected.delete(key);
         card.classList.add('notif-removing');
         setTimeout(() => {
             const group = card.previousElementSibling && card.previousElementSibling.classList.contains('notif-group-label')
@@ -400,6 +418,7 @@
             if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
             _updateChipCounts();
         }, 220);
+        _updateChipCounts();
         if (wasUnread) _updateBadges(Math.max(0, _getUnreadCount() - 1));
         if (key) _notifPost('equipment-booking/api/notif-delete.php', key);
         showToast('Notification deleted.');
@@ -470,6 +489,7 @@
             const itemId = card.dataset.linkItemId;
             if (!itemId) return;
             setTimeout(() => {
+                if (typeof window.psInventoryRevealRow === 'function') window.psInventoryRevealRow(itemId);
                 const row = document.querySelector('.inv-row-item[data-item-id="' + itemId + '"]');
                 if (!row) return;
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -486,7 +506,8 @@
 
             const mainRow = card.querySelector('.notif-card-main');
             if (mainRow) {
-                mainRow.addEventListener('click', () => {
+                mainRow.addEventListener('click', (e) => {
+                    if (_anSelectMode) { _anToggleSelect(card, e.shiftKey); return; }
                     const isExpanded = card.classList.contains('expanded');
                     document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
                     if (!isExpanded) {
@@ -502,6 +523,14 @@
             if (gotoBtn) {
                 gotoBtn.addEventListener('click', e => { e.stopPropagation(); _notifGoto(card); });
             }
+            const toggleBtn = card.querySelector('[data-notif-toggle-read]');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    // currently unread -> mark read; currently read -> mark unread
+                    _anSetRead([card.dataset.notifKey], card.classList.contains('unread'), true);
+                });
+            }
             const deleteBtn = card.querySelector('[data-notif-delete]');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', e => { e.stopPropagation(); _deleteCard(card); });
@@ -509,7 +538,13 @@
         });
     }
 
-    function filterNotifs(cat) {
+    function filterNotifs(cat, keepSelection) {
+        // A selection / pending delete must never silently follow you to a different pill.
+        if (!keepSelection) {
+            _anSelected.clear();
+            _anLastAnchor = null;
+            _anPending = null;
+        }
         document.querySelectorAll('.notif-filter-chips .rq-filter-chip').forEach(t => t.classList.remove('active'));
         const btn = document.querySelector('.notif-filter-chips .rq-filter-chip[data-notif-filter="' + cat + '"]');
         if (btn) btn.classList.add('active');
@@ -544,57 +579,301 @@
         const filterEmpty = document.getElementById('notifFilterEmptyState');
         const hasAnyCardAtAll = !!document.querySelector('#notifList .notif-item');
         if (filterEmpty) filterEmpty.style.display = (hasAnyCardAtAll && !anyCardVisible) ? '' : 'none';
+        _anRefreshChrome();
     }
 
-    /* Keep the filter chip row honest against live data: add a chip for
-       a category that just got its first notification, refresh the
-       counts on every chip, and drop a chip whose category emptied out
-       (unless it's the one currently active — filterNotifs() handles
-       falling back to "All" for that case). */
-    function _syncFilterChips(notifications) {
-        const bar = document.getElementById('notifFilterChips');
-        if (!bar) return;
-        const counts = { request: 0, overdue: 0, room: 0, system: 0 };
-        let unread = 0;
-        notifications.forEach(n => {
-            if (counts.hasOwnProperty(n.cat)) counts[n.cat]++;
-            if (!n.is_read) unread++;
-        });
-
-        const labels = { request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
-        Object.keys(counts).forEach(cat => {
-            let chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
-            if (counts[cat] > 0) {
-                if (!chip) {
-                    chip = document.createElement('button');
-                    chip.className = 'rq-filter-chip';
-                    chip.dataset.notifFilter = cat;
-                    chip.addEventListener('click', function () { filterNotifs(this.dataset.notifFilter); });
-                    bar.appendChild(chip);
-                }
-                chip.innerHTML = _esc(labels[cat]) + ' <span class="notif-chip-count">' + counts[cat] + '</span>';
-            } else if (chip && !chip.classList.contains('active')) {
-                chip.remove();
-            }
-        });
-
-        const unreadChip = bar.querySelector('.rq-filter-chip[data-notif-filter="unread"]');
-        if (unreadChip) {
-            unreadChip.innerHTML = 'Unread' + (unread > 0 ? ' <span class="notif-chip-count">' + unread + '</span>' : '');
-        }
+    /* Keep the filter pills honest against live data after a poll. (Every pill
+       is always rendered now, so this only has to refresh the numbers.) */
+    function _syncFilterChips() {
+        _updateChipCounts();
     }
 
     function markAllRead() {
-        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => {
-            item.classList.remove('unread');
-            const dot = item.querySelector('.unread-dot');
-            if (dot) dot.style.display = 'none';
-        });
+        document.querySelectorAll('#notifList .notif-item.unread').forEach(item => _anApplyReadState(item, true));
         _updateBadges(0);
         _updateChipCounts();
+        _anReapplyFilter();
         _notifPost('equipment-booking/api/notif-mark-all-read.php');
         showToast('All notifications marked as read.');
     }
+
+    /* ▼ NOTIF-SELECT-BEGIN ───────────────────────────────────────────────────
+       Select · Select all · Mark read / unread · Delete selected · Delete all
+       Same behaviour as the faculty Notifications modal, working on the
+       server-rendered cards above. Bulk writes go to api/notif-bulk.php. */
+    function _anPlural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+    function _anCards() {
+        return Array.from(document.querySelectorAll('#notifList .notif-item[data-notif-key]:not(.notif-removing)'));
+    }
+
+    function _anActiveFilter() {
+        const a = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
+        return a ? a.dataset.notifFilter : 'all';
+    }
+
+    /* The cards the current pill is showing (muted categories never count). */
+    function _anMatches() {
+        const f = _anActiveFilter();
+        const muted = _anMutedCats();
+        return _anCards().filter(c => {
+            if (muted.indexOf(c.dataset.cat) !== -1) return false;
+            if (f === 'all') return true;
+            if (f === 'unread') return c.classList.contains('unread');
+            return c.dataset.cat === f;
+        });
+    }
+
+    function _anReapplyFilter() { filterNotifs(_anActiveFilter(), true); }
+
+    function _anBulk(action, keys) {
+        const body = new URLSearchParams();
+        body.set('action', action);
+        body.set('csrf_token', getCsrfToken());
+        keys.forEach(k => body.append('keys[]', k));
+        _anBusy++;
+        return fetch('equipment-booking/api/notif-bulk.php', { method: 'POST', body: body, credentials: 'same-origin' })
+            .then(r => r.json().catch(() => ({})).then(j => {
+                if (!r.ok || j.status !== 'success') throw new Error(j.message || j.error || 'Request failed');
+                return j;
+            }))
+            .finally(() => { _anBusy--; });
+    }
+
+    function _anApplyReadState(card, read) {
+        card.classList.toggle('unread', !read);
+        const dot = card.querySelector('.unread-dot');
+        if (dot) dot.style.display = '';
+        const btn = card.querySelector('[data-notif-toggle-read]');
+        if (btn) {
+            const ic = btn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = read ? 'mark_email_unread' : 'drafts';
+            const lb = btn.querySelector('[data-notif-toggle-label]');
+            if (lb) lb.textContent = read ? 'Mark as unread' : 'Mark as read';
+        }
+    }
+
+    /* Optimistic: the list updates instantly, the server follows. */
+    function _anSetRead(keys, read) {
+        const cards = _anCards().filter(c => keys.indexOf(c.dataset.notifKey) !== -1 && c.classList.contains('unread') === read);
+        if (!cards.length) return Promise.resolve(true);
+        cards.forEach(c => _anApplyReadState(c, read));
+        _updateBadges(_getUnreadCount());
+        _updateChipCounts();
+        _anReapplyFilter();
+        return _anBulk(read ? 'mark_read' : 'mark_unread', cards.map(c => c.dataset.notifKey))
+            .then(() => true)
+            .catch(() => {
+                showToast('Could not update notifications. Please try again.');
+                _notifPoll();
+                return false;
+            });
+    }
+
+    function _anDelete(keys) {
+        const doomed = _anCards().filter(c => keys.indexOf(c.dataset.notifKey) !== -1);
+        if (!doomed.length) return Promise.resolve(true);
+        const gone = new Set(doomed.map(c => c.dataset.notifKey));
+        const unreadLeft = _anCards().filter(c => !gone.has(c.dataset.notifKey) && c.classList.contains('unread')).length;
+        gone.forEach(k => _anSelected.delete(k));
+        doomed.forEach(c => _deleteCardSilent(c));
+        _updateBadges(unreadLeft);
+        _updateChipCounts();
+        return _anBulk('delete', Array.from(gone))
+            .then(() => {
+                showToast(gone.size === 1 ? 'Notification deleted.' : _anPlural(gone.size, 'notification') + ' deleted.');
+                return true;
+            })
+            .catch(() => {
+                showToast('Could not delete. Please try again.');
+                _notifPoll();
+                return false;
+            });
+    }
+
+    function _anToggleSelect(card, range) {
+        const key = card.dataset.notifKey;
+        if (range && _anLastAnchor) {
+            const list = _anMatches();
+            const a = list.findIndex(c => c.dataset.notifKey === _anLastAnchor);
+            const b = list.findIndex(c => c.dataset.notifKey === key);
+            if (a > -1 && b > -1) {
+                for (let i = Math.min(a, b); i <= Math.max(a, b); i++) _anSelected.add(list[i].dataset.notifKey);
+                _anRefreshChrome();
+                return;
+            }
+        }
+        if (_anSelected.has(key)) _anSelected.delete(key); else _anSelected.add(key);
+        _anLastAnchor = key;
+        _anRefreshChrome();
+    }
+
+    function _anEnterSelect() {
+        _anSelectMode = true;
+        _anPending = null;
+        document.querySelectorAll('#notifList .notif-card.expanded').forEach(c => c.classList.remove('expanded'));
+        _anRefreshChrome();
+    }
+
+    function _anExitSelect() {
+        _anSelectMode = false;
+        _anSelected.clear();
+        _anLastAnchor = null;
+        _anPending = null;
+        _anRefreshChrome();
+    }
+
+    function _anSelectAll() {
+        const list = _anMatches();
+        const all = list.length > 0 && list.every(c => _anSelected.has(c.dataset.notifKey));
+        list.forEach(c => { if (all) _anSelected.delete(c.dataset.notifKey); else _anSelected.add(c.dataset.notifKey); });
+        _anRefreshChrome();
+    }
+
+    function _anAskDelete(keys, text) {
+        if (!keys.length) return;
+        _anPending = { keys: keys.slice(), text: text };
+        _anRefreshChrome();
+    }
+
+    /* Everything outside the cards that depends on the data: footer buttons,
+       selection bar, confirm strip, row checkboxes. Cheap -- safe to call often. */
+    function _anRefreshChrome() {
+        const list = document.getElementById('notifList');
+        if (!list) return;
+        const muted = _anMutedCats();
+        const cards = _anCards().filter(c => muted.indexOf(c.dataset.cat) === -1);
+
+        if (_anSelectMode && cards.length === 0) { _anSelectMode = false; _anSelected.clear(); _anPending = null; }
+        const live = new Set(_anCards().map(c => c.dataset.notifKey));
+        Array.from(_anSelected).forEach(k => { if (!live.has(k)) _anSelected.delete(k); });
+
+        const matches = _anMatches();
+        const matchKeys = new Set(matches.map(c => c.dataset.notifKey));
+        const selCount = matches.filter(c => _anSelected.has(c.dataset.notifKey)).length;
+
+        list.classList.toggle('is-selecting', _anSelectMode);
+        _anCards().forEach(c => {
+            const on = _anSelectMode && _anSelected.has(c.dataset.notifKey) && matchKeys.has(c.dataset.notifKey);
+            c.classList.toggle('is-selected', on);
+            const row = c.querySelector('.notif-card-main');
+            if (row) {
+                if (_anSelectMode) {
+                    row.setAttribute('role', 'checkbox');
+                    row.setAttribute('aria-checked', on ? 'true' : 'false');
+                } else {
+                    row.setAttribute('role', 'button');
+                    row.removeAttribute('aria-checked');
+                }
+            }
+        });
+
+        const selectBtn = document.getElementById('notifSelectBtn');
+        if (selectBtn) {
+            selectBtn.disabled = !_anSelectMode && cards.length === 0;
+            selectBtn.setAttribute('aria-pressed', _anSelectMode ? 'true' : 'false');
+            const lbl = document.getElementById('notifSelectLbl');
+            if (lbl) lbl.textContent = _anSelectMode ? 'Done' : 'Select';
+            const ic = selectBtn.querySelector('.material-symbols-outlined');
+            if (ic) ic.textContent = _anSelectMode ? 'close' : 'checklist';
+        }
+        const delAll = document.getElementById('notifDeleteAllBtn');
+        if (delAll) {
+            delAll.hidden = !_anSelectMode;
+            delAll.disabled = matches.length === 0;
+            const tail = delAll.lastChild;
+            if (tail && tail.nodeType === 3) tail.nodeValue = ' Delete all' + (_anActiveFilter() === 'all' ? '' : ' (' + matches.length + ')');
+        }
+        const selBar = document.getElementById('notifSelBar');
+        if (selBar) selBar.hidden = !_anSelectMode;
+        const selCountEl = document.getElementById('notifSelCount');
+        if (selCountEl) selCountEl.textContent = selCount + ' selected';
+        const selAll = document.getElementById('notifSelectAll');
+        if (selAll) {
+            selAll.checked = matches.length > 0 && selCount === matches.length;
+            selAll.indeterminate = selCount > 0 && selCount < matches.length;
+            selAll.disabled = matches.length === 0;
+        }
+        document.querySelectorAll('#notifSelBar [data-needs-sel]').forEach(b => { b.disabled = selCount === 0; });
+
+        const conf = document.getElementById('notifConfirm');
+        if (conf) {
+            conf.hidden = !_anPending;
+            const ct = document.getElementById('notifConfirmText');
+            if (ct && _anPending) ct.textContent = _anPending.text;
+        }
+    }
+
+    (function initNotifSelect() {
+        const overlay = document.getElementById('notifOverlay');
+        if (!overlay) return;
+
+        overlay.addEventListener('click', function (e) {
+            const b = e.target.closest('[data-nbar]');
+            if (!b || b.disabled) return;
+            const matches = _anMatches();
+            const selKeys = matches.filter(c => _anSelected.has(c.dataset.notifKey)).map(c => c.dataset.notifKey);
+            switch (b.dataset.nbar) {
+                case 'select':
+                    if (_anSelectMode) _anExitSelect(); else _anEnterSelect();
+                    break;
+                case 'mark-read':
+                    _anSetRead(selKeys, true).then(ok => { if (ok) showToast(_anPlural(selKeys.length, 'notification') + ' marked as read.'); });
+                    break;
+                case 'mark-unread':
+                    _anSetRead(selKeys, false).then(ok => { if (ok) showToast(_anPlural(selKeys.length, 'notification') + ' marked as unread.'); });
+                    break;
+                case 'delete-selected':
+                    _anAskDelete(selKeys, 'Delete ' + (selKeys.length === 1 ? 'the selected notification' : selKeys.length + ' selected notifications') + '? This can\u2019t be undone.');
+                    break;
+                case 'delete-all': {
+                    const keys = matches.map(c => c.dataset.notifKey);
+                    const f = _anActiveFilter();
+                    const scope = f === 'all' ? '' : ' ' + f;
+                    _anAskDelete(keys, 'Delete all ' + (keys.length === 1 ? '1' + scope + ' notification' : keys.length + scope + ' notifications') + '? This can\u2019t be undone.');
+                    break;
+                }
+                case 'confirm-cancel':
+                    _anPending = null;
+                    _anRefreshChrome();
+                    break;
+                case 'confirm-ok': {
+                    if (!_anPending) break;
+                    const keys = _anPending.keys;
+                    _anPending = null;
+                    _anRefreshChrome();
+                    _anDelete(keys);
+                    break;
+                }
+            }
+        });
+
+        const selAllBox = document.getElementById('notifSelectAll');
+        if (selAllBox) selAllBox.addEventListener('change', _anSelectAll);
+
+        // Shift-click selects a range -- don't start a text selection while doing it
+        const listEl = document.getElementById('notifList');
+        if (listEl) {
+            listEl.addEventListener('mousedown', function (e) { if (e.shiftKey && _anSelectMode) e.preventDefault(); });
+        }
+
+        // Esc: close the delete confirmation first, then leave Select mode, before anything else sees it
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || !overlay.classList.contains('ps-modal-open')) return;
+            if (_anPending) { e.preventDefault(); e.stopPropagation(); _anPending = null; _anRefreshChrome(); }
+            else if (_anSelectMode) { e.preventDefault(); e.stopPropagation(); _anExitSelect(); }
+        }, true);
+
+        // However the modal gets closed (X, backdrop, navigating to a notification), leave Select mode behind
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(function () {
+                if (!overlay.classList.contains('ps-modal-open') && (_anSelectMode || _anPending || _anSelected.size)) _anExitSelect();
+            }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+        }
+
+        _anRefreshChrome();
+    })();
+    /* ▲ NOTIF-SELECT-END ──────────────────────────────────────────────────── */
 
     /* ── Poll for genuinely new notifications (new request submitted,
        item went overdue, room issue reported, stock dropped, etc.)
@@ -620,6 +899,7 @@
 
         wrap.innerHTML =
             '<div class="notif-card-main" role="button" tabindex="0">' +
+            '<span class="anotif-check" aria-hidden="true"><span class="material-symbols-outlined">check</span></span>' +
             '<div class="notif-icon ' + _esc(n.icon_class) + '"><span class="material-symbols-outlined">' + _esc(n.icon) + '</span></div>' +
             '<div class="notif-body-wrap"><h4>' + _esc(n.title) + '</h4><p>' + n.body + '</p></div>' +
             '<div class="notif-meta"><span class="notif-time">' + _esc(n.time_label) + '</span><div class="unread-dot"></div>' +
@@ -628,6 +908,7 @@
             '<div class="notif-card-detail"><div class="ps-detail-grid">' + detailRows + '</div>' +
             '<div class="notif-card-actions">' +
             '<button type="button" class="ps-btn ps-btn--primary ps-btn--sm" data-notif-goto><span class="material-symbols-outlined">visibility</span>' + _esc(n.view_label) + '</button>' +
+            '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-toggle-read-btn" data-notif-toggle-read><span class="material-symbols-outlined">' + (n.is_read ? 'mark_email_unread' : 'drafts') + '</span><span data-notif-toggle-label>' + (n.is_read ? 'Mark as unread' : 'Mark as read') + '</span></button>' +
             '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm notif-delete-btn" data-notif-delete title="Delete notification"><span class="material-symbols-outlined">delete</span>Delete</button>' +
             '</div></div>';
         return wrap;
@@ -640,6 +921,9 @@
     }
 
     function _notifPoll() {
+        // Don't reshuffle the list under the admin's hands: pause while a bulk
+        // action is in flight or a delete confirmation is open.
+        if (_anBusy > 0 || _anPending) return;
         fetch('equipment-booking/api/notif-list.php')
             .then(r => r.ok ? r.json() : null)
             .then(data => {
@@ -685,7 +969,7 @@
                     initNotifCards();
                 }
                 const activeFilter = document.querySelector('.notif-filter-chips .rq-filter-chip.active');
-                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all');
+                filterNotifs(activeFilter ? activeFilter.dataset.notifFilter : 'all', true);
 
                 _updateBadges(data.unread_count);
             })
@@ -703,6 +987,7 @@
                 if (!next || !next.classList.contains('notif-item')) group.remove();
             }
             if (!document.querySelector('#notifList .notif-item')) _showEmptyState();
+            _updateChipCounts();
         }, 220);
     }
 
@@ -885,7 +1170,7 @@
                     if (greetEl) greetEl.textContent = (data.admin_name || '').split(' ')[0] || greetEl.textContent;
                     const initials = _computeInitials(data.admin_name);
                     if (initials) {
-                        document.querySelectorAll('.nav-account-avatar, .dd-avatar').forEach(el => { el.textContent = initials; });
+                        document.querySelectorAll('.nav-account-avatar, .dd-avatar, #dashAvatarBtn').forEach(el => { el.textContent = initials; });
                     }
 
                     // The database is now the source of truth for these fields —
@@ -967,29 +1252,141 @@
         });
     }
 
-    /* ── Equipment search (client-side) ──────────────────────────
+    /* ── Equipment list: client-side search + pagination ─────────
        NOTE: this intentionally does NOT use setupLiveSearch(). That
        helper replaces the container's innerHTML with whatever
-       live-search.php's ?section=inventory case returns — old
-       Bootstrap <tr>/<td> markup, meant for a <table>. #inventory-body
-       is a plain <div> of .inv-row-item cards, not a table, so that
-       swap produced invalid/garbled HTML (and it stayed garbled after
-       clearing the search, since an empty query still replaces the
-       real card markup with the old table-row markup). Filtering the
-       cards that are already in the DOM avoids all of that — nothing
-       is ever replaced, so there's nothing to garble. ── */
-    function setupInventorySearch() {
-        const input = document.getElementById('inventorySearch');
+       live-search.php's ?section=inventory case returns (old
+       Bootstrap markup), which garbled the list. Instead every
+       <tr.inv-row-item> is rendered once by PHP and this function only
+       shows/hides them: filter by the search box, then show 10 rows
+       per page. Nothing is ever replaced, so there's nothing to garble. */
+    function setupInventoryList() {
+        const PAGE_SIZE = 10;
         const body = document.getElementById('inventory-body');
-        if (!input || !body) return;
-        input.addEventListener('input', function () {
-            const q = this.value.trim().toLowerCase();
-            body.querySelectorAll('.inv-row-item').forEach(function (row) {
-                const name = (row.dataset.itemName || '').toLowerCase();
-                const cat = (row.dataset.itemCategory || '').toLowerCase();
-                row.style.display = (!q || name.includes(q) || cat.includes(q)) ? '' : 'none';
-            });
+        if (!body) return;
+
+        const input = document.getElementById('inventorySearch');
+        const rows = Array.from(body.querySelectorAll('tr.inv-row-item'));
+        const noMatch = document.getElementById('inv-nomatch-row');
+        const pager = document.getElementById('inv-pager');
+        const info = document.getElementById('inv-pager-info');
+        const ctl = document.getElementById('inv-pager-ctl');
+        const nums = document.getElementById('inv-pg-nums');
+        const prevBtn = document.getElementById('inv-pg-prev');
+        const nextBtn = document.getElementById('inv-pg-next');
+        let query = '';
+        let page = 1;
+
+        // Thumbnail fallback (replaces the old inline onerror handler).
+        rows.forEach(function (row) {
+            const img = row.querySelector('.inv-thumb img');
+            if (!img) return;
+            const thumb = img.closest('.inv-thumb');
+            const broken = function () { if (thumb) thumb.classList.add('is-broken'); };
+            img.addEventListener('error', broken);
+            if (img.complete && img.naturalWidth === 0) broken();
         });
+
+        function matches(row) {
+            if (!query) return true;
+            const d = row.dataset;
+            return [d.itemName, d.itemCategory, d.itemCondition].some(function (v) {
+                return (v || '').toLowerCase().includes(query);
+            });
+        }
+
+        // 1 … 4 5 6 … 12 — always first, last and the current page ±1.
+        function pageList(total, current) {
+            const keep = new Set([1, total, current - 1, current, current + 1]);
+            const list = [];
+            let last = 0;
+            Array.from(keep).filter(function (n) { return n >= 1 && n <= total; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function render() {
+            const hits = rows.filter(matches);
+            const total = hits.length;
+            const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            page = Math.min(Math.max(page, 1), pages);
+            const start = (page - 1) * PAGE_SIZE;
+            const end = Math.min(start + PAGE_SIZE, total);
+            const visible = new Set(hits.slice(start, end));
+
+            rows.forEach(function (row) {
+                row.classList.toggle('inv-row-hidden', !visible.has(row));
+            });
+            if (noMatch) noMatch.classList.toggle('inv-row-hidden', !(rows.length > 0 && total === 0));
+
+            if (!pager) return;
+            pager.hidden = rows.length === 0;
+            if (info) {
+                info.textContent = total
+                    ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
+                    : 'No results';
+            }
+            if (ctl) ctl.hidden = pages <= 1;
+            if (prevBtn) prevBtn.disabled = page <= 1;
+            if (nextBtn) nextBtn.disabled = page >= pages;
+            if (nums) {
+                nums.textContent = '';
+                pageList(pages, page).forEach(function (n) {
+                    if (n === 'gap') {
+                        const gap = document.createElement('span');
+                        gap.className = 'inv-pager-gap';
+                        gap.textContent = '\u2026';
+                        nums.appendChild(gap);
+                        return;
+                    }
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.dataset.page = String(n);
+                    btn.textContent = String(n);
+                    btn.setAttribute('aria-label', 'Page ' + n);
+                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    nums.appendChild(btn);
+                });
+            }
+        }
+
+        if (input) {
+            input.addEventListener('input', function () {
+                query = this.value.trim().toLowerCase();
+                page = 1;
+                render();
+            });
+        }
+        if (prevBtn) prevBtn.addEventListener('click', function () { page--; render(); });
+        if (nextBtn) nextBtn.addEventListener('click', function () { page++; render(); });
+        if (nums) {
+            nums.addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-page]');
+                if (!btn) return;
+                page = parseInt(btn.dataset.page, 10) || 1;
+                render();
+            });
+        }
+
+        // Lets notification deep-links open the page that holds a given item
+        // (clears any search so the row is guaranteed to be listed).
+        window.psInventoryRevealRow = function (itemId) {
+            query = '';
+            if (input) input.value = '';
+            const pos = rows.findIndex(function (r) { return r.dataset.itemId === String(itemId); });
+            if (pos < 0) return null;
+            page = Math.floor(pos / PAGE_SIZE) + 1;
+            render();
+            return rows[pos];
+        };
+
+        render();
     }
 
     /* ── Master event delegation ─────────────────────────────── */
@@ -1004,6 +1401,13 @@
                     psOpenModal('notifOverlay');
                     _closeMobileSidebar();
                     break;
+
+                case 'open-account-settings': {
+                    // Dashboard header avatar → Settings (My Account). The sidebar no longer has a
+                    // Settings item, so switch the tab directly.
+                    _switchTabDOM('settings', null);
+                    break;
+                }
 
                 case 'open-change-pass': {
                     const modal = document.getElementById('changePassModal');
@@ -1201,36 +1605,42 @@
         return d.innerHTML;
     }
 
-    function _buildFacultyRow(data) {
-        // data = { fullname, email, backup_email, role, org_name, org_id, faculty_id, allow_org_borrowing }
-        const tr = document.createElement('tr');
-        const isAdviser = data.role === 'Organization Adviser';
-        const subLabel = isAdviser && data.org_name
-            ? 'Org Adviser \u00B7 ' + data.org_name
-            : 'Active Faculty';
-        const init = (data.fullname || 'F').charAt(0).toUpperCase();
+    /* The faculty-list row is rendered in ONE place so the create form and the edit
+       modal produce rows identical to the ones the server prints (admin-dashboard.php).
+       An id starting with NOTSET- is the internal placeholder for "no Faculty ID yet"
+       (see config/faculty-id.php) and is shown as "Not set yet". */
+    window.psFacRender = function (tr, d) {
+        const isAdviser = d.role === 'Organization Adviser';
+        const idUnset = !d.faculty_id || String(d.faculty_id).indexOf('NOTSET-') === 0;
+        const init = ((d.fullname || 'F').trim().charAt(0) || 'F').toUpperCase();
 
-        tr.dataset.fullname = data.fullname || '';
-        tr.dataset.email = data.email || '';
-        tr.dataset.backupEmail = data.backup_email || '';
-        tr.dataset.facultyId = data.faculty_id || '';
-        tr.dataset.role = data.role || '';
-        tr.dataset.org = data.org_name || '';
-        tr.dataset.orgId = data.org_id || '0';
-        tr.dataset.aob = data.allow_org_borrowing === 1 ? '1' : '0';
+        tr.dataset.fullname = d.fullname || '';
+        tr.dataset.email = d.email || '';
+        tr.dataset.backupEmail = d.backup_email || '';
+        tr.dataset.facultyId = d.faculty_id || '';
+        tr.dataset.role = d.role || '';
+        tr.dataset.org = d.org_name || '';
+        tr.dataset.orgId = String(d.org_id || '0');
         tr.dataset.init = init;
 
         tr.innerHTML =
-            '<td>' +
-            '<div style="font-weight:600">' + _esc(data.fullname) + '</div>' +
-            '<div style="font-size:11px;color:var(--text-light)">' + _esc(subLabel) + '</div>' +
-            '</td>' +
-            '<td style="font-size:12px;color:var(--text-light)">' + _esc(data.faculty_id || '') + '</td>' +
-            '<td style="font-size:12px">' + _esc(data.email) + '</td>' +
-            '<td><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn">' +
+            '<td><div class="fac-person">' +
+            '<span class="fac-avatar">' + _esc(init) + '</span>' +
+            '<div class="fac-person-text">' +
+            '<div class="fac-person-name">' + _esc(d.fullname) + '</div>' +
+            '<div class="fac-person-sub">' + _esc(d.email) + '</div>' +
+            '</div></div></td>' +
+            '<td>' + (idUnset
+                ? '<span class="fac-id-pending">Not set yet</span>'
+                : '<span class="fac-id">' + _esc(d.faculty_id) + '</span>') + '</td>' +
+            '<td>' + (isAdviser
+                ? '<span class="fac-role fac-role--adviser">Org Adviser</span>' +
+                (d.org_name ? '<div class="fac-person-sub">' + _esc(d.org_name) + '</div>' : '')
+                : '<span class="fac-role">Faculty</span>') + '</td>' +
+            '<td class="fac-actions"><button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">' +
             '<span class="material-symbols-outlined">edit</span></button></td>';
         return tr;
-    }
+    };
 
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
@@ -1250,14 +1660,55 @@
         facFormAlert.textContent = '';
     }
 
+    /* After a successful create: show a small "Account created" overlay for a moment, then
+       load the Faculty tab fresh so the form, the list and its count are all back to a clean
+       state (the new account is simply part of the server-printed list).
+       FAC_CREATED_OVERLAY_MS must match the .fac-created-bar animation (2s) in admin-dashboard.css. */
+    const FAC_CREATED_OVERLAY_MS = 2000;
+    let _facReloading = false;
+
+    function _facAccountCreated(fullname) {
+        _facReloading = true;
+
+        // Empty the form right away so no browser can restore typed values (the password
+        // included) after the reload.
+        ['fac-email', 'fac-faculty-id', 'fac-first', 'fac-last', 'fac-password', 'fac-confirm']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        if (facAdviserChk) facAdviserChk.checked = false;
+        _syncAdviserToggle();
+        _clearFacAlert();
+
+        const ov = document.createElement('div');
+        ov.className = 'fac-created-overlay';
+        ov.setAttribute('role', 'status');
+        ov.setAttribute('aria-live', 'polite');
+        ov.innerHTML =
+            '<div class="fac-created-card">' +
+            '<span class="fac-created-icon"><span class="material-symbols-outlined">check</span></span>' +
+            '<div class="fac-created-title">Account created</div>' +
+            '<div class="fac-created-sub"></div>' +
+            '<span class="fac-created-bar"></span>' +
+            '</div>';
+        ov.querySelector('.fac-created-sub').textContent = fullname; // text, never parsed as HTML
+        document.body.appendChild(ov);
+
+        setTimeout(function () {
+            // ?view=faculty makes the dashboard open on the Faculty tab (a plain reload
+            // would drop back to the default tab).
+            window.location.href = window.location.pathname + '?view=faculty';
+        }, FAC_CREATED_OVERLAY_MS);
+    }
+
     if (facSubmitBtn) {
         facSubmitBtn.addEventListener('click', function () {
             _clearFacAlert();
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
-            const backup = (document.getElementById('fac-backup')?.value || '').trim();
+            const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
             const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const middleName = (document.getElementById('fac-middle')?.value || '').trim();
             const lastName = (document.getElementById('fac-last')?.value || '').trim();
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
@@ -1267,6 +1718,16 @@
             // Client-side pre-checks (mirror server validation for immediate UX feedback)
             if (!email) {
                 _showFacAlert('PUPSync email is required.', true); return;
+            }
+            if (!/^[^\s@]+@pupsync\.edu$/i.test(email)) {
+                _showFacAlert('Use a PUPSync email ending in @pupsync.edu.', true); return;
+            }
+            if (!facultyId) {
+                _showFacAlert('Faculty ID is required.', true); return;
+            }
+            // letters/digits in hyphen-separated groups, 5-30 characters, at least one digit (same rule as the server)
+            if (facultyId.length < 5 || facultyId.length > 30 || !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(facultyId) || !/\d/.test(facultyId)) {
+                _showFacAlert('Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).', true); return;
             }
             if (!firstName) {
                 _showFacAlert('First name is required.', true); return;
@@ -1294,9 +1755,8 @@
             const body = new URLSearchParams({
                 csrf_token: getCsrfToken(),
                 pupsync_email: email,
-                backup_email: backup,
+                faculty_id: facultyId,
                 first_name: firstName,
-                middle_name: middleName,
                 last_name: lastName,
                 password: password,
                 confirm_password: confirm,
@@ -1312,49 +1772,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        _showFacAlert(
-                            'Account created. Faculty ID: ' + data.faculty_id, false
-                        );
-                        showToast('Faculty account created successfully.');
-
-                        // Build fullname for the new DOM row
-                        const parts = [firstName, middleName, lastName].filter(Boolean);
-                        const fullname = parts.join(' ');
-                        const role = isAdviser === '1'
-                            ? 'Organization Adviser'
-                            : 'Regular Faculty';
-                        const orgName = isAdviser === '1'
-                            ? (facOrgSelect?.options[facOrgSelect.selectedIndex]?.text || '')
-                            : '';
-                        const orgIdVal = isAdviser === '1' ? orgId : '0';
-
-                        // DOM prepend: remove empty-state row if present, then prepend new row
-                        const emptyRow = document.getElementById('fac-empty-row');
-                        if (emptyRow) emptyRow.remove();
-
-                        const tbody = document.getElementById('faculty-list-tbody');
-                        if (tbody) {
-                            const newRow = _buildFacultyRow({
-                                fullname, email,
-                                backup_email: backup,
-                                role,
-                                org_name: orgName,
-                                org_id: orgIdVal,
-                                faculty_id: data.faculty_id || '',
-                                allow_org_borrowing: 0
-                            });
-                            tbody.prepend(newRow);
-                        }
-
-                        // Reset form
-                        ['fac-email', 'fac-backup', 'fac-first', 'fac-middle', 'fac-last', 'fac-password', 'fac-confirm']
-                            .forEach(id => {
-                                const el = document.getElementById(id);
-                                if (el) el.value = '';
-                            });
-                        if (facAdviserChk) facAdviserChk.checked = false;
-                        _syncAdviserToggle();
-
+                        _facAccountCreated([firstName, lastName].filter(Boolean).join(' '));
                     } else {
                         _showFacAlert(data.message || 'An error occurred.', true);
                     }
@@ -1363,6 +1781,7 @@
                     _showFacAlert('Network error. Please try again.', true);
                 })
                 .finally(() => {
+                    if (_facReloading) return; // stay locked: the page is about to reload
                     facSubmitBtn.disabled = false;
                     facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
                 });
@@ -2399,7 +2818,7 @@
         restoreState();
 
         initView();
-        initImageUpload(); // Add-equipment form (right column)
+        initImageUpload(); // Add-equipment form (left column)
         initImageUpload({ // Edit-equipment modal
             dropZone: 'eqm-dropZone',
             fileInput: 'eqm-itemImageInput',
@@ -2429,7 +2848,7 @@
         setupLiveSearch('returnSearch', 'return-body', 'approved');
         setupLiveSearch('approvedSearch', 'approved-list', 'approved');
         setupLiveSearch('declinedSearch', 'declined-list', 'declined');
-        setupInventorySearch(); // client-side filter — see note near its definition
+        setupInventoryList(); // client-side search + 10-per-page pagination — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
         // ── Arbitration log search (server-side, reload with query param) ──

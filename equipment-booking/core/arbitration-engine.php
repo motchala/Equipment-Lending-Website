@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 /**
@@ -29,6 +30,7 @@ declare(strict_types=1);
  */
 
 date_default_timezone_set('Asia/Manila');
+require_once __DIR__ . '/booking-schedule.php';
 
 class ArbitrationEngine
 {
@@ -47,6 +49,7 @@ class ArbitrationEngine
     public const RULE_5_ID_ORDER       = 'rule_5_id_order';
     public const RULE_OVERRIDE         = 'override';
     public const RULE_ERROR            = 'arbitration_error';
+    public const RULE_SCHEDULE_CONFLICT = 'rule_schedule_conflict';
 
     // ── Public entry point ───────────────────────────────────────────────────
 
@@ -124,6 +127,17 @@ class ArbitrationEngine
             // ── Step 6: Archived item check ──────────────────────────────────
             // Leave as Waiting — do not approve or decline archived items.
             if (isset($request['is_archived']) && (int)$request['is_archived'] === 1) {
+                return;
+            }
+
+            // ── Scheduled bookings (Today / Later) are decided against the SCHEDULE ──
+            // (units already promised for overlapping times), not the shelf count.
+            // Legacy rows (booking_mode NULL) keep the original stock-counter flow below.
+            if (
+                BookingSchedule::ensureSchema($conn)
+                && in_array((string)($request['booking_mode'] ?? ''), ['today', 'future'], true)
+            ) {
+                self::processScheduled($conn, $request_id, $request);
                 return;
             }
 
@@ -346,7 +360,6 @@ class ArbitrationEngine
 
             $conn->commit();
             $transaction_open = false;
-
         } catch (\Throwable $e) {
             if ($transaction_open) {
                 $conn->rollback();
@@ -356,7 +369,7 @@ class ArbitrationEngine
             // Log the error to PHP's error log.
             error_log(
                 'ArbitrationEngine::process — unexpected error for request_id='
-                . $request_id . ': ' . $e->getMessage()
+                    . $request_id . ': ' . $e->getMessage()
             );
 
             // Insert an arbitration_error entry into tbl_arbitration_log.
@@ -412,7 +425,7 @@ class ArbitrationEngine
                 // Silently swallow — a logging failure must not propagate.
                 error_log(
                     'ArbitrationEngine::process — failed to write error log for request_id='
-                    . $request_id . ': ' . $log_e->getMessage()
+                        . $request_id . ': ' . $log_e->getMessage()
                 );
             }
         }
@@ -568,36 +581,10 @@ class ArbitrationEngine
      */
     private static function checkMissingDocument(array $request, array $config): ?string
     {
-        // Step 1: Check if the missing-doc block rule is enabled.
-        if (($config['rule_missing_doc_block_enabled'] ?? '0') !== '1') {
-            return null;
-        }
-
-        // Step 2: Determine if a document is present.
-        $has_document = isset($request['document_path'])
-            && $request['document_path'] !== null
-            && $request['document_path'] !== '';
-
-        // Step 3: Document present — no hold needed.
-        if ($has_document) {
-            return null;
-        }
-
-        // Step 4: No document — check if this is an adviser-mode request.
-        // Two paths qualify:
-        //   (a) submitted_as = 'adviser'  → new explicit mode (Requirements 7.1)
-        //   (b) submitted_as = NULL AND role = 'Organization Adviser' → legacy path (Requirement 7.2)
-        // Personal-mode submissions (submitted_as = 'personal') do NOT trigger this hold
-        // based on allow_org_borrowing alone (Requirement 7.3).
-        $submitted_as    = isset($request['submitted_as']) ? (string)$request['submitted_as'] : null;
-        $is_adviser_mode = ($submitted_as === 'adviser')
-                           || ($submitted_as === null && isset($request['role']) && $request['role'] === 'Organization Adviser');
-
-        if ($is_adviser_mode) {
-            return 'A signed request letter is required for organization borrowing.';
-        }
-
-        // No hold required.
+        // A supporting / request letter is OPTIONAL for organization requests.
+        // Attaching one can still raise a request's priority (see validateDocument()),
+        // but a missing letter never puts a request on hold. The old
+        // rule_missing_doc_block_enabled setting is therefore no longer applied.
         return null;
     }
 
@@ -650,7 +637,8 @@ class ArbitrationEngine
             }
 
             // Department Head / Dept. Head → Signatory_Level 2.
-            if (stripos($contents, 'Department Head') !== false
+            if (
+                stripos($contents, 'Department Head') !== false
                 || stripos($contents, 'Dept. Head') !== false
             ) {
                 return 2;
@@ -817,7 +805,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare UPDATE failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -827,7 +815,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute UPDATE failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -848,7 +836,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare SELECT failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -858,7 +846,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute SELECT failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -898,7 +886,7 @@ class ArbitrationEngine
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::writeDecision — prepare INSERT log failed for request_id={$request_id}: "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -917,11 +905,95 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::writeDecision — execute INSERT log failed for request_id={$request_id}: "
-                . $stmt->error
+                    . $stmt->error
             );
         }
 
         $stmt->close();
+    }
+
+    /**
+     * Decide a Today / Later booking.
+     *
+     *  - Later: approved when enough of the item's TOTAL stock is free for the whole
+     *    window. The shelf count is irrelevant (it will change before the booking
+     *    starts), so an item that is out right now can still be booked ahead.
+     *  - Today: same schedule check, plus at least one unit must be on the shelf now.
+     *  - Approval does NOT touch the shelf unless the booking starts right now; later
+     *    bookings take their units off the shelf when they start (BookingSchedule::tick).
+     */
+    private static function processScheduled(mysqli $conn, int $request_id, array $request): void
+    {
+        $item    = (string)$request['equipment_name'];
+        $qty     = max(1, (int)($request['borrow_qty'] ?? 1));
+        $mode    = (string)$request['booking_mode'];
+        $startTs = $request['borrow_date'] . ' ' . (!empty($request['borrow_time']) ? $request['borrow_time'] : '00:00:00');
+        $endTs   = $request['return_date'] . ' ' . (!empty($request['return_time']) ? $request['return_time'] : '23:59:59');
+
+        $shelf = self::acquireStockLock($conn, $item);   // opens the transaction + locks the inventory row
+        if ($shelf === null) {
+            error_log('ArbitrationEngine: acquireStockLock returned null for equipment=' . $item . ' request_id=' . $request_id);
+            return;
+        }
+
+        try {
+            $total     = BookingSchedule::totalStock($conn, $item);
+            $occupied  = BookingSchedule::occupancy($conn, $item, $startTs, $endTs, $request_id);
+            $free      = $total - $occupied;
+            $immediate = ($mode === 'today')
+                && strtotime($startTs) <= time() + BookingSchedule::IMMEDIATE_GRACE_MIN * 60;
+
+            if ($mode === 'today' && $shelf < 1) {
+                self::writeDecision(
+                    $conn,
+                    $request_id,
+                    'Declined',
+                    self::RULE_OUT_OF_STOCK,
+                    'Out right now – book it for a later date instead.'
+                );
+                $conn->commit();
+                return;
+            }
+
+            if ($free < $qty) {
+                $why = $free <= 0
+                    ? 'Already fully booked for the requested schedule.'
+                    : 'Only ' . $free . ' unit(s) are free for the requested schedule (' . $qty . ' requested).';
+                self::writeDecision($conn, $request_id, 'Declined', self::RULE_SCHEDULE_CONFLICT, $why);
+                $conn->commit();
+                return;
+            }
+
+            self::writeDecision(
+                $conn,
+                $request_id,
+                'Approved',
+                self::RULE_1_FIFO,
+                'Approved: the equipment is free for the requested schedule.'
+            );
+
+            if ($immediate) {
+                $dec = $conn->prepare('UPDATE tbl_inventory SET quantity = quantity - ? WHERE item_name = ? AND quantity >= ?');
+                if ($dec === false) {
+                    throw new \RuntimeException('prepare inventory decrement failed');
+                }
+                $dec->bind_param('isi', $qty, $item, $qty);
+                $dec->execute();
+                $dec->close();
+
+                $mark = $conn->prepare('UPDATE tbl_requests SET stock_applied = 1 WHERE id = ?');
+                if ($mark) {
+                    $mark->bind_param('i', $request_id);
+                    $mark->execute();
+                    $mark->close();
+                }
+            }
+
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -940,19 +1012,24 @@ class ArbitrationEngine
     ): void {
         // Step 1: Fetch all Waiting request IDs for this equipment.
         // Join tbl_users so writeDecision() can pull borrower info from the log.
+        // Scheduled (Today / Later) bookings are decided on their own schedule and
+        // must never be swept up by a shelf count that reaches 0.
+        $only_legacy = BookingSchedule::ensureSchema($conn)
+            ? " AND (tbl_requests.booking_mode IS NULL OR tbl_requests.booking_mode = '')"
+            : '';
         $stmt = $conn->prepare(
             "SELECT tbl_requests.id
                FROM tbl_requests
                LEFT JOIN tbl_users
                       ON tbl_requests.faculty_id = tbl_users.faculty_id
               WHERE tbl_requests.equipment_name = ?
-                AND tbl_requests.status = 'Waiting'"
+                AND tbl_requests.status = 'Waiting'" . $only_legacy
         );
 
         if ($stmt === false) {
             error_log(
                 "ArbitrationEngine::cascadeDecline — prepare failed for equipment='{$equipment_name}': "
-                . $conn->error
+                    . $conn->error
             );
             return;
         }
@@ -962,7 +1039,7 @@ class ArbitrationEngine
         if (!$stmt->execute()) {
             error_log(
                 "ArbitrationEngine::cascadeDecline — execute failed for equipment='{$equipment_name}': "
-                . $stmt->error
+                    . $stmt->error
             );
             $stmt->close();
             return;
@@ -1060,44 +1137,51 @@ class ArbitrationEngine
             );
             if ($req_datetime === false || $req_datetime <= $now_manila) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_PAST_DATETIME,
+                    'Declined',
+                    self::RULE_PAST_DATETIME,
                     'This reservation date and time has already passed.'
                 );
                 return;
             }
 
-            // ── Step 3: Overdue block ────────────────────────────────────────
-            // Checks tbl_requests (equipment overdue) — same rule applies to rooms.
-            if (($config['rule_overdue_block_enabled'] ?? '0') === '1') {
-                if (self::checkOverdueBlock($conn, $faculty_id)) {
-                    self::writeRoomDecision(
-                        $conn, $reservation_id, $room_id, $room_name, $faculty_id,
-                        (string)$reservation['faculty_name'],
-                        'Declined', self::RULE_OVERDUE_BLOCK,
-                        'You have an overdue equipment item. Please return it before making a room reservation.'
-                    );
-                    return;
-                }
-            }
+            // ── Step 3: (removed) Overdue-equipment block ───────────────────
+            // Policy: a faculty member may reserve a room even while equipment
+            // is still out or overdue. The overdue block therefore applies to
+            // EQUIPMENT requests only (see process()). Overdue history is still
+            // used as a late tie-break when two reservations clash (Step 6).
 
             // ── Step 4: Room status check ────────────────────────────────────
             $room_status = (string)$reservation['room_status'];
             if ($room_status === 'Maintenance') {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'This room is currently under maintenance and cannot be reserved.'
                 );
                 return;
             }
             if ($room_status === 'Not Bookable') {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'This room is not available for reservation.'
                 );
                 return;
@@ -1106,9 +1190,14 @@ class ArbitrationEngine
             // ── Step 4b: Operating hours check ──────────────────────────────
             if (!self::checkOperatingHours($start_time, $end_time)) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_ARCHIVED,
+                    'Declined',
+                    self::RULE_ARCHIVED,
                     'Reservations must be within operating hours: 7:00 AM to 8:00 PM.'
                 );
                 return;
@@ -1119,9 +1208,14 @@ class ArbitrationEngine
             $hold_note = self::checkMissingDocument($reservation, $config);
             if ($hold_note !== null) {
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', self::RULE_MISSING_DOC_HOLD,
+                    'Declined',
+                    self::RULE_MISSING_DOC_HOLD,
                     $hold_note
                 );
                 return;
@@ -1155,9 +1249,14 @@ class ArbitrationEngine
             if (empty($conflicts)) {
                 // No conflict — approve immediately.
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Approved', self::RULE_1_FIFO,
+                    'Approved',
+                    self::RULE_1_FIFO,
                     'Room reservation approved — no time conflict.'
                 );
                 return;
@@ -1227,33 +1326,134 @@ class ArbitrationEngine
                 // This reservation beats all conflicts — decline the losers.
                 foreach ($conflicts as $loser) {
                     self::writeRoomDecision(
-                        $conn, (int)$loser['id'], $room_id, $room_name,
-                        (string)$loser['faculty_id'], (string)$loser['faculty_name'],
-                        'Declined', $applied_rule,
+                        $conn,
+                        (int)$loser['id'],
+                        $room_id,
+                        $room_name,
+                        (string)$loser['faculty_id'],
+                        (string)$loser['faculty_name'],
+                        'Declined',
+                        $applied_rule,
                         'A higher-priority reservation was submitted for the same time slot.'
                     );
                 }
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Approved', $applied_rule,
+                    'Approved',
+                    $applied_rule,
                     'Room reservation approved via priority scoring.'
                 );
             } else {
                 // A higher-priority reservation already holds this slot.
                 self::writeRoomDecision(
-                    $conn, $reservation_id, $room_id, $room_name, $faculty_id,
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
                     (string)$reservation['faculty_name'],
-                    'Declined', $applied_rule,
+                    'Declined',
+                    $applied_rule,
                     'This time slot is already reserved by a higher-priority request.'
                 );
             }
-
         } catch (\Throwable $e) {
             error_log(
                 'ArbitrationEngine::processRoomReservation — unexpected error for reservation_id='
-                . $reservation_id . ': ' . $e->getMessage()
+                    . $reservation_id . ': ' . $e->getMessage()
             );
+        }
+    }
+
+    /**
+     * "Declined" is never kept for a NEW submission.
+     *
+     * Call right after process(). If the engine declined the request that was just inserted
+     * (stock, schedule clash, overdue borrower, duplicate, missing document ...), the row, its
+     * arbitration-log entries and its uploaded letter are removed and the decline reason is
+     * returned so the caller can tell the user on the spot. Returns null when the row was kept
+     * (Approved / Waiting), so callers carry on as before.
+     */
+    public static function discardIfDeclined(mysqli $conn, int $request_id): ?string
+    {
+        $s = $conn->prepare("SELECT status, reason, document_path FROM tbl_requests WHERE id = ? LIMIT 1");
+        if ($s === false) return null;
+        $s->bind_param('i', $request_id);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc();
+        $s->close();
+        if (!$row || (string)$row['status'] !== 'Declined') return null;
+
+        $reason = trim((string)($row['reason'] ?? ''));
+        if ($reason === '') $reason = 'This request could not be accepted.';
+
+        foreach (
+            [
+                'DELETE FROM tbl_arbitration_log WHERE request_id = ?',
+                'DELETE FROM tbl_requests WHERE id = ?',
+            ] as $sql
+        ) {
+            $d = $conn->prepare($sql);
+            if ($d === false) continue;
+            $d->bind_param('i', $request_id);
+            $d->execute();
+            $d->close();
+        }
+        self::discardUpload($conn, 'tbl_requests', (string)($row['document_path'] ?? ''));
+        return $reason;
+    }
+
+    /**
+     * Room version of discardIfDeclined(): call right after processRoomReservation().
+     * Returns the decline reason (row removed) or null (row kept).
+     */
+    public static function discardRoomIfDeclined(mysqli $conn, int $reservation_id): ?string
+    {
+        $s = $conn->prepare("SELECT status, reason, document_path FROM tbl_room_reservations WHERE id = ? LIMIT 1");
+        if ($s === false) return null;
+        $s->bind_param('i', $reservation_id);
+        $s->execute();
+        $row = $s->get_result()->fetch_assoc();
+        $s->close();
+        if (!$row || (string)$row['status'] !== 'Declined') return null;
+
+        $reason = trim((string)($row['reason'] ?? ''));
+        if ($reason === '') $reason = 'This room could not be reserved for that time.';
+
+        foreach (
+            [
+                'DELETE FROM tbl_room_arbitration_log WHERE reservation_id = ?',
+                'DELETE FROM tbl_room_reservations WHERE id = ?',
+            ] as $sql
+        ) {
+            $d = $conn->prepare($sql);
+            if ($d === false) continue;
+            $d->bind_param('i', $reservation_id);
+            $d->execute();
+            $d->close();
+        }
+        self::discardUpload($conn, 'tbl_room_reservations', (string)($row['document_path'] ?? ''));
+        return $reason;
+    }
+
+    /** Remove an uploaded letter once no remaining row points at it (batch requests share one file). */
+    private static function discardUpload(mysqli $conn, string $table, string $rel): void
+    {
+        if ($rel === '' || strpos($rel, '..') !== false || strpos($rel, 'uploads/') !== 0) return;
+        $c = $conn->prepare("SELECT COUNT(*) AS n FROM {$table} WHERE document_path = ?");
+        if ($c === false) return;
+        $c->bind_param('s', $rel);
+        $c->execute();
+        $n = (int)($c->get_result()->fetch_assoc()['n'] ?? 0);
+        $c->close();
+        if ($n === 0) {
+            $abs = dirname(__DIR__, 2) . '/' . $rel;
+            if (is_file($abs)) @unlink($abs);
         }
     }
 
@@ -1303,10 +1503,16 @@ class ArbitrationEngine
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         );
         if ($log !== false) {
-            $log->bind_param('iissssss',
-                $reservation_id, $room_id, $room_name,
-                $borrower_id, $borrower_name,
-                $decision, $rule, $reason
+            $log->bind_param(
+                'iissssss',
+                $reservation_id,
+                $room_id,
+                $room_name,
+                $borrower_id,
+                $borrower_name,
+                $decision,
+                $rule,
+                $reason
             );
             $log->execute();
             $log->close();

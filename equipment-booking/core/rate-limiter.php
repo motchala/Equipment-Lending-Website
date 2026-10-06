@@ -1,4 +1,5 @@
 <?php
+
 /**
  * rate-limiter.php
  *
@@ -150,8 +151,10 @@ function recordFailedAttempt(
     if (!$stmt) {
         error_log('[RateLimiter] UPSERT prepare failed: ' . $conn->error);
         return _rl_failed_result(
-            $email_exists ? 'Wrong password.' : 'Account not found. Please register first.',
-            false, '', 0
+            $email_exists ? 'Wrong password.' : 'Account not found. Please contact admin.',
+            false,
+            '',
+            0
         );
     }
     $stmt->bind_param('ss', $email, $ip);
@@ -161,8 +164,10 @@ function recordFailedAttempt(
     $row = _rl_fetch_row($email, $ip, $conn);
     if ($row === null) {
         return _rl_failed_result(
-            $email_exists ? 'Wrong password.' : 'Account not found. Please register first.',
-            false, '', 0
+            $email_exists ? 'Wrong password.' : 'Account not found. Please contact admin.',
+            false,
+            '',
+            0
         );
     }
 
@@ -199,7 +204,9 @@ function recordFailedAttempt(
         $plural = $duration_min === 1 ? 'minute' : 'minutes';
         return _rl_failed_result(
             "Too many failed attempts. Try again in {$duration_min} {$plural}.",
-            true, $locked_until, $seconds_left
+            true,
+            $locked_until,
+            $seconds_left
         );
     }
 
@@ -207,7 +214,7 @@ function recordFailedAttempt(
     $plural        = $attempts_left === 1 ? 'attempt' : 'attempts';
     $message       = $email_exists
         ? "Wrong password. You have {$attempts_left} {$plural} left."
-        : 'Account not found. Please register first.';
+        : 'Account not found. Please contact admin.';
 
     return _rl_failed_result($message, false, '', 0);
 }
@@ -295,7 +302,7 @@ function recordIpFailedAttempt(string $ip, mysqli $conn): array
 
     if (!$stmt) {
         error_log('[RateLimiter/IP] UPSERT prepare failed: ' . $conn->error);
-        return _rl_failed_result('Account not found. Please register first.', false, '', 0);
+        return _rl_failed_result('Account not found. Please contact admin.', false, '', 0);
     }
 
     $w = RL_IP_WINDOW_MINUTES;
@@ -305,7 +312,7 @@ function recordIpFailedAttempt(string $ip, mysqli $conn): array
 
     $row = _rl_fetch_ip_row($ip, $conn);
     if ($row === null) {
-        return _rl_failed_result('Account not found. Please register first.', false, '', 0);
+        return _rl_failed_result('Account not found. Please contact admin.', false, '', 0);
     }
 
     $fail_count = (int)$row['fail_count'];
@@ -338,7 +345,7 @@ function recordIpFailedAttempt(string $ip, mysqli $conn): array
         );
     }
 
-    return _rl_failed_result('Account not found. Please register first.', false, '', 0);
+    return _rl_failed_result('Account not found. Please contact admin.', false, '', 0);
 }
 
 

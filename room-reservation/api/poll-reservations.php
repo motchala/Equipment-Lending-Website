@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/poll-reservations.php
  * Returns all room reservations for the logged-in faculty member, ordered
@@ -9,6 +10,11 @@
  *   { id, room_name, floor_label, building_name,
  *     reservation_date, start_time, end_time,
  *     purpose, submitted_as, status, reason }
+ *
+ * With ?view=activity it instead returns the room half of the "My Activity"
+ * screen, already rendered by the same functions the dashboard uses on first
+ * paint (core/faculty-room-quota.php, fact_*):
+ *   { body: html, rows: html, stats: { reserved, reserved_sub, next, next_sub, active } }
  *
  * Depth: 2  →  config prefix: __DIR__ . '/../../config/…'
  */
@@ -36,6 +42,20 @@ $conn = getDB();
 $faculty_id = $_SESSION['faculty_id'];
 
 date_default_timezone_set('Asia/Manila');
+
+// ── My Activity feed (?view=activity) ─────────────────────────────────────
+if (($_GET['view'] ?? '') === 'activity') {
+    require_once __DIR__ . '/../core/faculty-room-quota.php';
+    $activity = fact_load_rooms($conn, is_scalar($faculty_id) ? (string)$faculty_id : '');
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'body'  => fact_render_rooms_body($activity),
+        'rows'  => fact_render_room_history_rows($activity),
+        'stats' => fact_room_stats($activity),
+    ]);
+    $conn->close();
+    exit();
+}
 
 $stmt = $conn->prepare(
     "SELECT rr.id,

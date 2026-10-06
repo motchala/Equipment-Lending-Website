@@ -274,6 +274,11 @@ if (isset($_POST['login'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#4a0f15">
     <title>PUPSYNC — Institutional Access Portal</title>
+    <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
+    <link rel="icon" href="assets/images/favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
     <!-- Performance: preconnect to font origins -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

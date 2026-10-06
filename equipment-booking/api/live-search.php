@@ -39,7 +39,7 @@ switch ($section) {
         while ($row = $result->fetch_assoc()) {
             $isPast = strtotime($row['borrow_date']) < strtotime(date('Y-m-d'));
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td class='" . ($isPast ? "text-danger fw-bold" : "") . "'>
@@ -57,14 +57,15 @@ switch ($section) {
     case 'approved':
     case 'declined':
         $status = ($section === 'approved') ? 'Approved' : 'Declined';
+        // Auto-declined requests are never listed; only an admin's manual decline ('override') is.
         $sql = "SELECT * FROM tbl_requests 
-                WHERE status=? AND (
+                WHERE status=? AND (? <> 'Declined' OR COALESCE(arbitration_rule,'')='override') AND (
                     faculty_id LIKE ? OR
                     faculty_name LIKE ? OR
                     equipment_name LIKE ?
                 ) ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssss", $status, $search, $search, $search);
+        $stmt->bind_param("sssss", $status, $status, $search, $search, $search);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -75,7 +76,7 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td><span class='badge " . ($status === 'Approved' ? 'bg-success' : 'bg-danger') . "'>{$row['status']}</span></td>
@@ -121,7 +122,8 @@ switch ($section) {
     case 'raw':
         $sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date 
                 FROM tbl_requests 
-                WHERE faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ? 
+                WHERE (faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ?)
+                  AND NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')
                 ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sss", $search, $search, $search);
@@ -135,7 +137,7 @@ switch ($section) {
 
         while ($row = $result->fetch_assoc()) {
             echo "<tr>
-                <td>{$row['faculty_id']}</td>
+                <td>" . htmlspecialchars(faculty_id_display($row['faculty_id'], 'Not set')) . "</td>
                 <td class='fw-bold'>" . htmlspecialchars($row['faculty_name']) . "</td>
                 <td>" . htmlspecialchars($row['equipment_name']) . "</td>
                 <td>" . htmlspecialchars($row['instructor']) . "</td>
