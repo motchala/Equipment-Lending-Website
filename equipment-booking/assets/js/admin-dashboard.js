@@ -1916,122 +1916,18 @@
         btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
     });
 
-    /* ── Manage Admins — Add Admin form ──────────────────────────
-       Mirrors the pattern used by the Add Faculty form exactly:
-       fetch + JSON, inline alert on error, showToast on success,
-       update the slot counter and table body without a page reload. */
-    (function initAddAdminForm() {
-        const submitBtn = document.getElementById('adm-submit-btn');
-        const alertEl = document.getElementById('adm-form-alert');
-        if (!submitBtn) return; // form not rendered (slot limit reached)
-
-        /* Password eye buttons (#adm-password / #adm-confirm) are handled by the shared
-           ".fac-pw-toggle" handler near the top of this file — do not bind them again here,
-           two handlers on one button toggle twice and the field never changes. */
-
-        function setAlert(msg, isError) {
-            if (!alertEl) return;
-            alertEl.textContent = msg;
-            alertEl.className = 'alert-banner' + (isError ? ' alert-error' : ' alert-success');
-            alertEl.classList.remove('hidden');
-        }
-
-        function clearAlert() {
-            if (!alertEl) return;
-            alertEl.className = 'alert-banner hidden';
-            alertEl.textContent = '';
-        }
-
-        submitBtn.addEventListener('click', function () {
-            clearAlert();
-
-            const fullName = (document.getElementById('adm-fullname')?.value || '').trim();
-            const email = (document.getElementById('adm-email')?.value || '').trim().toLowerCase();
-            const role = document.getElementById('adm-role')?.value || 'Admin';
-            const password = document.getElementById('adm-password')?.value || '';
-            const confirm = document.getElementById('adm-confirm')?.value || '';
-
-            /* Client-side pre-flight (mirrors server checks) */
-            if (!fullName) { setAlert('Full name is required.', true); return; }
-            if (!email) { setAlert('Admin email is required.', true); return; }
-            if (!email.endsWith('@admin.edu')) {
-                setAlert('Admin emails must end in @admin.edu (e.g. name@admin.edu).', true);
-                return;
-            }
-            if (!password) { setAlert('Password is required.', true); return; }
-            if (password.length < 8) { setAlert('Password must be at least 8 characters.', true); return; }
-            if (password !== confirm) { setAlert('Passwords do not match.', true); return; }
-
-            submitBtn.disabled = true;
-            const origText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Creating…';
-
-            const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
-            const fd = new FormData();
-            fd.append('csrf_token', csrf);
-            fd.append('full_name', fullName);
-            fd.append('email', email);
-            fd.append('role', role);
-            fd.append('password', password);
-            fd.append('confirm_password', confirm);
-
-            fetch('equipment-booking/api/create-admin-account.php', {
-                method: 'POST',
-                body: fd,
-                credentials: 'same-origin'
-            })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origText;
-
-                    if (data.status === 'success') {
-                        /* Clear the form */
-                        ['adm-fullname', 'adm-email', 'adm-password', 'adm-confirm'].forEach(function (id) {
-                            const el = document.getElementById(id);
-                            if (el) el.value = '';
-                        });
-                        admResetPwEyes(document.getElementById('adm-form-card'));
-                        const roleEl = document.getElementById('adm-role');
-                        if (roleEl) roleEl.value = 'Admin';
-
-                        showToast('✅ ' + data.message);
-                        setAlert(data.message, false);
-
-                        /* Update the slot counter / form visibility live */
-                        if (typeof data.accounts_remaining === 'number') {
-                            admUpdateSeats(5 - data.accounts_remaining, data.accounts_remaining);
-                        }
-
-                        /* Append the new row to the accounts table immediately */
-                        const tbody = document.getElementById('admAccountsTbody');
-                        if (tbody) {
-                            /* Remove the "No accounts found" placeholder if present */
-                            const placeholder = tbody.querySelector('td[colspan]');
-                            if (placeholder) placeholder.closest('tr').remove();
-
-                            tbody.appendChild(admBuildRow(data.id, fullName, email, role));
-                        }
-                    } else {
-                        setAlert(data.message || 'Something went wrong. Please try again.', true);
-                    }
-                })
-                .catch(function () {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origText;
-                    setAlert('Network error — please check your connection and try again.', true);
-                });
-        });
-    })();
-
-    /* ▼ MANAGE-ADMINS-BEGIN ─────────────────────────────────────────────────
-       Settings → Manage Admins → Current Admins (Super Admin only).
-       Edit login details · make dormant · reactivate · delete, plus the
-       shared helpers the Add Admin form above uses (seat counter, row builder).
-       Talks to api/manage-admin-account.php; the server re-checks every rule. */
+    /* ▼ ADMIN-ACCOUNTS-PANEL-BEGIN ───────────────────────────────────────────
+       Sidebar → Admins (Super Admin only).
+       Left: list of admin accounts. Right: the selected admin's details,
+       actions (edit · lock · unlock · delete) and activity history.
+       Talks to api/manage-admin-account.php, api/create-admin-account.php and
+       api/admin-activity.php; the server re-checks every rule. */
 
     const ADM_API = 'equipment-booking/api/manage-admin-account.php';
+    const ADM_CREATE_API = 'equipment-booking/api/create-admin-account.php';
+    const ADM_ACTIVITY_API = 'equipment-booking/api/admin-activity.php';
     const ADM_MAX_DAYS = 30;
+    const ADM_TZ = 'Asia/Manila';
 
     function admEl(tag, cls, text) {
         const n = document.createElement(tag);
@@ -2041,8 +1937,8 @@
     }
 
     /* Hide every password field inside `root` again and put the eye buttons back to
-       their initial icon (same markup open-change-pass uses), so a revealed password
-       never stays on screen the next time the form / dialog is shown. */
+       their initial icon, so a revealed password never stays on screen the next time
+       a dialog is shown. */
     function admResetPwEyes(root) {
         if (!root) return;
         root.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
@@ -2060,112 +1956,47 @@
         return s;
     }
 
-    /* "Oct 7" — day shown in the Status pill (campus timezone) */
+    /* "Oct 7" — day shown in the status tag (campus timezone) */
     function admShortDate(ts) {
-        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: ADM_TZ });
     }
 
     /* "Oct 7, 2026, 3:00 PM" */
     function admLongDate(ts) {
         return new Date(ts * 1000).toLocaleString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila'
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ
         });
     }
 
-    /* Seat counter, banner, and Add-form / "maximum reached" card */
-    function admUpdateSeats(count, remaining) {
-        const text = document.getElementById('adm-slot-text');
-        if (text) {
-            text.textContent = '';
-            text.appendChild(admEl('strong', '', count + ' of 5'));
-            text.appendChild(document.createTextNode(' admin accounts in use — '));
-            if (remaining > 0) {
-                text.appendChild(admEl('span', '', String(remaining))).id = 'adm-slots-remaining';
-                text.appendChild(document.createTextNode(' slot' + (remaining !== 1 ? 's' : '') + ' remaining'));
-            } else {
-                text.appendChild(document.createTextNode('limit reached'));
-            }
-        }
-        const banner = document.querySelector('.adm-slot-banner');
-        if (banner) banner.classList.toggle('adm-slot-full', remaining <= 0);
-        const form = document.getElementById('adm-form-card');
-        if (form) form.hidden = remaining <= 0;
-        const max = document.getElementById('adm-max-card');
-        if (max) max.hidden = remaining > 0;
-    }
-
-    function admStatusCell(dormantUntil) {
-        const td = admEl('td', 'adm-td-status');
-        if (dormantUntil) {
-            const pill = admEl('span', 'adm-status adm-status--dormant');
-            pill.title = 'Dormant until ' + admLongDate(dormantUntil);
-            pill.appendChild(admIcon('bedtime'));
-            pill.appendChild(document.createTextNode('Dormant until ' + admShortDate(dormantUntil)));
-            td.appendChild(pill);
-        } else {
-            td.appendChild(admEl('span', 'adm-status adm-status--active', 'Active'));
-        }
-        return td;
-    }
-
-    function admActButton(action, icon, label, extra) {
-        const b = admEl('button', 'adm-act' + (extra ? ' ' + extra : ''));
-        b.type = 'button';
-        b.setAttribute('data-adm-action', action);
-        b.title = label;
-        b.setAttribute('aria-label', label);
-        b.appendChild(admIcon(icon));
-        return b;
-    }
-
-    function admActionsCell(manageable, dormant) {
-        const td = admEl('td', 'adm-td-actions');
-        if (!manageable) {
-            const dash = admEl('span', 'adm-protected', '—');
-            dash.title = 'Super Admin accounts are protected';
-            td.appendChild(dash);
-            return td;
-        }
-        const wrap = admEl('div', 'adm-actions');
-        wrap.appendChild(admActButton('edit', 'edit', 'Edit login details'));
-        wrap.appendChild(dormant
-            ? admActButton('reactivate', 'play_circle', 'Reactivate account')
-            : admActButton('dormant', 'bedtime', 'Make dormant'));
-        wrap.appendChild(admActButton('delete', 'delete', 'Delete account', 'adm-act--danger'));
-        td.appendChild(wrap);
-        return td;
-    }
-
-    /* A brand-new row (Add Admin form) — same cells as the PHP-rendered rows */
-    function admBuildRow(id, fullName, email, role) {
-        const tr = admEl('tr', 'adm-account-row');
-        tr.setAttribute('data-id', String(id || ''));
-        tr.setAttribute('data-name', fullName);
-        tr.setAttribute('data-email', email);
-        tr.appendChild(admEl('td', 'td-fw', fullName));
-        tr.appendChild(admEl('td', 'adm-td-email', email));
-        const roleTd = admEl('td');
-        roleTd.appendChild(admEl('span', 'adm-role-badge ' + (role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin'), role));
-        tr.appendChild(roleTd);
-        tr.appendChild(admStatusCell(null));
-        tr.appendChild(admEl('td', 'td-sm', new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
-        tr.appendChild(admActionsCell(role === 'Admin' && !!id, false));
-        return tr;
-    }
-
-    (function initManageAdmins() {
-        const tbody = document.getElementById('admAccountsTbody');
+    (function initAdminAccountsPanel() {
+        const list = document.getElementById('am-list');
         const editModal = document.getElementById('admEditModal');
-        if (!tbody || !editModal) return; // not a Super Admin — nothing rendered
+        if (!list || !editModal) return; // not a Super Admin — nothing rendered
 
-        const dormantModal = document.getElementById('admDormantModal');
+        const addModal = document.getElementById('amAddModal');
+        const dormantModal = document.getElementById('admDormantModal'); // the "Lock account" dialog
         const deleteModal = document.getElementById('admDeleteModal');
-        let currentRow = null;
+        const detail = document.getElementById('am-detail');
+        const detailBody = document.getElementById('am-detail-body');
+        const detailEmpty = document.getElementById('am-detail-empty');
+        const feed = document.getElementById('am-feed');
+        const moreBtn = document.getElementById('am-more');
+        const listEmpty = document.getElementById('am-list-empty');
+        const addBtn = document.getElementById('am-add-btn');
+
+        let current = null;   // the selected .am-item
         let busy = false;
+        let filter = 'all';
+        let feedOffset = 0;
+        let feedToken = 0;    // ignores answers that arrive after the selection / filter changed
+        let lastDayKey = '';
+        let lastDayList = null;
+
+        const items = function () { return Array.from(list.querySelectorAll('.am-item')); };
 
         /* ── modal plumbing ───────────────────────────────────── */
         function openModal(m) { m.classList.add('ps-modal-open'); }
-        function closeModal(m) { m.classList.remove('ps-modal-open'); currentRow = null; busy = false; }
+        function closeModal(m) { m.classList.remove('ps-modal-open'); busy = false; }
 
         function showAlert(id, msg) {
             const el = document.getElementById(id);
@@ -2194,15 +2025,12 @@
         });
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
-            [editModal, dormantModal, deleteModal].forEach(function (m) {
+            [addModal, editModal, dormantModal, deleteModal].forEach(function (m) {
                 if (m && m.classList.contains('ps-modal-open')) closeModal(m);
             });
         });
 
-        /* Password show/hide in these dialogs is handled by the shared ".fac-pw-toggle"
-           handler (it supports comma-separated targets), so nothing to bind here. */
-
-        /* ── one POST helper for every action ─────────────────── */
+        /* One POST helper for edit / lock / unlock / delete */
         function call(fields) {
             const fd = new FormData();
             Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
@@ -2222,44 +2050,376 @@
             if (html !== undefined) btn.innerHTML = html;
         }
 
-        /* ── row helpers ──────────────────────────────────────── */
-        function setRowDormant(tr, until) {
-            const oldStatus = tr.querySelector('.adm-td-status');
-            const oldActions = tr.querySelector('.adm-td-actions');
-            oldStatus.replaceWith(admStatusCell(until || null));
-            oldActions.replaceWith(admActionsCell(true, !!until));
+        /* ── seats (header counter + Add button) ──────────────── */
+        function updateSeats(count, remaining) {
+            const text = document.getElementById('am-seats-text');
+            if (text) {
+                text.textContent = '';
+                text.appendChild(admEl('strong', '', count + ' of 5'));
+                text.appendChild(document.createTextNode(' seats used'));
+            }
+            if (addBtn) {
+                addBtn.disabled = remaining <= 0;
+                if (remaining <= 0) addBtn.title = 'All 5 seats are in use. Delete an account to free one.';
+                else addBtn.removeAttribute('title');
+            }
         }
 
-        /* ── click delegation on the table ────────────────────── */
-        tbody.addEventListener('click', function (e) {
-            const btn = e.target.closest('[data-adm-action]');
-            if (!btn || busy) return;
-            const tr = btn.closest('tr.adm-account-row');
-            if (!tr) return;
-            currentRow = tr;
-            const action = btn.getAttribute('data-adm-action');
+        /* ── list ─────────────────────────────────────────────── */
+        function initials(name) {
+            const parts = String(name || '').trim().split(/\s+/);
+            let out = (parts[0] || '?').charAt(0).toUpperCase();
+            if (parts.length > 1) out += parts[parts.length - 1].charAt(0).toUpperCase();
+            return out;
+        }
 
-            if (action === 'edit') openEdit(tr);
-            else if (action === 'dormant') openDormant(tr);
-            else if (action === 'delete') openDelete(tr);
-            else if (action === 'reactivate') doReactivate(tr, btn);
+        function buildItem(a) {
+            const b = admEl('button', 'am-item');
+            b.type = 'button';
+            b.setAttribute('role', 'option');
+            b.setAttribute('aria-selected', 'false');
+            b.setAttribute('data-id', String(a.id || ''));
+            b.setAttribute('data-name', a.name);
+            b.setAttribute('data-email', a.email);
+            b.setAttribute('data-role', a.role);
+            b.setAttribute('data-created', a.created || '');
+            b.setAttribute('data-last-login', '');
+            b.setAttribute('data-locked-until', '0');
+            b.setAttribute('data-you', '0');
+            b.setAttribute('data-manage', a.role === 'Admin' ? '1' : '0');
+            b.appendChild(admEl('span', 'am-avatar', initials(a.name)));
+            const main = admEl('span', 'am-item-main');
+            main.appendChild(admEl('span', 'am-item-name', a.name));
+            main.appendChild(admEl('span', 'am-item-email', a.email));
+            b.appendChild(main);
+            const lock = admEl('span', 'material-symbols-outlined am-item-lock', 'lock');
+            lock.hidden = true;
+            lock.title = 'Locked';
+            b.appendChild(lock);
+            return b;
+        }
+
+        function syncItemLock(item) {
+            const lock = item.querySelector('.am-item-lock');
+            if (lock) lock.hidden = !(parseInt(item.getAttribute('data-locked-until'), 10) > 0);
+        }
+
+        function refreshListEmpty() {
+            const visible = items().filter(function (i) { return !i.hidden; }).length;
+            listEmpty.hidden = visible > 0;
+            listEmpty.textContent = items().length ? 'No admins match your search.' : 'No accounts found.';
+        }
+
+        document.getElementById('am-search').addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            items().forEach(function (i) {
+                const hay = (i.getAttribute('data-name') + ' ' + i.getAttribute('data-email')).toLowerCase();
+                i.hidden = q !== '' && hay.indexOf(q) === -1;
+            });
+            refreshListEmpty();
+        });
+
+        list.addEventListener('click', function (e) {
+            const item = e.target.closest('.am-item');
+            if (item) select(item, true);
+        });
+
+        /* ↑ / ↓ move through the list */
+        list.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            const shown = items().filter(function (i) { return !i.hidden; });
+            const idx = shown.indexOf(document.activeElement);
+            if (idx === -1) return;
+            const next = shown[idx + (e.key === 'ArrowDown' ? 1 : -1)];
+            if (next) { e.preventDefault(); next.focus(); select(next, false); }
+        });
+
+        /* ── detail ───────────────────────────────────────────── */
+        function setTag(el, text, kind, icon) {
+            el.className = 'am-tag' + (kind ? ' am-tag--' + kind : '');
+            el.textContent = '';
+            if (icon) el.appendChild(admIcon(icon));
+            el.appendChild(document.createTextNode(text));
+        }
+
+        function renderDetail(item) {
+            const name = item.getAttribute('data-name');
+            const role = item.getAttribute('data-role');
+            const until = parseInt(item.getAttribute('data-locked-until'), 10) || 0;
+            const you = item.getAttribute('data-you') === '1';
+            const manage = item.getAttribute('data-manage') === '1';
+
+            document.getElementById('am-d-avatar').textContent = initials(name);
+            document.getElementById('am-d-name').textContent = name;
+            document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
+            setTag(document.getElementById('am-d-role'), role, role === 'Super Admin' ? 'super' : '');
+            if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
+            else setTag(document.getElementById('am-d-status'), 'Active', 'active');
+
+            document.getElementById('am-f-login').textContent = item.getAttribute('data-last-login') || 'Never';
+            document.getElementById('am-f-created').textContent = item.getAttribute('data-created') || '—';
+            document.getElementById('am-f-total').textContent = '—';
+
+            const actions = document.getElementById('am-d-actions');
+            const note = document.getElementById('am-d-note');
+            actions.hidden = !manage;
+            note.hidden = manage;
+            if (!manage) {
+                document.getElementById('am-d-note-text').textContent = you
+                    ? 'This is your account. Change your own details from Settings → My Account.'
+                    : 'Super Admin accounts are protected and can\u2019t be edited, locked or deleted here.';
+            }
+            document.getElementById('am-lock-icon').textContent = until ? 'lock_open' : 'lock';
+            document.getElementById('am-lock-label').textContent = until ? 'Unlock' : 'Lock';
+        }
+
+        function select(item, scrollOnMobile) {
+            items().forEach(function (i) {
+                const on = i === item;
+                i.classList.toggle('is-selected', on);
+                i.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            current = item;
+            detailEmpty.hidden = true;
+            detailBody.hidden = false;
+            renderDetail(item);
+            resetFeedFilter();
+            loadFeed(true);
+            if (scrollOnMobile && window.matchMedia('(max-width: 900px)').matches) {
+                detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function clearSelection() {
+            current = null;
+            items().forEach(function (i) { i.classList.remove('is-selected'); i.setAttribute('aria-selected', 'false'); });
+            detailBody.hidden = true;
+            detailEmpty.hidden = false;
+        }
+
+        /* Open the panel with someone already showing (first manageable admin, else the first row). */
+        function ensureSelected() {
+            if (current && document.body.contains(current)) return;
+            const all = items();
+            if (!all.length) return;
+            const first = all.find(function (i) { return i.getAttribute('data-manage') === '1'; }) || all[0];
+            select(first, false);
+        }
+
+        const navAdmins = document.querySelector('.nav-item[data-tab="admins"]');
+        if (navAdmins) navAdmins.addEventListener('click', ensureSelected);
+        if (document.getElementById('panel-admins').classList.contains('active')) ensureSelected();
+        window.psAdminsPanelReady = ensureSelected; // lets ?view=admins open it with someone selected
+
+        /* ── activity feed ────────────────────────────────────── */
+        function resetFeedFilter() {
+            filter = 'all';
+            document.querySelectorAll('#am-chips .am-chip').forEach(function (c) {
+                c.classList.toggle('active', c.getAttribute('data-filter') === 'all');
+            });
+        }
+
+        document.getElementById('am-chips').addEventListener('click', function (e) {
+            const chip = e.target.closest('.am-chip');
+            if (!chip || !current) return;
+            filter = chip.getAttribute('data-filter');
+            document.querySelectorAll('#am-chips .am-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+            loadFeed(true);
+        });
+        moreBtn.addEventListener('click', function () { loadFeed(false); });
+
+        function dayKey(ts) {
+            return new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: ADM_TZ }); // YYYY-MM-DD
+        }
+        function dayLabel(ts) {
+            const key = dayKey(ts);
+            const nowSec = Date.now() / 1000;
+            if (key === dayKey(nowSec)) return 'Today';
+            if (key === dayKey(nowSec - 86400)) return 'Yesterday';
+            return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: ADM_TZ });
+        }
+        function timeLabel(ts) {
+            return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ });
+        }
+
+        function feedMessage(icon, text, retry) {
+            feed.textContent = '';
+            const box = admEl('div', 'am-feed-msg');
+            box.appendChild(admIcon(icon));
+            box.appendChild(admEl('p', '', text));
+            if (retry) {
+                const b = admEl('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Try again');
+                b.type = 'button';
+                b.addEventListener('click', function () { loadFeed(true); });
+                box.appendChild(b);
+            }
+            feed.appendChild(box);
+        }
+
+        function appendEvents(events) {
+            events.forEach(function (ev) {
+                const key = dayKey(ev.ts);
+                if (key !== lastDayKey) {
+                    feed.appendChild(admEl('h5', 'am-day', dayLabel(ev.ts)));
+                    lastDayList = admEl('ul', 'am-events');
+                    feed.appendChild(lastDayList);
+                    lastDayKey = key;
+                }
+                const li = admEl('li', 'am-event am-event--' + (ev.tone || 'neutral'));
+                li.appendChild(admEl('span', 'am-event-icon', '')).appendChild(admIcon(ev.icon || 'history'));
+                li.appendChild(admEl('span', 'am-event-text', ev.text));
+                li.appendChild(admEl('time', 'am-event-time', timeLabel(ev.ts)));
+                lastDayList.appendChild(li);
+            });
+        }
+
+        function loadFeed(reset) {
+            if (!current) return;
+            const id = current.getAttribute('data-id');
+            const token = ++feedToken;
+            if (reset) {
+                feedOffset = 0;
+                lastDayKey = '';
+                lastDayList = null;
+                moreBtn.hidden = true;
+                feedMessage('hourglass_top', 'Loading activity…');
+            } else {
+                moreBtn.disabled = true;
+            }
+            const url = ADM_ACTIVITY_API + '?id=' + encodeURIComponent(id) +
+                '&filter=' + encodeURIComponent(filter) + '&offset=' + feedOffset;
+            fetch(url, { credentials: 'same-origin' })
+                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
+                .then(function (r) {
+                    if (token !== feedToken) return; // user moved on
+                    moreBtn.disabled = false;
+                    if (!r.ok || r.data.status !== 'success') {
+                        if (reset) feedMessage('error', msgOf(r), true);
+                        return;
+                    }
+                    if (reset) feed.textContent = '';
+                    if (reset && r.data.totals && typeof r.data.totals.all === 'number') {
+                        document.getElementById('am-f-total').textContent = String(r.data.totals.all);
+                    }
+                    if (reset && !r.data.items.length) {
+                        feedMessage('history', filter === 'all' ? 'No activity recorded yet.' : 'Nothing here for this filter yet.');
+                        return;
+                    }
+                    appendEvents(r.data.items);
+                    feedOffset += r.data.items.length;
+                    moreBtn.hidden = !r.data.has_more;
+                })
+                .catch(function () {
+                    if (token !== feedToken) return;
+                    moreBtn.disabled = false;
+                    if (reset) feedMessage('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
+                });
+        }
+
+        /* ── actions on the selected admin ────────────────────── */
+        document.getElementById('am-d-actions').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-am-action]');
+            if (!btn || busy || !current) return;
+            const action = btn.getAttribute('data-am-action');
+            if (action === 'edit') openEdit(current);
+            else if (action === 'delete') openDelete(current);
+            else if (action === 'lock') {
+                if (parseInt(current.getAttribute('data-locked-until'), 10) > 0) doUnlock(current, btn);
+                else openLock(current);
+            }
+        });
+
+        function setLocked(item, until) {
+            item.setAttribute('data-locked-until', String(until || 0));
+            syncItemLock(item);
+            if (item === current) renderDetail(item);
+        }
+
+        /* ── ADD ──────────────────────────────────────────────── */
+        const submitBtn = document.getElementById('adm-submit-btn');
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                if (addBtn.disabled) return;
+                clearAlert('adm-form-alert');
+                ['adm-fullname', 'adm-email'].forEach(function (id) { document.getElementById(id).value = ''; });
+                document.getElementById('adm-role').value = 'Admin';
+                resetPasswordFields(['adm-password', 'adm-confirm'], addModal);
+                openModal(addModal);
+                document.getElementById('adm-fullname').focus();
+            });
+        }
+
+        submitBtn.addEventListener('click', function () {
+            if (busy) return;
+            clearAlert('adm-form-alert');
+
+            const fullName = document.getElementById('adm-fullname').value.trim();
+            const email = document.getElementById('adm-email').value.trim().toLowerCase();
+            const role = document.getElementById('adm-role').value || 'Admin';
+            const password = document.getElementById('adm-password').value;
+            const confirm = document.getElementById('adm-confirm').value;
+
+            /* Client-side pre-flight (mirrors the server checks) */
+            if (!fullName) return showAlert('adm-form-alert', 'Full name is required.');
+            if (!email) return showAlert('adm-form-alert', 'Admin email is required.');
+            if (!email.endsWith('@admin.edu')) return showAlert('adm-form-alert', 'Admin emails must end in @admin.edu (e.g. name@admin.edu).');
+            if (!password) return showAlert('adm-form-alert', 'Password is required.');
+            if (password.length < 8) return showAlert('adm-form-alert', 'Password must be at least 8 characters.');
+            if (password !== confirm) return showAlert('adm-form-alert', 'Passwords do not match.');
+
+            busy = true;
+            const orig = submitBtn.innerHTML;
+            setBusy(submitBtn, true, '<span class="material-symbols-outlined">hourglass_top</span> Creating…');
+
+            const fd = new FormData();
+            fd.append('csrf_token', getCsrfToken());
+            fd.append('full_name', fullName);
+            fd.append('email', email);
+            fd.append('role', role);
+            fd.append('password', password);
+            fd.append('confirm_password', confirm);
+
+            fetch(ADM_CREATE_API, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    busy = false;
+                    setBusy(submitBtn, false, orig);
+                    if (data.status !== 'success') {
+                        return showAlert('adm-form-alert', data.message || 'Something went wrong. Please try again.');
+                    }
+                    const item = buildItem({
+                        id: data.id, name: fullName, email: email, role: role,
+                        created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
+                    });
+                    list.insertBefore(item, listEmpty);
+                    refreshListEmpty();
+                    if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
+                    closeModal(addModal);
+                    showToast('✅ ' + data.message);
+                    select(item, true);
+                })
+                .catch(function () {
+                    busy = false;
+                    setBusy(submitBtn, false, orig);
+                    showAlert('adm-form-alert', 'Network error — please check your connection and try again.');
+                });
         });
 
         /* ── EDIT ─────────────────────────────────────────────── */
-        function openEdit(tr) {
+        function openEdit(item) {
             clearAlert('adm-edit-alert');
-            document.getElementById('adm-edit-name').value = tr.getAttribute('data-name') || '';
-            document.getElementById('adm-edit-email').value = tr.getAttribute('data-email') || '';
+            document.getElementById('adm-edit-name').value = item.getAttribute('data-name') || '';
+            document.getElementById('adm-edit-email').value = item.getAttribute('data-email') || '';
             resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth'], editModal);
             openModal(editModal);
-            currentRow = tr;
             document.getElementById('adm-edit-name').focus();
         }
 
         document.getElementById('adm-edit-save').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const name = document.getElementById('adm-edit-name').value.trim();
             const email = document.getElementById('adm-edit-email').value.trim().toLowerCase();
             const pw = document.getElementById('adm-edit-pw').value;
@@ -2277,7 +2437,7 @@
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
             call({
-                action: 'update', id: tr.getAttribute('data-id'),
+                action: 'update', id: item.getAttribute('data-id'),
                 full_name: name, email: email,
                 new_password: pw, confirm_password: pw2, current_password: reauth
             }).then(function (r) {
@@ -2287,11 +2447,12 @@
                     document.getElementById('adm-edit-reauth').value = '';
                     return showAlert('adm-edit-alert', msgOf(r));
                 }
-                tr.setAttribute('data-name', r.data.full_name);
-                tr.setAttribute('data-email', r.data.email);
-                const nameCell = tr.querySelector('td.td-fw');
-                nameCell.firstChild.textContent = r.data.full_name + ' ';
-                tr.querySelector('.adm-td-email').textContent = r.data.email;
+                item.setAttribute('data-name', r.data.full_name);
+                item.setAttribute('data-email', r.data.email);
+                item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
+                item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
+                item.querySelector('.am-item-email').textContent = r.data.email;
+                if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
             }).catch(function () {
@@ -2301,7 +2462,7 @@
             });
         });
 
-        /* ── DORMANT ──────────────────────────────────────────── */
+        /* ── LOCK ─────────────────────────────────────────────── */
         const customWrap = document.getElementById('adm-custom-days');
         const customInput = document.getElementById('adm-dormant-custom');
         const untilText = document.getElementById('adm-dormant-until-text');
@@ -2320,7 +2481,7 @@
             customWrap.hidden = !(chosen && chosen.value === 'custom');
             const n = selectedDays();
             untilText.textContent = n
-                ? 'Dormant until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
+                ? 'Locked until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
                 : 'Pick 1 to ' + ADM_MAX_DAYS + ' days (maximum ' + ADM_MAX_DAYS + ').';
         }
 
@@ -2332,21 +2493,20 @@
         });
         customInput.addEventListener('input', refreshUntil);
 
-        function openDormant(tr) {
+        function openLock(item) {
             clearAlert('adm-dormant-alert');
-            document.getElementById('adm-dormant-name').textContent = tr.getAttribute('data-name') || 'This admin';
+            document.getElementById('adm-dormant-name').textContent = item.getAttribute('data-name') || 'This admin';
             const def = document.querySelector('input[name="adm-dormant-days"][value="7"]');
             if (def) def.checked = true;
             customInput.value = '';
             refreshUntil();
             openModal(dormantModal);
-            currentRow = tr;
         }
 
         document.getElementById('adm-dormant-save').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const days = selectedDays();
             clearAlert('adm-dormant-alert');
             if (!days) return showAlert('adm-dormant-alert', 'Choose between 1 and ' + ADM_MAX_DAYS + ' days.');
@@ -2354,11 +2514,11 @@
             busy = true;
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
-            call({ action: 'dormant', id: tr.getAttribute('data-id'), days: days }).then(function (r) {
+            call({ action: 'dormant', id: item.getAttribute('data-id'), days: days }).then(function (r) {
                 busy = false;
                 setBusy(btn, false, orig);
                 if (!r.ok || r.data.status !== 'success') return showAlert('adm-dormant-alert', msgOf(r));
-                setRowDormant(tr, r.data.dormant_until);
+                setLocked(item, r.data.dormant_until);
                 closeModal(dormantModal);
                 showToast(r.data.message, 'success');
             }).catch(function () {
@@ -2368,18 +2528,16 @@
             });
         });
 
-        /* ── REACTIVATE (reversible, so no confirmation dialog) ── */
-        function doReactivate(tr, btn) {
+        /* ── UNLOCK (reversible, so no confirmation dialog) ───── */
+        function doUnlock(item, btn) {
             busy = true;
             btn.disabled = true;
-            call({ action: 'reactivate', id: tr.getAttribute('data-id') }).then(function (r) {
+            call({ action: 'reactivate', id: item.getAttribute('data-id') }).then(function (r) {
                 busy = false;
-                if (!r.ok || r.data.status !== 'success') {
-                    btn.disabled = false;
-                    return showToast(msgOf(r), 'error');
-                }
-                setRowDormant(tr, null);
-                showToast('Account reactivated.', 'success');
+                btn.disabled = false;
+                if (!r.ok || r.data.status !== 'success') return showToast(msgOf(r), 'error');
+                setLocked(item, 0);
+                showToast('Account unlocked.', 'success');
             }).catch(function () {
                 busy = false;
                 btn.disabled = false;
@@ -2388,19 +2546,18 @@
         }
 
         /* ── DELETE ───────────────────────────────────────────── */
-        function openDelete(tr) {
+        function openDelete(item) {
             clearAlert('adm-delete-alert');
-            document.getElementById('adm-delete-name').textContent = tr.getAttribute('data-name') || 'this admin';
+            document.getElementById('adm-delete-name').textContent = item.getAttribute('data-name') || 'this admin';
             resetPasswordFields(['adm-delete-reauth'], deleteModal);
             openModal(deleteModal);
-            currentRow = tr;
             document.getElementById('adm-delete-reauth').focus();
         }
 
         document.getElementById('adm-delete-confirm').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const reauth = document.getElementById('adm-delete-reauth').value;
             clearAlert('adm-delete-alert');
             if (!reauth) return showAlert('adm-delete-alert', 'Enter your own password to confirm.');
@@ -2408,18 +2565,22 @@
             busy = true;
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Deleting…');
-            call({ action: 'delete', id: tr.getAttribute('data-id'), current_password: reauth }).then(function (r) {
+            call({ action: 'delete', id: item.getAttribute('data-id'), current_password: reauth }).then(function (r) {
                 busy = false;
                 setBusy(btn, false, orig);
                 if (!r.ok || r.data.status !== 'success') {
                     document.getElementById('adm-delete-reauth').value = '';
                     return showAlert('adm-delete-alert', msgOf(r));
                 }
-                tr.remove();
-                if (typeof r.data.accounts_count === 'number') {
-                    admUpdateSeats(r.data.accounts_count, r.data.accounts_remaining);
-                }
+                const all = items();
+                const pos = all.indexOf(item);
+                item.remove();
+                if (typeof r.data.accounts_count === 'number') updateSeats(r.data.accounts_count, r.data.accounts_remaining);
                 closeModal(deleteModal);
+                refreshListEmpty();
+                const left = items();
+                if (left.length) select(left[Math.min(pos, left.length - 1)], false);
+                else clearSelection();
                 showToast('Admin account deleted. A seat is free for a new admin.', 'success');
             }).catch(function () {
                 busy = false;
@@ -2428,7 +2589,8 @@
             });
         });
     })();
-    /* ▲ MANAGE-ADMINS-END ───────────────────────────────────────────────── */
+    /* ▲ ADMIN-ACCOUNTS-PANEL-END ───────────────────────────────────────────── */
+
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
@@ -2775,6 +2937,10 @@
         } else if (view === 'faculty') {
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
+        } else if (view === 'admins') {
+            _switchTabDOM('admins');
+            if (typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+            history.replaceState({ tab: 'admins' }, '');
         } else {
             // Check for rooms tab param
             const tab = params.get('tab');
@@ -3609,3 +3775,658 @@ function psSelectFmt(btn) {
     row.querySelectorAll('.ps-export-fmt-btn').forEach(function (b) { b.classList.remove('active'); });
     btn.classList.add('active');
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   APPROVALS — review drawer for the Waiting table
+   Additive block. Opens from the request ID in each row (and from the
+   notification deep link, which clicks the same ID element). Approve /
+   Decline in the drawer hand off to the EXISTING approve / decline
+   modals by clicking the row's own buttons, so the confirm flow and the
+   admin-override.php call are untouched.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    var drawer = document.getElementById('ps-appr-drawer');
+    if (!drawer) return;
+    var currentId = null;
+
+    function el(id) { return document.getElementById(id); }
+    function txt(id, v) {
+        var n = el(id);
+        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    function openFor(row) {
+        var d = row.dataset;
+        currentId = d.id;
+
+        txt('ps-appr-reqno', '#' + String(d.id || 0).padStart(4, '0'));
+        txt('ps-appr-submitted', d.submitted);
+        txt('ps-appr-who', d.borrower);
+        txt('ps-appr-type', d.reqType);
+        txt('ps-appr-idno', d.idNumber);
+        txt('ps-appr-item', d.equipment);
+        txt('ps-appr-qty', d.qty);
+        txt('ps-appr-needed', d.dateNeeded);
+        txt('ps-appr-return', d.returnDateDisplay);
+        txt('ps-appr-room', d.room);
+        txt('ps-appr-instr', d.instructor);
+        txt('ps-appr-note', d.note);
+
+        var hasDoc = !!d.docUrl;
+        var card = el('ps-appr-doc'), none = el('ps-appr-doc-none'), prev = el('ps-appr-doc-preview');
+        if (card) card.hidden = !hasDoc;
+        if (none) none.hidden = hasDoc;
+        if (prev) prev.hidden = true;
+
+        if (hasDoc) {
+            var kind = d.docKind || 'file';
+            var icon = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
+            var ext = (d.docName.split('.').pop() || '').toUpperCase();
+            txt('ps-appr-doc-name', d.docName);
+            txt('ps-appr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
+            el('ps-appr-doc-icon').textContent = icon;
+            el('ps-appr-doc-open').setAttribute('href', d.docUrl);
+            var dl = el('ps-appr-doc-dl');
+            dl.setAttribute('href', d.docUrl);
+            dl.setAttribute('download', d.docName);
+            // Images can be previewed inline. PDFs open in a new tab: the server
+            // sends X-Frame-Options: DENY, which blocks embedding them in a frame.
+            if (kind === 'image' && prev) {
+                el('ps-appr-doc-img').setAttribute('src', d.docUrl);
+                prev.hidden = false;
+            }
+        }
+        if (typeof psOpenModal === 'function') psOpenModal('ps-appr-drawer');
+    }
+
+    // Capture phase: runs before the generic data-action handler, so the ID
+    // inside the Waiting table opens this drawer instead of the old detail modal.
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"]');
+        if (!t) return;
+        var row = t.closest('tr.ps-req-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openFor(row);
+    }, true);
+
+    drawer.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-appr-decide]');
+        if (!b || !currentId) return;
+        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"]');
+        if (!row) return;
+        var sel = b.getAttribute('data-appr-decide') === 'approve'
+            ? '[data-modal="ps-approve-modal"]'
+            : '[data-modal="ps-decline-modal"]';
+        var btn = row.querySelector(sel);
+        if (!btn) return;
+        if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
+        btn.click();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
+            psCloseModal('ps-appr-drawer');
+        }
+    });
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOMS — reservation details drawer (Rooms > Reservations table)
+   Additive block. "Cancel reservation" in the drawer clicks the row's
+   own Cancel button, so the existing cancel modal + API are reused.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    var drawer = document.getElementById('ps-room-drawer');
+    if (!drawer) return;
+    var currentRow = null;
+
+    function el(id) { return document.getElementById(id); }
+    function txt(id, v) {
+        var n = el(id);
+        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    function openFor(row) {
+        var d = row.dataset;
+        currentRow = row;
+        txt('ps-rr-no', '#' + d.rrId);
+        txt('ps-rr-submitted', d.submitted);
+        txt('ps-rr-room', d.room);
+        txt('ps-rr-where', d.where);
+        txt('ps-rr-date', d.date);
+        txt('ps-rr-time', d.time);
+        txt('ps-rr-attendees', d.attendees && d.attendees !== '0' ? d.attendees : '');
+        txt('ps-rr-purpose', d.purpose);
+        txt('ps-rr-who', d.whoSub && d.whoSub.indexOf('Student via') === 0 ? d.who + ' (' + d.whoSub + ')' : d.who);
+        txt('ps-rr-type', d.type);
+
+        var badge = el('ps-rr-status');
+        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned' };
+        badge.className = 'ps-badge ps-badge--dot ' + (cls[d.status] || 'ps-badge--returned');
+        badge.textContent = d.status;
+
+        var notes = [];
+        if (d.notes) notes.push(d.notes);
+        if (d.reason) notes.push((d.status === 'Declined' ? 'Declined: ' : d.status === 'Cancelled' ? 'Cancelled: ' : 'Reason: ') + d.reason);
+        txt('ps-rr-notes', notes.join('\n\n'));
+
+        var hasDoc = !!d.docUrl;
+        el('ps-rr-doc-sec').hidden = !hasDoc;
+        var prev = el('ps-rr-doc-preview');
+        if (prev) prev.hidden = true;
+        if (hasDoc) {
+            var kind = d.docKind || 'file';
+            var ext = (d.docName.split('.').pop() || '').toUpperCase();
+            txt('ps-rr-doc-name', d.docName);
+            txt('ps-rr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
+            el('ps-rr-doc-icon').textContent = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
+            el('ps-rr-doc-open').setAttribute('href', d.docUrl);
+            var dl = el('ps-rr-doc-dl');
+            dl.setAttribute('href', d.docUrl);
+            dl.setAttribute('download', d.docName);
+            if (kind === 'image' && prev) {
+                el('ps-rr-doc-img').setAttribute('src', d.docUrl);
+                prev.hidden = false;
+            }
+        }
+
+        // Cancel is only offered for Approved reservations (same rule as the table).
+        el('ps-rr-cancel-btn').hidden = !row.querySelector('.btn-cancel-rr-admin');
+
+        if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
+    }
+
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-rr-detail]');
+        if (!t) return;
+        var row = t.closest('tr.ps-rr-row');
+        if (!row) return;
+        e.preventDefault();
+        openFor(row);
+    });
+
+    drawer.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-rr-cancel]') || !currentRow) return;
+        var btn = currentRow.querySelector('.btn-cancel-rr-admin');
+        if (!btn) return;
+        if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
+        btn.click();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
+            psCloseModal('ps-room-drawer');
+        }
+    });
+})();
+
+/* ================================================================
+   PUPSYNC ADMIN — Dashboard tab behaviour
+   ----------------------------------------------------------------
+   1. Draws the "Demand & decisions" bar chart (plain SVG, no library
+      — the page's CSP only allows scripts from this site + jsDelivr).
+   2. Makes stat cards / "needs attention" rows / "Manage" links jump
+      to the right tab (and filter chip) by clicking the real sidebar
+      item, so the tab switch, drawer-close and history logic that
+      already exist in admin-dashboard.js are reused, not copied.
+   3. Keeps the panel live: every 15 s it fetches
+      admin-dashboard.php?fragment=dashboard (same markup PHP
+      rendered) and swaps it in, pausing while the tab is hidden or
+      the Dashboard tab isn't the one being viewed.
+
+   The header (greeting, action buttons, bell, avatar) is outside the
+   swapped region on purpose: admin-dashboard.js binds to those ids.
+================================================================ */
+(function () {
+    'use strict';
+
+    var root = document.getElementById('dash');
+    var live = document.getElementById('dashLive');
+    if (!root || !live) return;
+
+    var POLL_MS = 15000;
+    var state = { set: 'equipment', range: 14 };
+    var lastHtml = null;
+    var inflight = false;
+    var stopped = false;
+
+    // The entrance animation is first-paint only.
+    setTimeout(function () { root.classList.remove('dash-intro'); }, 900);
+
+    /* ── helpers ─────────────────────────────────────────────── */
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function parseYmd(s) {
+        var p = s.split('-');
+        return new Date(+p[0], +p[1] - 1, +p[2]);
+    }
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    function shortDate(s) { var d = parseYmd(s); return MON[d.getMonth()] + ' ' + d.getDate(); }
+    function longDate(s) { var d = parseYmd(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
+    function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
+
+    /* ── chart ───────────────────────────────────────────────── */
+    function drawChart(wrap) {
+        var data = wrap._data;
+        if (!data) return;
+        var set = data.sets[state.set] || data.sets.equipment;
+        var n = state.range;
+        var labels = data.labels.slice(-n);
+        var series = set.series.map(function (s) {
+            return { key: s.key, label: s.label, values: s.values.slice(-n) };
+        });
+        var totals = labels.map(function (_, i) {
+            return series.reduce(function (t, s) { return t + (s.values[i] || 0); }, 0);
+        });
+        var grand = sum(totals);
+
+        var chartEl = wrap.querySelector('[data-dash-chart]');
+        var sumEl = wrap.querySelector('[data-dash-summary]');
+        var legEl = wrap.querySelector('[data-dash-legend]');
+
+        /* summary tiles */
+        var approved = 0, declined = 0;
+        series.forEach(function (s) {
+            if (s.key === 'approved') approved = sum(s.values);
+            if (s.key === 'declined') declined = sum(s.values);
+        });
+        var rate = (approved + declined) > 0 ? Math.round(approved / (approved + declined) * 100) + '%' : '—';
+        var peak = 0, peakI = -1;
+        totals.forEach(function (t, i) { if (t > peak) { peak = t; peakI = i; } });
+        sumEl.innerHTML =
+            '<div class="dash-sum"><span>Total ' + esc(set.unit) + 's</span><strong>' + grand + '</strong></div>' +
+            '<div class="dash-sum"><span>Approval rate</span><strong>' + rate + '</strong></div>' +
+            '<div class="dash-sum"><span>Daily average</span><strong>' + (grand / n).toFixed(1) + '</strong></div>' +
+            '<div class="dash-sum"><span>Busiest day</span><strong>' + (peakI >= 0 ? esc(shortDate(labels[peakI])) + ' · ' + peak : '—') + '</strong></div>';
+
+        /* legend */
+        legEl.innerHTML = series.map(function (s) {
+            return '<span><i class="k-' + esc(s.key) + '"></i>' + esc(s.label) + ' (' + sum(s.values) + ')</span>';
+        }).join('');
+
+        chartEl.setAttribute('aria-label', set.title + ', last ' + n + ' days: ' + grand + ' total, approval rate ' + rate + '.');
+
+        if (grand === 0) {
+            chartEl.innerHTML = '<div class="dash-chart-empty">No ' + esc(set.unit) + 's in the last ' + n + ' days.</div>';
+            return;
+        }
+
+        /* geometry */
+        var W = Math.max(240, chartEl.clientWidth || 600);
+        var H = Math.max(200, chartEl.clientHeight || 230);
+        var m = { l: 26, r: 4, t: 8, b: 24 };
+        var pw = W - m.l - m.r, ph = H - m.t - m.b;
+        var step = Math.max(1, Math.ceil(peak / 4));
+        var top = step * 4;
+        var slot = pw / n;
+        var bw = Math.max(4, Math.min(30, slot * 0.64));
+        var every = n <= 7 ? 1 : (n <= 14 ? 2 : 5);
+
+        var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
+
+        for (var g = 0; g <= 4; g++) {
+            var gy = m.t + ph - (ph * g / 4);
+            out += '<line class="dash-grid-line" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + gy + '" y2="' + gy + '"/>';
+            out += '<text class="dash-axis-text" x="' + (m.l - 6) + '" y="' + (gy + 3.5) + '" text-anchor="end">' + (step * g) + '</text>';
+        }
+
+        labels.forEach(function (lab, i) {
+            var gx = m.l + slot * i;
+            var x = gx + (slot - bw) / 2;
+            var yCursor = m.t + ph;
+            out += '<g class="dash-bar-group" data-i="' + i + '"><rect class="dash-bar-hit" x="' + gx + '" y="' + m.t + '" width="' + slot + '" height="' + ph + '" rx="6"/>';
+            series.forEach(function (s) {
+                var v = s.values[i] || 0;
+                if (!v) return;
+                var h = Math.max(2, v / top * ph);
+                yCursor -= h;
+                out += '<rect class="dash-s-' + esc(s.key) + '" x="' + x + '" y="' + yCursor + '" width="' + bw + '" height="' + h + '" rx="2"/>';
+            });
+            out += '</g>';
+            if ((n - 1 - i) % every === 0) {
+                var isToday = i === n - 1;
+                out += '<text class="dash-axis-text' + (isToday ? ' dash-today-text' : '') + '" x="' + (gx + slot / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(isToday ? 'Today' : shortDate(lab)) + '</text>';
+            }
+        });
+        out += '</svg><div class="dash-tip" role="presentation"></div>';
+        chartEl.innerHTML = out;
+
+        /* tooltip */
+        var tip = chartEl.querySelector('.dash-tip');
+        function showTip(i, groupEl) {
+            var rows = series.map(function (s) {
+                return '<span><span><i class="k-' + esc(s.key) + '"></i>' + esc(s.label) + '</span><b>' + (s.values[i] || 0) + '</b></span>';
+            }).join('');
+            tip.innerHTML = '<b>' + esc(longDate(labels[i])) + '</b>' + rows;
+            var bx = (m.l + slot * i + slot / 2) / W * chartEl.clientWidth;
+            var tw = tip.offsetWidth || 140;
+            var left = Math.min(Math.max(4, bx - tw / 2), chartEl.clientWidth - tw - 4);
+            tip.style.left = left + 'px';
+            tip.style.top = '4px';
+            tip.classList.add('on');
+            Array.prototype.forEach.call(chartEl.querySelectorAll('.dash-bar-group.is-active'), function (el) { el.classList.remove('is-active'); });
+            if (groupEl) groupEl.classList.add('is-active');
+        }
+        function hideTip() {
+            tip.classList.remove('on');
+            Array.prototype.forEach.call(chartEl.querySelectorAll('.dash-bar-group.is-active'), function (el) { el.classList.remove('is-active'); });
+        }
+        chartEl.onpointermove = function (e) {
+            var gEl = e.target.closest && e.target.closest('.dash-bar-group');
+            if (gEl) showTip(+gEl.getAttribute('data-i'), gEl); else hideTip();
+        };
+        chartEl.onpointerleave = hideTip;
+    }
+
+    function initCharts() {
+        Array.prototype.forEach.call(live.querySelectorAll('.dash-chart-wrap'), function (wrap) {
+            try { wrap._data = JSON.parse(wrap.getAttribute('data-chart')); } catch (e) { wrap._data = null; }
+            syncControls();
+            drawChart(wrap);
+        });
+    }
+    function syncControls() {
+        Array.prototype.forEach.call(live.querySelectorAll('[data-dash-set]'), function (b) {
+            var on = b.getAttribute('data-dash-set') === state.set;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        Array.prototype.forEach.call(live.querySelectorAll('[data-dash-range]'), function (b) {
+            var on = +b.getAttribute('data-dash-range') === state.range;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    /* redraw when the card's width changes (sidebar collapse, rotate, resize) */
+    if (window.ResizeObserver) {
+        var lastW = 0;
+        new ResizeObserver(function () {
+            var el = live.querySelector('[data-dash-chart]');
+            if (!el) return;
+            var w = el.clientWidth;
+            if (Math.abs(w - lastW) < 2) return;
+            lastW = w;
+            var wrap = el.closest('.dash-chart-wrap');
+            if (wrap) drawChart(wrap);
+        }).observe(root);
+    }
+
+    /* ── clicks (delegated, so they survive live swaps) ──────── */
+    root.addEventListener('click', function (e) {
+        var go = e.target.closest('[data-dash-go]');
+        if (go) {
+            var tab = go.getAttribute('data-dash-go');
+            var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
+            if (nav) {
+                nav.click();
+                var chipKey = go.getAttribute('data-dash-chip');
+                if (chipKey) {
+                    var chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + chipKey + '"]');
+                    if (chip) chip.click();
+                }
+            }
+            return;
+        }
+        var setBtn = e.target.closest('[data-dash-set]');
+        if (setBtn) {
+            state.set = setBtn.getAttribute('data-dash-set');
+            syncControls();
+            var w1 = live.querySelector('.dash-chart-wrap'); if (w1) drawChart(w1);
+            return;
+        }
+        var rangeBtn = e.target.closest('[data-dash-range]');
+        if (rangeBtn) {
+            state.range = +rangeBtn.getAttribute('data-dash-range') || 14;
+            syncControls();
+            var w2 = live.querySelector('.dash-chart-wrap'); if (w2) drawChart(w2);
+        }
+    });
+
+    /* ── live refresh ────────────────────────────────────────── */
+    function stamp() {
+        var el = document.getElementById('dashUpdated');
+        if (el) el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    function dashboardVisible() {
+        var panel = document.getElementById('panel-dashboard');
+        return !!panel && panel.classList.contains('active') && !document.hidden;
+    }
+    function refresh() {
+        if (stopped || inflight || !dashboardVisible()) return;
+        inflight = true;
+        fetch(window.location.pathname + '?fragment=dashboard', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+            // session ended -> the server redirects to the login page: stop quietly instead of swapping it in
+            if (r.redirected || r.status === 401) { stopped = true; return null; }
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        }).then(function (html) {
+            if (html == null) return;
+            if (html.indexOf('dash-kpis') === -1) { stopped = true; return; }
+            if (html === lastHtml) { stamp(); return; }
+            lastHtml = html;
+
+            // keep keyboard focus on a chart toggle across the swap
+            var ae = document.activeElement, refocus = '';
+            if (ae && live.contains(ae)) {
+                if (ae.hasAttribute('data-dash-set')) refocus = '[data-dash-set="' + ae.getAttribute('data-dash-set') + '"]';
+                else if (ae.hasAttribute('data-dash-range')) refocus = '[data-dash-range="' + ae.getAttribute('data-dash-range') + '"]';
+            }
+            live.innerHTML = html;
+            initCharts();
+            if (refocus) { var f = live.querySelector(refocus); if (f) f.focus({ preventScroll: true }); }
+            stamp();
+        }).catch(function () { /* transient network error: try again next tick */ })
+            .then(function () { inflight = false; });
+    }
+
+    setInterval(refresh, POLL_MS);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+    // coming back to the Dashboard tab -> refresh right away (after admin-dashboard.js flips the panel)
+    document.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('.nav-item[data-tab="dashboard"]')) setTimeout(refresh, 80);
+    });
+
+    initCharts();
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOMS — visual filters + clickable tiles
+   Additive block. The original Building / Floor / Status <select>s
+   and the filter module in admin-dashboard.php stay the single
+   source of truth: the pills and chips below only READ their options
+   and WRITE their value (then fire "change"), so searching, filtering,
+   the live refresh after add / edit / archive, and the schedule modal
+   all keep working exactly as before. Without JS the plain dropdowns
+   stay visible.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    var STATUS = [
+        ['all', 'All', null],
+        ['Available', 'Available', '#27ae60'],
+        ['Maintenance', 'Maintenance', '#e67e22'],
+        ['Not Bookable', 'Not bookable', '#9ca3af']
+    ];
+
+    function install() {
+        var tb = document.getElementById('rmToolbar');
+        var table = document.getElementById('roomsRegistryTable');
+        var bld = document.getElementById('roomBuildingSelect');
+        var flr = document.getElementById('roomFloorSelect');
+        var st = document.getElementById('roomStatusSelect');
+        var search = document.getElementById('roomSearchInput');
+        var chipsEl = document.getElementById('rmStatusChips');
+        var pillsEl = document.getElementById('rmBuildingPills');
+        var floorsEl = document.getElementById('rmFloorChips');
+        var showingEl = document.getElementById('rmShowing');
+        if (!tb || !table || !bld || !flr || !st || !search || !chipsEl || !pillsEl || !floorsEl) return;
+
+        var lastPillSig = '';
+
+        function setSelect(sel, value) {
+            if (sel.value === value) return;
+            sel.value = value;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function roomRows() { return table.querySelectorAll('tbody tr.pr-room-row'); }
+
+        function el(tag, cls, text) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text !== undefined) n.textContent = text;
+            return n;
+        }
+
+        function icon(name) { return el('span', 'material-symbols-outlined', name); }
+
+        /* same scope rule the filter module uses: a search looks at every building */
+        function inScope(row) {
+            var q = (search.value || '').trim().toLowerCase();
+            var searching = q.length > 0;
+            var scope = searching || ((bld.value === 'all' || row.dataset.roomBuildingId === bld.value) &&
+                (flr.value === 'all' || row.dataset.roomFloorNum === flr.value));
+            var match = !searching || (row.dataset.roomName || '').toLowerCase().indexOf(q) !== -1;
+            return scope && match;
+        }
+
+        function buildStatusChips(counts) {
+            chipsEl.textContent = '';
+            STATUS.forEach(function (s) {
+                var b = el('button', 'rm-chip');
+                b.type = 'button';
+                b.dataset.value = s[0];
+                b.setAttribute('aria-pressed', st.value === s[0] ? 'true' : 'false');
+                if (s[2]) { var d = el('span', 'rm-dot'); d.style.setProperty('--dot', s[2]); b.appendChild(d); }
+                b.appendChild(el('span', '', s[1]));
+                b.appendChild(el('span', 'rm-n', String(counts[s[0]] || 0)));
+                chipsEl.appendChild(b);
+            });
+        }
+
+        function buildingInfo() {
+            var rows = roomRows(), perBld = {};
+            rows.forEach(function (r) { var id = r.dataset.roomBuildingId; perBld[id] = (perBld[id] || 0) + 1; });
+            var list = [{ id: 'all', name: 'All buildings', campus: '', icon: 'apps', accent: '', count: rows.length }];
+            Array.prototype.forEach.call(bld.options, function (o) {
+                if (o.value === 'all') return;
+                var parts = o.textContent.replace(/\s+/g, ' ').trim().split(' · ');
+                var name = parts.length > 1 ? parts.slice(1).join(' · ') : parts[0];
+                var div = table.querySelector('tr.pr-floor-divider[data-building-id="' + o.value + '"]');
+                var td = div && div.querySelector('td');
+                var ic = div && div.querySelector('.pr-building-icon');
+                list.push({
+                    id: o.value, name: name, campus: parts.length > 1 ? parts[0] : '',
+                    icon: ic ? ic.textContent.trim() : 'domain',
+                    accent: td ? td.style.getPropertyValue('--b-accent').trim() : '',
+                    count: perBld[o.value] || 0
+                });
+            });
+            return list;
+        }
+
+        function buildPills(list) {
+            pillsEl.textContent = '';
+            list.forEach(function (b) {
+                var btn = el('button', 'rm-bld');
+                btn.type = 'button';
+                btn.dataset.value = b.id;
+                btn.title = b.campus ? b.campus + ' · ' + b.name : b.name;
+                if (b.accent) btn.style.setProperty('--b-accent', b.accent);
+                var ico = el('span', 'rm-bld-ico'); ico.appendChild(icon(b.icon));
+                var txt = el('span', '');
+                txt.appendChild(el('span', 'rm-bld-t', b.name));
+                txt.appendChild(el('span', 'rm-bld-s', b.count + (b.count === 1 ? ' room' : ' rooms')));
+                btn.appendChild(ico); btn.appendChild(txt);
+                pillsEl.appendChild(btn);
+            });
+        }
+
+        function buildFloors() {
+            floorsEl.textContent = '';
+            /* only worth showing when a building is picked and it has 2+ floors */
+            if (flr.disabled || flr.options.length < 3) return;
+            Array.prototype.forEach.call(flr.options, function (o) {
+                var b = el('button', 'rm-chip rm-chip--sm', o.value === 'all' ? 'All floors' : o.textContent.trim());
+                b.type = 'button';
+                b.dataset.value = o.value;
+                b.setAttribute('aria-pressed', flr.value === o.value ? 'true' : 'false');
+                floorsEl.appendChild(b);
+            });
+        }
+
+        function sync() {
+            var counts = { all: 0, Available: 0, Maintenance: 0, 'Not Bookable': 0 };
+            var rows = roomRows(), shown = 0;
+            rows.forEach(function (r) {
+                if (inScope(r)) { counts.all++; counts[r.dataset.roomStatus] = (counts[r.dataset.roomStatus] || 0) + 1; }
+                if (r.style.display !== 'none') shown++;
+            });
+            buildStatusChips(counts);
+            buildFloors();
+
+            var list = buildingInfo();
+            var sig = list.map(function (b) { return [b.id, b.name, b.icon, b.accent, b.count].join('|'); }).join('~');
+            if (sig !== lastPillSig) { buildPills(list); lastPillSig = sig; }
+            Array.prototype.forEach.call(pillsEl.children, function (b) {
+                b.setAttribute('aria-pressed', b.dataset.value === bld.value ? 'true' : 'false');
+            });
+
+            tb.classList.toggle('rm-searching', (search.value || '').trim().length > 0);
+            if (showingEl) showingEl.textContent = shown === rows.length ? rows.length + ' rooms' : shown + ' of ' + rows.length + ' rooms';
+            tb.classList.add('rm-enhanced');
+        }
+
+        /* chips / pills -> write to the real selects */
+        tb.addEventListener('click', function (e) {
+            var c = e.target.closest('.rm-chip, .rm-bld');
+            if (!c || !tb.contains(c)) return;
+            var v = c.dataset.value;
+            if (c.closest('#rmStatusChips')) setSelect(st, v);
+            else if (c.closest('#rmBuildingPills')) setSelect(bld, v);
+            else if (c.closest('#rmFloorChips')) setSelect(flr, v);
+        });
+
+        /* keep in step with every change the filter module reacts to
+           (our listeners are added later, so they run after its own) */
+        bld.addEventListener('change', sync);
+        flr.addEventListener('change', sync);
+        st.addEventListener('change', sync);
+        search.addEventListener('input', sync);
+
+        /* the live refresh after add / edit / archive swaps in new rows */
+        var orig = window.psRefreshRoomsRegistry;
+        if (typeof orig === 'function' && !orig.__rmWrapped) {
+            var wrapped = function () { var r = orig.apply(this, arguments); sync(); return r; };
+            wrapped.__rmWrapped = true;
+            window.psRefreshRoomsRegistry = wrapped;
+        }
+
+        /* a click anywhere on a tile (except its own buttons) opens that room's schedule */
+        table.addEventListener('click', function (e) {
+            var row = e.target.closest('tr.pr-room-row');
+            if (!row || e.target.closest('a, button, .pr-row-actions')) return;
+            var btn = row.querySelector('[data-action="open-room-schedule"]');
+            if (btn) btn.click();
+        });
+
+        sync();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+    else install();
+})();

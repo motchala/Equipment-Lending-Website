@@ -3,6 +3,628 @@
 <?php require_once __DIR__ . '/equipment-booking/core/notif-functions.php'; ?>
 <?php require_once __DIR__ . '/config/role-splash.php'; ?>
 <?php
+// ================= DASHBOARD TAB (home screen) =================
+// Data + markup for the Dashboard tab. Read-only: nothing here writes to the database
+// (the overdue / auto-decline housekeeping stays in admin-functions.php and
+// poll-requests-data.php).
+//   dash_collect($conn)  -> every number / list the dashboard shows
+//   dash_render($d)      -> echoes the stat cards + panels
+// Used twice so first paint and live refresh can never disagree:
+//   • the Dashboard panel further down this file
+//   • "admin-dashboard.php?fragment=dashboard" (handled right after the functions), which
+//     returns the same markup; admin-dashboard.js swaps it into #dashLive every 15 s.
+// Every query is wrapped, so a missing table shows zeros instead of breaking the page.
+
+if (!function_exists('dash_h')) {
+    function dash_h($v): string
+    {
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+/** Run a SELECT and return all rows ([] on any failure). */
+if (!function_exists('dash_rows')) {
+    function dash_rows(mysqli $conn, string $sql, string $types = '', array $params = []): array
+    {
+        try {
+            if ($types === '') {
+                $res = $conn->query($sql);
+            } else {
+                $st = $conn->prepare($sql);
+                $st->bind_param($types, ...$params);
+                $st->execute();
+                $res = $st->get_result();
+            }
+            $rows = [];
+            if ($res) {
+                while ($r = $res->fetch_assoc()) {
+                    $rows[] = $r;
+                }
+            }
+            return $rows;
+        } catch (Throwable $e) {
+            error_log('[PUPSync] dashboard query failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
+/** First column of the first row as an int (0 on failure). */
+if (!function_exists('dash_scalar')) {
+    function dash_scalar(mysqli $conn, string $sql, string $types = '', array $params = []): int
+    {
+        $rows = dash_rows($conn, $sql, $types, $params);
+        return $rows ? (int)array_values($rows[0])[0] : 0;
+    }
+}
+
+if (!function_exists('dash_pl')) {
+    /** "1 request" / "3 requests" */
+    function dash_pl(int $n, string $word, ?string $plural = null): string
+    {
+        return $n . ' ' . ($n === 1 ? $word : ($plural ?? $word . 's'));
+    }
+}
+
+/**
+ * "just now", "12 min ago", "3 h ago", "Yesterday", "Oct 8".
+ * $ageSeconds comes from the database (TIMESTAMPDIFF(SECOND, col, NOW())) so it
+ * is right whatever timezone the DB server runs in; $datetime is only used to
+ * print the calendar date once something is older than two days.
+ */
+if (!function_exists('dash_ago')) {
+    function dash_ago($ageSeconds, ?string $datetime = null): string
+    {
+        if ($ageSeconds === null || $ageSeconds === '') {
+            return $datetime ? date('M j', strtotime($datetime)) : '';
+        }
+        $diff = (int)$ageSeconds;
+        if ($diff < 60)      return 'just now';
+        if ($diff < 3600)    return floor($diff / 60) . ' min ago';
+        if ($diff < 86400)   return floor($diff / 3600) . ' h ago';
+        if ($diff < 172800)  return 'Yesterday';
+        return $datetime ? date('M j', strtotime($datetime)) : floor($diff / 86400) . ' d ago';
+    }
+}
+
+/** Collect everything the dashboard shows. */
+function dash_collect(mysqli $conn): array
+{
+    $today = date('Y-m-d');
+    $nowT  = date('H:i:s');
+    $d     = ['today' => $today];
+
+    // ── Equipment requests ───────────────────────────────────────────────
+    $d['waiting']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Waiting'");
+    $d['active']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved'");
+    $d['due_today'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND return_date = ?", 's', [$today]);
+    $d['overdue']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Overdue'");
+
+    $d['overdue_days'] = 0;
+    $old = dash_rows($conn, "SELECT MIN(return_date) AS m FROM tbl_requests WHERE status='Overdue'");
+    if ($old && !empty($old[0]['m'])) {
+        $d['overdue_days'] = max(0, (int)floor((strtotime($today) - strtotime($old[0]['m'])) / 86400));
+    }
+
+    // ── Inventory ────────────────────────────────────────────────────────
+    $d['inv_total'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0");
+    $d['inv_out']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0 AND quantity<=0");
+    $d['inv_low']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0 AND quantity>0 AND quantity<=2");
+    $d['stock']     = dash_rows($conn, "SELECT item_name, category, quantity FROM tbl_inventory WHERE is_archived=0 AND quantity<=2 ORDER BY quantity ASC, item_name ASC LIMIT 5");
+
+    // ── Rooms ────────────────────────────────────────────────────────────
+    $d['rooms_bookable'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_rooms WHERE is_archived=0 AND status='Available'");
+    $d['rooms_today']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
+    $d['rooms_in_use']   = dash_scalar($conn, "SELECT COUNT(DISTINCT room_id) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
+    $d['rooms_issues']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_issues WHERE status='Open'");
+    $d['rooms_pct']      = $d['rooms_bookable'] > 0
+        ? (int)min(100, round($d['rooms_in_use'] / $d['rooms_bookable'] * 100))
+        : 0;
+    $d['upcoming'] = dash_rows(
+        $conn,
+        "SELECT r.reservation_date, r.start_time, r.end_time, r.purpose, r.faculty_name,
+                rm.room_name, b.name AS building
+           FROM tbl_room_reservations r
+      LEFT JOIN tbl_rooms rm     ON rm.room_id = r.room_id
+      LEFT JOIN tbl_buildings b  ON b.building_id = rm.building_id
+          WHERE r.status='Approved'
+            AND (r.reservation_date > ? OR (r.reservation_date = ? AND r.end_time >= ?))
+       ORDER BY r.reservation_date ASC, r.start_time ASC
+          LIMIT 4",
+        'sss',
+        [$today, $today, $nowT]
+    );
+
+    // ── Activity chart (last 30 days, both datasets; the range toggle is client-side) ──
+    $labels = [];
+    for ($i = 29; $i >= 0; $i--) {
+        $labels[] = date('Y-m-d', strtotime("-$i day", strtotime($today)));
+    }
+    $idx   = array_flip($labels);
+    $zeros = array_fill(0, 30, 0);
+    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros];
+    $rm    = ['approved' => $zeros, 'declined' => $zeros, 'cancelled' => $zeros];
+    $from  = $labels[0] . ' 00:00:00';
+
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_requests WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        // Approved / Overdue / Returned all started life as an approval.
+        $k = in_array($r['status'], ['Approved', 'Overdue', 'Returned'], true) ? 'approved'
+            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : null));
+        if ($k) $eq[$k][$idx[$r['d']]] += (int)$r['c'];
+    }
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_room_reservations WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        $k = strtolower($r['status']);
+        if (isset($rm[$k])) $rm[$k][$idx[$r['d']]] += (int)$r['c'];
+    }
+    $d['chart'] = [
+        'labels' => $labels,
+        'sets'   => [
+            'equipment' => ['title' => 'Equipment requests', 'unit' => 'request', 'series' => [
+                ['key' => 'approved', 'label' => 'Approved', 'values' => $eq['approved']],
+                ['key' => 'declined', 'label' => 'Declined', 'values' => $eq['declined']],
+                ['key' => 'waiting',  'label' => 'Waiting',  'values' => $eq['waiting']],
+            ]],
+            'rooms' => ['title' => 'Room bookings', 'unit' => 'booking', 'series' => [
+                ['key' => 'approved',  'label' => 'Approved',  'values' => $rm['approved']],
+                ['key' => 'declined',  'label' => 'Declined',  'values' => $rm['declined']],
+                ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $rm['cancelled']],
+            ]],
+        ],
+    ];
+
+    // ── Most requested equipment (30 days) ───────────────────────────────
+    $d['top'] = dash_rows(
+        $conn,
+        "SELECT equipment_name, COUNT(*) AS total,
+                SUM(status IN ('Approved','Overdue','Returned')) AS ok
+           FROM tbl_requests
+          WHERE request_date >= ?
+       GROUP BY equipment_name
+       ORDER BY total DESC, equipment_name ASC
+          LIMIT 5",
+        's',
+        [$from]
+    );
+
+    // ── Latest requests + decision log ───────────────────────────────────
+    // Same visibility rule the rest of the admin portal uses: auto-declined
+    // requests are hidden; only manual overrides of a decline show.
+    $d['latest'] = dash_rows($conn, "SELECT faculty_name, faculty_id, equipment_name, borrow_date, return_date, status, request_date,
+                                            TIMESTAMPDIFF(SECOND, request_date, NOW()) AS age_s
+                                       FROM tbl_requests
+                                      WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')
+                                   ORDER BY request_date DESC, id DESC LIMIT 6");
+    $d['log'] = dash_rows($conn, "SELECT decision, borrower_name, equipment_name, rule_applied, reason, override_by, created_at,
+                                         TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age_s
+                                    FROM tbl_arbitration_log
+                                ORDER BY created_at DESC, id DESC LIMIT 6");
+
+    return $d;
+}
+
+/** Items for the "Needs attention" panel, most urgent first. */
+function dash_attention(array $d): array
+{
+    $a = [];
+    if ($d['overdue'] > 0) {
+        $a[] = [
+            'tone' => 'danger',
+            'icon' => 'schedule',
+            'title' => dash_pl($d['overdue'], 'overdue return'),
+            'sub'   => $d['overdue_days'] > 0 ? 'Oldest is ' . dash_pl($d['overdue_days'], 'day') . ' past due' : 'Past its return date',
+            'go' => 'requests',
+            'chip' => 'rq-overdue'
+        ];
+    }
+    if ($d['waiting'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'assignment',
+            'title' => dash_pl($d['waiting'], 'request') . ' awaiting approval',
+            'sub'   => 'Review and approve or decline',
+            'go' => 'requests',
+            'chip' => 'rq-waiting'
+        ];
+    }
+    if ($d['due_today'] > 0) {
+        $a[] = [
+            'tone' => 'info',
+            'icon' => 'event_available',
+            'title' => dash_pl($d['due_today'], 'item') . ' due back today',
+            'sub'   => 'Expect returns by end of day',
+            'go' => 'requests',
+            'chip' => 'rq-active'
+        ];
+    }
+    if ($d['rooms_issues'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'build',
+            'title' => dash_pl($d['rooms_issues'], 'open room issue'),
+            'sub'   => 'Reported by faculty, not yet resolved',
+            'go' => 'rooms',
+            'chip' => ''
+        ];
+    }
+    if ($d['inv_out'] > 0) {
+        $names = [];
+        foreach ($d['stock'] as $s) {
+            if ((int)$s['quantity'] <= 0 && count($names) < 2) $names[] = $s['item_name'];
+        }
+        $a[] = [
+            'tone' => 'danger',
+            'icon' => 'inventory_2',
+            'title' => dash_pl($d['inv_out'], 'item') . ' out of stock',
+            'sub'   => $names ? implode(', ', $names) . ($d['inv_out'] > count($names) ? ' and more' : '') : 'Cannot be lent until restocked',
+            'go' => 'inventory',
+            'chip' => ''
+        ];
+    }
+    if ($d['inv_low'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'production_quantity_limits',
+            'title' => dash_pl($d['inv_low'], 'item') . ' running low',
+            'sub'   => '2 units or fewer remaining',
+            'go' => 'inventory',
+            'chip' => ''
+        ];
+    }
+    return $a;
+}
+
+/** Echo the dashboard body. */
+function dash_render(array $d): void
+{
+    $attn   = dash_attention($d);
+    $alerts = $d['inv_out'] + $d['inv_low'];
+    $tomorrow = date('Y-m-d', strtotime('+1 day', strtotime($d['today'])));
+
+    $kpis = [
+        [
+            'tone' => $d['waiting'] > 0 ? 'warn' : 'ok',
+            'icon' => 'assignment',
+            'label' => 'Pending approvals',
+            'val' => $d['waiting'],
+            'sub' => $d['waiting'] > 0 ? 'Needs your review' : 'Queue is clear',
+            'go' => 'requests',
+            'chip' => 'rq-waiting',
+        ],
+        [
+            'tone' => 'ok',
+            'icon' => 'swap_horiz',
+            'label' => 'Active loans',
+            'val' => $d['active'],
+            'sub' => $d['due_today'] > 0 ? dash_pl($d['due_today'], 'item') . ' due back today' : 'None due today',
+            'go' => 'requests',
+            'chip' => 'rq-active',
+        ],
+        [
+            'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
+            'icon' => 'schedule',
+            'label' => 'Overdue returns',
+            'val' => $d['overdue'],
+            'sub' => $d['overdue'] > 0
+                ? ($d['overdue_days'] > 0 ? 'Oldest ' . dash_pl($d['overdue_days'], 'day') . ' late' : 'Needs follow-up')
+                : 'Nothing overdue',
+            'go' => 'requests',
+            'chip' => 'rq-overdue',
+        ],
+        [
+            'tone' => 'info',
+            'icon' => 'meeting_room',
+            'label' => 'Rooms today',
+            'val' => $d['rooms_today'],
+            'sub' => $d['rooms_bookable'] > 0
+                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' rooms in use (' . $d['rooms_pct'] . '%)'
+                : 'No bookable rooms yet',
+            'go' => 'rooms',
+            'chip' => '',
+        ],
+        [
+            'tone' => $d['inv_out'] > 0 ? 'danger' : ($alerts > 0 ? 'warn' : 'ok'),
+            'icon' => 'inventory_2',
+            'label' => 'Stock alerts',
+            'val' => $alerts,
+            'sub' => $alerts > 0
+                ? $d['inv_out'] . ' out · ' . $d['inv_low'] . ' low · of ' . $d['inv_total'] . ' items'
+                : 'All ' . $d['inv_total'] . ' items stocked',
+            'go' => 'inventory',
+            'chip' => '',
+        ],
+    ];
+?>
+    <!-- ── Stat cards ─────────────────────────────────────────────── -->
+    <section class="dash-kpis" aria-label="Key figures">
+        <?php foreach ($kpis as $k): ?>
+            <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
+                data-dash-go="<?php echo dash_h($k['go']); ?>" data-dash-chip="<?php echo dash_h($k['chip']); ?>">
+                <span class="dash-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($k['icon']); ?></span></span>
+                <span class="dash-kpi-body">
+                    <span class="dash-kpi-label"><?php echo dash_h($k['label']); ?></span>
+                    <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
+                    <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
+                </span>
+                <span class="material-symbols-outlined dash-kpi-go" aria-hidden="true">arrow_outward</span>
+            </button>
+        <?php endforeach; ?>
+    </section>
+
+    <div class="dash-grid">
+
+        <!-- ── Activity chart ─────────────────────────────────────── -->
+        <section class="dash-card dash-area-chart" aria-labelledby="dashChartTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashChartTitle">Demand &amp; decisions</h2>
+                    <p>New requests per day, split by how they were decided</p>
+                </div>
+                <div class="dash-controls">
+                    <div class="dash-seg" role="group" aria-label="Dataset">
+                        <button type="button" class="dash-seg-btn active" data-dash-set="equipment" aria-pressed="true">Equipment</button>
+                        <button type="button" class="dash-seg-btn" data-dash-set="rooms" aria-pressed="false">Rooms</button>
+                    </div>
+                    <div class="dash-seg" role="group" aria-label="Range">
+                        <button type="button" class="dash-seg-btn" data-dash-range="7" aria-pressed="false">7D</button>
+                        <button type="button" class="dash-seg-btn active" data-dash-range="14" aria-pressed="true">14D</button>
+                        <button type="button" class="dash-seg-btn" data-dash-range="30" aria-pressed="false">30D</button>
+                    </div>
+                </div>
+            </header>
+            <div class="dash-chart-wrap" data-chart="<?php echo dash_h(json_encode($d['chart'], JSON_UNESCAPED_UNICODE)); ?>">
+                <div class="dash-chart-sum" data-dash-summary></div>
+                <div class="dash-chart" data-dash-chart role="img" aria-label="Bar chart of requests per day"></div>
+                <div class="dash-legend" data-dash-legend></div>
+            </div>
+        </section>
+
+        <!-- ── Needs attention ────────────────────────────────────── -->
+        <section class="dash-card dash-area-attn" aria-labelledby="dashAttnTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashAttnTitle">Needs attention</h2>
+                    <p>What to act on right now</p>
+                </div>
+                <?php if ($attn): ?><span class="dash-count-pill"><?php echo count($attn); ?></span><?php endif; ?>
+            </header>
+            <?php if ($attn): ?>
+                <ul class="dash-attn">
+                    <?php foreach ($attn as $a): ?>
+                        <li>
+                            <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
+                                data-dash-go="<?php echo dash_h($a['go']); ?>" data-dash-chip="<?php echo dash_h($a['chip']); ?>">
+                                <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
+                                <span class="dash-attn-text">
+                                    <strong><?php echo dash_h($a['title']); ?></strong>
+                                    <small><?php echo dash_h($a['sub']); ?></small>
+                                </span>
+                                <span class="material-symbols-outlined dash-attn-go" aria-hidden="true">chevron_right</span>
+                            </button>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty dash-empty--ok">
+                    <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+                    <strong>You're all caught up</strong>
+                    <small>No approvals, overdue returns, room issues or stock problems.</small>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Rooms today ────────────────────────────────────────── -->
+        <section class="dash-card dash-area-rooms" aria-labelledby="dashRoomsTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashRoomsTitle">Rooms</h2>
+                    <p>Today's usage and what's coming up</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="rooms">Manage</button>
+            </header>
+            <div class="dash-meter">
+                <div class="dash-meter-top">
+                    <span><strong><?php echo (int)$d['rooms_in_use']; ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> rooms in use today</span>
+                    <span class="dash-meter-pct"><?php echo (int)$d['rooms_pct']; ?>%</span>
+                </div>
+                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Room utilization today">
+                    <span style="width:<?php echo max($d['rooms_pct'] > 0 ? 2 : 0, (int)$d['rooms_pct']); ?>%"></span>
+                </div>
+                <?php if ($d['rooms_issues'] > 0): ?>
+                    <div class="dash-meter-note dash-tone-warn"><span class="material-symbols-outlined" aria-hidden="true">build</span><?php echo dash_pl($d['rooms_issues'], 'open issue'); ?> reported</div>
+                <?php endif; ?>
+            </div>
+            <?php if ($d['upcoming']): ?>
+                <ul class="dash-list">
+                    <?php foreach ($d['upcoming'] as $u):
+                        $dayLbl = $u['reservation_date'] === $d['today'] ? 'Today' : ($u['reservation_date'] === $tomorrow ? 'Tomorrow' : date('D, M j', strtotime($u['reservation_date'])));
+                    ?>
+                        <li class="dash-row">
+                            <span class="dash-row-when"><strong><?php echo dash_h($dayLbl); ?></strong><small><?php echo dash_h(date('g:i A', strtotime($u['start_time']))); ?></small></span>
+                            <span class="dash-row-main">
+                                <strong><?php echo dash_h($u['room_name'] ?? 'Room'); ?></strong>
+                                <small><?php echo dash_h(trim(($u['purpose'] ?? '') . ' · ' . ($u['faculty_name'] ?? ''), ' ·')); ?></small>
+                            </span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty"><small>No upcoming reservations.</small></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Most requested equipment ───────────────────────────── -->
+        <section class="dash-card dash-area-top" aria-labelledby="dashTopTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashTopTitle">Most requested</h2>
+                    <p>Equipment demand, last 30 days</p>
+                </div>
+            </header>
+            <?php if ($d['top']):
+                $max = max(1, (int)$d['top'][0]['total']); ?>
+                <ul class="dash-list dash-bars">
+                    <?php foreach ($d['top'] as $t):
+                        $tot = (int)$t['total'];
+                        $ok  = (int)$t['ok']; ?>
+                        <li>
+                            <div class="dash-bars-top"><span><?php echo dash_h($t['equipment_name']); ?></span><strong><?php echo $tot; ?></strong></div>
+                            <div class="dash-bar dash-bar--two" title="<?php echo $ok; ?> approved of <?php echo $tot; ?>">
+                                <span class="dash-bar-all" style="width:<?php echo round($tot / $max * 100); ?>%"></span>
+                                <span class="dash-bar-ok" style="width:<?php echo round($ok / $max * 100); ?>%"></span>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+                <p class="dash-foot"><span class="dash-dot dash-dot--ok"></span>Approved <span class="dash-dot dash-dot--all"></span>All requests</p>
+            <?php else: ?>
+                <div class="dash-empty"><small>No requests in the last 30 days.</small></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Stock watch ────────────────────────────────────────── -->
+        <section class="dash-card dash-area-stock" aria-labelledby="dashStockTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashStockTitle">Stock watch</h2>
+                    <p>Items with 2 or fewer units available</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="inventory">Manage</button>
+            </header>
+            <?php if ($d['stock']): ?>
+                <ul class="dash-list">
+                    <?php foreach ($d['stock'] as $s):
+                        $q = (int)$s['quantity']; ?>
+                        <li class="dash-row">
+                            <span class="dash-row-main">
+                                <strong><?php echo dash_h($s['item_name']); ?></strong>
+                                <small><?php echo dash_h($s['category']); ?></small>
+                            </span>
+                            <span class="dash-qty <?php echo $q <= 0 ? 'dash-qty--out' : 'dash-qty--low'; ?>"><?php echo $q <= 0 ? 'Out' : $q . ' left'; ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty dash-empty--ok">
+                    <span class="material-symbols-outlined" aria-hidden="true">inventory</span>
+                    <strong>Stock looks healthy</strong>
+                    <small>Every item has 3 or more units.</small>
+                </div>
+            <?php endif; ?>
+            <?php if ($d['inv_total'] > 0):
+                $healthy = max(0, $d['inv_total'] - $d['inv_out'] - $d['inv_low']);
+                $pct = fn(int $n): float => round($n / $d['inv_total'] * 100, 1); ?>
+                <div class="dash-health">
+                    <div class="dash-health-top"><span>Catalog health</span><strong><?php echo (int)round($healthy / $d['inv_total'] * 100); ?>% well stocked</strong></div>
+                    <div class="dash-stack" role="img" aria-label="<?php echo $healthy; ?> well stocked, <?php echo (int)$d['inv_low']; ?> low, <?php echo (int)$d['inv_out']; ?> out of stock">
+                        <span class="dash-stack-ok" style="width:<?php echo $pct($healthy); ?>%"></span>
+                        <span class="dash-stack-low" style="width:<?php echo $pct($d['inv_low']); ?>%"></span>
+                        <span class="dash-stack-out" style="width:<?php echo $pct($d['inv_out']); ?>%"></span>
+                    </div>
+                    <p class="dash-foot dash-foot--flat"><span class="dash-dot dash-dot--ok"></span><?php echo $healthy; ?> ok<span class="dash-dot dash-dot--low"></span><?php echo (int)$d['inv_low']; ?> low<span class="dash-dot dash-dot--out"></span><?php echo (int)$d['inv_out']; ?> out</p>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Latest requests ────────────────────────────────────── -->
+        <section class="dash-card dash-area-latest" aria-labelledby="dashLatestTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashLatestTitle">Latest requests</h2>
+                    <p>Most recent equipment requests</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="requests" data-dash-chip="rq-waiting">View all</button>
+            </header>
+            <div class="ps-table-wrap">
+                <table class="ps-table dash-table">
+                    <thead>
+                        <tr>
+                            <th>Requester</th>
+                            <th>Equipment</th>
+                            <th>Borrow period</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($d['latest']):
+                            foreach ($d['latest'] as $r):
+                                $badge = match ($r['status']) {
+                                    'Waiting'  => 'ps-badge--waiting',
+                                    'Approved' => 'ps-badge--active',
+                                    'Overdue'  => 'ps-badge--overdue',
+                                    default    => 'ps-badge--returned',
+                                };
+                                $b = strtotime($r['borrow_date']);
+                                $e = strtotime($r['return_date']);
+                                $period = date('M j', $b) . ($r['borrow_date'] !== $r['return_date'] ? ' – ' . date('M j', $e) : '');
+                        ?>
+                                <tr>
+                                    <td>
+                                        <div class="dash-cell-name"><?php echo dash_h($r['faculty_name']); ?></div>
+                                        <div class="dash-cell-sub"><?php echo dash_h(faculty_id_display($r['faculty_id'], 'Not set')); ?> · <?php echo dash_h(dash_ago($r['age_s'] ?? null, $r['request_date'])); ?></div>
+                                    </td>
+                                    <td><?php echo dash_h($r['equipment_name']); ?></td>
+                                    <td class="dash-cell-muted"><?php echo dash_h($period); ?></td>
+                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo dash_h($r['status']); ?></span></td>
+                                </tr>
+                            <?php endforeach;
+                        else: ?>
+                            <tr>
+                                <td colspan="4" class="dash-cell-empty">No requests yet.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── Decision log ───────────────────────────────────────── -->
+        <section class="dash-card dash-area-log" aria-labelledby="dashLogTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashLogTitle">Recent decisions</h2>
+                    <p>From the arbitration engine</p>
+                </div>
+            </header>
+            <?php if ($d['log']): ?>
+                <ul class="dash-list dash-log">
+                    <?php foreach ($d['log'] as $l):
+                        $dec  = (string)$l['decision'];
+                        $tone = $dec === 'Approved' ? 'ok' : ($dec === 'Declined' ? 'danger' : 'info');
+                        $icon = $dec === 'Approved' ? 'check_circle' : ($dec === 'Declined' ? 'cancel' : ($dec === 'Returned' ? 'assignment_return' : 'info'));
+                        $who  = !empty($l['override_by']) && $dec !== 'Returned' ? 'Manual override by ' . $l['override_by'] : ($l['borrower_name'] ?? '');
+                    ?>
+                        <li class="dash-row dash-tone-<?php echo $tone; ?>">
+                            <span class="dash-log-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $icon; ?></span></span>
+                            <span class="dash-row-main">
+                                <strong><?php echo dash_h($l['equipment_name']); ?> <em><?php echo dash_h($dec); ?></em></strong>
+                                <small title="<?php echo dash_h($l['reason'] ?? ''); ?>"><?php echo dash_h($who); ?></small>
+                            </span>
+                            <span class="dash-row-time"><?php echo dash_h(dash_ago($l['age_s'] ?? null, $l['created_at'])); ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty"><small>No decisions logged yet.</small></div>
+            <?php endif; ?>
+        </section>
+
+    </div>
+<?php
+}
+
+// Live-refresh request from admin-dashboard.js: return just the dashboard body and stop.
+// (admin-functions.php above has already enforced the admin session.)
+if (($_GET['fragment'] ?? '') === 'dashboard') {
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    dash_render(dash_collect($conn));
+    exit;
+}
+?>
+
+<?php
 // ================= NOTIFICATIONS (live feed) =================
 // Computed fresh on every load from tbl_requests / tbl_room_issues /
 // tbl_inventory — see notif-functions.php. $notif_unread drives every
@@ -16,6 +638,52 @@ $notif_unread  = notif_count_unread($notifications);
 $notif_cat_counts = ['request' => 0, 'overdue' => 0, 'room' => 0, 'system' => 0];
 foreach ($notifications as $n) {
     if (isset($notif_cat_counts[$n['cat']])) $notif_cat_counts[$n['cat']]++;
+}
+?>
+<?php
+// ── APPROVALS UI HELPERS (display only — no DB access) ───────────────────────
+// ps_doc_info(): turns a stored document_path into a safe, display-ready
+// descriptor. Only paths inside the two known upload folders are accepted
+// (no "..", no odd characters), so a bad value in the DB can never become a
+// link to something else. Returns null when there is no usable document.
+if (!function_exists('ps_doc_info')) {
+    function ps_doc_info($path)
+    {
+        $path = trim((string)$path);
+        if ($path === '' || strpos($path, '..') !== false) return null;
+        if (!preg_match('#^uploads/(request_letters|room_documents)/([A-Za-z0-9._ \-]+)$#', $path, $m)) return null;
+        $base = $m[2];
+        $ext  = strtolower(pathinfo($base, PATHINFO_EXTENSION));
+        $kind = $ext === 'pdf' ? 'pdf' : (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) ? 'image' : 'file');
+        return [
+            'url'  => 'uploads/' . $m[1] . '/' . rawurlencode($base),
+            // hide the upload timestamp prefix (e.g. "1790900630_" or "20261002_081929_")
+            'name' => preg_replace('/^(\d{8}_\d{6}_|\d{9,}_)/', '', $base),
+            'kind' => $kind,
+            'ext'  => strtoupper($ext),
+        ];
+    }
+}
+// ps_submitted_as_label(): human label for tbl_requests / tbl_room_reservations.submitted_as
+if (!function_exists('ps_submitted_as_label')) {
+    function ps_submitted_as_label($v)
+    {
+        switch ((string)$v) {
+            case 'adviser':
+                return 'Org Adviser';
+            case 'student':
+                return 'Student (via code)';
+            default:
+                return 'Faculty';
+        }
+    }
+}
+// ps_doc_icon(): Material Symbols icon name for a document kind
+if (!function_exists('ps_doc_icon')) {
+    function ps_doc_icon($kind)
+    {
+        return $kind === 'pdf' ? 'picture_as_pdf' : ($kind === 'image' ? 'image' : 'draft');
+    }
 }
 ?>
 <?php
@@ -127,7 +795,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </a>
                 <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
                     <span class="material-symbols-outlined">assignment</span>
-                    <span class="nav-label">Requests</span>
+                    <span class="nav-label">Approvals</span>
                     <?php if ($stat_waiting > 0): ?>
                         <span class="nav-badge"><?php echo $stat_waiting; ?></span>
                     <?php endif; ?>
@@ -144,6 +812,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <a class="nav-item" data-tab="faculty" href="#">
                         <span class="material-symbols-outlined">group</span>
                         <span class="nav-label">Faculty</span>
+                    </a>
+                    <a class="nav-item" data-tab="admins" id="snav-admins" href="#">
+                        <span class="material-symbols-outlined">admin_panel_settings</span>
+                        <span class="nav-label">Admins</span>
                     </a>
                 <?php endif; ?>
             </div>
@@ -182,262 +854,67 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     ============================================================ -->
             <div class="tab-panel active" id="panel-dashboard">
 
-                <!-- Overdue + flash messages (item/room saved, archived, restored, error) are now shown as
+                <!-- Overdue + flash messages (item/room saved, archived, restored, error) are shown as
                      toasts: see #toast-queue near the bottom of this file and initToastQueue() in
                      admin-dashboard.js. -->
 
-                <!-- Page header row -->
-                <div class="ps-page-header-row">
-                    <div class="ps-page-header">
-                        <h1>Good <?php
-                                    $hour = (int)date('H');
-                                    echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
-                                    ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
-                        <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
-                    </div>
-                    <div class="ps-dash-top-actions">
-                        <!-- Dashboard-only shortcuts (the sidebar keeps its own Notifications / account buttons).
-                             They live inside #panel-dashboard, so they are only visible on this tab. The badge
-                             uses .notif-btn-badge, which _updateBadges() in admin-dashboard.js keeps in sync. -->
-                        <button type="button" class="notif-btn ps-dash-top-btn" id="dashNotifBtn"
-                            data-action="open-notif-modal" aria-label="Open notifications" title="Notifications">
-                            <span class="material-symbols-outlined">notifications</span>
-                            <span class="notif-btn-badge" id="dashNotifBadge"
-                                style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
-                        </button>
-                        <button type="button" class="avatar-btn" id="dashAvatarBtn"
-                            data-action="open-account-settings" aria-label="Open my account" title="My account"><?php echo htmlspecialchars($initials); ?></button>
-                    </div>
-                </div>
+                <?php
+                // dash_collect() / dash_render() are defined at the top of this file; the same markup is
+                // returned by admin-dashboard.php?fragment=dashboard for the live refresh.
+                $dash_data = dash_collect($conn);
+                ?>
+                <div class="dash dash-intro" id="dash">
 
-                <!-- Stat cards -->
-                <div class="ps-stats-row">
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--maroon">
-                            <span class="material-symbols-outlined">assignment</span>
+                    <!-- Header: greeting + primary actions + bell/avatar.
+                         Everything here is static (never swapped by the live refresh), so the ids that
+                         admin-dashboard.js binds to — greetName, dashNotifBtn, dashNotifBadge, dashAvatarBtn,
+                         openQrScannerBtn — stay put. -->
+                    <header class="dash-head">
+                        <div class="dash-head-text">
+                            <h1>Good <?php
+                                        $hour = (int)date('H');
+                                        echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
+                                        ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
+                            <p>
+                                <?php echo date('l, F j, Y'); ?>
+                                <span class="dash-live" title="This page refreshes itself every few seconds">
+                                    <span class="dash-live-dot" aria-hidden="true"></span>Live &middot; updated <span id="dashUpdated"><?php echo date('g:i A'); ?></span>
+                                </span>
+                            </p>
                         </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_waiting; ?></div>
-                            <div class="ps-stat-lbl">Waiting Requests</div>
-                            <?php if ($stat_waiting > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn">Needs action</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">All clear</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--green">
-                            <span class="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_approved; ?></div>
-                            <div class="ps-stat-lbl">Active Borrowings</div>
-                            <div class="ps-stat-sub">Currently out</div>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--red">
-                            <span class="material-symbols-outlined">schedule</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_overdue; ?></div>
-                            <div class="ps-stat-lbl">Overdue Items</div>
-                            <?php if ($stat_overdue > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn">Immediate attention</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">None overdue</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--orange">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_inv_total; ?></div>
-                            <div class="ps-stat-lbl">Total Inventory</div>
-                            <?php if ($stat_inv_low > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn"><?php echo $stat_inv_low; ?> low stock</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">Stock OK</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Actions label -->
-                <div class="ps-section-label">
-                    <span class="material-symbols-outlined">bolt</span> Quick Actions
-                </div>
-
-                <!-- Quick Action cards -->
-                <div class="ps-quick-actions">
-                    <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="waiting" style="cursor:pointer">
-                        <span class="material-symbols-outlined">assignment_turned_in</span>
-                        <strong>Review Requests</strong>
-                        <small><?php echo $stat_waiting; ?> waiting for approval</small>
-                    </div>
-                    <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="inventory" style="cursor:pointer">
-                        <span class="material-symbols-outlined">add_box</span>
-                        <strong>Add Equipment</strong>
-                        <small>Update inventory catalog</small>
-                    </div>
-                    <!-- Scan Return (moved here from the sidebar). Keeps id="openQrScannerBtn": initQrScanner() in
-                         admin-dashboard.js binds to it. -->
-                    <button type="button" class="ps-qa-card ps-qa-card--dark" id="openQrScannerBtn">
-                        <span class="material-symbols-outlined">qr_code_scanner</span>
-                        <strong>Scan Return</strong>
-                        <small>Scan a QR code to confirm a return</small>
-                    </button>
-                </div>
-
-                <!-- Two-col: Room Status + Faculty Overview (sits between Quick Actions and the Recent tables) -->
-                <div class="ps-two-col" style="margin-bottom:1.25rem;">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">meeting_room</span> Room Status</h3>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-rooms">Manage</button>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0");
-                            $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
-                            $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE() AND status <> 'Declined'");
-                            $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $rooms_total; ?></div>
-                                    <div class="ps-mini-lbl">Active Rooms</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--warning)"><?php echo $rooms_issues; ?></div>
-                                    <div class="ps-mini-lbl">Reported Issues</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $rooms_today; ?></div>
-                                    <div class="ps-mini-lbl">Reservations Today</div>
-                                </div>
+                        <div class="dash-head-tools">
+                            <div class="dash-actions">
+                                <button type="button" class="dash-btn dash-btn--primary" data-action="go-lending" data-lending="waiting">
+                                    <span class="material-symbols-outlined" aria-hidden="true">assignment_turned_in</span>Review approvals
+                                </button>
+                                <button type="button" class="dash-btn" data-action="go-lending" data-lending="inventory">
+                                    <span class="material-symbols-outlined" aria-hidden="true">add_box</span>Add equipment
+                                </button>
+                                <!-- Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
+                                <button type="button" class="dash-btn" id="openQrScannerBtn">
+                                    <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>Scan return
+                                </button>
+                            </div>
+                            <div class="dash-head-user">
+                                <!-- .notif-btn-badge is kept in sync by _updateBadges() in admin-dashboard.js -->
+                                <button type="button" class="notif-btn ps-dash-top-btn" id="dashNotifBtn"
+                                    data-action="open-notif-modal" aria-label="Open notifications" title="Notifications">
+                                    <span class="material-symbols-outlined">notifications</span>
+                                    <span class="notif-btn-badge" id="dashNotifBadge"
+                                        style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
+                                </button>
+                                <button type="button" class="avatar-btn" id="dashAvatarBtn"
+                                    data-action="open-account-settings" aria-label="Open my account" title="My account"><?php echo htmlspecialchars($initials); ?></button>
                             </div>
                         </div>
+                    </header>
+
+                    <!-- Live region: stat cards + panels. Re-rendered by the dashboard block at the end of admin-dashboard.js. -->
+                    <div id="dashLive">
+                        <?php dash_render($dash_data); ?>
                     </div>
 
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
-                            <?php if ($is_super_admin): ?>
-                                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users");
-                            $fac_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role != 'Organization Adviser'");
-                            $fac_active = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role = 'Organization Adviser'");
-                            $fac_org    = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $fac_total; ?></div>
-                                    <div class="ps-mini-lbl">Total Faculty</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $fac_active; ?></div>
-                                    <div class="ps-mini-lbl">Active</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--accent-maroon)"><?php echo $fac_org; ?></div>
-                                    <div class="ps-mini-lbl">Org Advisers</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Two-col: Recent Requests + Recent Activity -->
-                <div class="ps-two-col">
-
-                    <!-- Recent Requests -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">assignment</span> Recent Requests</h3>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-lending" data-lending="waiting">View All</button>
-                        </div>
-                        <div class="ps-card-body" style="padding:0">
-                            <div class="ps-table-wrap">
-                                <table class="ps-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Requester</th>
-                                            <th>Equipment</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php
-                                        $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 5");
-                                        if ($recent_req && mysqli_num_rows($recent_req) > 0):
-                                            while ($rr = mysqli_fetch_assoc($recent_req)):
-                                                $badge = match ($rr['status']) {
-                                                    'Waiting'  => 'ps-badge--waiting',
-                                                    'Approved' => 'ps-badge--active',
-                                                    'Overdue'  => 'ps-badge--overdue',
-                                                    'Returned' => 'ps-badge--returned',
-                                                    default    => 'ps-badge--returned',
-                                                };
-                                        ?>
-                                                <tr>
-                                                    <td>
-                                                        <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
-                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($rr['faculty_id'], 'Not set')); ?></div>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
-                                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
-                                                </tr>
-                                            <?php endwhile;
-                                        else: ?>
-                                            <tr>
-                                                <td colspan="3" style="text-align:center;color:var(--text-light);padding:1.5rem">No requests yet.</td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Recent Activity</h3>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $recent_act = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
-                            if ($recent_act && mysqli_num_rows($recent_act) > 0):
-                                while ($ra = mysqli_fetch_assoc($recent_act)):
-                                    $dot_active = in_array($ra['status'], ['Approved', 'Returned']) ? '' : 'ps-feed-dot--gray';
-                            ?>
-                                    <div class="ps-feed-item">
-                                        <div class="ps-feed-dot <?php echo $dot_active; ?>"></div>
-                                        <div class="ps-feed-body">
-                                            <div class="ps-feed-title"><?php echo htmlspecialchars($ra['equipment_name']); ?> — <?php echo htmlspecialchars($ra['status']); ?></div>
-                                            <div class="ps-feed-meta"><?php echo htmlspecialchars($ra['faculty_name']); ?></div>
-                                        </div>
-                                        <div class="ps-feed-time"><?php echo date('M d', strtotime($ra['request_date'])); ?></div>
-                                    </div>
-                                <?php endwhile;
-                            else: ?>
-                                <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem">No activity yet.</p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+                </div><!-- /dash -->
 
             </div><!-- /panel-dashboard -->
 
@@ -450,8 +927,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Page header -->
                 <div class="ps-page-header-row">
                     <div class="ps-page-header">
-                        <h1>Equipment Requests</h1>
-                        <p>Review, approve, or decline borrow requests submitted by faculty and students.</p>
+                        <h1>Approvals</h1>
+                        <p>Review special requests that need a policy override, mainly Organization Adviser submissions with supporting documents. Standard requests are processed automatically.</p>
                     </div>
                     <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
                         <span class="material-symbols-outlined">download</span> Export
@@ -485,65 +962,105 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rq-sub-panel active" id="rq-waiting">
                     <div class="ps-help-note">
                         <span class="material-symbols-outlined">info</span>
-                        These requests are pending your approval. Approve to issue the item, or decline with an optional reason.
+                        Standard requests are approved automatically. Only requests that need a policy override appear here, usually from Organization Advisers with a supporting document. Open the document, then approve or decline.
                     </div>
                     <div class="ps-card">
                         <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">pending</span> Waiting for Approval</h3>
+                            <h3><span class="material-symbols-outlined">pending</span> Pending Review</h3>
                             <div style="display:flex;gap:6px">
                                 <input class="ps-form-control" style="width:200px" placeholder="Search requester..." id="rq-waiting-search">
                             </div>
                         </div>
                         <div class="ps-table-wrap">
-                            <table class="ps-table" id="rq-waiting-table">
+                            <table class="ps-table ps-appr-table" id="rq-waiting-table">
                                 <thead>
                                     <tr>
-                                        <th>Request ID</th>
-                                        <th>Requester</th>
-                                        <th>Student/Faculty ID</th>
-                                        <th>Equipment</th>
-                                        <th>Date Requested</th>
-                                        <th>Date Needed</th>
-                                        <th>Actions</th>
+                                        <th>Request</th>
+                                        <th>Item</th>
+                                        <th>Document</th>
+                                        <th>Status</th>
+                                        <th class="ps-appr-th-act">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
+                                    // Collect rows, count batch sizes, and list rows WITH a document first
+                                    // (attachment-first workflow). Order within each group stays newest-first.
                                     mysqli_data_seek($waiting_result, 0);
-                                    if (mysqli_num_rows($waiting_result) > 0):
-                                        while ($r = mysqli_fetch_assoc($waiting_result)):
+                                    $ps_w_with = [];
+                                    $ps_w_without = [];
+                                    $ps_w_batch = [];
+                                    while ($rw = mysqli_fetch_assoc($waiting_result)) {
+                                        if (!empty($rw['batch_id'])) {
+                                            $ps_w_batch[$rw['batch_id']] = ($ps_w_batch[$rw['batch_id']] ?? 0) + 1;
+                                        }
+                                        if (ps_doc_info($rw['document_path'] ?? '')) $ps_w_with[] = $rw;
+                                        else $ps_w_without[] = $rw;
+                                    }
+                                    $ps_w_rows = array_merge($ps_w_with, $ps_w_without);
+                                    if (count($ps_w_rows) > 0):
+                                        foreach ($ps_w_rows as $r):
+                                            $doc      = ps_doc_info($r['document_path'] ?? '');
+                                            $qty      = max(1, (int)($r['borrow_qty'] ?? 1));
+                                            $who_type = ps_submitted_as_label($r['submitted_as'] ?? '');
+                                            $batch_n  = !empty($r['batch_id']) ? (int)($ps_w_batch[$r['batch_id']] ?? 1) : 1;
                                     ?>
-                                            <tr class="ps-req-row"
+                                            <tr class="ps-req-row ps-appr-row<?php echo $doc ? ' has-doc' : ''; ?>"
                                                 data-id="<?php echo (int)$r['id']; ?>"
                                                 data-status="Waiting"
                                                 data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
                                                 data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
                                                 data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="Faculty"
+                                                data-req-type="<?php echo htmlspecialchars($who_type); ?>"
                                                 data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-qty="<?php echo $qty; ?>"
+                                                data-batch-n="<?php echo $batch_n; ?>"
                                                 data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
                                                 data-room="<?php echo htmlspecialchars($r['room']); ?>"
                                                 data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
                                                 data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
                                                 data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
                                                 data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
+                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
+                                                data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
+                                                data-doc-url="<?php echo $doc ? htmlspecialchars($doc['url']) : ''; ?>"
+                                                data-doc-name="<?php echo $doc ? htmlspecialchars($doc['name']) : ''; ?>"
+                                                data-doc-kind="<?php echo $doc ? $doc['kind'] : ''; ?>">
                                                 <td>
-                                                    <strong style="color:var(--accent-maroon);cursor:pointer"
-                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">
-                                                        #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
-                                                    </strong>
+                                                    <button type="button" class="ps-appr-id"
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal"
+                                                        title="Open review panel">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
+                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($who_type); ?> &middot; <?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></div>
                                                 </td>
                                                 <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)">Faculty</div>
+                                                    <div class="ps-appr-item">
+                                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                                        <?php if ($qty > 1): ?><span class="ps-appr-qty">&times;<?php echo $qty; ?></span><?php endif; ?>
+                                                    </div>
+                                                    <div class="ps-appr-sub">
+                                                        Needed <?php echo date('M d', strtotime($r['borrow_date'])); ?>
+                                                        <?php if ($batch_n > 1): ?><span class="ps-appr-batch" title="Part of one submission with <?php echo $batch_n; ?> items">Batch of <?php echo $batch_n; ?></span><?php endif; ?>
+                                                    </div>
                                                 </td>
-                                                <td><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></td>
-                                                <td><?php echo date('M d, g:i A', strtotime($r['borrow_date'])); ?></td>
                                                 <td>
-                                                    <div style="display:flex;gap:6px">
+                                                    <?php if ($doc): ?>
+                                                        <a class="ps-doc-chip ps-doc-chip--<?php echo $doc['kind']; ?>"
+                                                            href="<?php echo htmlspecialchars($doc['url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                            title="Open <?php echo htmlspecialchars($doc['name']); ?> in a new tab">
+                                                            <span class="material-symbols-outlined"><?php echo ps_doc_icon($doc['kind']); ?></span>
+                                                            <span class="ps-doc-chip__name"><?php echo htmlspecialchars($doc['name']); ?></span>
+                                                            <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <span class="ps-doc-chip ps-doc-chip--none">
+                                                            <span class="material-symbols-outlined">block</span> No document
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span></td>
+                                                <td>
+                                                    <div class="ps-appr-actions">
                                                         <button class="ps-btn ps-btn--success ps-btn--sm"
                                                             data-action="ps-open-modal" data-modal="ps-approve-modal">
                                                             <span class="material-symbols-outlined">check</span> Approve
@@ -555,13 +1072,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     </div>
                                                 </td>
                                             </tr>
-                                        <?php endwhile;
+                                        <?php endforeach;
                                     else: ?>
                                         <tr>
-                                            <td colspan="7">
+                                            <td colspan="5">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">assignment_turned_in</span>
-                                                    <p>No pending requests. All caught up!</p>
+                                                    <p>Nothing needs your review. Standard requests are processed automatically.</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -794,7 +1311,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="pr-page-header-row">
                     <div>
                         <h1 class="pr-page-title">Room Management</h1>
-                        <p class="pr-page-subtitle">Manage campus rooms, reservations, and reported issues. <?php echo $stat_rooms_total; ?> active room<?php echo $stat_rooms_total !== 1 ? 's' : ''; ?> — <?php echo $stat_rooms_available; ?> Available, <?php echo $stat_rooms_maintenance; ?> Maintenance, <?php echo $stat_rooms_notbookable; ?> Not Bookable.</p>
+                        <p class="pr-page-subtitle">Browse rooms, reservations and reported issues.</p>
                     </div>
                     <div style="display:flex;gap:8px;flex-shrink:0;">
                         <button class="pr-btn pr-btn-ghost pr-btn-sm" data-rooms-tab="rooms-archived" title="View archived rooms">
@@ -900,24 +1417,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </div>
                                 </div>
 
-                                <!-- Row 3: Seating Capacity | Room Status -->
+                                <!-- Row 3: Room Status | Display Position -->
                                 <div class="form-row">
-                                    <div class="form-group">
-                                        <label>
-                                            Seating Capacity <small class="field-optional">(optional)</small>
-                                            <span class="field-tip" data-tip="How many people this room can hold. Leave blank if unknown." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">How many people this room can hold. Leave blank if unknown.</span>
-                                            </span>
-                                        </label>
-                                        <input type="number" name="seating_capacity" class="form-control-custom" min="1"
-                                            value="<?php echo ($edit_room && $edit_room['seating_capacity'] !== null) ? (int)$edit_room['seating_capacity'] : ''; ?>"
-                                            placeholder="e.g. 40">
-                                    </div>
                                     <div class="form-group">
                                         <label>
                                             Room Status <span class="req-star" aria-label="required">*</span>
@@ -939,10 +1440,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-                                </div>
-
-                                <!-- Row 4: Display Position (left only, right empty — mirrors Quantity row in equipment form) -->
-                                <div class="form-row">
                                     <div class="form-group">
                                         <label>
                                             Display Position <small class="field-optional">(optional)</small>
@@ -958,10 +1455,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <input type="number" name="sort_order" class="form-control-custom" min="0"
                                             value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
                                     </div>
-                                    <div class="form-group"><!-- empty right column --></div>
                                 </div>
 
-                                <!-- Row 5: Room Features (full width) -->
+                                <!-- Row 4: Room Features (full width) -->
                                 <div class="form-group">
                                     <label>
                                         Room Features <small class="field-optional">(optional)</small>
@@ -1033,8 +1529,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- ── Tab navigation (streamlined: 2 tabs — Rooms + Issues) ── -->
                 <div class="pr-sub-tabs" id="rooms-toggle-wrap">
-                    <button class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
+                    <button class="pr-sub-tab active" data-rooms-tab="rooms-active">
+                        <span class="material-symbols-outlined">meeting_room</span>
+                        Rooms
+                    </button>
+                    <button class="pr-sub-tab" data-rooms-tab="rooms-reservations">
+                        <span class="material-symbols-outlined">calendar_month</span>
+                        Reservations
+                        <?php
+                        $rm_resv_approved = count(array_filter($admin_room_reservations ?? [], function ($r) {
+                            return ($r['status'] ?? '') === 'Approved';
+                        }));
+                        if ($rm_resv_approved > 0): ?>
+                            <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo $rm_resv_approved; ?></span>
+                        <?php endif; ?>
+                    </button>
                     <button class="pr-sub-tab" data-rooms-tab="rooms-issues">
+                        <span class="material-symbols-outlined">report_problem</span>
                         Issues
                         <?php if (!empty($admin_room_issues_open)): ?>
                             <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
@@ -1046,83 +1557,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                      SUB-PANEL: ACTIVE ROOMS
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
-
-                    <div class="pr-card">
-                        <div class="pr-card-header">
-                            <h3>
-                                <span class="material-symbols-outlined">calendar_month</span>
-                                Reservations
-                            </h3>
-                        </div>
-                        <div class="pr-tbl-wrap">
-                            <table class="pr-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Room</th>
-                                        <th>Location</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Faculty</th>
-                                        <th>Submitted As</th>
-                                        <th>Purpose</th>
-                                        <th>Status</th>
-                                        <th>Reason</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($admin_room_reservations)): ?>
-                                        <tr>
-                                            <td colspan="11" style="text-align:center;padding:2.5rem;color:var(--text-light);">No reservations yet.</td>
-                                        </tr>
-                                        <?php else: foreach ($admin_room_reservations as $ar):
-                                            $ar_pill = 'pr-pill-approved';
-                                            if ($ar['status'] === 'Declined')  $ar_pill = 'pr-pill-declined';
-                                            if ($ar['status'] === 'Cancelled') $ar_pill = 'pr-pill-cancelled';
-
-                                            $ar_submitted = match ($ar['submitted_as']) {
-                                                'adviser' => 'Adviser',
-                                                'student' => 'Student (via code)',
-                                                default   => 'Personal',
-                                            };
-                                            $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
-                                                ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
-                                                : htmlspecialchars($ar['faculty_name']);
-                                        ?>
-                                            <tr>
-                                                <td class="td-sm">#<?php echo (int)$ar['id']; ?></td>
-                                                <td class="td-fw"><?php echo htmlspecialchars($ar['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($ar['floor_label'] . ', ' . $ar['building_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></td>
-                                                <td style="white-space:nowrap;"><?php echo htmlspecialchars($ar['start_fmt'] . ' – ' . $ar['end_fmt']); ?></td>
-                                                <td><?php echo $ar_who; ?></td>
-                                                <td><?php echo htmlspecialchars($ar_submitted); ?></td>
-                                                <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
-                                                <td><span class="pr-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
-                                                <td class="td-sm"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
-                                                <td>
-                                                    <?php if ($ar['status'] === 'Approved'): ?>
-                                                        <button class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
-                                                            data-action="admin-cancel-reservation"
-                                                            data-rr-id="<?php echo (int)$ar['id']; ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
-                                                            data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
-                                                            title="Cancel this reservation">
-                                                            <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
-                                                            Cancel
-                                                        </button>
-                                                    <?php else: ?>
-                                                        <span class="td-sm">—</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
 
                     <?php
                     // ── Group active rooms by building → floor, and assign each
@@ -1138,7 +1572,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     ?>
 
                     <?php if (empty($rooms_buildings)): ?>
-                        <div class="pr-card" style="margin-top:1.75rem;">
+                        <div class="pr-card rm-rooms-card">
                             <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
@@ -1151,55 +1585,61 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     <?php else: ?>
 
-                        <div class="pr-card" style="margin-top:1.75rem;">
+                        <div class="pr-card rm-rooms-card">
                             <div class="pr-card-header">
                                 <h3>
                                     <span class="material-symbols-outlined">meeting_room</span>
                                     All Rooms
                                 </h3>
+                                <span class="rm-showing" id="rmShowing" aria-live="polite"></span>
                             </div>
 
                             <!-- ── Toolbar: search + Building / Floor / Status filters ── -->
-                            <div class="pr-rooms-toolbar">
-                                <div class="pr-search-wrap">
-                                    <span class="material-symbols-outlined">search</span>
-                                    <input type="text" id="roomSearchInput" placeholder="Search rooms…" autocomplete="off">
+                            <div class="pr-rooms-toolbar rm-toolbar" id="rmToolbar">
+                                <div class="rm-toolbar-top">
+                                    <div class="pr-search-wrap">
+                                        <span class="material-symbols-outlined">search</span>
+                                        <input type="text" id="roomSearchInput" placeholder="Search rooms…" autocomplete="off">
+                                    </div>
+                                    <div class="rm-status-chips" id="rmStatusChips" role="group" aria-label="Filter by status"></div>
                                 </div>
-                                <select id="roomBuildingSelect" class="pr-filter-select">
-                                    <option value="all">All Buildings</option>
-                                    <?php foreach ($rooms_buildings as $bid => $b): ?>
-                                        <option value="<?php echo (int)$bid; ?>" <?php echo $bid === $first_building_id ? ' selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($b['campus_name'] . ' · ' . $b['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <select id="roomFloorSelect" class="pr-filter-select">
-                                    <option value="all">All Floors</option>
-                                    <?php foreach (($floors_by_building_js[$first_building_id] ?? []) as $f): ?>
-                                        <option value="<?php echo (int)$f['num']; ?>"><?php echo htmlspecialchars($f['label']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <select id="roomStatusSelect" class="pr-filter-select">
-                                    <option value="all">All Statuses</option>
-                                    <option value="Available">Available</option>
-                                    <option value="Maintenance">Maintenance</option>
-                                    <option value="Not Bookable">Not Bookable</option>
-                                </select>
+                                <div class="rm-bld-pills" id="rmBuildingPills" role="group" aria-label="Filter by building"></div>
+                                <div class="rm-floor-chips" id="rmFloorChips" role="group" aria-label="Filter by floor"></div>
+                                <div class="rm-native-filters">
+                                    <select id="roomBuildingSelect" class="pr-filter-select">
+                                        <option value="all">All Buildings</option>
+                                        <?php foreach ($rooms_buildings as $bid => $b): ?>
+                                            <option value="<?php echo (int)$bid; ?>" <?php echo $bid === $first_building_id ? ' selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($b['campus_name'] . ' · ' . $b['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <select id="roomFloorSelect" class="pr-filter-select">
+                                        <option value="all">All Floors</option>
+                                        <?php foreach (($floors_by_building_js[$first_building_id] ?? []) as $f): ?>
+                                            <option value="<?php echo (int)$f['num']; ?>"><?php echo htmlspecialchars($f['label']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <select id="roomStatusSelect" class="pr-filter-select">
+                                        <option value="all">All Statuses</option>
+                                        <option value="Available">Available</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Not Bookable">Not Bookable</option>
+                                    </select>
+                                </div><!-- /.rm-native-filters -->
                             </div>
 
                             <!-- ── One flat, floor-grouped table for every building ────── -->
                             <div class="pr-tbl-wrap">
-                                <table class="pr-table pr-rooms-table" id="roomsRegistryTable">
+                                <table class="pr-rooms-table rm-grid" id="roomsRegistryTable" aria-label="Rooms">
                                     <colgroup>
                                         <col>
-                                        <col class="pr-col-capacity" style="width:110px;">
                                         <col style="width:150px;">
                                         <col style="width:132px;">
                                     </colgroup>
                                     <thead>
                                         <tr>
                                             <th>Room</th>
-                                            <th>Capacity</th>
                                             <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
@@ -1455,6 +1895,120 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div><!-- /#rooms-active-panel -->
 
                 <!-- ════════════════════════════════════════════════════
+                     SUB-PANEL: RESERVATIONS (moved here from the top of the Rooms tab)
+                     ════════════════════════════════════════════════════ -->
+                <div class="rooms-sub-panel" id="rooms-reservations-panel">
+                    <div class="pr-card">
+                        <div class="pr-card-header">
+                            <h3>
+                                <span class="material-symbols-outlined">calendar_month</span>
+                                Reservations
+                            </h3>
+                        </div>
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table ps-appr-table">
+                                <thead>
+                                    <tr>
+                                        <th>Reservation</th>
+                                        <th>When</th>
+                                        <th>Requested by</th>
+                                        <th>Document</th>
+                                        <th>Status</th>
+                                        <th class="ps-appr-th-act">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($admin_room_reservations)): ?>
+                                        <tr>
+                                            <td colspan="6" style="text-align:center;padding:2.5rem;color:var(--text-light);">No reservations yet.</td>
+                                        </tr>
+                                        <?php else: foreach ($admin_room_reservations as $ar):
+                                            $ar_badge = 'ps-badge--active';
+                                            if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
+                                            if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
+
+                                            $ar_type    = ps_submitted_as_label($ar['submitted_as']);
+                                            $ar_is_stud = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name']);
+                                            $ar_name    = $ar_is_stud ? $ar['submitted_by_name'] : $ar['faculty_name'];
+                                            $ar_sub     = $ar_is_stud ? 'Student via ' . $ar['faculty_name'] : $ar_type;
+                                            $ar_doc     = ps_doc_info($ar['document_path'] ?? '');
+                                            $ar_where   = $ar['floor_label'] . ', ' . $ar['building_name'];
+                                            $ar_time    = $ar['start_fmt'] . ' – ' . $ar['end_fmt'];
+                                        ?>
+                                            <tr class="ps-rr-row<?php echo $ar_doc ? ' has-doc' : ''; ?>"
+                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                data-room="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                data-where="<?php echo htmlspecialchars($ar_where); ?>"
+                                                data-date="<?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?>"
+                                                data-time="<?php echo htmlspecialchars($ar_time); ?>"
+                                                data-who="<?php echo htmlspecialchars($ar_name); ?>"
+                                                data-who-sub="<?php echo htmlspecialchars($ar_sub); ?>"
+                                                data-type="<?php echo htmlspecialchars($ar_type); ?>"
+                                                data-purpose="<?php echo htmlspecialchars($ar['purpose'] ?? ''); ?>"
+                                                data-attendees="<?php echo (int)($ar['attendees'] ?? 0); ?>"
+                                                data-status="<?php echo htmlspecialchars($ar['status']); ?>"
+                                                data-reason="<?php echo htmlspecialchars($ar['reason'] ?? ''); ?>"
+                                                data-notes="<?php echo htmlspecialchars($ar['notes'] ?? ''); ?>"
+                                                data-submitted="<?php echo !empty($ar['request_date']) ? date('M d, Y g:i A', strtotime($ar['request_date'])) : ''; ?>"
+                                                data-doc-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['url']) : ''; ?>"
+                                                data-doc-name="<?php echo $ar_doc ? htmlspecialchars($ar_doc['name']) : ''; ?>"
+                                                data-doc-kind="<?php echo $ar_doc ? $ar_doc['kind'] : ''; ?>">
+                                                <td>
+                                                    <button type="button" class="ps-appr-id" data-rr-detail title="Open details">#<?php echo (int)$ar['id']; ?></button>
+                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($ar['room_name']); ?></div>
+                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($ar_where); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="ps-appr-item"><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></div>
+                                                    <div class="ps-appr-sub" style="white-space:nowrap;"><?php echo htmlspecialchars($ar_time); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($ar_name); ?></div>
+                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($ar_sub); ?></div>
+                                                </td>
+                                                <td>
+                                                    <?php if ($ar_doc): ?>
+                                                        <a class="ps-doc-chip ps-doc-chip--<?php echo $ar_doc['kind']; ?>"
+                                                            href="<?php echo htmlspecialchars($ar_doc['url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                            title="Open <?php echo htmlspecialchars($ar_doc['name']); ?> in a new tab">
+                                                            <span class="material-symbols-outlined"><?php echo ps_doc_icon($ar_doc['kind']); ?></span>
+                                                            <span class="ps-doc-chip__name"><?php echo htmlspecialchars($ar_doc['name']); ?></span>
+                                                            <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <span class="td-sm">—</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><span class="ps-badge ps-badge--dot <?php echo $ar_badge; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
+                                                <td>
+                                                    <div class="ps-appr-actions">
+                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>
+                                                            <span class="material-symbols-outlined" style="font-size:14px;">visibility</span>
+                                                            Details
+                                                        </button>
+                                                        <?php if ($ar['status'] === 'Approved'): ?>
+                                                            <button class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
+                                                                data-action="admin-cancel-reservation"
+                                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                                data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
+                                                                title="Cancel this reservation">
+                                                                <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
+                                                                Cancel
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                    <?php endforeach;
+                                    endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div><!-- /#rooms-reservations-panel -->
+
+                <!-- ════════════════════════════════════════════════════
                      SUB-PANEL: ARCHIVED ROOMS
                      ════════════════════════════════════════════════════ -->
                 <div class="rooms-sub-panel" id="rooms-archived-panel">
@@ -1593,7 +2147,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         'campus'     => $r['campus_name'],
                         'building'   => $r['building_name'],
                         'floor'      => !empty($r['floor_label']) ? $r['floor_label'] : ($r['floor_number'] . 'F'),
-                        'capacity'   => $r['seating_capacity'],
                     ];
                 }, $rooms_list ?? []);
 
@@ -1803,10 +2356,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             if (meta) {
                                 const campus = card.dataset.roomCampus || '';
                                 const floor = card.dataset.roomFloor || '';
-                                const capacity = card.dataset.roomCapacity || '';
-                                let parts = [campus, floor].filter(Boolean).join(' – ');
-                                if (capacity) parts += ' – Capacity: ' + capacity;
-                                meta.textContent = parts;
+                                meta.textContent = [campus, floor].filter(Boolean).join(' – ');
                             }
                             const modal = document.getElementById('roomScheduleModal');
                             if (modal) modal.classList.remove('hidden');
@@ -1853,9 +2403,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                             el = form.querySelector('input[name="floor_label"]');
                             if (el) el.value = d.roomFloorLabel || '';
-
-                            el = form.querySelector('input[name="seating_capacity"]');
-                            if (el) el.value = d.roomCapacity || '';
 
                             el = form.querySelector('select[name="status"]');
                             if (el) el.value = d.roomStatus || 'Available';
@@ -2194,6 +2741,151 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div><!-- /faculty-layout -->
                 </div><!-- /panel-faculty -->
             <?php endif; ?>
+
+            <!-- ============================================================
+         TAB: ADMINS  (Super Admin only)
+         Left: everyone with an admin account. Right: the selected admin's
+         details, actions and activity history. Driven by the "Admin Accounts
+         panel" block in admin-dashboard.js.
+    ============================================================ -->
+            <?php if ($is_super_admin): ?>
+                <div class="tab-panel" id="panel-admins">
+
+                    <div class="am-head">
+                        <div class="am-head-text">
+                            <h2 class="am-title">Admin Accounts</h2>
+                            <p class="am-sub">Control who can sign in and review what each admin has been doing.</p>
+                        </div>
+                        <div class="am-head-actions">
+                            <span class="am-seats" id="am-seats" title="Admin accounts in use">
+                                <span class="material-symbols-outlined">group</span>
+                                <span id="am-seats-text"><strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> seats used</span>
+                            </span>
+                            <button type="button" class="ps-btn ps-btn--primary" id="am-add-btn"
+                                <?php echo $admin_accounts_remaining > 0 ? '' : 'disabled title="All 5 seats are in use. Delete an account to free one."'; ?>>
+                                <span class="material-symbols-outlined">person_add</span> Add admin
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="am-layout">
+
+                        <!-- ── Admin list ── -->
+                        <section class="eq-card am-list-card" aria-label="Admin accounts">
+                            <div class="am-search">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="am-search" class="form-control-custom"
+                                    placeholder="Search admins" autocomplete="off" aria-label="Search admins">
+                            </div>
+                            <div class="am-list" id="am-list" role="listbox" aria-label="Admins">
+                                <?php foreach ($admin_accounts_list as $acct):
+                                    $am_you     = strtolower($acct['email'] ?? '') === strtolower($admin_email);
+                                    $am_until   = admin_is_dormant($acct['dormant_until'] ?? null) ? (int)$acct['dormant_until'] : 0;
+                                    $am_manage  = !$am_you && ($acct['role'] ?? '') === 'Admin';
+                                    $am_parts   = preg_split('/\s+/', trim((string)($acct['fullName'] ?? '')));
+                                    $am_ini     = strtoupper(substr($am_parts[0] ?? '?', 0, 1));
+                                    if (count($am_parts) > 1) $am_ini .= strtoupper(substr(end($am_parts), 0, 1));
+                                    $am_created = !empty($acct['created_at']) ? date('M j, Y', strtotime($acct['created_at'])) : '';
+                                    $am_login   = !empty($acct['last_login']) ? date('M j, Y, g:i A', strtotime($acct['last_login'])) : '';
+                                ?>
+                                    <button type="button" class="am-item" role="option" aria-selected="false"
+                                        data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
+                                        data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
+                                        data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>"
+                                        data-role="<?php echo htmlspecialchars($acct['role'] ?? 'Admin', ENT_QUOTES); ?>"
+                                        data-created="<?php echo htmlspecialchars($am_created, ENT_QUOTES); ?>"
+                                        data-last-login="<?php echo htmlspecialchars($am_login, ENT_QUOTES); ?>"
+                                        data-locked-until="<?php echo $am_until; ?>"
+                                        data-you="<?php echo $am_you ? '1' : '0'; ?>"
+                                        data-manage="<?php echo $am_manage ? '1' : '0'; ?>">
+                                        <span class="am-avatar"><?php echo htmlspecialchars($am_ini); ?></span>
+                                        <span class="am-item-main">
+                                            <span class="am-item-name"><?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?><?php if ($am_you): ?> <span class="am-you">You</span><?php endif; ?></span>
+                                            <span class="am-item-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></span>
+                                        </span>
+                                        <span class="material-symbols-outlined am-item-lock" <?php echo $am_until ? '' : 'hidden'; ?> title="Locked">lock</span>
+                                    </button>
+                                <?php endforeach; ?>
+                                <p class="am-list-empty" id="am-list-empty" <?php echo empty($admin_accounts_list) ? '' : 'hidden'; ?>>
+                                    <?php echo empty($admin_accounts_list) ? 'No accounts found.' : 'No admins match your search.'; ?>
+                                </p>
+                            </div>
+                        </section>
+
+                        <!-- ── Selected admin ── -->
+                        <section class="eq-card am-detail-card" id="am-detail" aria-live="polite">
+
+                            <div class="am-empty" id="am-detail-empty">
+                                <span class="material-symbols-outlined">manage_accounts</span>
+                                <p>Select an admin to see their details and activity.</p>
+                            </div>
+
+                            <div id="am-detail-body" hidden>
+                                <header class="am-profile">
+                                    <span class="am-avatar am-avatar--lg" id="am-d-avatar"></span>
+                                    <div class="am-profile-main">
+                                        <h3 class="am-d-name" id="am-d-name"></h3>
+                                        <p class="am-d-email" id="am-d-email"></p>
+                                        <div class="am-tags">
+                                            <span class="am-tag" id="am-d-role"></span>
+                                            <span class="am-tag" id="am-d-status"></span>
+                                        </div>
+                                    </div>
+                                    <div class="am-actions" id="am-d-actions" hidden>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-am-action="edit">
+                                            <span class="material-symbols-outlined">edit</span> Edit
+                                        </button>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-am-action="lock" id="am-lock-btn">
+                                            <span class="material-symbols-outlined" id="am-lock-icon">lock</span>
+                                            <span id="am-lock-label">Lock</span>
+                                        </button>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm am-danger" data-am-action="delete">
+                                            <span class="material-symbols-outlined">delete</span> Delete
+                                        </button>
+                                    </div>
+                                </header>
+
+                                <p class="am-note" id="am-d-note" hidden>
+                                    <span class="material-symbols-outlined">shield</span>
+                                    <span id="am-d-note-text"></span>
+                                </p>
+
+                                <dl class="am-facts">
+                                    <div>
+                                        <dt>Last sign-in</dt>
+                                        <dd id="am-f-login">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Added</dt>
+                                        <dd id="am-f-created">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Actions logged</dt>
+                                        <dd id="am-f-total">—</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="am-activity">
+                                    <div class="am-activity-head">
+                                        <h4>Activity</h4>
+                                        <div class="am-chips" id="am-chips" role="group" aria-label="Filter activity">
+                                            <button type="button" class="am-chip active" data-filter="all">All</button>
+                                            <button type="button" class="am-chip" data-filter="requests">Requests</button>
+                                            <button type="button" class="am-chip" data-filter="equipment">Equipment</button>
+                                            <button type="button" class="am-chip" data-filter="accounts">Accounts</button>
+                                            <button type="button" class="am-chip" data-filter="signins">Sign-ins</button>
+                                        </div>
+                                    </div>
+                                    <div class="am-feed" id="am-feed"></div>
+                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm am-more" id="am-more" hidden>Show more</button>
+                                </div>
+                            </div>
+
+                        </section>
+                    </div>
+                </div><!-- /panel-admins -->
+            <?php endif; ?>
+
 
 
 
@@ -2558,7 +3250,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <?php if ($is_super_admin): ?>
                         <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
-                        <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
                     <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
@@ -2726,208 +3417,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /sett-account -->
 
-                <!-- ── MANAGE ADMINS (Super Admin only) ────────────────── -->
-                <?php if ($is_super_admin): ?>
-                    <div class="rq-sub-panel" id="sett-admins">
-
-                        <!-- Slot counter banner -->
-                        <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
-                            <span class="material-symbols-outlined">group</span>
-                            <span id="adm-slot-text">
-                                <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
-                                <?php if ($admin_accounts_remaining > 0): ?>
-                                    — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
-                                    slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> remaining
-                                <?php else: ?>
-                                    — limit reached
-                                <?php endif; ?>
-                            </span>
-                        </div>
-
-                        <!-- Add Admin form (hidden when limit reached) -->
-                        <div class="eq-card adm-form-card" id="adm-form-card" <?php echo $admin_accounts_remaining > 0 ? '' : 'hidden'; ?>>
-                            <div class="eq-card-header">
-                                <h2>
-                                    <span class="material-symbols-outlined">person_add</span>
-                                    Add New Admin
-                                </h2>
-                            </div>
-                            <div class="eq-card-body">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
-                                        <input type="text" id="adm-fullname" name="adm_fullname"
-                                            class="form-control-custom"
-                                            placeholder="e.g. Juan dela Cruz"
-                                            maxlength="255" autocomplete="off">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="adm-email">Admin Email <span class="req-star">*</span></label>
-                                        <input type="email" id="adm-email" name="adm_email"
-                                            class="form-control-custom"
-                                            placeholder="name@admin.edu"
-                                            maxlength="255" autocomplete="off">
-                                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-role">Role <span class="req-star">*</span></label>
-                                        <select id="adm-role" name="adm_role" class="form-control-custom">
-                                            <option value="Admin" selected>Admin</option>
-                                            <option value="Super Admin">Super Admin</option>
-                                        </select>
-                                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-password">Password <span class="req-star">*</span></label>
-                                        <div class="fac-pw-wrap">
-                                            <input type="password" id="adm-password" name="adm_password"
-                                                class="form-control-custom"
-                                                placeholder="Min. 8 characters"
-                                                autocomplete="new-password">
-                                            <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
-                                                <span class="material-symbols-outlined">visibility</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
-                                        <div class="fac-pw-wrap">
-                                            <input type="password" id="adm-confirm" name="adm_confirm"
-                                                class="form-control-custom"
-                                                placeholder="Re-enter password"
-                                                autocomplete="new-password">
-                                            <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
-                                                <span class="material-symbols-outlined">visibility</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
-
-                                <div class="adm-form-actions">
-                                    <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
-                                        <span class="material-symbols-outlined">person_add</span>
-                                        Create Admin Account
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="eq-card" id="adm-max-card" <?php echo $admin_accounts_remaining > 0 ? 'hidden' : ''; ?>
-                            style="padding:1.5rem;text-align:center;color:var(--text-light);">
-                            <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
-                            Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
-                        </div>
-
-                        <!-- Existing admin accounts list -->
-                        <div class="eq-card adm-list-card">
-                            <div class="eq-card-header">
-                                <h2>
-                                    <span class="material-symbols-outlined">manage_accounts</span>
-                                    Current Admins
-                                </h2>
-                            </div>
-                            <div class="pr-tbl-wrap">
-                                <table class="pr-table adm-accounts-table" id="admAccountsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Email</th>
-                                            <th>Role</th>
-                                            <th>Status</th>
-                                            <th>Added</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="admAccountsTbody">
-                                        <?php if (empty($admin_accounts_list)): ?>
-                                            <tr>
-                                                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-light);">
-                                                    No accounts found.
-                                                </td>
-                                            </tr>
-                                        <?php else: ?>
-                                            <?php foreach ($admin_accounts_list as $acct):
-                                                $acct_is_you  = strtolower($acct['email'] ?? '') === strtolower($admin_email);
-                                                $acct_dormant = admin_is_dormant($acct['dormant_until'] ?? null);
-                                                // Only plain "Admin" accounts other than yourself can be managed;
-                                                // Super Admins are protected (enforced again on the server).
-                                                $acct_manage  = !$acct_is_you && ($acct['role'] ?? '') === 'Admin';
-                                            ?>
-                                                <tr class="adm-account-row"
-                                                    data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
-                                                    data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
-                                                    data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>">
-                                                    <td class="td-fw">
-                                                        <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
-                                                        <?php if ($acct_is_you): ?>
-                                                            <span class="adm-you-badge">You</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="adm-td-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
-                                                    <td>
-                                                        <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
-                                                            <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="adm-td-status">
-                                                        <?php if ($acct_dormant): ?>
-                                                            <span class="adm-status adm-status--dormant"
-                                                                title="Dormant until <?php echo htmlspecialchars(admin_format_time((int)$acct['dormant_until'])); ?>">
-                                                                <span class="material-symbols-outlined">bedtime</span>
-                                                                Dormant until <?php echo htmlspecialchars((new DateTime('@' . (int)$acct['dormant_until']))->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j')); ?>
-                                                            </span>
-                                                        <?php else: ?>
-                                                            <span class="adm-status adm-status--active">Active</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="td-sm">
-                                                        <?php echo $acct['created_at']
-                                                            ? date('M j, Y', strtotime($acct['created_at']))
-                                                            : '—'; ?>
-                                                    </td>
-                                                    <td class="adm-td-actions">
-                                                        <?php if ($acct_manage): ?>
-                                                            <div class="adm-actions">
-                                                                <button type="button" class="adm-act" data-adm-action="edit"
-                                                                    title="Edit login details" aria-label="Edit login details">
-                                                                    <span class="material-symbols-outlined">edit</span>
-                                                                </button>
-                                                                <?php if ($acct_dormant): ?>
-                                                                    <button type="button" class="adm-act" data-adm-action="reactivate"
-                                                                        title="Reactivate account" aria-label="Reactivate account">
-                                                                        <span class="material-symbols-outlined">play_circle</span>
-                                                                    </button>
-                                                                <?php else: ?>
-                                                                    <button type="button" class="adm-act" data-adm-action="dormant"
-                                                                        title="Make dormant" aria-label="Make dormant">
-                                                                        <span class="material-symbols-outlined">bedtime</span>
-                                                                    </button>
-                                                                <?php endif; ?>
-                                                                <button type="button" class="adm-act adm-act--danger" data-adm-action="delete"
-                                                                    title="Delete account" aria-label="Delete account">
-                                                                    <span class="material-symbols-outlined">delete</span>
-                                                                </button>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <span class="adm-protected"
-                                                                title="<?php echo $acct_is_you ? 'This is you — use My Account' : 'Super Admin accounts are protected'; ?>">—</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                    </div><!-- /sett-admins -->
-                <?php endif; ?>
 
                 <!-- ── PREFERENCES ────────────────────────────────────── -->
                 <div class="rq-sub-panel" id="sett-prefs">
@@ -3247,7 +3736,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Requests</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                                                Go to <strong>Approvals</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
                                             </div>
                                         </details>
 
@@ -3460,9 +3949,76 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <?php if ($is_super_admin): ?>
-        <!-- ═══ MANAGE ADMINS — edit / dormant / delete (Super Admin only) ═══
+        <!-- ═══ MANAGE ADMINS — edit / lock / delete (Super Admin only) ═══
          Direct children of <body>, same ps-modal system as the Requests modals.
-         Driven by the "Manage Admins" block in admin-dashboard.js. -->
+         Driven by the "Admin Accounts panel" block in admin-dashboard.js. -->
+
+        <!-- MODAL: ADD ADMIN -->
+        <div class="ps-modal-backdrop" id="amAddModal">
+            <div class="ps-modal">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">person_add</span>
+                    </div>
+                    <h3>Add Admin</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="amAddModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                            <input type="text" id="adm-fullname" class="form-control-custom"
+                                placeholder="e.g. Juan dela Cruz" maxlength="255" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                            <input type="email" id="adm-email" class="form-control-custom"
+                                placeholder="name@admin.edu" maxlength="255" autocomplete="off">
+                            <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="adm-role">Role <span class="req-star">*</span></label>
+                        <select id="adm-role" class="form-control-custom">
+                            <option value="Admin" selected>Admin</option>
+                            <option value="Super Admin">Super Admin</option>
+                        </select>
+                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-password">Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-password" class="form-control-custom"
+                                    placeholder="Min. 8 characters" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-confirm" class="form-control-custom"
+                                    placeholder="Re-enter password" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="amAddModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-submit-btn">
+                        <span class="material-symbols-outlined">person_add</span> Create Admin
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- MODAL: EDIT ADMIN LOGIN DETAILS -->
         <div class="ps-modal-backdrop" id="admEditModal">
@@ -3533,14 +4089,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
 
-        <!-- MODAL: MAKE ADMIN DORMANT -->
+        <!-- MODAL: LOCK ADMIN ACCOUNT -->
         <div class="ps-modal-backdrop" id="admDormantModal">
             <div class="ps-modal ps-modal--sm">
                 <div class="ps-modal-head">
                     <div class="ps-modal-head-icon ps-mhi--warning">
-                        <span class="material-symbols-outlined">bedtime</span>
+                        <span class="material-symbols-outlined">lock</span>
                     </div>
-                    <h3>Make Account Dormant</h3>
+                    <h3>Lock Account</h3>
                     <button type="button" class="ps-modal-close" data-adm-close="admDormantModal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -3549,9 +4105,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div id="adm-dormant-alert" class="alert-banner hidden" role="alert"></div>
                     <p class="adm-modal-text">
                         <strong id="adm-dormant-name">This admin</strong> keeps their account, but will be signed out and
-                        cannot log in until the period ends. You can reactivate it any time.
+                        cannot log in until the period ends. You can unlock it any time.
                     </p>
-                    <div class="adm-days" role="radiogroup" aria-label="Dormant for">
+                    <div class="adm-days" role="radiogroup" aria-label="Locked for">
                         <?php foreach (ADMIN_DORMANT_CHOICES as $d): ?>
                             <label class="adm-day-chip">
                                 <input type="radio" name="adm-dormant-days" value="<?php echo (int)$d; ?>" <?php echo $d === 7 ? 'checked' : ''; ?>>
@@ -3576,7 +4132,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="ps-modal-foot">
                     <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDormantModal">Cancel</button>
                     <button type="button" class="ps-btn ps-btn--primary" id="adm-dormant-save">
-                        <span class="material-symbols-outlined">bedtime</span> Make Dormant
+                        <span class="material-symbols-outlined">lock</span> Lock Account
                     </button>
                 </div>
             </div>
@@ -3791,6 +4347,165 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- DRAWER: APPROVALS REVIEW (Waiting table). Reuses the ps-modal-backdrop open/close
+         mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
+         Approve / Decline here hand off to the existing approve/decline modals. -->
+    <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
+        <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-appr-title">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">fact_check</span>
+                </div>
+                <h3 id="ps-appr-title">Review <span id="ps-appr-reqno">#0000</span></h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-appr-drawer" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-drawer-body">
+                <div class="ps-drawer-status">
+                    <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
+                    <span class="ps-drawer-muted">Submitted <span id="ps-appr-submitted">—</span></span>
+                </div>
+
+                <section class="ps-drawer-sec">
+                    <h4>Supporting document</h4>
+                    <div class="ps-doc-card" id="ps-appr-doc">
+                        <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-appr-doc-icon">draft</span></div>
+                        <div class="ps-doc-card__meta">
+                            <div class="ps-doc-card__name" id="ps-appr-doc-name">—</div>
+                            <div class="ps-drawer-muted" id="ps-appr-doc-kind">—</div>
+                        </div>
+                        <div class="ps-doc-card__btns">
+                            <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-appr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
+                                <span class="material-symbols-outlined">open_in_new</span> Open
+                            </a>
+                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-appr-doc-dl" href="#" download>
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="ps-doc-preview" id="ps-appr-doc-preview" hidden>
+                        <img id="ps-appr-doc-img" alt="Attached document preview">
+                    </div>
+                    <div class="ps-doc-none" id="ps-appr-doc-none" hidden>
+                        <span class="material-symbols-outlined">warning</span>
+                        <span>No supporting document is attached. Standard requests are handled automatically, so check why this one needs a manual decision.</span>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Requester</h4>
+                    <div class="ps-kv">
+                        <div><span>Name</span><strong id="ps-appr-who">—</strong></div>
+                        <div><span>Type</span><strong id="ps-appr-type">—</strong></div>
+                        <div><span>ID</span><strong id="ps-appr-idno">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Request</h4>
+                    <div class="ps-kv">
+                        <div><span>Item</span><strong id="ps-appr-item">—</strong></div>
+                        <div><span>Quantity</span><strong id="ps-appr-qty">—</strong></div>
+                        <div><span>Date needed</span><strong id="ps-appr-needed">—</strong></div>
+                        <div><span>Return by</span><strong id="ps-appr-return">—</strong></div>
+                        <div><span>Room</span><strong id="ps-appr-room">—</strong></div>
+                        <div><span>Instructor</span><strong id="ps-appr-instr">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec" id="ps-appr-note-sec">
+                    <h4>Notes</h4>
+                    <div class="ps-drawer-note" id="ps-appr-note">—</div>
+                </section>
+            </div>
+            <div class="ps-drawer-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-appr-drawer">Close</button>
+                <button class="ps-btn ps-btn--danger" type="button" data-appr-decide="decline">
+                    <span class="material-symbols-outlined">close</span> Decline
+                </button>
+                <button class="ps-btn ps-btn--success" type="button" data-appr-decide="approve">
+                    <span class="material-symbols-outlined">check</span> Approve
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- DRAWER: ROOM RESERVATION DETAILS (Rooms > Reservations). Same shell/CSS as the
+         approvals drawer; Cancel hands off to the existing admin cancel-reservation modal. -->
+    <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-room-drawer">
+        <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-rr-title">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">meeting_room</span>
+                </div>
+                <h3 id="ps-rr-title">Reservation <span id="ps-rr-no">#0</span></h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-room-drawer" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-drawer-body">
+                <div class="ps-drawer-status">
+                    <span class="ps-badge ps-badge--dot ps-badge--active" id="ps-rr-status">Approved</span>
+                    <span class="ps-drawer-muted">Submitted <span id="ps-rr-submitted">—</span></span>
+                </div>
+
+                <section class="ps-drawer-sec" id="ps-rr-doc-sec">
+                    <h4>Supporting document</h4>
+                    <div class="ps-doc-card" id="ps-rr-doc">
+                        <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-rr-doc-icon">draft</span></div>
+                        <div class="ps-doc-card__meta">
+                            <div class="ps-doc-card__name" id="ps-rr-doc-name">—</div>
+                            <div class="ps-drawer-muted" id="ps-rr-doc-kind">—</div>
+                        </div>
+                        <div class="ps-doc-card__btns">
+                            <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-rr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
+                                <span class="material-symbols-outlined">open_in_new</span> Open
+                            </a>
+                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-rr-doc-dl" href="#" download>
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="ps-doc-preview" id="ps-rr-doc-preview" hidden>
+                        <img id="ps-rr-doc-img" alt="Attached document preview">
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Reservation</h4>
+                    <div class="ps-kv">
+                        <div><span>Room</span><strong id="ps-rr-room">—</strong></div>
+                        <div><span>Location</span><strong id="ps-rr-where">—</strong></div>
+                        <div><span>Date</span><strong id="ps-rr-date">—</strong></div>
+                        <div><span>Time</span><strong id="ps-rr-time">—</strong></div>
+                        <div><span>Attendees</span><strong id="ps-rr-attendees">—</strong></div>
+                        <div><span>Purpose</span><strong id="ps-rr-purpose">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Requested by</h4>
+                    <div class="ps-kv">
+                        <div><span>Name</span><strong id="ps-rr-who">—</strong></div>
+                        <div><span>Type</span><strong id="ps-rr-type">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Notes</h4>
+                    <div class="ps-drawer-note" id="ps-rr-notes">—</div>
+                </section>
+            </div>
+            <div class="ps-drawer-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
+                <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
+                    <span class="material-symbols-outlined">cancel</span> Cancel reservation
+                </button>
+            </div>
+        </aside>
     </div>
 
     <!-- MODAL: EXPORT REQUESTS -->

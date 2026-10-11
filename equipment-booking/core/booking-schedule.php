@@ -293,6 +293,119 @@ final class BookingSchedule
         return mb_substr($label, 0, 100);
     }
 
+    /**
+     * Turns what the form sent into a room: a live room id, or "outside" (no room).
+     * @return array{ok:bool,error?:string,label?:string,id?:?int}
+     */
+    public static function resolveRoom(mysqli $conn, string $input): array
+    {
+        $input = trim($input);
+        if ($input === 'outside') {
+            return ['ok' => true, 'label' => 'Outside', 'id' => null];
+        }
+        $row = ctype_digit($input) ? self::findRoom($conn, (int)$input) : null;
+        if (!$row) {
+            return ['ok' => false, 'error' => 'Please choose a room.'];
+        }
+        if ($row['status'] === 'Maintenance') {
+            return ['ok' => false, 'error' => 'That room is under maintenance. Please choose another room.'];
+        }
+        return ['ok' => true, 'label' => self::roomLabel($row), 'id' => (int)$row['room_id']];
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Room reservations (tbl_room_reservations) versus equipment going to a room
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Approved room reservations that overlap [startTs, endTs).
+     * @return array<int, array{room_id:int,faculty_id:string}>
+     */
+    public static function reservationsIn(mysqli $conn, string $startTs, string $endTs): array
+    {
+        $stmt = $conn->prepare(
+            "SELECT room_id, faculty_id
+               FROM tbl_room_reservations
+              WHERE status = 'Approved'
+                AND TIMESTAMP(reservation_date, start_time) < ?
+                AND TIMESTAMP(reservation_date, end_time)   > ?"
+        );
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('ss', $endTs, $startTs);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return array_map(fn($r) => ['room_id' => (int)$r['room_id'], 'faculty_id' => (string)$r['faculty_id']], $rows);
+    }
+
+    /**
+     * Rooms that are reserved by SOMEONE ELSE during the window (equipment cannot go there),
+     * and rooms the given faculty reserved themselves (good suggestions).
+     * @return array{reserved:int[],mine:int[]}
+     */
+    public static function roomsByReservation(mysqli $conn, string $startTs, string $endTs, string $facultyId): array
+    {
+        $reserved = [];
+        $mine     = [];
+        foreach (self::reservationsIn($conn, $startTs, $endTs) as $r) {
+            if ($r['faculty_id'] === $facultyId) {
+                $mine[$r['room_id']] = true;
+            } else {
+                $reserved[$r['room_id']] = true;
+            }
+        }
+        // a room both reserved by me and by someone else stays blocked
+        return ['reserved' => array_keys($reserved), 'mine' => array_values(array_diff(array_keys($mine), array_keys($reserved)))];
+    }
+
+    /** Error text when another faculty holds a reservation on this room during the window, else null. */
+    public static function roomConflictMessage(mysqli $conn, int $roomId, string $startTs, string $endTs, string $facultyId): ?string
+    {
+        $map = self::roomsByReservation($conn, $startTs, $endTs, $facultyId);
+        if (!in_array($roomId, $map['reserved'], true)) {
+            return null;
+        }
+        $room = self::findRoom($conn, $roomId);
+        return ($room ? $room['room_name'] : 'That room') . ' is reserved by another faculty for that time. Choose another room or time.';
+    }
+
+    /**
+     * The faculty member's own upcoming (approved) room reservations: used to suggest a room.
+     * @return array<int, array<string,mixed>>
+     */
+    public static function myUpcomingReservations(mysqli $conn, string $facultyId, int $limit = 4): array
+    {
+        $stmt = $conn->prepare(
+            "SELECT rr.room_id, r.room_name, b.name AS building_name,
+                    CONCAT(rr.reservation_date, ' ', rr.start_time) AS start_at,
+                    CONCAT(rr.reservation_date, ' ', rr.end_time)   AS end_at
+               FROM tbl_room_reservations rr
+               JOIN tbl_rooms     r ON r.room_id     = rr.room_id AND r.is_archived = 0
+               JOIN tbl_buildings b ON b.building_id = r.building_id
+              WHERE rr.faculty_id = ? AND rr.status = 'Approved'
+                AND TIMESTAMP(rr.reservation_date, rr.end_time) > NOW()
+                AND rr.reservation_date <= DATE_ADD(CURDATE(), INTERVAL " . (int)self::MAX_ADVANCE_DAYS . " DAY)
+              ORDER BY rr.reservation_date ASC, rr.start_time ASC
+              LIMIT " . (int)$limit
+        );
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('s', $facultyId);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return array_map(fn($r) => [
+            'room_id'  => (int)$r['room_id'],
+            'name'     => $r['room_name'],
+            'building' => $r['building_name'],
+            'start'    => $r['start_at'],
+            'end'      => $r['end_at'],
+        ], $rows);
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // Stock & schedule
     // ═════════════════════════════════════════════════════════════════════════
@@ -529,35 +642,32 @@ final class BookingSchedule
     }
 
     /**
-     * Room picker: building > floor > room name > availability, straight from the same
-     * tables the Facilities section uses (so renamed / moved / archived rooms follow along).
+     * Room picker shell. The list itself (Your reservations / Outside / building tabs > floors > rooms)
+     * is built in the browser from window.BOOKING_META.rooms, which comes from the same tables the
+     * Facilities section uses, so renamed / moved / archived rooms follow along.
+     * The chosen value goes in the hidden room_id field: a room id, or "outside".
      */
-    public static function renderRoomSelect(string $id, array $tree): string
+    public static function renderRoomPicker(string $id): string
     {
-        $status = ['Available' => 'Available', 'Maintenance' => 'Under maintenance', 'Not Bookable' => 'Not bookable'];
-        $h  = '<div class="form-group">';
-        $h .= '<label class="form-label" for="' . self::h($id) . '">Room / Laboratory</label>';
-        $h .= '<select name="room_id" id="' . self::h($id) . '" class="form-input bm-select" required>';
-        if (!$tree) {
-            $h .= '<option value="" selected disabled>No rooms have been set up yet</option>';
-        } else {
-            $h .= '<option value="" selected disabled>Choose where you will use it</option>';
-        }
-        foreach ($tree as $b) {
-            foreach ($b['floors'] as $f) {
-                $h .= '<optgroup label="' . self::h($b['name'] . ' · ' . $f['label']) . '">';
-                foreach ($f['rooms'] as $r) {
-                    $dis = $r['status'] === 'Maintenance' ? ' disabled' : '';
-                    $h  .= '<option value="' . (int)$r['room_id'] . '"' . $dis . '>'
-                         . self::h($r['name'] . ' — ' . ($status[$r['status']] ?? $r['status'])) . '</option>';
-                }
-                $h .= '</optgroup>';
-            }
-        }
-        $h .= '</select>';
-        $h .= '<p class="bm-hint">Where the equipment will be used (same list as Facilities).</p>';
-        $h .= '</div>';
-        return $h;
+        $id = self::h($id);
+        return '
+        <div class="form-group bm-room" data-bm-room>
+            <span class="form-label" id="' . $id . 'Label">Room</span>
+            <input type="hidden" name="room_id" value="" data-bm-room-input>
+            <button type="button" class="bm-room-trigger" id="' . $id . '" data-bm-room-trigger
+                aria-haspopup="listbox" aria-expanded="false" aria-labelledby="' . $id . 'Label ' . $id . 'Value">
+                <span class="bm-room-value" id="' . $id . 'Value" data-bm-room-value><span class="bm-room-ph">Choose a room</span></span>
+                <span class="material-symbols-outlined bm-room-chev" aria-hidden="true">expand_more</span>
+            </button>
+            <p class="bm-hint" data-bm-room-hint hidden></p>
+            <div class="bm-room-panel" data-bm-room-panel hidden>
+                <label class="bm-room-search">
+                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                    <input type="search" placeholder="Search rooms" autocomplete="off" aria-label="Search rooms" data-bm-room-search>
+                </label>
+                <div class="bm-room-list" role="listbox" aria-labelledby="' . $id . 'Label" data-bm-room-list></div>
+            </div>
+        </div>';
     }
 
     /**

@@ -277,14 +277,12 @@
         var shown = displayStatus(room);
         var ui = uiFor(shown);
         var locked = shown === 'Not Bookable';
-        var seats = room.seating_capacity !== null && room.seating_capacity !== undefined
-            ? '<span class="fcty-room-seats">' + icon('chair') + room.seating_capacity + '</span>' : '';
         return '<button type="button" class="fcty-room ' + ui.cls + '" data-room-id="' + room.room_id + '"' +
             (locked ? ' disabled aria-disabled="true"' : '') + '>' +
             '<span class="fcty-room-name">' + esc(room.name) + '</span>' +
             '<span class="fcty-room-foot">' +
             '<span class="fcty-room-status"><span class="fcty-dot"></span>' +
-            '<span class="fcty-room-status-text">' + ui.text + '</span></span>' + seats +
+            '<span class="fcty-room-status-text">' + ui.text + '</span></span>' +
             '</span></button>';
     }
 
@@ -476,15 +474,14 @@
         return '<div class="fcty-slot vacant is-note"><span class="fcty-slot-what">' + text + '</span></div>';
     }
 
-    /* Only real bookings are listed — no filler "Vacant" rows */
+    /* Only real bookings are listed — no filler rows */
     function dailyHTML(daySchedule) {
         var list = sortByStart(daySchedule);
-        var hours = minToLabel(SCHOOL_START_MIN) + ' \u2013 ' + minToLabel(SCHOOL_END_MIN);
-        if (!list.length) return note('No bookings today \u00b7 open ' + hours);
+        if (!list.length) return note('No reservations today');
         return list.map(function (s) {
             return '<div class="fcty-slot occupied"><span class="fcty-slot-time">' + timeRange(s.start, s.end) +
                 '</span><span class="fcty-slot-what">' + s.label + '</span></div>';
-        }).join('') + note('Open ' + hours);
+        }).join('');
     }
 
     function weeklyHTML(week) {
@@ -495,21 +492,14 @@
                 ? items.map(function (s) {
                     return '<div><time>' + timeRange(s.start, s.end) + '</time>' + s.label + '</div>';
                 }).join('')
-                : '<span class="is-free">No bookings</span>';
+                : '<span class="is-free">Free</span>';
             return '<div class="fcty-week-row' + (d === today ? ' is-today' : '') + '">' +
                 '<span class="fcty-week-day">' + DAY_NAMES[d].slice(0, 3) + '</span>' +
                 '<div class="fcty-week-items">' + body + '</div></div>';
         }).join('');
     }
 
-    function freeNow(daySchedule) {
-        var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
-        return !(daySchedule || []).some(function (s) {
-            return m >= timeToMin(s.start) && m < timeToMin(s.end);
-        });
-    }
-
-    /* "Free until 2:00 PM" / "Busy until 10:30 AM" */
+    /* "Free until 2:00 PM" / "In use until 10:30 AM" — shown in the status pill */
     function availabilityHint(daySchedule) {
         var now = new Date(), m = now.getHours() * 60 + now.getMinutes();
         if (m < SCHOOL_START_MIN) return 'Opens at ' + minToLabel(SCHOOL_START_MIN);
@@ -529,9 +519,6 @@
 
         $('fcty-modal-room-name').textContent = room.name;
         $('fcty-modal-location').textContent = locationLabel;
-        $('fcty-modal-capacity').textContent = room.seating_capacity !== null && room.seating_capacity !== undefined
-            ? room.seating_capacity : '\u2014';
-        $('fcty-modal-hint').hidden = true;
 
         var blocked = room.status === 'Maintenance' || room.status === 'Not Bookable';
         if (room.status === 'Maintenance') setStatusBadge('maintenance', 'Maintenance');
@@ -539,7 +526,6 @@
         else setStatusBadge('', 'Checking\u2026');
 
         var today = new Date();
-        $('fcty-modal-day-label').textContent = DAY_NAMES[today.getDay()];
         $('fcty-modal-daily-list').innerHTML = note('Loading schedule\u2026');
         $('fcty-modal-weekly-grid').innerHTML = '';
         setScheduleTab('daily');
@@ -558,10 +544,10 @@
                 $('fcty-modal-daily-list').innerHTML = dailyHTML(todays);
                 $('fcty-modal-weekly-grid').innerHTML = weeklyHTML(week);
                 if (!blocked) {
-                    if (freeNow(todays)) setStatusBadge('', 'Available');
-                    else setStatusBadge('booked', 'In use now');
-                    $('fcty-modal-hint-text').textContent = availabilityHint(todays);
-                    $('fcty-modal-hint').hidden = false;
+                    var hint = availabilityHint(todays);
+                    if (/^Busy/.test(hint)) setStatusBadge('booked', hint.replace('Busy', 'In use'));
+                    else if (/^Free/.test(hint)) setStatusBadge('', hint);
+                    else setStatusBadge('static', hint);   /* "Opens at …" / "Closed for today" */
                 }
             })
             .catch(function () {
@@ -658,7 +644,6 @@
         st.end = Math.min(SCHOOL_END_MIN, st.start + 60);
 
         var todayStr = ymd(now);
-        var seats = room.seating_capacity !== null && room.seating_capacity !== undefined ? room.seating_capacity : null;
         var weekData = null;          /* schedule for the week of st.date */
         var serverClash = false;
         var availTimer = null, availCtl = null;
@@ -674,14 +659,12 @@
             '<h3 class="fcty-res-room">' + esc(room.name) + '</h3>' +
             '<p class="fcty-res-where">' + esc(currentRoom ? currentRoom.location : '') + '</p>' +
             '<div class="fcty-chip-row">' +
-            (seats !== null ? '<span class="fcty-seats">' + icon('chair') + plural(seats, 'seat') + '</span>' : '') +
-            '<span class="fcty-seats" id="fcty-quota" hidden></span>' +
+            '<span class="fcty-pill" id="fcty-quota" hidden></span>' +
             '</div>' +
             '</div>' +
             '<ul class="fcty-ticket" aria-live="polite">' +
             '<li>' + icon('event') + '<div><small>Date</small><strong id="fcty-tk-date"></strong></div></li>' +
             '<li>' + icon('schedule') + '<div><small>Time</small><strong id="fcty-tk-time"></strong></div></li>' +
-            '<li>' + icon('timer') + '<div><small>Duration</small><strong id="fcty-tk-dur"></strong></div></li>' +
             '</ul>' +
             '<div class="fcty-tl">' +
             '<div class="fcty-tl-head"><span>Room schedule</span><span id="fcty-tl-day"></span></div>' +
@@ -692,19 +675,18 @@
             }).join('') +
             '</div>' +
             '<div class="fcty-tl-note" id="fcty-tl-note"></div>' +
-            '<ul class="fcty-tl-list" id="fcty-tl-list"></ul>' +
             '</div>' +
             '</aside>' +
 
             /* ── Right: form ── */
             '<section class="fcty-res-main" id="fcty-res-main">' +
-            '<div class="fcty-res-top"><h4 class="fcty-res-heading" id="fcty-form-title">Plan your booking</h4>' +
+            '<div class="fcty-res-top"><h4 class="fcty-res-heading" id="fcty-form-title">Booking details</h4>' +
             '<button type="button" class="fcty-icon-btn" id="fcty-form-close" aria-label="Close">' + icon('close') + '</button></div>' +
             '<div class="fcty-res-scroll">' +
             alertHTML('fcty-res-msg', 'error') +
             alertHTML('fcty-res-limit', 'warn') +
 
-            '<div class="fcty-step"><div class="fcty-step-head"><span class="fcty-step-num">1</span>When</div>' +
+            '<div class="fcty-step">' +
             '<div class="fcty-sub"><span class="fcty-sublabel">Date</span>' +
             '<div class="fcty-chips" id="fcty-date-chips">' +
             '<button type="button" class="fcty-chip" aria-pressed="false" data-day="0">Today</button>' +
@@ -717,7 +699,7 @@
             '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-end">To</label>' +
             '<select id="fcty-res-end" class="fcty-input"></select></div>' +
             '</div>' +
-            '<div class="fcty-sub"><span class="fcty-sublabel">Quick duration</span>' +
+            '<div class="fcty-sub"><span class="fcty-sublabel">Quick Set</span>' +
             '<div class="fcty-chips" id="fcty-dur-chips">' +
             [60, 180, 300].map(function (m) {
                 return '<button type="button" class="fcty-chip" aria-pressed="false" data-min="' + m + '">' + durLabel(m) + '</button>';
@@ -726,16 +708,14 @@
             alertHTML('fcty-res-avail', 'warn') +
             '</div>' +
 
-            '<div class="fcty-step"><div class="fcty-step-head"><span class="fcty-step-num">2</span>Details</div>' +
+            '<div class="fcty-step">' +
             '<div class="fcty-sub"><label class="fcty-sublabel" for="fcty-res-purpose">Purpose</label>' +
             chipRow('fcty-purpose-chips', PURPOSES) +
-            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or describe it in your own words\u2026" maxlength="200"></div>' +
-            '<button type="button" class="fcty-link-btn" id="fcty-note-toggle">' + icon('add') + 'Add a note</button>' +
-            '<textarea id="fcty-res-notes" class="fcty-input" rows="2" placeholder="Anything the admin should know?" hidden></textarea>' +
+            '<input type="text" id="fcty-res-purpose" class="fcty-input" placeholder="Or type your own\u2026" maxlength="200"></div>' +
             '<div class="fcty-sub" id="fcty-doc-block" hidden>' +
             '<span class="fcty-sublabel">Supporting letter <small>(optional)</small></span>' +
             '<label class="fcty-drop" id="fcty-drop" for="fcty-res-doc">' + icon('upload_file') +
-            '<span><strong>Drop a file or browse</strong><small>JPG, PNG or PDF \u00b7 up to 5 MB</small></span></label>' +
+            '<span><strong>Upload a file</strong><small>JPG, PNG or PDF \u00b7 max 5 MB</small></span></label>' +
             '<input type="file" id="fcty-res-doc" class="fcty-sr-only" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">' +
             '<div class="fcty-file" id="fcty-file" hidden></div>' +
             '<p class="fcty-hint" id="fcty-doc-hint"></p>' +
@@ -797,7 +777,7 @@
         var docFile = null;
         var DOC_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
         var DOC_MAX = 5 * 1024 * 1024;
-        var DOC_HINT = 'Optional. Attached letters are kept with your request and may be used to prioritise it.';
+        var DOC_HINT = '';
         var elDoc = $('fcty-res-doc'), elDrop = $('fcty-drop'), elFile = $('fcty-file'), elDocHint = $('fcty-doc-hint');
 
         function fileKind(f) {
@@ -812,6 +792,7 @@
         function docMessage(text) {
             elDocHint.textContent = text || DOC_HINT;
             elDocHint.classList.toggle('is-over', !!text);
+            elDocHint.hidden = !text && !DOC_HINT;
         }
         function setDoc(f) {
             if (!f) {
@@ -886,8 +867,8 @@
         function renderSummary() {
             var d = parseYmd(st.date);
             $('fcty-tk-date').textContent = longDate(d);
-            $('fcty-tk-time').textContent = minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end);
-            $('fcty-tk-dur').textContent = durLabel(st.end - st.start);
+            $('fcty-tk-time').textContent = minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) +
+                ' \u00b7 ' + durLabel(st.end - st.start);
             $('fcty-tl-day').textContent = DAY_NAMES[d.getDay()];
 
             /* Timeline */
@@ -921,11 +902,6 @@
                 noteEl.className = 'fcty-tl-note';
                 noteEl.innerHTML = icon('check_circle') + 'This time is free.';
             }
-
-            var list = $('fcty-tl-list');
-            list.innerHTML = bookings.slice(0, 3).map(function (b) {
-                return '<li><b>' + timeRange(b.start, b.end) + '</b> \u00b7 ' + b.label + '</li>';
-            }).join('') + (bookings.length > 3 ? '<li>+' + (bookings.length - 3) + ' more</li>' : '');
 
             /* Server-side conflict notice (only if the local check didn't already flag it) */
             if (serverClash && !clash.length) {
@@ -1014,12 +990,6 @@
             st.purpose = elPurpose.value;
             setPressed($('fcty-purpose-chips'), function (c) { return c.dataset.val === st.purpose; });
         });
-        $('fcty-note-toggle').addEventListener('click', function () {
-            var ta = $('fcty-res-notes');
-            ta.hidden = !ta.hidden;
-            this.innerHTML = ta.hidden ? icon('add') + 'Add a note' : icon('remove') + 'Hide note';
-            if (!ta.hidden) ta.focus();
-        });
         $('fcty-res-back').addEventListener('click', backToRoom);
 
         btnSubmit.addEventListener('click', function () {
@@ -1037,7 +1007,6 @@
             fd.append('start_time', minToHHMM(st.start));
             fd.append('end_time', minToHHMM(st.end));
             fd.append('purpose', purpose);
-            fd.append('notes', $('fcty-res-notes').value.trim());
             fd.append('csrf_token', csrf());
             if (docFile && quota && quota.is_adviser) fd.append('document', docFile, docFile.name);
 

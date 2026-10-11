@@ -307,4 +307,6 @@ if ($pic !== '' && $pic !== '.' && $pic !== '..') {
     }
 }
 
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity($conn, 'faculty', 'Deleted faculty account of ' . trim((string)($target['fullname'] ?? $faculty_id)));
 respond(200, 'success', 'Faculty account deleted.');

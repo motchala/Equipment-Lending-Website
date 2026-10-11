@@ -114,7 +114,7 @@ if (isset($_POST['login'])) {
         @mysqli_query($conn, "UPDATE tbl_accounts SET role = 'Super Admin' WHERE email = 'main@admin.edu'");
     }
 
-    // dormant_until / session_epoch columns (Manage Admins → dormant accounts)
+    // dormant_until / session_epoch columns (Manage Admins → locked accounts)
     admin_accounts_ensure_schema($conn);
 
     $stmt_acc  = $conn->prepare("SELECT fullName, password, role, dormant_until FROM tbl_accounts WHERE email = ? LIMIT 1");
@@ -128,7 +128,7 @@ if (isset($_POST['login'])) {
 
     if ($row_acc) {
         if (password_verify($password, $row_acc['password'])) {
-            // ── Dormant account: correct password, but not allowed in yet ──
+            // ── Locked account: correct password, but not allowed in yet ──
             // Checked only AFTER the password is verified so the dormant
             // state is never revealed to someone who doesn't know it.
             if (admin_is_dormant($row_acc['dormant_until'])) {
@@ -139,6 +139,8 @@ if (isset($_POST['login'])) {
 
             // ── Successful admin login ─────────────────────────
             $_SESSION['admin']      = true;
+            require_once __DIR__ . '/config/admin-activity.php';
+            admin_log_activity($conn, 'login', 'Signed in', $email);
             $_SESSION['login_time'] = time();
 
             $admin_name_db = 'Administrator';

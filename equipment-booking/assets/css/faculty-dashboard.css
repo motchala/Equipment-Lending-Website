@@ -11157,3 +11157,360 @@ body .side-nav .side-nav-user .side-nav-user-name {
     opacity: 0.4;
     cursor: not-allowed;
 }
+
+
+/* ================================================================
+   ROOM PICKER  (Borrow Request modal)
+   Trigger = a normal field. The panel opens inline under it (no
+   clipping inside the scrolling modal): suggestions + Outside on
+   top, then building tabs > floors > rooms in an even 2-column grid.
+================================================================ */
+.bm-room [hidden] {
+    display: none !important;
+}
+
+.bm-room-trigger {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 10px;
+    background: var(--color-surface-lowest);
+    color: var(--color-on-surface);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.bm-room-trigger:hover {
+    border-color: var(--color-outline);
+}
+
+.bm-room.is-open .bm-room-trigger,
+.bm-room-trigger:focus-visible {
+    border-color: var(--color-primary-container);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-container) 18%, transparent);
+    outline: none;
+}
+
+.bm-room-value {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.bm-room-value strong {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.bm-room-value span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.78rem;
+    color: var(--color-on-surface-variant);
+}
+
+.bm-room-value .bm-room-ph {
+    font-size: 0.9rem;
+    color: var(--color-on-surface-variant);
+}
+
+.bm-room-chev {
+    flex-shrink: 0;
+    font-size: 20px;
+    color: var(--color-on-surface-variant);
+    transition: transform 0.18s;
+}
+
+.bm-room.is-open .bm-room-chev {
+    transform: rotate(180deg);
+}
+
+.bm-hint.ok {
+    color: var(--color-success);
+}
+
+.bm-hint.bad {
+    color: var(--color-error);
+}
+
+/* Panel */
+.bm-room-panel {
+    margin-top: 6px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 12px;
+    background: var(--color-surface-lowest);
+    overflow: hidden;
+}
+
+.bm-room-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0 12px;
+    height: 42px;
+    border-bottom: 1px solid var(--color-outline-variant);
+    color: var(--color-on-surface-variant);
+}
+
+.bm-room-search .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.bm-room-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-on-surface);
+    font: inherit;
+    font-size: 0.875rem;
+}
+
+.bm-room-list {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: 8px;
+    scrollbar-width: thin;
+}
+
+.bm-rp-head,
+.bm-rp-fhead {
+    padding: 6px 6px 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--color-on-surface-variant);
+}
+
+/* Suggestions + Outside */
+.bm-rp-top {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.bm-rp-res {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-on-surface);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.bm-rp-res>.material-symbols-outlined {
+    flex-shrink: 0;
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.bm-rp-txt {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+
+.bm-rp-txt strong {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.bm-rp-txt small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--color-on-surface-variant);
+}
+
+.bm-rp-sug {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary-container) 12%, transparent);
+    color: var(--color-primary);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+/* Building tabs */
+.bm-rp-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--color-surface-container);
+}
+
+.bm-rp-tab {
+    flex: 1;
+    min-width: 0;
+    min-height: 32px;
+    padding: 0 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.bm-rp-tab:hover:not(.active) {
+    color: var(--color-on-surface);
+}
+
+.bm-rp-tab.active {
+    background: var(--color-surface-lowest);
+    color: var(--color-primary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+
+/* Buildings > floors > rooms */
+.bm-rp-bhead {
+    display: none;
+    padding: 8px 6px 2px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+}
+
+.bm-rp-bldg.is-searching .bm-rp-bhead {
+    display: block;
+}
+
+.bm-rp-floor+.bm-rp-floor {
+    margin-top: 6px;
+}
+
+.bm-rp-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px 6px;
+}
+
+.bm-rp-opt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-on-surface);
+    font: inherit;
+    font-size: 0.84rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.bm-rp-dot {
+    flex-shrink: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-success);
+}
+
+.bm-rp-opt[data-state="office"] .bm-rp-dot {
+    background: var(--color-outline);
+}
+
+.bm-rp-opt[data-state="maint"] .bm-rp-dot,
+.bm-rp-opt[data-state="reserved"] .bm-rp-dot {
+    background: var(--color-error);
+}
+
+.bm-rp-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bm-rp-tag {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+}
+
+.bm-rp-tag:empty {
+    display: none;
+}
+
+.bm-rp-opt:hover:not(:disabled),
+.bm-rp-res:hover:not(:disabled),
+.bm-rp-opt:focus-visible,
+.bm-rp-res:focus-visible {
+    background: var(--color-surface-container);
+    outline: none;
+}
+
+.bm-rp-opt.is-selected,
+.bm-rp-res.is-selected {
+    background: color-mix(in srgb, var(--color-primary-container) 10%, transparent);
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.bm-rp-opt:disabled,
+.bm-rp-res:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bm-rp-empty {
+    padding: 18px 8px;
+    text-align: center;
+    font-size: 0.8125rem;
+    color: var(--color-on-surface-variant);
+}
+
+@media (max-width: 480px) {
+    .bm-rp-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .bm-room-value span {
+        display: none;
+    }
+}

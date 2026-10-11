@@ -26,6 +26,7 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 }
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/admin-activity.php';
 $conn = getDB();
 
 // Root URL: SCRIPT_NAME for admin-dashboard.php is now /Equipment-Lending-Website/admin-dashboard.php
@@ -250,6 +251,7 @@ if (isset($_POST['add_item'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
+        admin_log_activity($conn, 'equipment', 'Added equipment: ' . $name);
         header("Location: {$base}/admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
@@ -325,6 +327,7 @@ if (isset($_POST['update_item'])) {
     $stmt->execute();
     $stmt->close();
 
+    admin_log_activity($conn, 'equipment', 'Updated equipment: ' . $name);
     header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();
 }
@@ -341,6 +344,7 @@ if (isset($_GET['delete_item'])) {
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Archived equipment: ' . admin_activity_item_name($conn, $id));
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=inventory");
     exit();
@@ -355,6 +359,7 @@ if (isset($_GET['restore_item'])) {
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 0 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Restored equipment: ' . admin_activity_item_name($conn, $item_id));
 
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=archive");
@@ -366,10 +371,12 @@ if (isset($_GET['restore_item'])) {
 
 if (isset($_GET['force_delete'])) {
     $item_id = intval($_GET['force_delete']);
+    $force_name = admin_activity_item_name($conn, $item_id);
 
     $stmt = mysqli_prepare($conn, "DELETE FROM tbl_inventory WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Permanently deleted equipment: ' . $force_name);
 
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=archive");
@@ -534,8 +541,15 @@ $admin_accounts_remaining = max(0, 5 - $admin_accounts_count);
 // Columns: fullName, email, role, created_at — id added by migration.
 $_admin_list_result = @mysqli_query(
     $conn,
-    "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    "SELECT id, fullName, email, role, created_at, last_login, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
 );
+if (!$_admin_list_result) {
+    // last_login column not migrated yet — fall back so the panel still lists everyone.
+    $_admin_list_result = @mysqli_query(
+        $conn,
+        "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    );
+}
 $admin_accounts_list = [];
 if ($_admin_list_result) {
     while ($ar = mysqli_fetch_assoc($_admin_list_result)) {

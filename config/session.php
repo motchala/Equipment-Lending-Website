@@ -46,7 +46,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // ── Admin session re-validation ─────────────────────────────────────────
-// Ends admin sessions whose account was deleted, made dormant, or had its
+// Ends admin sessions whose account was deleted, locked, or had its
 // credentials changed by a Super Admin. No-op for visitors/faculty/students.
 require_once __DIR__ . '/admin-auth.php';
 require_once __DIR__ . '/faculty-id.php';

@@ -101,17 +101,11 @@
                     <span class="fcty-dot"></span>
                     <span id="fcty-modal-availability-text">Checking&hellip;</span>
                 </span>
-                <span class="fcty-fact">
-                    <span class="material-symbols-outlined" aria-hidden="true">chair</span>
-                    <span><strong id="fcty-modal-capacity">&mdash;</strong> seats</span>
-                </span>
-                <span class="fcty-fact" id="fcty-modal-hint" hidden>
-                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span>
-                    <span id="fcty-modal-hint-text"></span>
-                </span>
             </div>
 
-            <div class="fcty-seg" role="tablist" aria-label="Schedule range">
+            <h4 class="fcty-sched-title" id="fcty-sched-title">Current reservations</h4>
+
+            <div class="fcty-seg" role="tablist" aria-label="Current reservations">
                 <button class="fcty-seg-btn active" type="button" data-schedule-tab="daily"
                     role="tab" aria-selected="true">Today</button>
                 <button class="fcty-seg-btn" type="button" data-schedule-tab="weekly"
@@ -119,7 +113,6 @@
             </div>
 
             <div class="fcty-schedule-panel active" data-schedule-panel="daily">
-                <p class="fcty-day-label" id="fcty-modal-day-label">Today</p>
                 <div class="fcty-schedule-list" id="fcty-modal-daily-list"></div>
             </div>
 

@@ -364,25 +364,6 @@ table {
         flex: 1 1 auto;
         justify-content: center;
     }
-
-    /* admin-dashboard.css hides the Rooms Registry's Capacity column
-       at <=640px (display:none on td/th:nth-child(2), plus
-       visibility:collapse on .pr-col-capacity) because a 4-column
-       table was too tight. That pre-dates the card view: a card has
-       room for the row, so show it again. The selectors below
-       deliberately repeat the originals' "tbody" so they carry the
-       same specificity and win by source order. */
-    #panel-rooms .pr-rooms-table .pr-col-capacity {
-        visibility: visible;
-    }
-
-    #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
-        display: flex;
-    }
-
-    #panel-rooms .pr-rooms-table tbody tr.pr-floor-divider td:nth-child(2) {
-        display: none;
-    }
 }
 
 

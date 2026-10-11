@@ -72,7 +72,7 @@ function ps_load_rooms_and_buildings(mysqli $conn): array
 
     $rooms_result = $conn->query(
         "SELECT r.room_id, r.building_id, r.room_name, r.floor_number,
-                r.floor_label, r.seating_capacity, r.amenities, r.status,
+                r.floor_label, r.amenities, r.status,
                 r.sort_order, r.is_archived,
                 b.name AS building_name, b.campus_id,
                 c.campus_name
@@ -143,6 +143,40 @@ function ps_prepare_rooms_registry_view(array $rooms_buildings, array $rooms_lis
 }
 
 /**
+ * Display helpers for the room tiles (presentation only — no DB access).
+ * ps_amenity_icon(): Material Symbols icon for an amenity label. The eight
+ * preset amenities from the Add/Edit Room form get their own icon; any
+ * custom label falls back to a neutral tag icon.
+ * ps_room_status_icon(): the icon shown on a tile's badge. The SHAPE differs
+ * per status (not just the colour) so status is readable without colour.
+ */
+if (!function_exists('ps_amenity_icon')) {
+    function ps_amenity_icon($label): string
+    {
+        static $map = [
+            'wifi'          => 'wifi',
+            'a/c'           => 'ac_unit',
+            'projector'     => 'present_to_all',
+            'pa system'     => 'campaign',
+            'running water' => 'water_drop',
+            'safety kit'    => 'medical_services',
+            'whiteboard'    => 'draw',
+            'smart tv'      => 'tv',
+        ];
+        $k = strtolower(trim((string)$label));
+        return $map[$k] ?? 'sell';
+    }
+}
+if (!function_exists('ps_room_status_icon')) {
+    function ps_room_status_icon($status): string
+    {
+        if ($status === 'Maintenance')  return 'construction';
+        if ($status === 'Not Bookable') return 'lock';
+        return 'meeting_room';
+    }
+}
+
+/**
  * Render the #roomsRegistryTable <tbody> rows to a string — the single
  * source of truth for what a room row looks like. Called from exactly
  * two places: admin-dashboard.php echoes this directly on a normal page
@@ -160,7 +194,7 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
         $isFirstFloorOfBuilding = true;
         foreach ($floors as $fNum => $fData): ?>
             <tr class="pr-floor-divider<?php echo $isFirstFloorOfBuilding ? ' pr-floor-divider-first' : ''; ?>" data-building-id="<?php echo (int)$bid; ?>" data-floor-num="<?php echo (int)$fNum; ?>">
-                <td colspan="4" style="--b-accent: <?php echo $building_accent[$bid]; ?>;">
+                <td colspan="3" style="--b-accent: <?php echo $building_accent[$bid]; ?>;">
                     <span class="material-symbols-outlined pr-building-icon"><?php echo htmlspecialchars($b['icon'] ?: 'domain'); ?></span>
                     <?php echo htmlspecialchars($b['name'] . ' — ' . $fData['label']); ?>
                     <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
@@ -179,7 +213,6 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
                     data-room-campus="<?php echo htmlspecialchars($room['campus_name'], ENT_QUOTES); ?>"
                     data-room-floor="<?php echo htmlspecialchars($fl, ENT_QUOTES); ?>"
                     data-room-building="<?php echo htmlspecialchars($room['building_name'], ENT_QUOTES); ?>"
-                    data-room-capacity="<?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : ''; ?>"
                     data-room-building-id="<?php echo (int)$room['building_id']; ?>"
                     data-room-floor-num="<?php echo (int)$room['floor_number']; ?>"
                     data-room-floor-label="<?php echo htmlspecialchars($room['floor_label'] ?? '', ENT_QUOTES); ?>"
@@ -190,9 +223,20 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
                                             $am_arr = json_decode($am_raw, true);
                                             echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
                                             ?>">
-                    <td class="td-fw"><?php echo htmlspecialchars($room['room_name']); ?></td>
-                    <td class="td-sm"><?php echo $room['seating_capacity'] !== null ? (int)$room['seating_capacity'] : '—'; ?></td>
-                    <td><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
+                    <?php $rm_am = is_array($am_arr) ? $am_arr : []; ?>
+                    <td class="rm-ico" title="<?php echo htmlspecialchars($room['status']); ?>">
+                        <span class="material-symbols-outlined"><?php echo ps_room_status_icon($room['status']); ?></span>
+                    </td>
+                    <td class="td-fw rm-name" title="<?php echo htmlspecialchars($room['room_name']); ?>"><?php echo htmlspecialchars($room['room_name']); ?></td>
+                    <td class="rm-stat"><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
+                    <td class="rm-amen">
+                        <?php foreach (array_slice($rm_am, 0, 3) as $am): ?>
+                            <span class="rm-am" title="<?php echo htmlspecialchars($am); ?>"><span class="material-symbols-outlined"><?php echo ps_amenity_icon($am); ?></span></span>
+                        <?php endforeach; ?>
+                        <?php if (count($rm_am) > 3): ?>
+                            <span class="rm-am-more" title="<?php echo htmlspecialchars(implode(', ', array_slice($rm_am, 3))); ?>">+<?php echo count($rm_am) - 3; ?></span>
+                        <?php endif; ?>
+                    </td>
                     <td class="pr-row-actions">
                         <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
                             <span class="material-symbols-outlined">calendar_month</span>
@@ -211,7 +255,8 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
     <?php endforeach;
     endforeach; ?>
     <tr class="pr-no-match-row" style="display:none;">
-        <td colspan="4" style="text-align:center;padding:2.5rem;color:var(--text-light);">
+        <td colspan="5" class="rm-nomatch">
+            <span class="material-symbols-outlined">search_off</span>
             No rooms match your filters.
         </td>
     </tr>
@@ -260,7 +305,6 @@ if (isset($_POST['add_room'])) {
     $room_name        = trim($_POST['room_name'] ?? '');
     $floor_number     = intval($_POST['floor_number'] ?? 1);
     $floor_label      = trim($_POST['floor_label'] ?? '');
-    $seating_capacity = $_POST['seating_capacity'] !== '' ? intval($_POST['seating_capacity']) : null;
     $status           = $_POST['status'] ?? 'Available';
     $sort_order       = intval($_POST['sort_order'] ?? 0);
 
@@ -290,16 +334,15 @@ if (isset($_POST['add_room'])) {
     $stmt = $conn->prepare(
         "INSERT INTO tbl_rooms
             (building_id, room_name, floor_number, floor_label,
-             seating_capacity, amenities, status, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+             amenities, status, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->bind_param(
-        'isisisis',
+        'isisssi',
         $building_id,
         $room_name,
         $floor_number,
         $floor_label,
-        $seating_capacity,
         $amenities_json,
         $status,
         $sort_order
@@ -333,7 +376,6 @@ if (isset($_POST['update_room'])) {
     $room_name        = trim($_POST['room_name'] ?? '');
     $floor_number     = intval($_POST['floor_number'] ?? 1);
     $floor_label      = trim($_POST['floor_label'] ?? '');
-    $seating_capacity = ($_POST['seating_capacity'] ?? '') !== '' ? intval($_POST['seating_capacity']) : null;
     $status           = $_POST['status'] ?? 'Available';
     $sort_order       = intval($_POST['sort_order'] ?? 0);
 
@@ -360,16 +402,15 @@ if (isset($_POST['update_room'])) {
     $stmt = $conn->prepare(
         "UPDATE tbl_rooms
          SET building_id = ?, room_name = ?, floor_number = ?, floor_label = ?,
-             seating_capacity = ?, amenities = ?, status = ?, sort_order = ?
+             amenities = ?, status = ?, sort_order = ?
          WHERE room_id = ? AND is_archived = 0"
     );
     $stmt->bind_param(
-        'isisissii',
+        'isisssii',
         $building_id,
         $room_name,
         $floor_number,
         $floor_label,
-        $seating_capacity,
         $amenities_json,
         $status,
         $sort_order,
@@ -483,7 +524,7 @@ if ($rooms_buildings_result) {
 // All active rooms joined to building + campus
 $rooms_list_result = $conn->query(
     "SELECT r.room_id, r.building_id, r.room_name, r.floor_number,
-            r.floor_label, r.seating_capacity, r.amenities, r.status,
+            r.floor_label, r.amenities, r.status,
             r.sort_order, r.is_archived,
             b.name AS building_name, b.campus_id,
             c.campus_name
@@ -567,7 +608,7 @@ $admin_room_reservations_result = $conn->query(
             TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,
             rr.faculty_name, rr.submitted_as, rr.submitted_by_name,
             rr.purpose, rr.attendees, rr.status, rr.reason,
-            rr.request_date,
+            rr.request_date, rr.document_path, rr.notes,
             r.room_name,
             b.name AS building_name,
             COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label,
