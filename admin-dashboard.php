@@ -808,6 +808,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <span class="material-symbols-outlined">meeting_room</span>
                     <span class="nav-label">Rooms</span>
                 </a>
+                <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
+                    <span class="material-symbols-outlined">history</span>
+                    <span class="nav-label">Activity</span>
+                </a>
                 <?php if ($is_super_admin): ?>
                     <a class="nav-item" data-tab="faculty" href="#">
                         <span class="material-symbols-outlined">group</span>
@@ -2867,17 +2871,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                                 <div class="am-activity">
                                     <div class="am-activity-head">
-                                        <h4>Activity</h4>
-                                        <div class="am-chips" id="am-chips" role="group" aria-label="Filter activity">
-                                            <button type="button" class="am-chip active" data-filter="all">All</button>
-                                            <button type="button" class="am-chip" data-filter="requests">Requests</button>
-                                            <button type="button" class="am-chip" data-filter="equipment">Equipment</button>
-                                            <button type="button" class="am-chip" data-filter="accounts">Accounts</button>
-                                            <button type="button" class="am-chip" data-filter="signins">Sign-ins</button>
+                                        <div class="am-activity-title">
+                                            <h4>Activity</h4>
+                                            <button type="button" class="act-open" id="am-open-activity">
+                                                Open in Activity <span class="material-symbols-outlined">arrow_forward</span>
+                                            </button>
+                                        </div>
+                                        <div class="act-chips" id="am-chips" role="group" aria-label="Filter activity">
+                                            <button type="button" class="act-chip active" data-filter="all">All</button>
+                                            <button type="button" class="act-chip" data-filter="requests">Requests</button>
+                                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                                            <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
+                                            <button type="button" class="act-chip" data-filter="system">System</button>
+                                            <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
                                         </div>
                                     </div>
-                                    <div class="am-feed" id="am-feed"></div>
-                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm am-more" id="am-more" hidden>Show more</button>
+                                    <div class="act-feed" id="am-feed"></div>
+                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm act-more" id="am-more" hidden>Show more</button>
                                 </div>
                             </div>
 
@@ -2885,6 +2895,55 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /panel-admins -->
             <?php endif; ?>
+
+            <!-- ============================================================
+         TAB: ACTIVITY  (every admin)
+         One timeline for everything that happens: manual decisions (with the
+         admin's name) and automatic ones from the rules engine. Filters are
+         type chips + Who + When. Driven by the "Activity page" block in
+         admin-dashboard.js and api/admin-activity.php.
+    ============================================================ -->
+            <div class="tab-panel" id="panel-activity">
+
+                <div class="act-head">
+                    <h2 class="act-title">Activity</h2>
+                    <p class="act-sub">Every decision and change, and who made it. Automatic decisions come from the rules engine.</p>
+                </div>
+
+                <section class="eq-card act-card" aria-label="Activity timeline">
+                    <div class="act-toolbar">
+                        <div class="act-chips" id="act-chips" role="group" aria-label="Filter by type">
+                            <button type="button" class="act-chip active" data-filter="all">All</button>
+                            <button type="button" class="act-chip" data-filter="requests">Requests</button>
+                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                            <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
+                            <button type="button" class="act-chip" data-filter="system">System</button>
+                            <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
+                        </div>
+                        <div class="act-selects">
+                            <select id="act-actor" class="form-control-custom" aria-label="Who">
+                                <option value="all">Everyone</option>
+                                <option value="auto">Automatic</option>
+                                <option value="me">Me</option>
+                                <?php foreach ($admin_accounts_list as $act_acct):
+                                    if (strtolower($act_acct['email'] ?? '') === strtolower($admin_email)) continue; ?>
+                                    <option value="<?php echo (int)($act_acct['id'] ?? 0); ?>"><?php echo htmlspecialchars($act_acct['fullName'] ?? ''); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="act-range" class="form-control-custom" aria-label="When">
+                                <option value="today">Today</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d" selected>Last 30 days</option>
+                                <option value="all">All time</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="act-feed" id="act-feed"></div>
+                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm act-more" id="act-more" hidden>Show more</button>
+                </section>
+            </div><!-- /panel-activity -->
+
 
 
 

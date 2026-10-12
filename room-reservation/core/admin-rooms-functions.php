@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../config/admin-activity.php'; // activity log helpers
 
 /**
  * admin-rooms-functions.php
@@ -350,6 +351,7 @@ if (isset($_POST['add_room'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
+        admin_log_activity($conn, 'room', 'Added room: ' . $room_name);
         if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room added.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_added=1");
@@ -419,6 +421,7 @@ if (isset($_POST['update_room'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
+        admin_log_activity($conn, 'room', 'Updated room: ' . $room_name);
         if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room updated.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_updated=1");
@@ -442,6 +445,7 @@ if (isset($_GET['archive_room'])) {
     $stmt->bind_param('i', $room_id);
     $stmt->execute();
     $stmt->close();
+    admin_log_activity($conn, 'room', 'Archived room: ' . admin_activity_room_name($conn, $room_id));
     if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Room archived.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_archived=1");
@@ -458,6 +462,7 @@ if (isset($_GET['restore_room'])) {
     $stmt->bind_param('i', $room_id);
     $stmt->execute();
     $stmt->close();
+    admin_log_activity($conn, 'room', 'Restored room: ' . admin_activity_room_name($conn, $room_id));
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_restored=1");
     exit();
@@ -480,6 +485,7 @@ if (isset($_GET['set_room_status'], $_GET['room_status_id'])) {
         $stmt->bind_param('si', $new_status, $room_id);
         $stmt->execute();
         $stmt->close();
+        admin_log_activity($conn, 'room', 'Set ' . admin_activity_room_name($conn, $room_id) . ' to ' . $new_status);
     }
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_updated=1");

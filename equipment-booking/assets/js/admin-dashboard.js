@@ -1968,6 +1968,119 @@
         });
     }
 
+    /* ── Shared activity timeline ─────────────────────────────────
+       One renderer for the Activity page and the per-admin timeline in the
+       Admins panel. Both read api/admin-activity.php, so they always agree. */
+    function actDayKey(ts) {
+        return new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: ADM_TZ }); // YYYY-MM-DD
+    }
+    function actDayLabel(ts) {
+        const key = actDayKey(ts);
+        const nowSec = Date.now() / 1000;
+        if (key === actDayKey(nowSec)) return 'Today';
+        if (key === actDayKey(nowSec - 86400)) return 'Yesterday';
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: ADM_TZ });
+    }
+    function actTimeLabel(ts) {
+        return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ });
+    }
+
+    /* cfg: { feed, moreBtn, params(): {actor, filter, range}, showActor: bool, onTotals(n) } */
+    function createActivityFeed(cfg) {
+        let offset = 0;
+        let token = 0;        // ignores answers that arrive after the filters changed
+        let lastKey = '';
+        let lastList = null;
+
+        function message(icon, text, retry) {
+            cfg.feed.textContent = '';
+            const box = admEl('div', 'act-feed-msg');
+            box.appendChild(admIcon(icon));
+            box.appendChild(admEl('p', '', text));
+            if (retry) {
+                const b = admEl('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Try again');
+                b.type = 'button';
+                b.addEventListener('click', function () { load(true); });
+                box.appendChild(b);
+            }
+            cfg.feed.appendChild(box);
+        }
+
+        function appendEvents(events) {
+            events.forEach(function (ev) {
+                const key = actDayKey(ev.ts);
+                if (key !== lastKey) {
+                    cfg.feed.appendChild(admEl('h5', 'act-day', actDayLabel(ev.ts)));
+                    lastList = admEl('ul', 'act-events');
+                    cfg.feed.appendChild(lastList);
+                    lastKey = key;
+                }
+                const li = admEl('li', 'act-event act-event--' + (ev.tone || 'neutral'));
+                const ico = admEl('span', 'act-event-icon');
+                ico.appendChild(admIcon(ev.icon || 'history'));
+                li.appendChild(ico);
+
+                const body = admEl('div', 'act-event-body');
+                body.appendChild(admEl('div', 'act-event-text', ev.text));
+                const auto = ev.actor_type === 'auto';
+                const who = cfg.showActor ? (auto ? '' : ev.actor_name) : '';
+                if (cfg.showActor || ev.meta) {
+                    const meta = admEl('div', 'act-event-meta');
+                    if (cfg.showActor && auto) meta.appendChild(admEl('span', 'act-pill', 'Automatic'));
+                    const bits = [who, ev.meta].filter(function (b) { return b; }).join(' \u00b7 ');
+                    if (bits) meta.appendChild(document.createTextNode((cfg.showActor && auto ? ' ' : '') + bits));
+                    if (meta.childNodes.length) body.appendChild(meta);
+                }
+                li.appendChild(body);
+                li.appendChild(admEl('time', 'act-event-time', actTimeLabel(ev.ts)));
+                lastList.appendChild(li);
+            });
+        }
+
+        function load(reset) {
+            const p = cfg.params();
+            const myToken = ++token;
+            if (reset) {
+                offset = 0;
+                lastKey = '';
+                lastList = null;
+                cfg.moreBtn.hidden = true;
+                message('hourglass_top', 'Loading activity\u2026');
+            } else {
+                cfg.moreBtn.disabled = true;
+            }
+            const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
+                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&offset=' + offset;
+            fetch(url, { credentials: 'same-origin' })
+                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
+                .then(function (r) {
+                    if (myToken !== token) return; // the user moved on
+                    cfg.moreBtn.disabled = false;
+                    if (!r.ok || r.data.status !== 'success') {
+                        if (reset) message('error', (r.data && r.data.message) || 'Something went wrong. Please try again.', true);
+                        return;
+                    }
+                    if (reset) cfg.feed.textContent = '';
+                    if (reset && cfg.onTotals && r.data.totals && typeof r.data.totals.all === 'number') cfg.onTotals(r.data.totals.all);
+                    if (reset && !r.data.items.length) {
+                        message('history', p.filter === 'all' ? 'No activity for this selection yet.' : 'Nothing here for this filter yet.');
+                        return;
+                    }
+                    appendEvents(r.data.items);
+                    offset += r.data.items.length;
+                    cfg.moreBtn.hidden = !r.data.has_more;
+                })
+                .catch(function () {
+                    if (myToken !== token) return;
+                    cfg.moreBtn.disabled = false;
+                    if (reset) message('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
+                });
+        }
+
+        cfg.moreBtn.addEventListener('click', function () { load(false); });
+        return { load: load };
+    }
+
     (function initAdminAccountsPanel() {
         const list = document.getElementById('am-list');
         const editModal = document.getElementById('admEditModal');
@@ -1987,10 +2100,6 @@
         let current = null;   // the selected .am-item
         let busy = false;
         let filter = 'all';
-        let feedOffset = 0;
-        let feedToken = 0;    // ignores answers that arrive after the selection / filter changed
-        let lastDayKey = '';
-        let lastDayList = null;
 
         const items = function () { return Array.from(list.querySelectorAll('.am-item')); };
 
@@ -2184,7 +2293,7 @@
             detailBody.hidden = false;
             renderDetail(item);
             resetFeedFilter();
-            loadFeed(true);
+            adminFeed.load(true);
             if (scrollOnMobile && window.matchMedia('(max-width: 900px)').matches) {
                 detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
@@ -2211,110 +2320,35 @@
         if (document.getElementById('panel-admins').classList.contains('active')) ensureSelected();
         window.psAdminsPanelReady = ensureSelected; // lets ?view=admins open it with someone selected
 
-        /* ── activity feed ────────────────────────────────────── */
+        /* ── activity timeline (shared renderer) ──────────────── */
+        const adminFeed = createActivityFeed({
+            feed: feed,
+            moreBtn: moreBtn,
+            showActor: false, // the whole timeline belongs to the selected admin
+            params: function () {
+                return { actor: current ? current.getAttribute('data-id') : '0', filter: filter, range: 'all' };
+            },
+            onTotals: function (n) { document.getElementById('am-f-total').textContent = String(n); }
+        });
+
         function resetFeedFilter() {
             filter = 'all';
-            document.querySelectorAll('#am-chips .am-chip').forEach(function (c) {
+            document.querySelectorAll('#am-chips .act-chip').forEach(function (c) {
                 c.classList.toggle('active', c.getAttribute('data-filter') === 'all');
             });
         }
 
         document.getElementById('am-chips').addEventListener('click', function (e) {
-            const chip = e.target.closest('.am-chip');
+            const chip = e.target.closest('.act-chip');
             if (!chip || !current) return;
             filter = chip.getAttribute('data-filter');
-            document.querySelectorAll('#am-chips .am-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
-            loadFeed(true);
+            document.querySelectorAll('#am-chips .act-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+            adminFeed.load(true);
         });
-        moreBtn.addEventListener('click', function () { loadFeed(false); });
 
-        function dayKey(ts) {
-            return new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: ADM_TZ }); // YYYY-MM-DD
-        }
-        function dayLabel(ts) {
-            const key = dayKey(ts);
-            const nowSec = Date.now() / 1000;
-            if (key === dayKey(nowSec)) return 'Today';
-            if (key === dayKey(nowSec - 86400)) return 'Yesterday';
-            return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: ADM_TZ });
-        }
-        function timeLabel(ts) {
-            return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ });
-        }
-
-        function feedMessage(icon, text, retry) {
-            feed.textContent = '';
-            const box = admEl('div', 'am-feed-msg');
-            box.appendChild(admIcon(icon));
-            box.appendChild(admEl('p', '', text));
-            if (retry) {
-                const b = admEl('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Try again');
-                b.type = 'button';
-                b.addEventListener('click', function () { loadFeed(true); });
-                box.appendChild(b);
-            }
-            feed.appendChild(box);
-        }
-
-        function appendEvents(events) {
-            events.forEach(function (ev) {
-                const key = dayKey(ev.ts);
-                if (key !== lastDayKey) {
-                    feed.appendChild(admEl('h5', 'am-day', dayLabel(ev.ts)));
-                    lastDayList = admEl('ul', 'am-events');
-                    feed.appendChild(lastDayList);
-                    lastDayKey = key;
-                }
-                const li = admEl('li', 'am-event am-event--' + (ev.tone || 'neutral'));
-                li.appendChild(admEl('span', 'am-event-icon', '')).appendChild(admIcon(ev.icon || 'history'));
-                li.appendChild(admEl('span', 'am-event-text', ev.text));
-                li.appendChild(admEl('time', 'am-event-time', timeLabel(ev.ts)));
-                lastDayList.appendChild(li);
-            });
-        }
-
-        function loadFeed(reset) {
-            if (!current) return;
-            const id = current.getAttribute('data-id');
-            const token = ++feedToken;
-            if (reset) {
-                feedOffset = 0;
-                lastDayKey = '';
-                lastDayList = null;
-                moreBtn.hidden = true;
-                feedMessage('hourglass_top', 'Loading activity…');
-            } else {
-                moreBtn.disabled = true;
-            }
-            const url = ADM_ACTIVITY_API + '?id=' + encodeURIComponent(id) +
-                '&filter=' + encodeURIComponent(filter) + '&offset=' + feedOffset;
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
-                .then(function (r) {
-                    if (token !== feedToken) return; // user moved on
-                    moreBtn.disabled = false;
-                    if (!r.ok || r.data.status !== 'success') {
-                        if (reset) feedMessage('error', msgOf(r), true);
-                        return;
-                    }
-                    if (reset) feed.textContent = '';
-                    if (reset && r.data.totals && typeof r.data.totals.all === 'number') {
-                        document.getElementById('am-f-total').textContent = String(r.data.totals.all);
-                    }
-                    if (reset && !r.data.items.length) {
-                        feedMessage('history', filter === 'all' ? 'No activity recorded yet.' : 'Nothing here for this filter yet.');
-                        return;
-                    }
-                    appendEvents(r.data.items);
-                    feedOffset += r.data.items.length;
-                    moreBtn.hidden = !r.data.has_more;
-                })
-                .catch(function () {
-                    if (token !== feedToken) return;
-                    moreBtn.disabled = false;
-                    if (reset) feedMessage('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
-                });
-        }
+        document.getElementById('am-open-activity').addEventListener('click', function () {
+            if (current && typeof window.psActivityOpen === 'function') window.psActivityOpen({ actor: current.getAttribute('data-id') });
+        });
 
         /* ── actions on the selected admin ────────────────────── */
         document.getElementById('am-d-actions').addEventListener('click', function (e) {
@@ -2590,6 +2624,67 @@
         });
     })();
     /* ▲ ADMIN-ACCOUNTS-PANEL-END ───────────────────────────────────────────── */
+
+    /* ▼ ACTIVITY-PAGE-BEGIN ──────────────────────────────────────────────────
+       Sidebar → Activity (every admin). Filter chips (type) + Who + When,
+       all served by api/admin-activity.php. */
+    (function initActivityPage() {
+        const feedEl = document.getElementById('act-feed');
+        const panel = document.getElementById('panel-activity');
+        if (!feedEl || !panel) return;
+
+        const actorSel = document.getElementById('act-actor');
+        const rangeSel = document.getElementById('act-range');
+        const chipsEl = document.getElementById('act-chips');
+        let filter = 'all';
+        let loaded = false;
+
+        const feed = createActivityFeed({
+            feed: feedEl,
+            moreBtn: document.getElementById('act-more'),
+            showActor: true,
+            params: function () { return { actor: actorSel.value, filter: filter, range: rangeSel.value }; }
+        });
+
+        function setChip(value) {
+            filter = value;
+            chipsEl.querySelectorAll('.act-chip').forEach(function (c) {
+                c.classList.toggle('active', c.getAttribute('data-filter') === value);
+            });
+        }
+
+        chipsEl.addEventListener('click', function (e) {
+            const chip = e.target.closest('.act-chip');
+            if (!chip) return;
+            setChip(chip.getAttribute('data-filter'));
+            feed.load(true);
+        });
+        actorSel.addEventListener('change', function () { feed.load(true); });
+        rangeSel.addEventListener('change', function () { feed.load(true); });
+
+        function ensureLoaded() {
+            if (loaded) return;
+            loaded = true;
+            feed.load(true);
+        }
+
+        const nav = document.querySelector('.nav-item[data-tab="activity"]');
+        if (nav) nav.addEventListener('click', ensureLoaded);
+        if (panel.classList.contains('active')) ensureLoaded();
+        window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
+
+        /* Called from the Admins panel: open Activity already filtered to one admin. */
+        window.psActivityOpen = function (opts) {
+            const actor = opts && opts.actor ? String(opts.actor) : 'all';
+            actorSel.value = Array.from(actorSel.options).some(function (o) { return o.value === actor; }) ? actor : 'all';
+            rangeSel.value = 'all';
+            setChip('all');
+            loaded = true;
+            if (nav) nav.click();
+            feed.load(true);
+        };
+    })();
+    /* ▲ ACTIVITY-PAGE-END ───────────────────────────────────────────────────── */
 
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
@@ -2937,6 +3032,10 @@
         } else if (view === 'faculty') {
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
+        } else if (view === 'activity') {
+            _switchTabDOM('activity');
+            if (typeof window.psActivityReady === 'function') window.psActivityReady();
+            history.replaceState({ tab: 'activity' }, '');
         } else if (view === 'admins') {
             _switchTabDOM('admins');
             if (typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/resolve-room-issue.php
  * Admin resolves or dismisses a room issue report.
@@ -91,6 +92,15 @@ $upd = $conn->prepare(
 $upd->bind_param('ssi', $resolution, $adminNotesVal, $issueId);
 $upd->execute();
 $upd->close();
+
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity(
+    $conn,
+    'room',
+    $resolution . ' room issue #' . $issueId . ' (' . admin_activity_room_name($conn, (int)$issue['room_id']) . ')',
+    null,
+    ['action' => $resolution === 'Resolved' ? 'issue_resolved' : 'issue_dismissed', 'ref_type' => 'issue', 'ref_id' => $issueId]
+);
 
 // Optionally set room to Maintenance
 if ($setMaintenance && $resolution === 'Resolved') {

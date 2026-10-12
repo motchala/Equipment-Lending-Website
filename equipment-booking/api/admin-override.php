@@ -91,6 +91,11 @@ $conn->set_charset('utf8mb4');
 require_once __DIR__ . '/../core/booking-schedule.php';
 BookingSchedule::ensureSchema($conn);
 
+// Activity log: make sure override_by_id exists (DDL) BEFORE the transaction starts.
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_activity_bootstrap($conn);
+$acting_admin_id = admin_current_id($conn);
+
 // ── Task 7.2d: Verify request exists and fetch its data ──────────────────────
 $fetch_stmt = $conn->prepare(
     "SELECT r.id,
@@ -282,16 +287,17 @@ try {
         "INSERT INTO tbl_arbitration_log
             (request_id, borrower_id, borrower_name, equipment_name,
              decision, rule_applied, reason,
-             override_by, override_reason, created_at)
+             override_by, override_by_id, override_reason, created_at)
          VALUES
             (?, ?, ?, ?,
              ?, 'override', ?,
-             ?, ?, NOW())
+             ?, ?, ?, NOW())
          ON DUPLICATE KEY UPDATE
             decision        = VALUES(decision),
             rule_applied    = 'override',
             reason          = VALUES(reason),
             override_by     = VALUES(override_by),
+            override_by_id  = VALUES(override_by_id),
             override_reason = VALUES(override_reason),
             created_at      = NOW()"
     );
@@ -301,7 +307,7 @@ try {
     }
 
     $log_stmt->bind_param(
-        'isssssss',
+        'issssssis',
         $request_id,
         $borrower_id,
         $borrower_name,
@@ -309,6 +315,7 @@ try {
         $new_status,
         $raw_override_reason,
         $admin_name,
+        $acting_admin_id,
         $raw_override_reason
     );
 
@@ -328,6 +335,15 @@ try {
     error_log('[admin-override] ' . $e->getMessage());
     send_json(500, 'error', 'Override failed. Please try again.');
 }
+
+// Activity log: who made this decision (shared with every admin).
+admin_log_activity(
+    $conn,
+    'request',
+    $new_status . ' request #' . $request_id . ': ' . $equipment_name . ($borrower_name !== '' ? ' for ' . $borrower_name : ''),
+    null,
+    ['action' => $new_status === 'Approved' ? 'request_approved' : 'request_declined', 'ref_type' => 'request', 'ref_id' => $request_id]
+);
 
 $conn->close();
 

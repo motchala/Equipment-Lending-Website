@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 require_once __DIR__ . '/../../config/security-headers.php';
 
@@ -109,4 +110,6 @@ try {
 $conn->close();
 
 // ── Task 6.4: Return success response ────────────────────────────────────────
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity($conn, 'settings', 'Updated borrowing rules');
 send_json(200, 'success', 'Arbitration settings saved.');

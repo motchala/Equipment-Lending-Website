@@ -19,6 +19,11 @@ $conn = getDB();
 require_once __DIR__ . '/core/booking-schedule.php';
 BookingSchedule::ensureSchema($conn);
 
+// Activity log: make sure override_by_id exists (DDL) BEFORE the transaction starts.
+require_once __DIR__ . '/../config/admin-activity.php';
+admin_activity_bootstrap($conn);
+$acting_admin_id = admin_current_id($conn);
+
 $token = trim($_GET['token'] ?? '');
 $message = '';
 $success = false;
@@ -68,15 +73,22 @@ if ($token) {
             $admin_name = $_SESSION['admin_name'] ?? 'Admin';
             $log = $conn->prepare(
                 "INSERT INTO tbl_arbitration_log
-                 (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_reason, created_at)
-                 VALUES (?, ?, ?, ?, 'Returned', 'qr_return', 'Equipment returned via QR scan', ?, 'QR Token Return', NOW())
-                 ON DUPLICATE KEY UPDATE decision='Returned', rule_applied='qr_return', override_by=VALUES(override_by), created_at=NOW()"
+                 (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_by_id, override_reason, created_at)
+                 VALUES (?, ?, ?, ?, 'Returned', 'qr_return', 'Equipment returned via QR scan', ?, ?, 'QR Token Return', NOW())
+                 ON DUPLICATE KEY UPDATE decision='Returned', rule_applied='qr_return', override_by=VALUES(override_by), override_by_id=VALUES(override_by_id), created_at=NOW()"
             );
-            $log->bind_param('issss', $req_id, $row['faculty_name'], $row['faculty_name'], $eq_name, $admin_name);
+            $log->bind_param('issssi', $req_id, $row['faculty_name'], $row['faculty_name'], $eq_name, $admin_name, $acting_admin_id);
             $log->execute();
             $log->close();
 
             $conn->commit();
+            admin_log_activity(
+                $conn,
+                'request',
+                'Marked ' . $eq_name . ' as returned (' . $row['faculty_name'] . ')',
+                null,
+                ['action' => 'request_returned', 'ref_type' => 'request', 'ref_id' => $req_id]
+            );
             $success = true;
             $message = "Return confirmed for {$row['equipment_name']} borrowed by {$row['faculty_name']}.";
         }

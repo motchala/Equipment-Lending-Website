@@ -673,19 +673,26 @@ body {
     gap: 10px;
 }
 
+.am-activity-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+}
+
 .am-activity-head h4 {
     font-size: 14px;
     font-weight: 700;
     color: var(--text-dark);
 }
 
-.am-chips {
+.act-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-.am-chip {
+.act-chip {
     padding: 4px 12px;
     font-family: inherit;
     font-size: 12px;
@@ -698,22 +705,22 @@ body {
     transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.am-chip:hover {
+.act-chip:hover {
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
 }
 
-.am-chip.active {
+.act-chip.active {
     color: #fff;
     background: var(--accent-maroon);
     border-color: var(--accent-maroon);
 }
 
-.am-feed {
+.act-feed {
     margin-top: 6px;
 }
 
-.am-day {
+.act-day {
     margin: 16px 0 4px;
     font-size: 11px;
     font-weight: 700;
@@ -722,13 +729,13 @@ body {
     color: var(--text-light);
 }
 
-.am-events {
+.act-events {
     list-style: none;
     margin: 0;
     padding: 0;
 }
 
-.am-event {
+.act-event {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr) auto;
     align-items: center;
@@ -737,11 +744,11 @@ body {
     border-bottom: 1px solid var(--khaki-border);
 }
 
-.am-event:last-child {
+.act-event:last-child {
     border-bottom: 0;
 }
 
-.am-event-icon {
+.act-event-icon {
     display: grid;
     place-items: center;
     width: 32px;
@@ -751,39 +758,43 @@ body {
     background: var(--secondary-cream);
 }
 
-.am-event-icon .material-symbols-outlined {
+.act-event-icon .material-symbols-outlined {
     font-size: 17px;
 }
 
-.am-event--ok .am-event-icon {
+.act-event--ok .act-event-icon {
     color: #1e7e45;
     background: #e8f6ee;
 }
 
-.am-event--bad .am-event-icon {
+.act-event--bad .act-event-icon {
     color: #a32a1f;
     background: #fdecea;
 }
 
-.am-event--warn .am-event-icon {
+.act-event--warn .act-event-icon {
     color: #8a5a00;
     background: #fef6e4;
 }
 
-.am-event-text {
+.act-event-body {
+    min-width: 0;
+}
+
+.act-event-text {
     font-size: 13px;
     line-height: 1.4;
     color: var(--text-dark);
     overflow-wrap: anywhere;
 }
 
-.am-event-time {
+.act-event-time {
     font-size: 11.5px;
     color: var(--text-light);
     white-space: nowrap;
 }
 
-.am-feed-msg {
+.act-feed-msg {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -794,12 +805,12 @@ body {
     color: var(--text-light);
 }
 
-.am-feed-msg .material-symbols-outlined {
+.act-feed-msg .material-symbols-outlined {
     font-size: 32px;
     opacity: 0.35;
 }
 
-.am-more {
+.act-more {
     display: flex;
     margin: 10px auto 0;
 }
@@ -819,12 +830,125 @@ body {
         grid-template-columns: 1fr;
     }
 
-    .am-event {
+    .act-event {
         grid-template-columns: 32px minmax(0, 1fr);
     }
 
-    .am-event-time {
+    .act-event-time {
         grid-column: 2;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACTIVITY PAGE — sidebar → Activity (every admin)
+   One card: a filter toolbar on top, then the day-grouped timeline.
+   The timeline rows (.act-event …) are shared with the Admins panel.
+   ══════════════════════════════════════════════════════════════ */
+
+#panel-activity [hidden] {
+    display: none !important;
+}
+
+.act-head {
+    margin-bottom: 1.5rem;
+}
+
+.act-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.act-sub {
+    margin-top: 2px;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+/* Capped width: a timeline reads better as a column than stretched across a wide screen. */
+.act-card {
+    max-width: 1000px;
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.act-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+.act-selects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.act-selects .form-control-custom {
+    width: auto;
+    min-width: 150px;
+    min-height: 38px;
+}
+
+.act-card .act-feed {
+    margin-top: 0;
+}
+
+.act-event-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.act-pill {
+    display: inline-block;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: var(--accent-maroon);
+    background: var(--accent-light);
+    border: 1px solid var(--accent-maroon);
+}
+
+.act-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-maroon);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.act-open .material-symbols-outlined {
+    font-size: 15px;
+}
+
+.act-open:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+    .act-card {
+        padding: 1rem;
+    }
+
+    .act-selects,
+    .act-selects .form-control-custom {
+        width: 100%;
     }
 }
 
