@@ -76,7 +76,7 @@
 }
 
 /* ── Sidebar tokens ───────────────────────────────────────────────
-   Same dark-maroon surface, text and gold-hover values the Faculty
+   Same dark-maroon surface, text and gold-highlight values the Faculty
    portal's sidebar uses, so both portals read as one product. */
 :root {
     --nav-bg-top: #4a0909;
@@ -84,9 +84,10 @@
     --nav-text: rgba(255, 255, 255, 0.86);
     --nav-text-dim: rgba(255, 255, 255, 0.64);
     --nav-line: rgba(255, 255, 255, 0.12);
-    --nav-hover-bg: #dcb862;
-    --nav-on-hover: #2b0000;
-    --nav-active-bg: rgba(255, 255, 255, 0.12);
+    --nav-active-bg: #dcb862;
+    --nav-on-active: #2b0000;
+    --nav-hover-bg: rgba(255, 255, 255, 0.18);
+    --nav-on-hover: #ffffff;
     --brand-h: 64px;
 }
 
@@ -101,8 +102,10 @@
     --nav-text: #ffffff;
     --nav-text-dim: #ffffff;
     --nav-line: rgba(255, 255, 255, 0.6);
-    --nav-hover-bg: #ffd83a;
-    --nav-active-bg: rgba(255, 255, 255, 0.22);
+    --nav-active-bg: #ffd83a;
+    --nav-on-active: #2b0000;
+    --nav-hover-bg: rgba(255, 255, 255, 0.28);
+    --nav-on-hover: #ffffff;
 }
 
 /* ── Reset ────────────────────────────────────────────────────── */
@@ -810,11 +813,6 @@ body {
     opacity: 0.35;
 }
 
-.act-more {
-    display: flex;
-    margin: 10px auto 0;
-}
-
 @media (max-width: 900px) {
     .am-layout {
         grid-template-columns: 1fr;
@@ -1353,10 +1351,10 @@ button.nav-item {
     color: inherit;
 }
 
-/* Current screen: a plain, quiet highlight. */
+/* Current screen: gold highlight. */
 .nav-item.active {
     background: var(--nav-active-bg);
-    color: #ffffff;
+    color: var(--nav-on-active);
     font-weight: 600;
 }
 
@@ -1364,9 +1362,8 @@ button.nav-item {
     font-variation-settings: 'FILL' 1;
 }
 
-/* Hover: the one place gold appears (declared after .active so hovering
-   the current tab still responds). */
-.nav-item:hover {
+/* Only inactive tabs get the subtle white hover highlight. */
+.nav-item:not(.active):hover {
     background: var(--nav-hover-bg);
     color: var(--nav-on-hover);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
@@ -8247,8 +8244,9 @@ body:has(#roomScheduleModal:not(.hidden)) {
     display: none !important;
 }
 
-/* ── Pagination footer ────────────────────────────────────── */
-.inv-pager {
+/* ── Pagination footer (Equipment list + Activity timelines) ─── */
+.inv-pager,
+.act-pager {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -8258,33 +8256,39 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-top: 1px solid var(--khaki-border);
 }
 
-.inv-pager[hidden] {
+.inv-pager[hidden],
+.act-pager[hidden] {
     display: none;
 }
 
-.inv-pager-info {
+.inv-pager-info,
+.act-pager-info {
     font-size: 12px;
     color: var(--text-light);
 }
 
-.inv-pager-ctl {
+.inv-pager-ctl,
+.act-pager-ctl {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-left: auto;
 }
 
-.inv-pager-ctl[hidden] {
+.inv-pager-ctl[hidden],
+.act-pager-ctl[hidden] {
     display: none;
 }
 
-.inv-pager-nums {
+.inv-pager-nums,
+.act-pager-nums {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
-.inv-pager-btn {
+.inv-pager-btn,
+.act-pager-btn {
     display: inline-grid;
     place-items: center;
     min-width: 32px;
@@ -8301,29 +8305,34 @@ body:has(#roomScheduleModal:not(.hidden)) {
     transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.inv-pager-btn .material-symbols-outlined {
+.inv-pager-btn .material-symbols-outlined,
+.act-pager-btn .material-symbols-outlined {
     font-size: 18px;
 }
 
-.inv-pager-btn:hover:not(:disabled):not(.is-active) {
+.inv-pager-btn:hover:not(:disabled):not(.is-active),
+.act-pager-btn:hover:not(:disabled):not(.is-active) {
     background: var(--hover-bg);
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
 }
 
-.inv-pager-btn.is-active {
+.inv-pager-btn.is-active,
+.act-pager-btn.is-active {
     background: var(--accent-maroon);
     border-color: var(--accent-maroon);
     color: #fff;
     cursor: default;
 }
 
-.inv-pager-btn:disabled {
+.inv-pager-btn:disabled,
+.act-pager-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 
-.inv-pager-gap {
+.inv-pager-gap,
+.act-pager-gap {
     display: inline-grid;
     place-items: center;
     min-width: 20px;
@@ -8333,18 +8342,30 @@ body:has(#roomScheduleModal:not(.hidden)) {
 }
 
 @media (max-width: 520px) {
-    .inv-pager {
+
+    .inv-pager,
+    .act-pager {
         justify-content: center;
     }
 
-    .inv-pager-info {
+    .inv-pager-info,
+    .act-pager-info {
         width: 100%;
         text-align: center;
     }
 
-    .inv-pager-ctl {
+    .inv-pager-ctl,
+    .act-pager-ctl {
         margin-left: 0;
     }
+}
+
+/* Activity timelines: the pager sits inside the card's own padding. */
+.act-card .act-pager,
+.am-activity .act-pager {
+    margin-top: 0.75rem;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -9168,6 +9189,91 @@ nav.sidebar .nav-item.nav-signout {
 
     nav.sidebar .sidebar-footer {
         padding-bottom: 10px;
+    }
+}
+
+/* ── Sidebar groups: small titles with a trailing separator line ──────────── */
+nav.sidebar .sidebar-links {
+    gap: 0;
+    /* spacing now lives inside / between the groups */
+}
+
+nav.sidebar .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--nav-item-gap);
+}
+
+nav.sidebar .nav-group+.nav-group {
+    margin-top: 14px;
+}
+
+nav.sidebar .nav-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px 2px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    color: var(--nav-text-dim);
+    opacity: 0.8;
+    user-select: none;
+}
+
+nav.sidebar .nav-group-title::after {
+    content: "";
+    flex: 1;
+    min-width: 12px;
+    border-top: 1px solid var(--nav-line);
+}
+
+/* Collapsed rail (desktop) and icon rail (tablet): no room for titles — the line still separates groups */
+body.sidebar-collapsed nav.sidebar .nav-group-title {
+    display: none;
+}
+
+body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--nav-line);
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    nav.sidebar .nav-group-title {
+        display: none;
+    }
+
+    nav.sidebar .nav-group+.nav-group {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nav-line);
+    }
+}
+
+/* Short laptop screens: slightly smaller tabs and tighter groups so the list doesn't need to scroll */
+@media (min-width: 769px) and (max-height: 700px) {
+    nav.sidebar {
+        --nav-item-h: 42px;
+        --nav-item-gap: 3px;
+    }
+
+    nav.sidebar .nav-group+.nav-group {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--nav-line);
+    }
+
+    nav.sidebar .nav-group-title {
+        padding-bottom: 0;
+    }
+}
+
+/* Very short screens: drop the titles, keep the separating lines */
+@media (min-width: 769px) and (max-height: 560px) {
+    nav.sidebar .nav-group-title {
+        display: none;
     }
 }
 

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * admin-activity-feed.php — the ONE place that builds the activity timeline.
  *
@@ -25,13 +26,20 @@ if (!function_exists('adm_act_categories')) {
     function adm_act_categories(string $filter): array
     {
         switch ($filter) {
-            case 'requests':  return ['request'];
-            case 'rooms':     return ['room'];
-            case 'decisions': return ['request', 'room'];
-            case 'equipment': return ['equipment'];
-            case 'system':    return ['account', 'faculty', 'settings'];
-            case 'signins':   return ['login'];
-            default:          return ['request', 'room', 'equipment', 'account', 'faculty', 'settings', 'login'];
+            case 'requests':
+                return ['request'];
+            case 'rooms':
+                return ['room'];
+            case 'decisions':
+                return ['request', 'room'];
+            case 'equipment':
+                return ['equipment'];
+            case 'system':
+                return ['account', 'faculty', 'settings'];
+            case 'signins':
+                return ['login'];
+            default:
+                return ['request', 'room', 'equipment', 'account', 'faculty', 'settings', 'login'];
         }
     }
 
@@ -39,13 +47,20 @@ if (!function_exists('adm_act_categories')) {
     function adm_act_category_meta(string $category): array
     {
         switch ($category) {
-            case 'request':   return ['requests', 'requests'];
-            case 'room':      return ['rooms', 'rooms'];
-            case 'equipment': return ['equipment', 'inventory'];
-            case 'account':   return ['system', 'admins'];
-            case 'faculty':   return ['system', 'faculty'];
-            case 'settings':  return ['system', 'settings'];
-            default:          return ['signins', ''];
+            case 'request':
+                return ['requests', 'requests'];
+            case 'room':
+                return ['rooms', 'rooms'];
+            case 'equipment':
+                return ['equipment', 'inventory'];
+            case 'account':
+                return ['system', 'admins'];
+            case 'faculty':
+                return ['system', 'faculty'];
+            case 'settings':
+                return ['system', 'settings'];
+            default:
+                return ['signins', ''];
         }
     }
 
@@ -131,35 +146,22 @@ if (!function_exists('adm_act_categories')) {
     }
 }
 
-if (!function_exists('admin_activity_feed')) {
+if (!function_exists('adm_act_specs')) {
     /**
-     * @param array $q {
-     *   viewer_id  int     the signed-in admin's account id
-     *   is_super   bool
-     *   actor_mode string  all | auto | admin
-     *   actor_id   int     used when actor_mode = admin
-     *   filter     string  all | requests | rooms | equipment | system | signins | decisions
-     *   since      ?int    unix timestamp lower bound (null = no limit)
-     *   offset     int
-     *   limit      int
-     * }
-     * @return array{items: array<int,array>, has_more: bool}
+     * The three sources as query specs, so the same filters drive both the page of rows
+     * (admin_activity_feed) and the total (admin_activity_count).
+     *
+     * @return array<int, array{from:string, count_from:string, where:string, types:string, params:array, cols:string, order:string, map:callable}>
      */
-    function admin_activity_feed(mysqli $conn, array $q): array
+    function adm_act_specs(array $q): array
     {
-        admin_activity_bootstrap($conn);
-
         $viewer     = (int)($q['viewer_id'] ?? 0);
         $is_super   = !empty($q['is_super']);
         $actor_mode = (string)($q['actor_mode'] ?? 'all');
         $actor_id   = (int)($q['actor_id'] ?? 0);
         $filter     = (string)($q['filter'] ?? 'all');
         $since      = isset($q['since']) ? (int)$q['since'] : null;
-        $offset     = max(0, (int)($q['offset'] ?? 0));
-        $limit      = max(1, (int)($q['limit'] ?? 15));
-
-        $want  = $offset + $limit + 1; // enough from each source to know whether more exists
-        $items = [];
+        $specs      = [];
 
         // ── Source 1: manual actions (tbl_admin_activity) ────────────────────────
         if ($actor_mode !== 'auto') {
@@ -167,7 +169,6 @@ if (!function_exists('admin_activity_feed')) {
             $where  = ['t.category IN (' . implode(',', array_fill(0, count($cats), '?')) . ')'];
             $types  = str_repeat('s', count($cats));
             $params = $cats;
-
             if ($actor_mode === 'admin') {
                 $where[]  = 't.admin_id = ?';
                 $types   .= 'i';
@@ -184,32 +185,31 @@ if (!function_exists('admin_activity_feed')) {
                 $types   .= 'i';
                 $params[] = $viewer;
             }
-            $types   .= 'i';
-            $params[] = $want;
-
-            $sql = "SELECT t.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, t.category, t.action,
-                           t.summary, UNIX_TIMESTAMP(t.created_at) AS ts
-                      FROM tbl_admin_activity t
-                      LEFT JOIN tbl_accounts a ON a.id = t.admin_id
-                     WHERE " . implode(' AND ', $where) . "
-                     ORDER BY t.created_at DESC, t.id DESC
-                     LIMIT ?";
-            foreach (adm_act_rows($conn, $sql, $types, $params) as $r) {
-                [$chip, $tab]  = adm_act_category_meta($r['category']);
-                [$icon, $tone] = adm_act_style($r['category'], $r['action'], (string)$r['summary']);
-                $items[] = [
-                    'ts'         => (int)$r['ts'],
-                    'actor_type' => 'admin',
-                    'actor_id'   => (int)$r['admin_id'],
-                    'actor_name' => (string)$r['actor_name'],
-                    'category'   => $chip,
-                    'icon'       => $icon,
-                    'tone'       => $tone,
-                    'text'       => (string)$r['summary'],
-                    'meta'       => '',
-                    'tab'        => $tab,
-                ];
-            }
+            $specs[] = [
+                'from'       => 'tbl_admin_activity t LEFT JOIN tbl_accounts a ON a.id = t.admin_id',
+                'count_from' => 'tbl_admin_activity t',
+                'where'      => implode(' AND ', $where),
+                'types'      => $types,
+                'params'     => $params,
+                'cols'       => 't.admin_id, COALESCE(a.fullName, t.admin_name) AS actor_name, t.category, t.action, t.summary, UNIX_TIMESTAMP(t.created_at) AS ts',
+                'order'      => 't.created_at DESC, t.id DESC',
+                'map'        => static function (array $r): array {
+                    [$chip, $tab]  = adm_act_category_meta($r['category']);
+                    [$icon, $tone] = adm_act_style($r['category'], $r['action'], (string)$r['summary']);
+                    return [
+                        'ts'         => (int)$r['ts'],
+                        'actor_type' => 'admin',
+                        'actor_id'   => (int)$r['admin_id'],
+                        'actor_name' => (string)$r['actor_name'],
+                        'category'   => $chip,
+                        'icon'       => $icon,
+                        'tone'       => $tone,
+                        'text'       => (string)$r['summary'],
+                        'meta'       => '',
+                        'tab'        => $tab,
+                    ];
+                },
+            ];
         }
 
         // ── Source 2: automatic request decisions (tbl_arbitration_log) ──────────
@@ -222,36 +222,37 @@ if (!function_exists('admin_activity_feed')) {
                 $types   .= 'i';
                 $params[] = $since;
             }
-            $types   .= 'i';
-            $params[] = $want;
-            $sql = "SELECT request_id, borrower_name, equipment_name, decision, rule_applied, UNIX_TIMESTAMP(created_at) AS ts
-                      FROM tbl_arbitration_log
-                     WHERE " . implode(' AND ', $where) . "
-                     ORDER BY created_at DESC, id DESC
-                     LIMIT ?";
-            foreach (adm_act_rows($conn, $sql, $types, $params) as $r) {
-                $d    = (string)$r['decision'];
-                $who  = trim((string)$r['borrower_name']);
-                $text = $d . ' request #' . (int)$r['request_id'] . ': ' . trim((string)$r['equipment_name']) . ($who !== '' ? ' for ' . $who : '');
-                [$icon, $tone] = $d === 'Approved' ? ['check_circle', 'ok'] : ($d === 'Declined' ? ['cancel', 'bad'] : ['assignment', 'neutral']);
-                $items[] = [
-                    'ts'         => (int)$r['ts'],
-                    'actor_type' => 'auto',
-                    'actor_id'   => 0,
-                    'actor_name' => 'Automatic',
-                    'category'   => 'requests',
-                    'icon'       => $icon,
-                    'tone'       => $tone,
-                    'text'       => $text,
-                    'meta'       => adm_act_rule_label($r['rule_applied']),
-                    'tab'        => 'requests',
-                ];
-            }
+            $specs[] = [
+                'from'       => 'tbl_arbitration_log',
+                'count_from' => 'tbl_arbitration_log',
+                'where'      => implode(' AND ', $where),
+                'types'      => $types,
+                'params'     => $params,
+                'cols'       => 'request_id, borrower_name, equipment_name, decision, rule_applied, UNIX_TIMESTAMP(created_at) AS ts',
+                'order'      => 'created_at DESC, id DESC',
+                'map'        => static function (array $r): array {
+                    $d    = (string)$r['decision'];
+                    $who  = trim((string)$r['borrower_name']);
+                    $text = $d . ' request #' . (int)$r['request_id'] . ': ' . trim((string)$r['equipment_name']) . ($who !== '' ? ' for ' . $who : '');
+                    [$icon, $tone] = $d === 'Approved' ? ['check_circle', 'ok'] : ($d === 'Declined' ? ['cancel', 'bad'] : ['assignment', 'neutral']);
+                    return [
+                        'ts'         => (int)$r['ts'],
+                        'actor_type' => 'auto',
+                        'actor_id'   => 0,
+                        'actor_name' => 'Automatic',
+                        'category'   => 'requests',
+                        'icon'       => $icon,
+                        'tone'       => $tone,
+                        'text'       => $text,
+                        'meta'       => adm_act_rule_label($r['rule_applied']),
+                        'tab'        => 'requests',
+                    ];
+                },
+            ];
         }
 
         // ── Source 3: automatic room-reservation decisions ───────────────────────
-        if ($actor_mode !== 'admin' && in_array($filter, ['all', 'rooms', 'decisions'], true)
-            && admin_activity_table_exists($conn, 'tbl_room_arbitration_log')) {
+        if ($actor_mode !== 'admin' && in_array($filter, ['all', 'rooms', 'decisions'], true)) {
             $where  = ['1 = 1'];
             $types  = '';
             $params = [];
@@ -260,30 +261,88 @@ if (!function_exists('admin_activity_feed')) {
                 $types   .= 'i';
                 $params[] = $since;
             }
-            $types   .= 'i';
-            $params[] = $want;
-            $sql = "SELECT reservation_id, room_name, borrower_name, decision, rule_applied, UNIX_TIMESTAMP(created_at) AS ts
-                      FROM tbl_room_arbitration_log
-                     WHERE " . implode(' AND ', $where) . "
-                     ORDER BY created_at DESC, id DESC
-                     LIMIT ?";
-            foreach (adm_act_rows($conn, $sql, $types, $params) as $r) {
-                $d    = (string)$r['decision'];
-                $who  = trim((string)$r['borrower_name']);
-                $text = $d . ' reservation #' . (int)$r['reservation_id'] . ': ' . trim((string)$r['room_name']) . ($who !== '' ? ' for ' . $who : '');
-                [$icon, $tone] = $d === 'Approved' ? ['event_available', 'ok'] : ($d === 'Declined' ? ['event_busy', 'bad'] : ['meeting_room', 'neutral']);
-                $items[] = [
-                    'ts'         => (int)$r['ts'],
-                    'actor_type' => 'auto',
-                    'actor_id'   => 0,
-                    'actor_name' => 'Automatic',
-                    'category'   => 'rooms',
-                    'icon'       => $icon,
-                    'tone'       => $tone,
-                    'text'       => $text,
-                    'meta'       => adm_act_rule_label($r['rule_applied']),
-                    'tab'        => 'rooms',
-                ];
+            $specs[] = [
+                'from'       => 'tbl_room_arbitration_log',
+                'count_from' => 'tbl_room_arbitration_log',
+                'where'      => implode(' AND ', $where),
+                'types'      => $types,
+                'params'     => $params,
+                'cols'       => 'reservation_id, room_name, borrower_name, decision, rule_applied, UNIX_TIMESTAMP(created_at) AS ts',
+                'order'      => 'created_at DESC, id DESC',
+                'map'        => static function (array $r): array {
+                    $d    = (string)$r['decision'];
+                    $who  = trim((string)$r['borrower_name']);
+                    $text = $d . ' reservation #' . (int)$r['reservation_id'] . ': ' . trim((string)$r['room_name']) . ($who !== '' ? ' for ' . $who : '');
+                    [$icon, $tone] = $d === 'Approved' ? ['event_available', 'ok'] : ($d === 'Declined' ? ['event_busy', 'bad'] : ['meeting_room', 'neutral']);
+                    return [
+                        'ts'         => (int)$r['ts'],
+                        'actor_type' => 'auto',
+                        'actor_id'   => 0,
+                        'actor_name' => 'Automatic',
+                        'category'   => 'rooms',
+                        'icon'       => $icon,
+                        'tone'       => $tone,
+                        'text'       => $text,
+                        'meta'       => adm_act_rule_label($r['rule_applied']),
+                        'tab'        => 'rooms',
+                    ];
+                },
+            ];
+        }
+        return $specs;
+    }
+}
+
+if (!function_exists('admin_activity_count')) {
+    /** How many events match (same filters and visibility as admin_activity_feed). */
+    function admin_activity_count(mysqli $conn, array $q): int
+    {
+        admin_activity_bootstrap($conn);
+        $total = 0;
+        foreach (adm_act_specs($q) as $spec) {
+            if ($spec['from'] === 'tbl_room_arbitration_log' && !admin_activity_table_exists($conn, 'tbl_room_arbitration_log')) {
+                continue;
+            }
+            $rows = adm_act_rows($conn, 'SELECT COUNT(*) AS c FROM ' . $spec['count_from'] . ' WHERE ' . $spec['where'], $spec['types'], $spec['params']);
+            $total += (int)($rows[0]['c'] ?? 0);
+        }
+        return $total;
+    }
+}
+
+if (!function_exists('admin_activity_feed')) {
+    /**
+     * One page of the timeline, newest first.
+     *
+     * @param array $q {
+     *   viewer_id  int     the signed-in admin's account id
+     *   is_super   bool
+     *   actor_mode string  all | auto | admin
+     *   actor_id   int     used when actor_mode = admin
+     *   filter     string  all | requests | rooms | equipment | system | signins | decisions
+     *   since      ?int    unix timestamp lower bound (null = no limit)
+     *   offset     int
+     *   limit      int
+     * }
+     * @return array{items: array<int,array>, has_more: bool}
+     */
+    function admin_activity_feed(mysqli $conn, array $q): array
+    {
+        admin_activity_bootstrap($conn);
+
+        $offset = max(0, (int)($q['offset'] ?? 0));
+        $limit  = max(1, (int)($q['limit'] ?? 15));
+        $want   = $offset + $limit + 1; // enough from each source to know whether more exists
+        $items  = [];
+
+        foreach (adm_act_specs($q) as $spec) {
+            if ($spec['from'] === 'tbl_room_arbitration_log' && !admin_activity_table_exists($conn, 'tbl_room_arbitration_log')) {
+                continue;
+            }
+            $sql = 'SELECT ' . $spec['cols'] . ' FROM ' . $spec['from'] . ' WHERE ' . $spec['where']
+                . ' ORDER BY ' . $spec['order'] . ' LIMIT ?';
+            foreach (adm_act_rows($conn, $sql, $spec['types'] . 'i', array_merge($spec['params'], [$want])) as $r) {
+                $items[] = ($spec['map'])($r);
             }
         }
 

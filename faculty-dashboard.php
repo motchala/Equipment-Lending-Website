@@ -1332,15 +1332,25 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             outline-offset: 1px;
         }
 
-        #panel-home .fdb-view {
-            display: none;
+        /* Months and Week are stacked in the same cell and only their visibility is switched, so the
+           card keeps the same height (the Week view's) and nothing around it moves when you toggle. */
+        #panel-home .fdb-views {
+            display: grid;
             flex: 1;
-            flex-direction: column;
+            min-width: 0;
         }
 
-        #panel-home #fdbRangeMonths:checked~.fdb-view--months,
-        #panel-home #fdbRangeWeek:checked~.fdb-view--week {
+        #panel-home .fdb-view {
+            grid-area: 1 / 1;
             display: flex;
+            flex-direction: column;
+            min-width: 0;
+            visibility: hidden;
+        }
+
+        #panel-home #fdbRangeMonths:checked~.fdb-views .fdb-view--months,
+        #panel-home #fdbRangeWeek:checked~.fdb-views .fdb-view--week {
+            visibility: visible;
         }
 
         #panel-home .fdb-plot {
@@ -1457,6 +1467,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             font-size: 11px;
             font-weight: 600;
             line-height: 1.25;
+            min-height: 28px;
             color: var(--fdb-muted);
         }
 
@@ -1698,8 +1709,43 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             border-radius: 16px;
         }
 
+        /* Header at the top, button at the bottom, and the code block centred in the space between */
         #panel-home .fdb-area-code .dash-code-body {
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 0;
+            text-align: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-code-display {
+            display: flex;
+            width: 100%;
+            gap: 8px !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
+        #panel-home .fdb-area-code .fcc-code-value {
+            flex: 0 1 auto !important;
+            text-align: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-copy-btn {
+            margin-top: 0 !important;
+        }
+
+        #panel-home .fdb-area-code .fcc-status-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-no-code,
+        #panel-home .fdb-area-code .fcc-used-info {
+            text-align: center;
         }
 
         @media (max-width: 1180px) {
@@ -2635,22 +2681,28 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-links">
-            <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
-                <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-            <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
-                <span class="material-symbols-outlined">inventory_2</span>
-                <span>Equipment</span>
-            </a>
-            <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
-                <span class="material-symbols-outlined">meeting_room</span>
-                <span>Facilities</span>
-            </a>
-            <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
-                <span class="material-symbols-outlined">history</span>
-                <span>My Activity</span>
-            </a>
+            <div class="side-nav-section" role="group" aria-labelledby="fnavg-overview">
+                <span class="side-nav-section-title" id="fnavg-overview">Overview</span>
+                <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
+                    <span class="material-symbols-outlined">history</span>
+                    <span>My Activity</span>
+                </a>
+            </div>
+            <div class="side-nav-section" role="group" aria-labelledby="fnavg-operations">
+                <span class="side-nav-section-title" id="fnavg-operations">Operations</span>
+                <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span>Equipment</span>
+                </a>
+                <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
+                    <span class="material-symbols-outlined">meeting_room</span>
+                    <span>Facilities</span>
+                </a>
+            </div>
         </div>
 
         <div class="side-nav-footer">
@@ -3040,8 +3092,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 <?php endif; ?>
                             </header>
                             <?php if ($fdb_has_chart): ?>
-                                <div class="fdb-view fdb-view--months"><?php echo $fdb_chart(array_values($fdb_months), 'Borrows and reservations per month'); ?></div>
-                                <div class="fdb-view fdb-view--week"><?php echo $fdb_chart($fdb_week, 'Borrows and reservations per day this week'); ?></div>
+                                <div class="fdb-views">
+                                    <div class="fdb-view fdb-view--months"><?php echo $fdb_chart(array_values($fdb_months), 'Borrows and reservations per month'); ?></div>
+                                    <div class="fdb-view fdb-view--week"><?php echo $fdb_chart($fdb_week, 'Borrows and reservations per day this week'); ?></div>
+                                </div>
                             <?php else: ?>
                                 <div class="fdb-empty"><span class="material-symbols-outlined" aria-hidden="true">bar_chart</span><span>No activity yet</span></div>
                             <?php endif; ?>

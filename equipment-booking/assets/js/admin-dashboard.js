@@ -1985,12 +1985,21 @@
         return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ });
     }
 
-    /* cfg: { feed, moreBtn, params(): {actor, filter, range}, showActor: bool, onTotals(n) } */
+    /* cfg: { feed, pager, params(): {actor, filter, range}, showActor: bool, onTotals(n) }
+       Shows ONE page (15 events) at a time; the server counts the total and caps paging at the
+       3,000 most recent events, so a huge log can never slow the page down. */
     function createActivityFeed(cfg) {
-        let offset = 0;
+        let page = 1;
         let token = 0;        // ignores answers that arrive after the filters changed
         let lastKey = '';
         let lastList = null;
+
+        const pg = cfg.pager;
+        const infoEl = pg.querySelector('.act-pager-info');
+        const ctlEl = pg.querySelector('.act-pager-ctl');
+        const numsEl = pg.querySelector('.act-pager-nums');
+        const prevBtn = pg.querySelector('[data-pg="prev"]');
+        const nextBtn = pg.querySelector('[data-pg="next"]');
 
         function message(icon, text, retry) {
             cfg.feed.textContent = '';
@@ -2000,7 +2009,7 @@
             if (retry) {
                 const b = admEl('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Try again');
                 b.type = 'button';
-                b.addEventListener('click', function () { load(true); });
+                b.addEventListener('click', function () { fetchPage(); });
                 box.appendChild(b);
             }
             cfg.feed.appendChild(box);
@@ -2037,47 +2046,95 @@
             });
         }
 
-        function load(reset) {
+        /* 1 … 4 5 6 … 12 — always first, last and the current page ±1 */
+        function pageList(total, current) {
+            const keep = new Set([1, total, current - 1, current, current + 1]);
+            const list = [];
+            let last = 0;
+            Array.from(keep).filter(function (n) { return n >= 1 && n <= total; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function renderPager(d) {
+            if (!d.total) { pg.hidden = true; return; }
+            pg.hidden = false;
+            const start = (d.page - 1) * d.per_page + 1;
+            const end = Math.min(d.page * d.per_page, d.total);
+            infoEl.textContent = 'Showing ' + start.toLocaleString() + '\u2013' + end.toLocaleString() + ' of ' + d.total.toLocaleString() +
+                (d.capped ? ' most recent \u2014 narrow the filters or Export for older activity' : '');
+            ctlEl.hidden = d.pages <= 1;
+            prevBtn.disabled = d.page <= 1;
+            nextBtn.disabled = d.page >= d.pages;
+            numsEl.textContent = '';
+            pageList(d.pages, d.page).forEach(function (n) {
+                if (n === 'gap') { numsEl.appendChild(admEl('span', 'act-pager-gap', '\u2026')); return; }
+                const btn = admEl('button', 'act-pager-btn' + (n === d.page ? ' is-active' : ''), String(n));
+                btn.type = 'button';
+                btn.setAttribute('data-page', String(n));
+                btn.setAttribute('aria-label', 'Page ' + n);
+                if (n === d.page) btn.setAttribute('aria-current', 'page');
+                numsEl.appendChild(btn);
+            });
+        }
+
+        function fetchPage(scroll) {
             const p = cfg.params();
             const myToken = ++token;
-            if (reset) {
-                offset = 0;
-                lastKey = '';
-                lastList = null;
-                cfg.moreBtn.hidden = true;
-                message('hourglass_top', 'Loading activity\u2026');
-            } else {
-                cfg.moreBtn.disabled = true;
-            }
+            lastKey = '';
+            lastList = null;
+            message('hourglass_top', 'Loading activity\u2026');
             const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
-                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&offset=' + offset;
+                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
             fetch(url, { credentials: 'same-origin' })
                 .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
                 .then(function (r) {
                     if (myToken !== token) return; // the user moved on
-                    cfg.moreBtn.disabled = false;
                     if (!r.ok || r.data.status !== 'success') {
-                        if (reset) message('error', (r.data && r.data.message) || 'Something went wrong. Please try again.', true);
+                        pg.hidden = true;
+                        message('error', (r.data && r.data.message) || 'Something went wrong. Please try again.', true);
                         return;
                     }
-                    if (reset) cfg.feed.textContent = '';
-                    if (reset && cfg.onTotals && r.data.totals && typeof r.data.totals.all === 'number') cfg.onTotals(r.data.totals.all);
-                    if (reset && !r.data.items.length) {
+                    const d = r.data;
+                    page = d.page; // the server clamps out-of-range pages
+                    cfg.feed.textContent = '';
+                    if (cfg.onTotals && d.totals && typeof d.totals.all === 'number') cfg.onTotals(d.totals.all);
+                    if (!d.items.length) {
+                        pg.hidden = true;
                         message('history', p.filter === 'all' ? 'No activity for this selection yet.' : 'Nothing here for this filter yet.');
                         return;
                     }
-                    appendEvents(r.data.items);
-                    offset += r.data.items.length;
-                    cfg.moreBtn.hidden = !r.data.has_more;
+                    appendEvents(d.items);
+                    renderPager(d);
+                    if (scroll && cfg.feed.getBoundingClientRect().top < 0) cfg.feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 })
                 .catch(function () {
                     if (myToken !== token) return;
-                    cfg.moreBtn.disabled = false;
-                    if (reset) message('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
+                    pg.hidden = true;
+                    message('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
                 });
         }
 
-        cfg.moreBtn.addEventListener('click', function () { load(false); });
+        function go(n) { page = n; fetchPage(true); }
+
+        prevBtn.addEventListener('click', function () { go(page - 1); });
+        nextBtn.addEventListener('click', function () { go(page + 1); });
+        numsEl.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-page]');
+            if (btn) go(parseInt(btn.getAttribute('data-page'), 10) || 1);
+        });
+
+        /* load(true) = filters changed → back to page 1 */
+        function load(resetPage) {
+            if (resetPage) page = 1;
+            fetchPage(false);
+        }
+
         return { load: load };
     }
 
@@ -2093,7 +2150,7 @@
         const detailBody = document.getElementById('am-detail-body');
         const detailEmpty = document.getElementById('am-detail-empty');
         const feed = document.getElementById('am-feed');
-        const moreBtn = document.getElementById('am-more');
+        const pager = document.getElementById('am-pager');
         const listEmpty = document.getElementById('am-list-empty');
         const addBtn = document.getElementById('am-add-btn');
 
@@ -2333,7 +2390,7 @@
         /* ── activity timeline (shared renderer) ──────────────── */
         const adminFeed = createActivityFeed({
             feed: feed,
-            moreBtn: moreBtn,
+            pager: pager,
             showActor: false, // the whole timeline belongs to the selected admin
             params: function () {
                 return { actor: current ? current.getAttribute('data-id') : '0', filter: filter, range: 'all' };
@@ -2654,7 +2711,7 @@
 
         const feed = createActivityFeed({
             feed: feedEl,
-            moreBtn: document.getElementById('act-more'),
+            pager: document.getElementById('act-pager'),
             showActor: true,
             params: function () { return { actor: actorSel.value, filter: filter, range: rangeSel.value }; }
         });
@@ -3929,12 +3986,12 @@ function psSelectFmt(btn) {
             txt('ps-appr-doc-name', d.docName);
             txt('ps-appr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
             el('ps-appr-doc-icon').textContent = icon;
-            el('ps-appr-doc-open').setAttribute('href', d.docUrl);
+            el('ps-appr-doc-open').setAttribute('href', d.docOpenUrl);
             var dl = el('ps-appr-doc-dl');
             dl.setAttribute('href', d.docUrl);
             dl.setAttribute('download', d.docName);
-            // Images can be previewed inline. PDFs open in a new tab: the server
-            // sends X-Frame-Options: DENY, which blocks embedding them in a frame.
+            // Keep inline previews and downloads on the original file URL; the
+            // Open link uses the branded document viewer.
             if (kind === 'image' && prev) {
                 el('ps-appr-doc-img').setAttribute('src', d.docUrl);
                 prev.hidden = false;
@@ -4028,7 +4085,7 @@ function psSelectFmt(btn) {
             txt('ps-rr-doc-name', d.docName);
             txt('ps-rr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
             el('ps-rr-doc-icon').textContent = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
-            el('ps-rr-doc-open').setAttribute('href', d.docUrl);
+            el('ps-rr-doc-open').setAttribute('href', d.docOpenUrl);
             var dl = el('ps-rr-doc-dl');
             dl.setAttribute('href', d.docUrl);
             dl.setAttribute('download', d.docName);

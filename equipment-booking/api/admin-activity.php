@@ -6,10 +6,12 @@
  *   GET  actor   all | auto | me | <admin id>        (default all)
  *        filter  all | requests | rooms | equipment | system | signins   (default all)
  *        range   today | 7d | 30d | all               (default 30d)
- *        offset  rows to skip                         (default 0)
+ *        page    1-based page number                  (default 1, 15 events per page)
  *        format  json (default) | csv                 (csv = every matching row, max 5000)
  *
- * Returns { status, items:[event…], has_more, totals }
+ * Returns { status, items:[event…], page, pages, per_page, total, capped, totals }
+ *   Paging is capped at the 3,000 most recent events so a very large log can never slow the
+ *   system down; the CSV export is the way to get at older rows (narrow the filters first).
  *   event = { ts, actor_type: admin|auto, actor_id, actor_name, category, icon, tone,
  *             text, meta, tab }
  *
@@ -49,7 +51,7 @@ $viewer   = admin_current_id($conn) ?? 0;
 // ── Inputs ───────────────────────────────────────────────────────────────────
 $filter    = (string)($_GET['filter'] ?? 'all');
 $range     = (string)($_GET['range'] ?? '30d');
-$offset    = max(0, (int)($_GET['offset'] ?? 0));
+$page      = max(1, (int)($_GET['page'] ?? 1));
 $actor_raw = (string)($_GET['actor'] ?? 'all');
 $format    = (string)($_GET['format'] ?? 'json');
 
@@ -124,12 +126,20 @@ if ($format === 'csv') {
     exit;
 }
 
-// ── JSON ─────────────────────────────────────────────────────────────────────
-$feed = admin_activity_feed($conn, $query + ['offset' => $offset, 'limit' => 15]);
+// ── JSON (one page at a time) ────────────────────────────────────────────────
+const ACT_PER_PAGE = 15;
+const ACT_MAX_ROWS = 3000;
+
+$total_all = admin_activity_count($conn, $query);
+$total     = min($total_all, ACT_MAX_ROWS);
+$pages     = max(1, (int)ceil($total / ACT_PER_PAGE));
+$page      = min($page, $pages);
+
+$feed = admin_activity_feed($conn, $query + ['offset' => ($page - 1) * ACT_PER_PAGE, 'limit' => ACT_PER_PAGE]);
 
 // Totals: how many actions one admin has logged (shown in the Admins panel).
 $totals = null;
-if ($offset === 0 && $actor_mode === 'admin' && $actor_id > 0) {
+if ($page === 1 && $actor_mode === 'admin' && $actor_id > 0) {
     $sql    = 'SELECT COUNT(*) AS c FROM tbl_admin_activity WHERE admin_id = ?';
     $types  = 'i';
     $params = [$actor_id];
@@ -144,6 +154,11 @@ if ($offset === 0 && $actor_mode === 'admin' && $actor_id > 0) {
 
 act_respond(200, 'success', 'OK', [
     'items'    => $feed['items'],
-    'has_more' => $feed['has_more'],
+    'page'     => $page,
+    'pages'    => $pages,
+    'per_page' => ACT_PER_PAGE,
+    'total'    => $total,
+    'capped'   => $total_all > ACT_MAX_ROWS,
+    'total_all' => $total_all,
     'totals'   => $totals,
 ]);

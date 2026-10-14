@@ -408,7 +408,7 @@ if (isset($_POST['login'])) {
 
             <div class="panel-bottom">
                 <div class="panel-links">
-                    <a href="#">Lending Policy</a>
+                    <a href="#">Policy</a>
                     <span class="panel-dot">&middot;</span>
                     <a href="#">FAQs</a>
                     <span class="panel-dot">&middot;</span>

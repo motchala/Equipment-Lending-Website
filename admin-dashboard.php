@@ -669,6 +669,7 @@ if (!function_exists('ps_doc_info')) {
         $kind = $ext === 'pdf' ? 'pdf' : (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) ? 'image' : 'file');
         return [
             'url'  => 'uploads/' . $m[1] . '/' . rawurlencode($base),
+            'open_url' => 'views/document-viewer.php?file=' . rawurlencode($path),
             // hide the upload timestamp prefix (e.g. "1790900630_" or "20261002_081929_")
             'name' => preg_replace('/^(\d{8}_\d{6}_|\d{9,}_)/', '', $base),
             'kind' => $kind,
@@ -800,42 +801,52 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
 
+            <!-- Tabs are grouped by purpose: Overview (what's happening) · Operations (day-to-day work) ·
+                 Accounts (Super Admin only). Each group title shares a row with its thin separator line. -->
             <div class="sidebar-links">
-                <a class="nav-item active" data-tab="dashboard" href="#">
-                    <span class="material-symbols-outlined">dashboard</span>
-                    <span class="nav-label">Dashboard</span>
-                </a>
-                <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
-                    <span class="material-symbols-outlined">assignment</span>
-                    <span class="nav-label">Approvals</span>
-                    <?php if ($stat_waiting > 0): ?>
-                        <span class="nav-badge"><?php echo $stat_waiting; ?></span>
-                    <?php endif; ?>
-                </a>
-                <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
-                    <span class="material-symbols-outlined">inventory_2</span>
-                    <span class="nav-label">Equipment</span>
-                </a>
-                <a class="nav-item" data-tab="rooms" href="#">
-                    <span class="material-symbols-outlined">meeting_room</span>
-                    <span class="nav-label">Rooms</span>
-                </a>
-                <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
-                    <span class="material-symbols-outlined">history</span>
-                    <span class="nav-label">Activity</span>
-                </a>
+                <div class="nav-group" role="group" aria-labelledby="navg-overview">
+                    <span class="nav-group-title" id="navg-overview">Overview</span>
+                    <a class="nav-item active" data-tab="dashboard" href="#">
+                        <span class="material-symbols-outlined">dashboard</span>
+                        <span class="nav-label">Dashboard</span>
+                    </a>
+                    <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
+                        <span class="material-symbols-outlined">history</span>
+                        <span class="nav-label">Activity</span>
+                    </a>
+                </div>
+                <div class="nav-group" role="group" aria-labelledby="navg-operations">
+                    <span class="nav-group-title" id="navg-operations">Operations</span>
+                    <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
+                        <span class="material-symbols-outlined">assignment</span>
+                        <span class="nav-label">Approvals</span>
+                        <?php if ($stat_waiting > 0): ?>
+                            <span class="nav-badge"><?php echo $stat_waiting; ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        <span class="nav-label">Equipment</span>
+                    </a>
+                    <a class="nav-item" data-tab="rooms" href="#">
+                        <span class="material-symbols-outlined">meeting_room</span>
+                        <span class="nav-label">Rooms</span>
+                    </a>
+                </div>
                 <?php if ($is_super_admin): ?>
-                    <a class="nav-item" data-tab="faculty" href="#">
-                        <span class="material-symbols-outlined">group</span>
-                        <span class="nav-label">Faculty</span>
-                    </a>
-                    <a class="nav-item" data-tab="admins" id="snav-admins" href="#">
-                        <span class="material-symbols-outlined">admin_panel_settings</span>
-                        <span class="nav-label">Admins</span>
-                    </a>
+                    <div class="nav-group" role="group" aria-labelledby="navg-accounts">
+                        <span class="nav-group-title" id="navg-accounts">Accounts</span>
+                        <a class="nav-item" data-tab="faculty" href="#">
+                            <span class="material-symbols-outlined">group</span>
+                            <span class="nav-label">Faculty</span>
+                        </a>
+                        <a class="nav-item" data-tab="admins" id="snav-admins" href="#">
+                            <span class="material-symbols-outlined">admin_panel_settings</span>
+                            <span class="nav-label">Admins</span>
+                        </a>
+                    </div>
                 <?php endif; ?>
             </div>
-
             <div class="sidebar-footer">
                 <!-- Signed-in admin: the name only. Not a button, no avatar. Notifications and Settings
                      live in the Dashboard's top-right bell / avatar; Scan Return is a Quick Action card
@@ -1040,6 +1051,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
                                                 data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
                                                 data-doc-url="<?php echo $doc ? htmlspecialchars($doc['url']) : ''; ?>"
+                                                data-doc-open-url="<?php echo $doc ? htmlspecialchars($doc['open_url']) : ''; ?>"
                                                 data-doc-name="<?php echo $doc ? htmlspecialchars($doc['name']) : ''; ?>"
                                                 data-doc-kind="<?php echo $doc ? $doc['kind'] : ''; ?>">
                                                 <td>
@@ -1062,7 +1074,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td>
                                                     <?php if ($doc): ?>
                                                         <a class="ps-doc-chip ps-doc-chip--<?php echo $doc['kind']; ?>"
-                                                            href="<?php echo htmlspecialchars($doc['url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                            href="<?php echo htmlspecialchars($doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
                                                             title="Open <?php echo htmlspecialchars($doc['name']); ?> in a new tab">
                                                             <span class="material-symbols-outlined"><?php echo ps_doc_icon($doc['kind']); ?></span>
                                                             <span class="ps-doc-chip__name"><?php echo htmlspecialchars($doc['name']); ?></span>
@@ -1937,6 +1949,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-notes="<?php echo htmlspecialchars($ar['notes'] ?? ''); ?>"
                                                 data-submitted="<?php echo !empty($ar['request_date']) ? date('M d, Y g:i A', strtotime($ar['request_date'])) : ''; ?>"
                                                 data-doc-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['url']) : ''; ?>"
+                                                data-doc-open-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['open_url']) : ''; ?>"
                                                 data-doc-name="<?php echo $ar_doc ? htmlspecialchars($ar_doc['name']) : ''; ?>"
                                                 data-doc-kind="<?php echo $ar_doc ? $ar_doc['kind'] : ''; ?>">
                                                 <td>
@@ -1951,7 +1964,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <div class="rm-main">
                                                         <?php echo htmlspecialchars($ar_name); ?>
                                                         <?php if ($ar_doc): ?>
-                                                            <a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                            <a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
                                                                 title="Open attachment: <?php echo htmlspecialchars($ar_doc['name']); ?>">
                                                                 <span class="material-symbols-outlined">attach_file</span>
                                                             </a>
@@ -2898,7 +2911,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </div>
                                     </div>
                                     <div class="act-feed" id="am-feed"></div>
-                                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm act-more" id="am-more" hidden>Show more</button>
+                                    <div class="act-pager" id="am-pager" hidden>
+                                        <span class="act-pager-info"></span>
+                                        <div class="act-pager-ctl">
+                                            <button type="button" class="act-pager-btn" data-pg="prev" aria-label="Previous page">
+                                                <span class="material-symbols-outlined">chevron_left</span>
+                                            </button>
+                                            <div class="act-pager-nums"></div>
+                                            <button type="button" class="act-pager-btn" data-pg="next" aria-label="Next page">
+                                                <span class="material-symbols-outlined">chevron_right</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2955,7 +2979,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
 
                     <div class="act-feed" id="act-feed"></div>
-                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm act-more" id="act-more" hidden>Show more</button>
+                    <div class="act-pager" id="act-pager" hidden>
+                        <span class="act-pager-info"></span>
+                        <div class="act-pager-ctl">
+                            <button type="button" class="act-pager-btn" data-pg="prev" aria-label="Previous page">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="act-pager-nums"></div>
+                            <button type="button" class="act-pager-btn" data-pg="next" aria-label="Next page">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
                 </section>
             </div><!-- /panel-activity -->
 

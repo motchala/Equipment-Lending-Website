@@ -8020,13 +8020,13 @@ body {
 }
 
 /* ================================================================
-   SIDEBAR — DARK MAROON THEME (muted gold hover only)
+   SIDEBAR — DARK MAROON THEME (gold active, subtle white hover)
    ----------------------------------------------------------------
    Everything in the sidebar (brand, tabs, account tab, submenu) is
    restyled for a dark maroon surface. All rules are prefixed `body
    .side-nav` so they win over the earlier light-theme sidebar rules.
-   Colour is kept to: maroon surface, white text, and one muted gold
-   used ONLY for the hover state.
+   Colour is kept to: maroon surface, white text, gold active state,
+   and a subtle white hover.
 ================================================================ */
 :root {
     --nav-bg-top: #4a0909;
@@ -8034,9 +8034,10 @@ body {
     --nav-text: rgba(255, 255, 255, 0.86);
     --nav-text-dim: rgba(255, 255, 255, 0.64);
     --nav-line: rgba(255, 255, 255, 0.12);
-    --nav-hover-bg: #dcb862;
-    --nav-on-hover: #2b0000;
-    --nav-active-bg: rgba(255, 255, 255, 0.12);
+    --nav-active-bg: #dcb862;
+    --nav-on-active: #2b0000;
+    --nav-hover-bg: rgba(255, 255, 255, 0.18);
+    --nav-on-hover: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -8050,8 +8051,10 @@ body {
     --nav-text: #ffffff;
     --nav-text-dim: #ffffff;
     --nav-line: rgba(255, 255, 255, 0.6);
-    --nav-hover-bg: #ffd83a;
-    --nav-active-bg: rgba(255, 255, 255, 0.22);
+    --nav-active-bg: #ffd83a;
+    --nav-on-active: #2b0000;
+    --nav-hover-bg: rgba(255, 255, 255, 0.28);
+    --nav-on-hover: #ffffff;
 }
 
 /* ── Surface ─────────────────────────────────────────────────────── */
@@ -8147,6 +8150,41 @@ body .side-nav .side-nav-item:focus-visible {
 }
 
 /* ── Tabs ────────────────────────────────────────────────────────── */
+body .side-nav .side-nav-links {
+    gap: 0 !important;
+}
+
+body .side-nav .side-nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+body .side-nav .side-nav-section+.side-nav-section {
+    margin-top: 14px;
+}
+
+body .side-nav .side-nav-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px 2px;
+    color: var(--nav-text-dim);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    user-select: none;
+}
+
+body .side-nav .side-nav-section-title::after {
+    content: "";
+    flex: 1;
+    min-width: 12px;
+    border-top: 1px solid var(--nav-line);
+}
+
 body .side-nav .side-nav-item {
     position: relative;
     color: var(--nav-text) !important;
@@ -8159,21 +8197,56 @@ body .side-nav .side-nav-item .material-symbols-outlined {
     color: inherit !important;
 }
 
-/* Current screen: a plain, quiet highlight. No accent colour, no marker. */
+/* Current screen: gold highlight. */
 body .side-nav .side-nav-item.active {
     background: var(--nav-active-bg) !important;
-    color: #ffffff !important;
+    color: var(--nav-on-active) !important;
     font-weight: 600 !important;
     box-shadow: none;
 }
 
-/* Hover: the one place gold appears. Muted gold fill, dark text.
-   Declared after .active so hovering the current tab still responds. */
-body .side-nav .side-nav-item:hover {
+/* Only inactive tabs get the subtle white hover highlight. */
+body .side-nav .side-nav-item:not(.active):hover {
     background: var(--nav-hover-bg) !important;
     color: var(--nav-on-hover) !important;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
     transform: translateX(2px);
+}
+
+@media (min-width: 1025px) {
+    body.sidebar-collapsed .side-nav .side-nav-section-title {
+        display: none !important;
+    }
+
+    body.sidebar-collapsed .side-nav .side-nav-section+.side-nav-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nav-line);
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .side-nav-section-title {
+        display: none !important;
+    }
+
+    body .side-nav .side-nav-section+.side-nav-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nav-line);
+    }
+}
+
+@media (min-width: 769px) and (max-height: 560px) {
+    .side-nav-section-title {
+        display: none !important;
+    }
+
+    body .side-nav .side-nav-section+.side-nav-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nav-line);
+    }
 }
 
 /* ── Footer ──────────────────────────────────────────────────────── */
