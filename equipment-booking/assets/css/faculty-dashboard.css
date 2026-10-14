@@ -3323,7 +3323,8 @@ body {
 .side-nav-footer {
     padding: 14px 12px 16px !important;
     border-top: 1px solid var(--redesign-sidebar-border) !important;
-    gap: 8px !important;
+    gap: 3px !important;
+    /* same spacing as the tabs above */
     margin-bottom: 0;
 }
 
@@ -3352,10 +3353,10 @@ body {
     font-size: 18px !important;
 }
 
+/* Settings / Log Out sit directly in the footer (the tabs sit inside a section wrapper), so let them
+   size exactly like the tabs in the icon-rail too, instead of being squeezed to the rail width. */
 .side-nav-footer .side-nav-item {
-    min-height: unset;
-    padding: 10px 14px !important;
-    gap: 12px !important;
+    width: auto;
 }
 
 /* ================================================================
@@ -5809,7 +5810,7 @@ body {
 
 /* ── 2. Sidebar: Sign Out (last item in .side-nav-footer) ─────────────── */
 .side-nav-item.side-nav-signout {
-    margin-top: 4px;
+    margin-top: 0;
     color: var(--color-error) !important;
 }
 

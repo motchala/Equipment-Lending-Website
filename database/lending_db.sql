@@ -6,6 +6,14 @@
 -- Generation Time: Oct 06, 2026 at 05:18 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
+--
+-- UNIFIED FILE: this is the full database (structure + data) for a fresh import.
+-- It already includes everything that used to live in database/migration/:
+--   * 2026_10_borrow_scheduling.sql     -> columns are part of `tbl_requests` below
+--   * 2026_10_delete_archived_rooms.sql -> appended as the last section of this file
+-- It also includes the objects the PHP code used to create/alter at runtime but that
+-- were missing from the earlier dump: `tbl_admin_activity`, tbl_accounts.last_password_change,
+-- tbl_arbitration_log.override_by_id and tbl_rooms.is_locked.
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -36,7 +44,8 @@ CREATE TABLE `tbl_accounts` (
   `created_at` datetime DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
-  `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0
+  `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+  `last_password_change` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -46,6 +55,25 @@ CREATE TABLE `tbl_accounts` (
 INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `created_at`, `last_login`, `dormant_until`, `session_epoch`) VALUES
 (1, 'Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', '2026-01-01 00:00:00', '2026-10-06 09:43:14', NULL, 0),
 (2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', '2026-10-02 11:05:03', '2026-10-04 05:50:19', NULL, 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_admin_activity`
+--
+
+CREATE TABLE `tbl_admin_activity` (
+  `id` int(11) NOT NULL,
+  `admin_id` int(11) NOT NULL,
+  `admin_name` varchar(255) NOT NULL,
+  `category` varchar(20) NOT NULL,
+  `action` varchar(30) DEFAULT NULL,
+  `summary` varchar(255) NOT NULL,
+  `ref_type` varchar(12) DEFAULT NULL,
+  `ref_id` int(11) DEFAULT NULL,
+  `ref` varchar(40) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -90,6 +118,7 @@ CREATE TABLE `tbl_arbitration_log` (
   `rule_applied` varchar(50) NOT NULL,
   `reason` varchar(500) NOT NULL,
   `override_by` varchar(255) DEFAULT NULL,
+  `override_by_id` int(11) DEFAULT NULL,
   `override_reason` text DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -422,6 +451,7 @@ CREATE TABLE `tbl_rooms` (
   `amenities` varchar(500) DEFAULT NULL,
   `status` enum('Available','Maintenance','Not Bookable') NOT NULL DEFAULT 'Available',
   `is_archived` tinyint(1) NOT NULL DEFAULT 0,
+  `is_locked` tinyint(1) NOT NULL DEFAULT 0,
   `sort_order` smallint(5) NOT NULL DEFAULT 0,
   `created_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -687,6 +717,15 @@ ALTER TABLE `tbl_accounts`
   ADD UNIQUE KEY `email` (`email`);
 
 --
+-- Indexes for table `tbl_admin_activity`
+--
+ALTER TABLE `tbl_admin_activity`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_admin_time` (`admin_id`,`created_at`),
+  ADD KEY `idx_time` (`created_at`),
+  ADD KEY `idx_ref` (`ref`);
+
+--
 -- Indexes for table `tbl_arbitration_config`
 --
 ALTER TABLE `tbl_arbitration_config`
@@ -832,6 +871,12 @@ ALTER TABLE `tbl_accounts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `tbl_admin_activity`
+--
+ALTER TABLE `tbl_admin_activity`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `tbl_arbitration_config`
 --
 ALTER TABLE `tbl_arbitration_config`
@@ -972,7 +1017,104 @@ ALTER TABLE `tbl_room_waitlist`
 --
 ALTER TABLE `tbl_users`
   ADD CONSTRAINT `fk_users_org` FOREIGN KEY (`organization_id`) REFERENCES `tbl_organizations` (`id`);
+
+--
+-- Activity-log backfill (same logic as admin_activity_bootstrap() in config/admin-activity.php)
+-- 1) record which admin account made each manual decision, 2) copy those manual
+-- decisions / QR returns into `tbl_admin_activity` so the activity feed keeps its history.
+-- Safe to re-run: rows are only added when they are not there yet.
+--
+UPDATE `tbl_arbitration_log` l
+  JOIN (SELECT MIN(id) AS id, fullName FROM `tbl_accounts` GROUP BY fullName HAVING COUNT(*) = 1) a
+    ON a.fullName = l.override_by
+   SET l.override_by_id = a.id
+ WHERE l.override_by_id IS NULL AND l.override_by IS NOT NULL AND l.override_by <> '';
+
+INSERT INTO `tbl_admin_activity` (`admin_id`, `admin_name`, `category`, `action`, `summary`, `ref_type`, `ref_id`, `ref`, `created_at`)
+SELECT COALESCE(l.override_by_id, 0), l.override_by, 'request',
+       CASE l.decision WHEN 'Approved' THEN 'request_approved'
+                       WHEN 'Declined' THEN 'request_declined'
+                       WHEN 'Returned' THEN 'request_returned'
+                       ELSE 'request_other' END,
+       LEFT(CASE l.decision
+              WHEN 'Returned' THEN CONCAT('Marked ', l.equipment_name, ' as returned',
+                                          IF(l.borrower_name <> '', CONCAT(' (', l.borrower_name, ')'), ''))
+              ELSE CONCAT(l.decision, ' request #', l.request_id, ': ', l.equipment_name,
+                          IF(l.borrower_name <> '', CONCAT(' for ', l.borrower_name), ''))
+            END, 255),
+       'request', l.request_id, CONCAT('arb:', l.id), COALESCE(l.created_at, NOW())
+  FROM `tbl_arbitration_log` l
+ WHERE l.override_by IS NOT NULL AND l.override_by <> ''
+   AND NOT EXISTS (SELECT 1 FROM `tbl_admin_activity` t WHERE t.ref = CONCAT('arb:', l.id));
+
 COMMIT;
+
+-- ============================================================================
+-- MERGED MIGRATIONS (formerly database/migration/*.sql)
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 2026_10_borrow_scheduling.sql
+-- Nothing left to run here: borrow_time, return_time, borrow_qty, room_id,
+-- booking_mode and stock_applied are already defined in `tbl_requests` above.
+-- ----------------------------------------------------------------------------
+
+
+-- ----------------------------------------------------------------------------
+-- 2026_10_delete_archived_rooms.sql
+-- One-time clean-up: permanently deletes every ARCHIVED room (is_archived = 1).
+-- The data in this file contains no archived rooms, so on a fresh import it removes
+-- nothing; it is kept here so the clean-up stays part of the unified file.
+-- ----------------------------------------------------------------------------
+-- ---------------------------------------------------------------------------
+-- STEP 1 - PREVIEW
+-- ---------------------------------------------------------------------------
+SELECT r.room_id, b.name AS building, r.floor_number, r.room_name,
+       (SELECT COUNT(*) FROM tbl_room_reservations x WHERE x.room_id = r.room_id) AS reservations,
+       (SELECT COUNT(*) FROM tbl_room_issues       x WHERE x.room_id = r.room_id) AS issues,
+       (SELECT COUNT(*) FROM tbl_room_waitlist     x WHERE x.room_id = r.room_id) AS waitlist
+  FROM tbl_rooms r
+  JOIN tbl_buildings b ON b.building_id = r.building_id
+ WHERE r.is_archived = 1
+ ORDER BY b.building_id, r.floor_number, r.room_name;
+
+
+-- ---------------------------------------------------------------------------
+-- STEP 2 - DELETE
+-- Anything that points at these rooms is removed first (the database will not
+-- allow a room to be deleted while reservations, issues or waitlist entries
+-- still reference it), then the rooms themselves.
+-- ---------------------------------------------------------------------------
+START TRANSACTION;
+
+CREATE TEMPORARY TABLE tmp_rooms_to_delete AS
+    SELECT room_id, building_id FROM tbl_rooms WHERE is_archived = 1;
+
+DELETE FROM tbl_room_waitlist         WHERE room_id IN (SELECT room_id FROM tmp_rooms_to_delete);
+DELETE FROM tbl_room_issues           WHERE room_id IN (SELECT room_id FROM tmp_rooms_to_delete);
+DELETE FROM tbl_room_reservations     WHERE room_id IN (SELECT room_id FROM tmp_rooms_to_delete);
+DELETE FROM tbl_room_arbitration_log  WHERE room_id IN (SELECT room_id FROM tmp_rooms_to_delete);
+
+-- Equipment requests that were linked to one of these rooms are kept, just unlinked.
+UPDATE tbl_requests SET room_id = NULL WHERE room_id IN (SELECT room_id FROM tmp_rooms_to_delete);
+
+DELETE FROM tbl_rooms WHERE is_archived = 1;
+
+-- A building's floor count follows its highest remaining floor with rooms
+-- (only for buildings that just lost rooms).
+UPDATE tbl_buildings b
+   SET b.floor_count = COALESCE(
+         (SELECT MAX(r.floor_number) FROM tbl_rooms r
+           WHERE r.building_id = b.building_id AND r.is_archived = 0),
+         b.floor_count)
+ WHERE b.building_id IN (SELECT building_id FROM tmp_rooms_to_delete);
+
+DROP TEMPORARY TABLE tmp_rooms_to_delete;
+
+COMMIT;
+
+-- Check: this should now return 0 rows.
+SELECT room_id, room_name FROM tbl_rooms WHERE is_archived = 1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

@@ -623,7 +623,7 @@ function dash_render(array $d): void
         </section>
 
     </div>
-<?php
+    <?php
 }
 
 // Live-refresh request from admin-dashboard.js: return just the dashboard body and stop.
@@ -644,11 +644,15 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
 
     $inv_rows = [];
     $inv_result = $conn->query("SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY created_at DESC");
-    if ($inv_result) { while ($r = $inv_result->fetch_assoc()) $inv_rows[] = $r; }
+    if ($inv_result) {
+        while ($r = $inv_result->fetch_assoc()) $inv_rows[] = $r;
+    }
 
     $arch_rows = [];
     $arch_result = $conn->query("SELECT * FROM tbl_inventory WHERE is_archived = 1 ORDER BY item_name ASC");
-    if ($arch_result) { while ($r = $arch_result->fetch_assoc()) $arch_rows[] = $r; }
+    if ($arch_result) {
+        while ($r = $arch_result->fetch_assoc()) $arch_rows[] = $r;
+    }
 
     // Render active tbody
     ob_start();
@@ -659,16 +663,23 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
                 No equipment yet. Add your first item using the form.
             </td>
         </tr>
-    <?php else:
+        <?php else:
         foreach ($inv_rows as $item):
             $inv_qty       = (int)$item['quantity'];
             $inv_cond      = $item['condition'] ?? 'Good';
             $inv_condClass = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
-            if ($inv_qty === 0)     { $inv_stockClass = 'none'; $inv_stockLabel = 'No stock'; }
-            elseif ($inv_qty <= 2)  { $inv_stockClass = 'low';  $inv_stockLabel = 'Low stock'; }
-            else                    { $inv_stockClass = 'ok';   $inv_stockLabel = 'In stock'; }
+            if ($inv_qty === 0) {
+                $inv_stockClass = 'none';
+                $inv_stockLabel = 'No stock';
+            } elseif ($inv_qty <= 2) {
+                $inv_stockClass = 'low';
+                $inv_stockLabel = 'Low stock';
+            } else {
+                $inv_stockClass = 'ok';
+                $inv_stockLabel = 'In stock';
+            }
             $inv_addedTs = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
-    ?>
+        ?>
             <tr class="inv-row-item"
                 data-item-id="<?php echo (int)$item['item_id']; ?>"
                 data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
@@ -701,21 +712,23 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
                     </button>
                 </td>
             </tr>
-    <?php endforeach; ?>
-            <tr id="inv-nomatch-row" class="inv-row-hidden">
-                <td colspan="5" class="inv-empty-cell">
-                    <span class="material-symbols-outlined">search_off</span>
-                    No equipment matches your search.
-                </td>
-            </tr>
+        <?php endforeach; ?>
+        <tr id="inv-nomatch-row" class="inv-row-hidden">
+            <td colspan="5" class="inv-empty-cell">
+                <span class="material-symbols-outlined">search_off</span>
+                No equipment matches your search.
+            </td>
+        </tr>
     <?php endif;
     $active_html = ob_get_clean();
 
     // Render archived tbody
     ob_start();
     if (empty($arch_rows)): ?>
-        <tr><td colspan="4" class="inv-empty-cell">No archived items.</td></tr>
-    <?php else:
+        <tr>
+            <td colspan="4" class="inv-empty-cell">No archived items.</td>
+        </tr>
+        <?php else:
         foreach ($arch_rows as $item): ?>
             <tr>
                 <td><img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>" class="item-img" onerror="this.src='../uploads/default.png'"></td>
@@ -726,23 +739,24 @@ if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
                         <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
                             class="btn-action btn-restore" title="Restore">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                <polyline points="1 4 1 10 7 10"/>
-                                <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
                             </svg>
                         </a>
                         <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
                             class="btn-action btn-force-del" title="Delete permanently">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                                <polyline points="3 6 5 6 21 6"/>
-                                <path d="M19 6l-1 14H6L5 6"/>
-                                <path d="M10 11v6"/><path d="M14 11v6"/>
-                                <path d="M9 6V4h6v2"/>
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                                <path d="M9 6V4h6v2" />
                             </svg>
                         </a>
                     </div>
                 </td>
             </tr>
-    <?php endforeach;
+        <?php endforeach;
     endif;
     $archive_html = ob_get_clean();
 
@@ -772,7 +786,9 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
             . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
             . " ORDER BY u.fullname ASC"
     );
-    if ($fac_result) { while ($r = $fac_result->fetch_assoc()) $fac_rows[] = $r; }
+    if ($fac_result) {
+        while ($r = $fac_result->fetch_assoc()) $fac_rows[] = $r;
+    }
 
     ob_start();
     if (empty($fac_rows)): ?>
@@ -782,12 +798,12 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
                 No faculty accounts yet.
             </td>
         </tr>
-    <?php else:
+        <?php else:
         foreach ($fac_rows as $frow):
             $isAdviser = ($frow['role'] === 'Organization Adviser');
             $idUnset   = faculty_id_is_unset($frow['faculty_id']);
             $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
-    ?>
+        ?>
             <tr
                 data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
                 data-email="<?= htmlspecialchars($frow['email']) ?>"
@@ -829,7 +845,7 @@ if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
                     </button>
                 </td>
             </tr>
-    <?php endforeach;
+<?php endforeach;
     endif;
     $faculty_html = ob_get_clean();
 
@@ -910,7 +926,9 @@ if (!function_exists('ps_doc_icon')) {
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
     $req_id = intval($_GET['id']);
     $is_ajax_rc = ($_GET['ajax'] ?? '') === '1';
-    if ($is_ajax_rc) { header('Content-Type: application/json'); }
+    if ($is_ajax_rc) {
+        header('Content-Type: application/json');
+    }
     require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
     BookingSchedule::ensureSchema($conn);
     $res = $conn->query("SELECT equipment_name, borrow_qty, stock_applied FROM tbl_requests WHERE id = $req_id LIMIT 1");
@@ -961,7 +979,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <?php role_splash_head(); ?>
     <script>
         /* Keep the default dashboard from appearing while the restored tab loads. */
-        (function () {
+        (function() {
             var params = new URLSearchParams(window.location.search);
             var tab = null;
 
@@ -980,7 +998,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             }
 
             if (['requests', 'rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
-            try { if (sessionStorage.getItem('adminHardRefresh') === '1') return; } catch (_) {}
+            try {
+                if (sessionStorage.getItem('adminHardRefresh') === '1') return;
+            } catch (_) {}
             window._preJumpTab = tab;
             document.documentElement.classList.add('admin-tab-pending');
         })();
@@ -1753,14 +1773,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </button>
                             </form>
 
-                            <!-- Archive zone: always in DOM, shown/hidden by JS -->
+                            <!-- Room actions zone (edit mode only): always in DOM, shown/hidden by JS.
+                                 Lock / Unlock: Admin + Super Admin.  Archive: Super Admin only
+                                 (the link is not even rendered for a regular Admin; the server checks too). -->
+                            <?php $edit_locked = $edit_room && !empty($edit_room['is_locked']); ?>
                             <div class="rmod-archive-zone<?php echo $edit_room ? '' : ' hidden'; ?>" id="room-archive-zone">
-                                <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
-                                    id="room-archive-link"
-                                    class="pr-btn pr-btn-danger pr-btn-sm">
-                                    <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
-                                    Archive Room
-                                </a>
+                                <button type="button" id="room-lock-btn"
+                                    class="pr-btn pr-btn-ghost pr-btn-sm"
+                                    data-action="toggle-room-lock"
+                                    data-lock="<?php echo $edit_locked ? '0' : '1'; ?>">
+                                    <span class="material-symbols-outlined" id="room-lock-icon" style="font-size:15px;"><?php echo $edit_locked ? 'lock_open' : 'lock'; ?></span>
+                                    <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Room' : 'Lock Room'; ?></span>
+                                </button>
+                                <?php if ($is_super_admin): ?>
+                                    <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
+                                        id="room-archive-link"
+                                        class="pr-btn pr-btn-danger pr-btn-sm">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                                        Archive Room
+                                    </a>
+                                <?php endif; ?>
                             </div>
 
                         </div><!-- /.form-card-body -->
@@ -1803,9 +1835,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="pr-sub-tabs rm-tabs-solo" id="rooms-archived-tab-wrap">
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived">
                             Archived
-                            <?php if (!empty($rooms_archived)): ?>
-                                <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo count($rooms_archived); ?></span>
-                            <?php endif; ?>
+                            <span class="pr-tab-badge" id="roomsArchivedBadge" style="background:var(--text-light);<?php echo empty($rooms_archived) ? 'display:none;' : ''; ?>"><?php echo count($rooms_archived); ?></span>
                         </button>
                     </div>
                 </div>
@@ -2044,10 +2074,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 }
 
                                 function afterMutation(json) {
+                                    json = normalizeReply(json);
                                     if (json && json.status === 'success') {
                                         if (window.psRefreshRoomsRegistry) {
                                             window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
                                         }
+                                        refreshArchived(json);
                                         closeRoomModal();
                                         if (typeof showToast === 'function') showToast(json.message || 'Saved.');
                                     } else {
@@ -2060,6 +2092,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 function onNetworkError() {
                                     if (typeof showToast === 'function') showToast('Network error — please try again.');
                                 }
+
+                                /* Server replies for a bad CSRF token use {error:...}; everything else {message:...}. */
+                                function normalizeReply(json) {
+                                    if (json && json.status === 'error' && !json.message && json.error) json.message = json.error;
+                                    return json;
+                                }
+
+                                /* Keep the Archived tab (rows + count badge) in step with the server. */
+                                function refreshArchived(json) {
+                                    if (!json || typeof json.archived_html !== 'string') return;
+                                    const body = document.getElementById('rooms-archived-body');
+                                    if (body) body.innerHTML = json.archived_html;
+                                    const badge = document.getElementById('roomsArchivedBadge');
+                                    if (badge) {
+                                        const n = parseInt(json.archived_count, 10) || 0;
+                                        badge.textContent = n;
+                                        badge.style.display = n > 0 ? '' : 'none';
+                                    }
+                                }
+
+                                /* Lock button in the Edit modal: label + icon + next action. */
+                                window.psSetLockButton = function(isLocked) {
+                                    const btn = document.getElementById('room-lock-btn');
+                                    if (!btn) return;
+                                    btn.dataset.lock = isLocked ? '0' : '1';
+                                    const ico = document.getElementById('room-lock-icon');
+                                    const lbl = document.getElementById('room-lock-label');
+                                    if (ico) ico.textContent = isLocked ? 'lock_open' : 'lock';
+                                    if (lbl) lbl.textContent = isLocked ? 'Unlock Room' : 'Lock Room';
+                                };
 
                                 const submitBtns = ['room-form-submit-inner', 'room-form-submit-foot']
                                     .map(function(id) {
@@ -2140,13 +2202,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     const href = link.getAttribute('href');
                                     const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
 
-                                    fetch(url, { credentials: 'same-origin' })
-                                        .then(function(res) { return res.json(); })
+                                    fetch(url, {
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
                                         .then(function(json) {
+                                            json = normalizeReply(json);
                                             if (json && json.status === 'success') {
                                                 if (window.psRefreshRoomsRegistry) {
                                                     window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
                                                 }
+                                                refreshArchived(json);
                                                 if (typeof showToast === 'function') showToast(json.message || 'Room restored.');
                                                 if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-active');
                                             } else {
@@ -2154,6 +2222,146 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             }
                                         })
                                         .catch(onNetworkError);
+                                });
+
+                                /* Lock / Unlock (Edit modal). The modal stays open so unsaved edits
+                                   are not lost; the tiles behind it refresh straight away. */
+                                document.addEventListener('click', function(e) {
+                                    const btn = e.target.closest('[data-action="toggle-room-lock"]');
+                                    if (!btn) return;
+                                    const idEl = document.getElementById('room-form-id');
+                                    const roomId = idEl ? idEl.value : '';
+                                    if (!roomId) return;
+                                    const lock = btn.dataset.lock === '1' ? '1' : '0';
+                                    const tok = roomForm.querySelector('input[name="csrf_token"]');
+
+                                    const fd = new FormData();
+                                    fd.set('toggle_room_lock', '1');
+                                    fd.set('room_id', roomId);
+                                    fd.set('lock', lock);
+                                    fd.set('ajax', '1');
+                                    if (tok) fd.set('csrf_token', tok.value);
+
+                                    btn.disabled = true;
+                                    fetch('admin-dashboard.php', {
+                                            method: 'POST',
+                                            body: fd,
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            btn.disabled = false;
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                window.psSetLockButton(lock === '1');
+                                                if (typeof showToast === 'function') showToast(json.message || (lock === '1' ? 'Room locked.' : 'Room unlocked.'));
+                                            } else if (typeof showToast === 'function') {
+                                                showToast((json && json.message) || 'Could not change the lock. Please try again.');
+                                            }
+                                        })
+                                        .catch(function() {
+                                            btn.disabled = false;
+                                            onNetworkError();
+                                        });
+                                });
+
+                                /* Permanent delete (Archived tab, Super Admin). The button only opens
+                                   a confirmation dialog; nothing is sent until the box is ticked and
+                                   "Delete permanently" is pressed. The server re-checks everything. */
+                                /* The dialog lives at the end of <body> (after this script runs), so it
+                                   is looked up when needed, never once at load. */
+                                let delRoomId = '';
+                                const delEl = function(id) {
+                                    return document.getElementById(id);
+                                };
+
+                                function closeDeleteModal() {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (m) m.classList.add('hidden');
+                                    delRoomId = '';
+                                }
+
+                                document.addEventListener('click', function(e) {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (!m) return; // regular Admins never get the dialog
+
+                                    const openBtn = e.target.closest('[data-action="delete-room-permanent"]');
+                                    if (openBtn) {
+                                        delRoomId = openBtn.dataset.roomId || '';
+                                        const n = parseInt(openBtn.dataset.reservations, 10) || 0;
+                                        delEl('rdc-room-name').textContent = openBtn.dataset.roomName || '';
+                                        delEl('rdc-resv').textContent =
+                                            n === 0 ? 'No reservation records' : (n === 1 ? '1 reservation record' : n + ' reservation records');
+                                        delEl('rdc-ack').checked = false;
+                                        delEl('rdc-confirm').disabled = true;
+                                        m.classList.remove('hidden');
+                                        delEl('rdc-ack').focus();
+                                        return;
+                                    }
+                                    if (e.target.closest('[data-action="close-room-delete"]') || e.target === m) {
+                                        closeDeleteModal();
+                                        return;
+                                    }
+
+                                    /* Confirm: only acts once the box is ticked. */
+                                    const go = e.target.closest('#rdc-confirm');
+                                    if (!go) return;
+                                    const ack = delEl('rdc-ack');
+                                    if (!ack.checked || !delRoomId || go.disabled) return;
+
+                                    const tok = roomForm.querySelector('input[name="csrf_token"]');
+                                    const fd = new FormData();
+                                    fd.set('delete_room_permanently', '1');
+                                    fd.set('room_id', delRoomId);
+                                    fd.set('confirm', 'yes');
+                                    fd.set('ajax', '1');
+                                    if (tok) fd.set('csrf_token', tok.value);
+
+                                    go.disabled = true;
+                                    fetch('admin-dashboard.php', {
+                                            method: 'POST',
+                                            body: fd,
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                closeDeleteModal();
+                                                if (typeof showToast === 'function') showToast(json.message || 'Room permanently deleted.');
+                                            } else {
+                                                go.disabled = !ack.checked;
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not delete the room.');
+                                            }
+                                        })
+                                        .catch(function() {
+                                            go.disabled = !ack.checked;
+                                            onNetworkError();
+                                        });
+                                });
+
+                                document.addEventListener('keydown', function(e) {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeDeleteModal();
+                                });
+
+                                document.addEventListener('change', function(e) {
+                                    if (e.target && e.target.id === 'rdc-ack') {
+                                        const go = delEl('rdc-confirm');
+                                        if (go) go.disabled = !e.target.checked;
+                                    }
                                 });
                             })();
                         </script>
@@ -2374,30 +2582,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th><span class="rm-sr">Actions</span></th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <?php if (empty($rooms_archived)): ?>
-                                        <tr>
-                                            <td colspan="2" class="rm-empty-cell">No archived rooms.</td>
-                                        </tr>
-                                        <?php else: foreach ($rooms_archived as $ar):
-                                            $ar_floor = !empty($ar['floor_label']) ? $ar['floor_label'] : $ar['floor_number'] . 'F';
-                                        ?>
-                                            <tr>
-                                                <td>
-                                                    <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
-                                                    <div class="rm-subline"><?php echo htmlspecialchars($ar_floor . ', ' . $ar['building_name']); ?></div>
-                                                </td>
-                                                <td>
-                                                    <div class="rm-actions">
-                                                        <a href="admin-dashboard.php?restore_room=<?php echo (int)$ar['room_id']; ?>" class="pr-tbl-btn restore">
-                                                            <span class="material-symbols-outlined" style="font-size:14px;">unarchive</span>
-                                                            Restore
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
+                                <tbody id="rooms-archived-body">
+                                    <?php echo ps_render_archived_tbody($rooms_archived, $is_super_admin); ?>
                                 </tbody>
                             </table>
                         </div>
@@ -2619,6 +2805,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         window.psOpenSchedule = function(btn) {
                             const card = btn.closest('.pr-room-row');
                             if (!card) return;
+                            if (card.dataset.roomLocked === '1') return; // locked rooms never open their schedule
                             _roomId = parseInt(card.dataset.roomId) || null;
                             _roomName = card.dataset.roomName || '';
                             _weekOff = 0;
@@ -2648,6 +2835,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             _weekOff += dir;
                             renderGrid();
                         };
+
+                        /* ── Whole tile opens the schedule ──────────────────────────
+                           The tile itself is the "view schedule" control. Clicks inside
+                           the actions cell (the Edit icon) are skipped so Edit keeps
+                           working on its own. Delegated on document, so tiles swapped in
+                           by the AJAX refresh work without re-binding. */
+                        document.addEventListener('click', function(e) {
+                            var tile = e.target.closest('#roomsRegistryTable tr.pr-room-row');
+                            if (!tile) return;
+                            if (e.target.closest('.pr-row-actions')) return;
+                            if (tile.dataset.roomLocked === '1') return; // locked: schedule stays closed
+                            window.psOpenSchedule(tile);
+                        });
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            var tile = e.target.closest ? e.target.closest('#roomsRegistryTable tr.pr-room-row') : null;
+                            if (!tile || e.target !== tile) return;
+                            e.preventDefault();
+                            if (tile.dataset.roomLocked === '1') return;
+                            window.psOpenSchedule(tile);
+                        });
 
                         /* ── edit-room-inline: populate & show form without page reload ── */
                         document.addEventListener('click', function(e) {
@@ -2714,6 +2922,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             if (az) az.classList.remove('hidden');
                             var al = document.getElementById('room-archive-link');
                             if (al) al.href = 'admin-dashboard.php?archive_room=' + encodeURIComponent(d.roomId || '');
+                            if (window.psSetLockButton) window.psSetLockButton(d.roomLocked === '1');
 
                             /* Show form and scroll */
                             var rfw = document.getElementById('room-form-wrap');
@@ -3390,7 +3599,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </button>
                                         <?php if ($edit_item): ?>
                                             <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
-                                                class="btn-inv-delete" title="Archive item">                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                     fill="none" stroke="currentColor" stroke-width="2"
                                                     stroke-linecap="round" stroke-linejoin="round"
                                                     width="15" height="15">
@@ -4066,7 +4275,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>.
+                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>. Only a Super Admin can archive a room, and only a Super Admin can permanently delete an archived room (this removes it and its reservation history for good). To keep a room visible but stop its schedule from opening, open the room's <strong>Edit</strong> window and choose <strong>Lock Room</strong> — Admins and Super Admins can lock and unlock.
                                             </div>
                                         </details>
 
@@ -5714,6 +5923,38 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div><!-- /.rsm-card -->
     </div><!-- /#roomScheduleModal -->
 
+    <?php if ($is_super_admin): ?>
+        <!-- Permanent-delete confirmation (Super Admin only). Direct <body> child on purpose. -->
+        <div id="roomDeleteConfirm" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rdc-title">
+            <div class="rdc-card">
+                <div class="rdc-head">
+                    <div class="rdc-icon"><span class="material-symbols-outlined">delete_forever</span></div>
+                    <h3 id="rdc-title">Delete room permanently?</h3>
+                </div>
+                <div class="rdc-body">
+                    <p class="rdc-room" id="rdc-room-name"></p>
+                    <p>This cannot be undone. The room and the following will be removed for good:</p>
+                    <ul class="rdc-list">
+                        <li id="rdc-resv">No reservation records</li>
+                        <li>Its issue reports and waitlist entries</li>
+                    </ul>
+                    <p class="rdc-note">Equipment requests that mention this room are kept.</p>
+                    <label class="rdc-check">
+                        <input type="checkbox" id="rdc-ack">
+                        <span>I understand this cannot be undone</span>
+                    </label>
+                </div>
+                <div class="rdc-foot">
+                    <button type="button" class="rdc-btn rdc-btn-ghost" data-action="close-room-delete">Cancel</button>
+                    <button type="button" class="rdc-btn rdc-btn-danger" id="rdc-confirm" disabled>
+                        <span class="material-symbols-outlined">delete_forever</span>
+                        Delete permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+
 
 
     <!-- ================================================================
@@ -6187,17 +6428,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             /* Refresh the faculty list tbody from the server fragment endpoint.
                Called after in-place account creation so the new row appears without
                a full page reload. Exposed globally so admin-dashboard.js can call it. */
-            window.adminRefreshFacultyList = function () {
-                fetch('admin-dashboard.php?fragment=faculty-tbody', { credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (json) {
+            window.adminRefreshFacultyList = function() {
+                fetch('admin-dashboard.php?fragment=faculty-tbody', {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
                         if (json.status !== 'success') return;
                         if (_facTbody) _facTbody.innerHTML = json.faculty_html;
                         // Edit buttons are wired via delegated listener on #fac-list-table,
                         // so no per-row re-binding is needed after the innerHTML swap.
                         _facRefreshCount();
                     })
-                    .catch(function () {
+                    .catch(function() {
                         if (typeof showToast === 'function') showToast('Could not refresh the faculty list. Please reload the page.');
                     });
             };
@@ -6443,181 +6688,218 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     <!-- ── Inventory AJAX: intercept add/edit/archive/restore/force_delete without page reload ── -->
     <script nonce="<?php echo $csp_nonce; ?>">
-    (function () {
-        'use strict';
+        (function() {
+            'use strict';
 
-        /* ── Refresh inventory tbodies from the fragment endpoint ─────────── */
-        function refreshInventoryTbody(onDone) {
-            fetch('admin-dashboard.php?fragment=inventory-tbody', { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (json) {
-                    if (json.status !== 'success') return;
+            /* ── Refresh inventory tbodies from the fragment endpoint ─────────── */
+            function refreshInventoryTbody(onDone) {
+                fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status !== 'success') return;
 
-                    var activeBody = document.getElementById('inventory-body');
-                    if (activeBody) activeBody.innerHTML = json.active_html;
+                        var activeBody = document.getElementById('inventory-body');
+                        if (activeBody) activeBody.innerHTML = json.active_html;
 
-                    var archBody = document.getElementById('inv-archive-body');
-                    if (archBody) archBody.innerHTML = json.archive_html;
+                        var archBody = document.getElementById('inv-archive-body');
+                        if (archBody) archBody.innerHTML = json.archive_html;
 
-                    var badge = document.getElementById('inv-count-badge');
-                    if (badge) badge.textContent = '(' + json.active_count + ')';
+                        var badge = document.getElementById('inv-count-badge');
+                        if (badge) badge.textContent = '(' + json.active_count + ')';
 
-                    // Re-wire pagination/search since rows are brand new DOM nodes
-                    if (typeof window._setupInventoryListFn === 'function') {
-                        window._setupInventoryListFn();
+                        // Re-wire pagination/search since rows are brand new DOM nodes
+                        if (typeof window._setupInventoryListFn === 'function') {
+                            window._setupInventoryListFn();
+                        }
+
+                        if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+
+                        if (typeof onDone === 'function') onDone();
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Could not refresh inventory. Please reload.');
+                    });
+            }
+
+            /* ── Intercept itemForm (Add Equipment) ───────────────────────────── */
+            var itemForm = document.getElementById('itemForm');
+            if (itemForm) {
+                itemForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var fd = new FormData(itemForm);
+                    fd.set('ajax', '1');
+
+                    var submitBtn = itemForm.querySelector('[name="add_item"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Saving\u2026';
                     }
 
-                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
-
-                    if (typeof onDone === 'function') onDone();
-                })
-                .catch(function () {
-                    if (typeof showToast === 'function') showToast('Could not refresh inventory. Please reload.');
+                    fetch('admin-dashboard.php', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin'
+                        })
+                        .then(function(r) {
+                            return r.json();
+                        })
+                        .then(function(json) {
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'Add Equipment';
+                            }
+                            if (json.status === 'success') {
+                                if (typeof showToast === 'function') showToast(json.message || 'Saved.');
+                                itemForm.reset();
+                                var preview = document.getElementById('imagePreview');
+                                if (preview) {
+                                    preview.src = '';
+                                    preview.style.display = 'none';
+                                }
+                                if (typeof window._exitEditModeFn === 'function') window._exitEditModeFn();
+                                var fw = document.getElementById('item-form-wrap');
+                                if (fw) fw.classList.add('hidden');
+                                refreshInventoryTbody();
+                            } else {
+                                if (typeof showToast === 'function') showToast(json.message || 'Error saving equipment.');
+                            }
+                        })
+                        .catch(function() {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                        });
                 });
-        }
+            }
 
-        /* ── Intercept itemForm (Add Equipment) ───────────────────────────── */
-        var itemForm = document.getElementById('itemForm');
-        if (itemForm) {
-            itemForm.addEventListener('submit', function (e) {
+            /* ── Intercept eqEditForm (Edit Equipment modal) ──────────────────── */
+            var eqEditForm = document.getElementById('eqEditForm');
+            if (eqEditForm) {
+                eqEditForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var fd = new FormData(eqEditForm);
+                    fd.set('update_item', '1');
+                    fd.set('ajax', '1');
+
+                    var submitBtn = document.querySelector('button[form="eqEditForm"][name="update_item"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
+                    fetch('admin-dashboard.php', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin'
+                        })
+                        .then(function(r) {
+                            return r.json();
+                        })
+                        .then(function(json) {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (json.status === 'success') {
+                                if (typeof psCloseModal === 'function') psCloseModal('eq-edit-modal');
+                                if (typeof showToast === 'function') showToast(json.message || 'Equipment updated.');
+                                refreshInventoryTbody();
+                            } else {
+                                if (typeof showToast === 'function') showToast(json.message || 'Could not update equipment.');
+                            }
+                        })
+                        .catch(function() {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                        });
+                });
+            }
+
+            /* ── Intercept archive (delete_item) links ────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="delete_item="]');
+                if (!link) return;
                 e.preventDefault();
-                var fd = new FormData(itemForm);
-                fd.set('ajax', '1');
+                var msg = 'Archive this item? It will no longer be available for lending, but borrow history is preserved.';
+                if (!confirm(msg)) return;
 
-                var submitBtn = itemForm.querySelector('[name="add_item"]');
-                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving\u2026'; }
-
-                fetch('admin-dashboard.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (json) {
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Add Equipment'; }
-                        if (json.status === 'success') {
-                            if (typeof showToast === 'function') showToast(json.message || 'Saved.');
-                            itemForm.reset();
-                            var preview = document.getElementById('imagePreview');
-                            if (preview) { preview.src = ''; preview.style.display = 'none'; }
-                            if (typeof window._exitEditModeFn === 'function') window._exitEditModeFn();
-                            var fw = document.getElementById('item-form-wrap');
-                            if (fw) fw.classList.add('hidden');
-                            refreshInventoryTbody();
-                        } else {
-                            if (typeof showToast === 'function') showToast(json.message || 'Error saving equipment.');
-                        }
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
                     })
-                    .catch(function () {
-                        if (submitBtn) submitBtn.disabled = false;
-                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
-                    });
-            });
-        }
-
-        /* ── Intercept eqEditForm (Edit Equipment modal) ──────────────────── */
-        var eqEditForm = document.getElementById('eqEditForm');
-        if (eqEditForm) {
-            eqEditForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                var fd = new FormData(eqEditForm);
-                fd.set('update_item', '1');
-                fd.set('ajax', '1');
-
-                var submitBtn = document.querySelector('button[form="eqEditForm"][name="update_item"]');
-                if (submitBtn) submitBtn.disabled = true;
-
-                fetch('admin-dashboard.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (json) {
-                        if (submitBtn) submitBtn.disabled = false;
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
                         if (json.status === 'success') {
                             if (typeof psCloseModal === 'function') psCloseModal('eq-edit-modal');
-                            if (typeof showToast === 'function') showToast(json.message || 'Equipment updated.');
+                            if (typeof showToast === 'function') showToast(json.message || 'Item archived.');
                             refreshInventoryTbody();
                         } else {
-                            if (typeof showToast === 'function') showToast(json.message || 'Could not update equipment.');
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not archive item.');
                         }
                     })
-                    .catch(function () {
-                        if (submitBtn) submitBtn.disabled = false;
+                    .catch(function() {
                         if (typeof showToast === 'function') showToast('Network error. Please try again.');
                     });
             });
-        }
 
-        /* ── Intercept archive (delete_item) links ────────────────────────── */
-        document.addEventListener('click', function (e) {
-            var link = e.target.closest('a[href*="delete_item="]');
-            if (!link) return;
-            e.preventDefault();
-            var msg = 'Archive this item? It will no longer be available for lending, but borrow history is preserved.';
-            if (!confirm(msg)) return;
+            /* ── Intercept restore_item links ─────────────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="restore_item="]');
+                if (!link) return;
+                e.preventDefault();
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status === 'success') {
+                            if (typeof showToast === 'function') showToast(json.message || 'Item restored.');
+                            refreshInventoryTbody();
+                        } else {
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not restore item.');
+                        }
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                    });
+            });
 
-            var href = link.getAttribute('href');
-            var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (json) {
-                    if (json.status === 'success') {
-                        if (typeof psCloseModal === 'function') psCloseModal('eq-edit-modal');
-                        if (typeof showToast === 'function') showToast(json.message || 'Item archived.');
-                        refreshInventoryTbody();
-                    } else {
-                        if (typeof showToast === 'function') showToast(json.message || 'Could not archive item.');
-                    }
-                })
-                .catch(function () {
-                    if (typeof showToast === 'function') showToast('Network error. Please try again.');
-                });
-        });
+            /* ── Intercept force_delete links ─────────────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="force_delete="]');
+                if (!link) return;
+                e.preventDefault();
+                if (!confirm('Permanently delete? This cannot be undone.')) return;
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status === 'success') {
+                            if (typeof showToast === 'function') showToast(json.message || 'Item permanently deleted.');
+                            refreshInventoryTbody();
+                        } else {
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not delete item.');
+                        }
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                    });
+            });
 
-        /* ── Intercept restore_item links ─────────────────────────────────── */
-        document.addEventListener('click', function (e) {
-            var link = e.target.closest('a[href*="restore_item="]');
-            if (!link) return;
-            e.preventDefault();
-            var href = link.getAttribute('href');
-            var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (json) {
-                    if (json.status === 'success') {
-                        if (typeof showToast === 'function') showToast(json.message || 'Item restored.');
-                        refreshInventoryTbody();
-                    } else {
-                        if (typeof showToast === 'function') showToast(json.message || 'Could not restore item.');
-                    }
-                })
-                .catch(function () {
-                    if (typeof showToast === 'function') showToast('Network error. Please try again.');
-                });
-        });
-
-        /* ── Intercept force_delete links ─────────────────────────────────── */
-        document.addEventListener('click', function (e) {
-            var link = e.target.closest('a[href*="force_delete="]');
-            if (!link) return;
-            e.preventDefault();
-            if (!confirm('Permanently delete? This cannot be undone.')) return;
-            var href = link.getAttribute('href');
-            var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
-            fetch(url, { credentials: 'same-origin' })
-                .then(function (r) { return r.json(); })
-                .then(function (json) {
-                    if (json.status === 'success') {
-                        if (typeof showToast === 'function') showToast(json.message || 'Item permanently deleted.');
-                        refreshInventoryTbody();
-                    } else {
-                        if (typeof showToast === 'function') showToast(json.message || 'Could not delete item.');
-                    }
-                })
-                .catch(function () {
-                    if (typeof showToast === 'function') showToast('Network error. Please try again.');
-                });
-        });
-
-    })();
+        })();
     </script>
     <script>
         /* Activate the restored panel before revealing the content area. */
-        (function () {
+        (function() {
             var tab = window._preJumpTab;
             if (tab) {
                 var target = document.getElementById('panel-' + tab);
@@ -6626,7 +6908,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     if (current) current.classList.remove('active');
                     target.classList.add('active');
 
-                    document.querySelectorAll('.nav-item[data-tab]').forEach(function (item) {
+                    document.querySelectorAll('.nav-item[data-tab]').forEach(function(item) {
                         item.classList.toggle('active', item.dataset.tab === tab);
                     });
                     var accountToggle = document.getElementById('navAccountToggle');

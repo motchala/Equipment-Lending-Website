@@ -1203,6 +1203,23 @@ class ArbitrationEngine
                 return;
             }
 
+            // ── Step 4c: Closed day check ───────────────────────────────────
+            // Rooms are closed on Sundays, whichever route the reservation came in by.
+            if ((int)date('N', strtotime($res_date)) === 7) {
+                self::writeRoomDecision(
+                    $conn,
+                    $reservation_id,
+                    $room_id,
+                    $room_name,
+                    $faculty_id,
+                    (string)$reservation['faculty_name'],
+                    'Declined',
+                    self::RULE_ARCHIVED,
+                    'Reservations are not available on Sundays. Please choose another day.'
+                );
+                return;
+            }
+
             // ── Step 5: Missing document check ───────────────────────────────
             // Rooms have no stock queue — Adviser without document → Declined immediately            // (unlike equipment, which holds as Waiting until the document arrives).
             $hold_note = self::checkMissingDocument($reservation, $config);

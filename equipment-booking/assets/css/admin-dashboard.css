@@ -6312,6 +6312,17 @@ input[type="range"] {
     background: var(--hover-bg);
 }
 
+#panel-rooms .pr-tbl-btn.danger {
+    color: var(--danger);
+    border-color: #e6b0aa;
+}
+
+#panel-rooms .pr-tbl-btn.danger:hover {
+    background: #fdecea;
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
 #panel-rooms .pr-tbl-btn.cancel-r {
     color: var(--danger);
     border-color: #e5b8bb;
@@ -6487,6 +6498,19 @@ body:has(#roomScheduleModal:not(.hidden)) {
     border-top: 1px solid var(--khaki-border);
     margin-top: 1rem;
     padding-top: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rmod-archive-zone.hidden {
+    display: none;
+}
+
+#panel-rooms .rmod-archive-zone .pr-btn[disabled] {
+    opacity: .6;
+    cursor: wait;
 }
 
 /* Hide the old inline submit — replaced by rmod-footer below */
@@ -6527,6 +6551,155 @@ body:has(#roomScheduleModal:not(.hidden)) {
 
 #roomScheduleModal.hidden {
     display: none;
+}
+
+/* ── Permanent-delete confirmation (Super Admin) — direct <body> child ── */
+#roomDeleteConfirm {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.52);
+    z-index: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+#roomDeleteConfirm.hidden {
+    display: none;
+}
+
+body:has(#roomDeleteConfirm:not(.hidden)) {
+    overflow: hidden;
+}
+
+.rdc-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
+    overflow: hidden;
+    font-family: 'Poppins', sans-serif;
+}
+
+.rdc-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 1rem 1.25rem;
+    border-bottom: 1.5px solid var(--khaki-border);
+}
+
+.rdc-head h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.rdc-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #fdecea;
+    color: var(--danger);
+    flex-shrink: 0;
+}
+
+.rdc-body {
+    padding: 1rem 1.25rem;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-dark);
+}
+
+.rdc-body p {
+    margin: 0 0 .6rem;
+}
+
+.rdc-room {
+    font-weight: 700;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.rdc-list {
+    margin: 0 0 .6rem;
+    padding-left: 1.2rem;
+}
+
+.rdc-note {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+.rdc-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: .8rem;
+    padding: .6rem .75rem;
+    border: 1.5px solid #e6b0aa;
+    border-radius: 10px;
+    background: #fdf6f5;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.rdc-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--danger);
+}
+
+.rdc-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: .9rem 1.25rem;
+    border-top: 1.5px solid var(--khaki-border);
+    background: var(--secondary-cream);
+}
+
+.rdc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: .45rem 1rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--khaki-border);
+    background: transparent;
+    font-family: 'Poppins', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+}
+
+.rdc-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.rdc-btn-ghost:hover {
+    background: var(--hover-bg);
+}
+
+.rdc-btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+}
+
+.rdc-btn-danger:hover:not([disabled]) {
+    background: #a93226;
+}
+
+.rdc-btn-danger[disabled] {
+    opacity: .45;
+    cursor: not-allowed;
 }
 
 .rsm-card {
@@ -10941,6 +11114,11 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
 }
 
+#panel-rooms .pr-rooms-table.rm-grid tbody tr.pr-room-row:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
 #panel-rooms .pr-rooms-table.rm-grid tbody tr.pr-room-row>td[class] {
     display: block;
     padding: 0;
@@ -11050,6 +11228,60 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     background: var(--accent-light);
     color: var(--accent-maroon);
     border-color: transparent;
+}
+
+/* Locked room: muted, dashed tile that does not look clickable. The "Locked" chip
+   (lock icon + word) is always visible, so the state never relies on colour alone.
+   The Edit icon keeps working. */
+#panel-rooms .pr-rooms-table.rm-grid tbody tr.pr-room-row.pr-row-locked {
+    cursor: not-allowed;
+    border-style: dashed;
+    background: color-mix(in srgb, var(--card-bg) 90%, #6b7280);
+}
+
+#panel-rooms .pr-rooms-table.rm-grid tbody tr.pr-room-row.pr-row-locked:hover {
+    border-color: color-mix(in srgb, var(--text-dark) 14%, var(--khaki-border));
+    box-shadow: none;
+}
+
+#panel-rooms .pr-rooms-table.rm-grid tr.pr-row-locked>td.rm-name[class] {
+    color: var(--text-light);
+}
+
+/* the status cell is normally hidden for Available / Not Bookable — show it for locked tiles */
+#panel-rooms .pr-rooms-table.rm-grid tr.pr-row-locked>td.rm-stat[class] {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* for a locked Available / Not Bookable room only the chip shows (the badge already says the rest) */
+#panel-rooms .rm-grid tr.pr-row-locked.pr-row-avail td.rm-stat .rc-status,
+#panel-rooms .rm-grid tr.pr-row-locked.pr-row-nobk td.rm-stat .rc-status {
+    display: none;
+}
+
+#panel-rooms .rm-grid .rc-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 8px 1px 5px;
+    border-radius: 50px;
+    background: rgba(107, 114, 128, .16);
+    color: #4b5563;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+#panel-rooms .rm-grid .rc-lock .material-symbols-outlined {
+    font-size: 13px;
 }
 
 /* nothing matched */

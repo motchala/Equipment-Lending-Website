@@ -1976,3 +1976,274 @@ textarea.fcty-input {
     gap: 8px;
     font-weight: 600;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOM SCHEDULE — collapsible day dropdowns + 8 AM – 8 PM timeline
+   (Room details dialog: Today / This week)
+═══════════════════════════════════════════════════════════════ */
+.fcty-week-range {
+    margin: 0;
+    font-size: .8125rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
+}
+
+.fcty-day {
+    border: 1px solid var(--fcty-line);
+    border-radius: 12px;
+    background: var(--fcty-card);
+    overflow: hidden;
+}
+
+.fcty-day.is-today {
+    border-color: var(--fcty-brand);
+}
+
+.fcty-day-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--fcty-ink);
+    font: inherit;
+    font-size: .875rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background .18s;
+}
+
+.fcty-day-head:hover {
+    background: var(--fcty-soft);
+}
+
+.fcty-day-head:focus-visible {
+    outline: 2px solid var(--fcty-brand);
+    outline-offset: -2px;
+}
+
+.fcty-day-main {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+}
+
+.fcty-day-title {
+    font-weight: 700;
+}
+
+.fcty-day.is-today .fcty-day-title {
+    color: var(--color-primary, #800000);
+}
+
+.fcty-day.is-past .fcty-day-title {
+    color: var(--fcty-muted);
+}
+
+.fcty-day-tag {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--fcty-brand);
+    color: #fff;
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.fcty-day-count {
+    font-size: .75rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
+    white-space: nowrap;
+}
+
+.fcty-day-count.has {
+    color: var(--color-primary, #800000);
+}
+
+.fcty-day-head>.material-symbols-outlined {
+    color: var(--fcty-muted);
+    transition: transform .2s;
+}
+
+.fcty-day.is-open .fcty-day-head>.material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+.fcty-day-body {
+    padding: 4px 12px 14px;
+}
+
+.fcty-day-body[hidden] {
+    display: none;
+}
+
+/* Timeline: same progress-bar idea as the reserve dialog, on the light card surface */
+.fcty-dtl {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fcty-dtl-track {
+    position: relative;
+    height: 28px;
+    border-radius: 10px;
+    background-color: var(--fcty-soft);
+    background-image: linear-gradient(to right, var(--fcty-line) 1px, transparent 1px);
+    background-size: calc(100% / 6) 100%;
+    outline: 1px solid var(--fcty-line);
+    outline-offset: -1px;
+    overflow: hidden;
+}
+
+.fcty-dtl-block {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    min-width: 3px;
+    border-radius: 6px;
+    background: var(--fcty-brand);
+    box-shadow: 0 0 0 1px var(--fcty-card);
+}
+
+.fcty-dtl-block.is-ongoing {
+    background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .32) 0 4px, transparent 4px 8px), var(--fcty-brand);
+}
+
+.fcty-dtl-block.is-past {
+    background: var(--fcty-static);
+    opacity: .5;
+}
+
+.fcty-dtl-now {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--fcty-booked);
+    z-index: 1;
+}
+
+.fcty-dtl-ticks {
+    position: relative;
+    height: 14px;
+}
+
+.fcty-dtl-ticks span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    font-size: .6875rem;
+    color: var(--fcty-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.fcty-dtl-ticks span:first-child {
+    transform: none;
+}
+
+.fcty-dtl-ticks span:last-child {
+    transform: translateX(-100%);
+}
+
+.fcty-dtl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.fcty-dtl-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 10px;
+    border-left: 3px solid var(--fcty-brand);
+    border-radius: 8px;
+    background: var(--fcty-soft);
+    font-size: .8125rem;
+}
+
+.fcty-dtl-item.is-ongoing {
+    border-left-color: var(--fcty-booked);
+}
+
+.fcty-dtl-item.is-past {
+    border-left-color: var(--fcty-static);
+}
+
+.fcty-dtl-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.fcty-dtl-info time {
+    font-weight: 600;
+    color: var(--fcty-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.fcty-dtl-what {
+    font-weight: 600;
+    color: var(--fcty-ink);
+    overflow-wrap: anywhere;
+}
+
+.fcty-dtl-item.is-past .fcty-dtl-what {
+    color: var(--fcty-muted);
+}
+
+.fcty-dtl-state {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fcty-brand) 12%, transparent);
+    color: var(--color-primary, #800000);
+    font-size: .6875rem;
+    font-weight: 700;
+}
+
+.fcty-dtl-item.is-ongoing .fcty-dtl-state {
+    background: color-mix(in srgb, var(--fcty-booked) 14%, transparent);
+    color: var(--fcty-booked);
+}
+
+.fcty-dtl-item.is-past .fcty-dtl-state {
+    background: color-mix(in srgb, var(--fcty-static) 16%, transparent);
+    color: var(--fcty-static);
+}
+
+.fcty-dtl-empty {
+    margin: 6px 0 0;
+    font-size: .8125rem;
+    color: var(--fcty-muted);
+}
+
+@media (max-width: 560px) {
+
+    /* keep the hour labels from colliding on phones */
+    .fcty-dtl-ticks .is-minor {
+        display: none;
+    }
+
+    .fcty-day-head {
+        padding: 12px 10px;
+    }
+
+    .fcty-day-body {
+        padding: 2px 10px 12px;
+    }
+}
