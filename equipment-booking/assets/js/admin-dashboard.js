@@ -1719,8 +1719,10 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
-            // Trigger a live-render poll so the new account appears in the table immediately.
-            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+            // Reset the flag so the submit button is re-enabled for the next account.
+            _facReloading = false;
+            // Refresh the faculty list from the server so the new account appears immediately.
+            if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
     }
 
