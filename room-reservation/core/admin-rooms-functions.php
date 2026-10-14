@@ -144,30 +144,10 @@ function ps_prepare_rooms_registry_view(array $rooms_buildings, array $rooms_lis
 }
 
 /**
- * Display helpers for the room tiles (presentation only — no DB access).
- * ps_amenity_icon(): Material Symbols icon for an amenity label. The eight
- * preset amenities from the Add/Edit Room form get their own icon; any
- * custom label falls back to a neutral tag icon.
+ * Display helper for the room tiles (presentation only — no DB access).
  * ps_room_status_icon(): the icon shown on a tile's badge. The SHAPE differs
  * per status (not just the colour) so status is readable without colour.
  */
-if (!function_exists('ps_amenity_icon')) {
-    function ps_amenity_icon($label): string
-    {
-        static $map = [
-            'wifi'          => 'wifi',
-            'a/c'           => 'ac_unit',
-            'projector'     => 'present_to_all',
-            'pa system'     => 'campaign',
-            'running water' => 'water_drop',
-            'safety kit'    => 'medical_services',
-            'whiteboard'    => 'draw',
-            'smart tv'      => 'tv',
-        ];
-        $k = strtolower(trim((string)$label));
-        return $map[$k] ?? 'sell';
-    }
-}
 if (!function_exists('ps_room_status_icon')) {
     function ps_room_status_icon($status): string
     {
@@ -195,10 +175,10 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
         $isFirstFloorOfBuilding = true;
         foreach ($floors as $fNum => $fData): ?>
             <tr class="pr-floor-divider<?php echo $isFirstFloorOfBuilding ? ' pr-floor-divider-first' : ''; ?>" data-building-id="<?php echo (int)$bid; ?>" data-floor-num="<?php echo (int)$fNum; ?>">
-                <td colspan="3" style="--b-accent: <?php echo $building_accent[$bid]; ?>;">
-                    <span class="material-symbols-outlined pr-building-icon"><?php echo htmlspecialchars($b['icon'] ?: 'domain'); ?></span>
-                    <?php echo htmlspecialchars($b['name'] . ' — ' . $fData['label']); ?>
-                    <span class="pr-floor-count"><?php echo count($fData['rooms']); ?> room<?php echo count($fData['rooms']) !== 1 ? 's' : ''; ?></span>
+                <td colspan="3">
+                    <span class="rm-div-bld"><?php echo htmlspecialchars($b['name']); ?><span class="rm-div-sep">&middot;</span></span>
+                    <span class="rm-div-floor"><?php echo htmlspecialchars($fData['label']); ?></span>
+                    <span class="pr-floor-count"><?php echo count($fData['rooms']); ?></span>
                 </td>
             </tr>
             <?php $isFirstFloorOfBuilding = false; ?>
@@ -224,39 +204,25 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
                                             $am_arr = json_decode($am_raw, true);
                                             echo htmlspecialchars(json_encode(is_array($am_arr) ? $am_arr : []), ENT_QUOTES);
                                             ?>">
-                    <?php $rm_am = is_array($am_arr) ? $am_arr : []; ?>
                     <td class="rm-ico" title="<?php echo htmlspecialchars($room['status']); ?>">
                         <span class="material-symbols-outlined"><?php echo ps_room_status_icon($room['status']); ?></span>
                     </td>
                     <td class="td-fw rm-name" title="<?php echo htmlspecialchars($room['room_name']); ?>"><?php echo htmlspecialchars($room['room_name']); ?></td>
                     <td class="rm-stat"><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span></td>
-                    <td class="rm-amen">
-                        <?php foreach (array_slice($rm_am, 0, 3) as $am): ?>
-                            <span class="rm-am" title="<?php echo htmlspecialchars($am); ?>"><span class="material-symbols-outlined"><?php echo ps_amenity_icon($am); ?></span></span>
-                        <?php endforeach; ?>
-                        <?php if (count($rm_am) > 3): ?>
-                            <span class="rm-am-more" title="<?php echo htmlspecialchars(implode(', ', array_slice($rm_am, 3))); ?>">+<?php echo count($rm_am) - 3; ?></span>
-                        <?php endif; ?>
-                    </td>
                     <td class="pr-row-actions">
-                        <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule">
+                        <button type="button" class="pr-icon-btn" data-action="open-room-schedule" title="View schedule" aria-label="View schedule">
                             <span class="material-symbols-outlined">calendar_month</span>
                         </button>
-                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room">
+                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room" aria-label="Edit room">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
-                        <a href="admin-dashboard.php?archive_room=<?php echo (int)$room['room_id']; ?>"
-                            class="pr-icon-btn danger"
-                            title="Archive room">
-                            <span class="material-symbols-outlined">archive</span>
-                        </a>
                     </td>
                 </tr>
             <?php endforeach; ?>
     <?php endforeach;
     endforeach; ?>
     <tr class="pr-no-match-row" style="display:none;">
-        <td colspan="5" class="rm-nomatch">
+        <td colspan="4" class="rm-nomatch">
             <span class="material-symbols-outlined">search_off</span>
             No rooms match your filters.
         </td>

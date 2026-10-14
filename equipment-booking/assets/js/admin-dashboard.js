@@ -2022,16 +2022,16 @@
 
                 const body = admEl('div', 'act-event-body');
                 body.appendChild(admEl('div', 'act-event-text', ev.text));
-                const auto = ev.actor_type === 'auto';
-                const who = cfg.showActor ? (auto ? '' : ev.actor_name) : '';
-                if (cfg.showActor || ev.meta) {
-                    const meta = admEl('div', 'act-event-meta');
-                    if (cfg.showActor && auto) meta.appendChild(admEl('span', 'act-pill', 'Automatic'));
-                    const bits = [who, ev.meta].filter(function (b) { return b; }).join(' \u00b7 ');
-                    if (bits) meta.appendChild(document.createTextNode((cfg.showActor && auto ? ' ' : '') + bits));
-                    if (meta.childNodes.length) body.appendChild(meta);
-                }
+                if (ev.meta) body.appendChild(admEl('div', 'act-event-meta', ev.meta)); // e.g. the rule that applied
                 li.appendChild(body);
+                if (cfg.showActor) {
+                    // "Who" gets its own column so a wide timeline stays easy to scan.
+                    li.classList.add('act-event--who');
+                    const who = admEl('div', 'act-event-who');
+                    if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
+                    else who.textContent = ev.actor_name;
+                    li.appendChild(who);
+                }
                 li.appendChild(admEl('time', 'act-event-time', actTimeLabel(ev.ts)));
                 lastList.appendChild(li);
             });
@@ -2160,6 +2160,16 @@
         }
 
         /* ── seats (header counter + Add button) ──────────────── */
+        /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
+        function syncActorOption(id, name) {
+            const sel = document.getElementById('act-actor');
+            if (!sel || !id) return;
+            let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
+            if (name === null) { if (opt) opt.remove(); return; }
+            if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
+            opt.textContent = name;
+        }
+
         function updateSeats(count, remaining) {
             const text = document.getElementById('am-seats-text');
             if (text) {
@@ -2427,6 +2437,7 @@
                         created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
                     });
                     list.insertBefore(item, listEmpty);
+                    syncActorOption(data.id, fullName);
                     refreshListEmpty();
                     if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
                     closeModal(addModal);
@@ -2486,6 +2497,7 @@
                 item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
                 item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
                 item.querySelector('.am-item-email').textContent = r.data.email;
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name);
                 if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
@@ -2608,6 +2620,7 @@
                 }
                 const all = items();
                 const pos = all.indexOf(item);
+                syncActorOption(item.getAttribute('data-id'), null);
                 item.remove();
                 if (typeof r.data.accounts_count === 'number') updateSeats(r.data.accounts_count, r.data.accounts_remaining);
                 closeModal(deleteModal);
@@ -2673,16 +2686,34 @@
         if (panel.classList.contains('active')) ensureLoaded();
         window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
 
-        /* Called from the Admins panel: open Activity already filtered to one admin. */
+        /* Open Activity with a preset — used by the Admins panel, Borrowing Rules and My Account.
+           opts: { actor: 'all' | 'auto' | 'me' | <admin id>, filter: chip key, range: today | 7d | 30d | all } */
         window.psActivityOpen = function (opts) {
-            const actor = opts && opts.actor ? String(opts.actor) : 'all';
+            opts = opts || {};
+            const actor = opts.actor ? String(opts.actor) : 'all';
             actorSel.value = Array.from(actorSel.options).some(function (o) { return o.value === actor; }) ? actor : 'all';
-            rangeSel.value = 'all';
-            setChip('all');
+            rangeSel.value = opts.range || 'all';
+            setChip(opts.filter || 'all');
             loaded = true;
             if (nav) nav.click();
             feed.load(true);
         };
+
+        /* Links elsewhere in the portal: <button data-act-open="auto|me"> */
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('[data-act-open]');
+            if (!link) return;
+            const which = link.getAttribute('data-act-open');
+            if (which === 'auto') window.psActivityOpen({ actor: 'auto', filter: 'requests', range: '30d' });
+            else if (which === 'me') window.psActivityOpen({ actor: 'me', range: '30d' });
+        });
+
+        /* Export exactly what the filters are showing (the server applies the same visibility rules). */
+        document.getElementById('act-export').addEventListener('click', function () {
+            const p = { actor: actorSel.value, filter: filter, range: rangeSel.value };
+            window.location.href = ADM_ACTIVITY_API + '?format=csv&actor=' + encodeURIComponent(p.actor) +
+                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range);
+        });
     })();
     /* ▲ ACTIVITY-PAGE-END ───────────────────────────────────────────────────── */
 
@@ -3840,33 +3871,6 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
    PHASE 3 — ARBITRATION + EXPORT HELPERS
 ════════════════════════════════════════════════════════════════ */
 
-/* Arbitration sub-tab switcher */
-(function () {
-    var arbTabs = document.getElementById('arbSubTabs');
-    if (!arbTabs) return;
-    arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('#sett-rules .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
-            tab.classList.add('active');
-            var panel = document.getElementById(tab.dataset.arbPanel);
-            if (panel) panel.classList.add('active');
-        });
-    });
-
-    /* Decision log filter */
-    var filterSel = document.getElementById('arb-log-filter');
-    var logTable = document.getElementById('arb-log-new-table');
-    if (filterSel && logTable) {
-        filterSel.addEventListener('change', function () {
-            var val = filterSel.value;
-            logTable.querySelectorAll('tbody tr').forEach(function (row) {
-                row.style.display = (!val || (row.dataset.decision || '') === val) ? '' : 'none';
-            });
-        });
-    }
-})();
-
 /* Export format button selector */
 function psSelectFmt(btn) {
     var row = btn.closest('.ps-export-fmt-row');
@@ -4343,24 +4347,17 @@ function psSelectFmt(btn) {
 })();
 
 
-/* ═══════════════════════════════════════════════════════════════
-   ROOMS — visual filters + clickable tiles
+/* ───────────────────────────────────────────────────────────────
+   ROOMS -- building / floor pills + clickable tiles
    Additive block. The original Building / Floor / Status <select>s
    and the filter module in admin-dashboard.php stay the single
-   source of truth: the pills and chips below only READ their options
-   and WRITE their value (then fire "change"), so searching, filtering,
-   the live refresh after add / edit / archive, and the schedule modal
-   all keep working exactly as before. Without JS the plain dropdowns
-   stay visible.
-   ═══════════════════════════════════════════════════════════════ */
+   source of truth: the pills below only READ their options and
+   WRITE their value (then fire "change"), so searching, filtering,
+   the live refresh after add / edit / archive, and the schedule
+   modal all keep working exactly as before. Without JS the plain
+   dropdowns stay visible. Status is a plain dropdown (no pills).
+   ─────────────────────────────────────────────────────────────── */
 (function () {
-    var STATUS = [
-        ['all', 'All', null],
-        ['Available', 'Available', '#27ae60'],
-        ['Maintenance', 'Maintenance', '#e67e22'],
-        ['Not Bookable', 'Not bookable', '#9ca3af']
-    ];
-
     function install() {
         var tb = document.getElementById('rmToolbar');
         var table = document.getElementById('roomsRegistryTable');
@@ -4368,11 +4365,10 @@ function psSelectFmt(btn) {
         var flr = document.getElementById('roomFloorSelect');
         var st = document.getElementById('roomStatusSelect');
         var search = document.getElementById('roomSearchInput');
-        var chipsEl = document.getElementById('rmStatusChips');
         var pillsEl = document.getElementById('rmBuildingPills');
         var floorsEl = document.getElementById('rmFloorChips');
         var showingEl = document.getElementById('rmShowing');
-        if (!tb || !table || !bld || !flr || !st || !search || !chipsEl || !pillsEl || !floorsEl) return;
+        if (!tb || !table || !bld || !flr || !st || !search || !pillsEl || !floorsEl) return;
 
         var lastPillSig = '';
 
@@ -4391,67 +4387,26 @@ function psSelectFmt(btn) {
             return n;
         }
 
-        function icon(name) { return el('span', 'material-symbols-outlined', name); }
-
-        /* same scope rule the filter module uses: a search looks at every building */
-        function inScope(row) {
-            var q = (search.value || '').trim().toLowerCase();
-            var searching = q.length > 0;
-            var scope = searching || ((bld.value === 'all' || row.dataset.roomBuildingId === bld.value) &&
-                (flr.value === 'all' || row.dataset.roomFloorNum === flr.value));
-            var match = !searching || (row.dataset.roomName || '').toLowerCase().indexOf(q) !== -1;
-            return scope && match;
+        function pill(cls, value, label, pressed) {
+            var b = el('button', cls, label);
+            b.type = 'button';
+            b.dataset.value = value;
+            b.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+            return b;
         }
 
-        function buildStatusChips(counts) {
-            chipsEl.textContent = '';
-            STATUS.forEach(function (s) {
-                var b = el('button', 'rm-chip');
-                b.type = 'button';
-                b.dataset.value = s[0];
-                b.setAttribute('aria-pressed', st.value === s[0] ? 'true' : 'false');
-                if (s[2]) { var d = el('span', 'rm-dot'); d.style.setProperty('--dot', s[2]); b.appendChild(d); }
-                b.appendChild(el('span', '', s[1]));
-                b.appendChild(el('span', 'rm-n', String(counts[s[0]] || 0)));
-                chipsEl.appendChild(b);
+        function buildPills() {
+            var opts = Array.prototype.map.call(bld.options, function (o) {
+                return [o.value, o.value === 'all' ? 'All' : o.textContent.replace(/\s+/g, ' ').trim()];
             });
-        }
-
-        function buildingInfo() {
-            var rows = roomRows(), perBld = {};
-            rows.forEach(function (r) { var id = r.dataset.roomBuildingId; perBld[id] = (perBld[id] || 0) + 1; });
-            var list = [{ id: 'all', name: 'All buildings', campus: '', icon: 'apps', accent: '', count: rows.length }];
-            Array.prototype.forEach.call(bld.options, function (o) {
-                if (o.value === 'all') return;
-                var parts = o.textContent.replace(/\s+/g, ' ').trim().split(' · ');
-                var name = parts.length > 1 ? parts.slice(1).join(' · ') : parts[0];
-                var div = table.querySelector('tr.pr-floor-divider[data-building-id="' + o.value + '"]');
-                var td = div && div.querySelector('td');
-                var ic = div && div.querySelector('.pr-building-icon');
-                list.push({
-                    id: o.value, name: name, campus: parts.length > 1 ? parts[0] : '',
-                    icon: ic ? ic.textContent.trim() : 'domain',
-                    accent: td ? td.style.getPropertyValue('--b-accent').trim() : '',
-                    count: perBld[o.value] || 0
-                });
-            });
-            return list;
-        }
-
-        function buildPills(list) {
-            pillsEl.textContent = '';
-            list.forEach(function (b) {
-                var btn = el('button', 'rm-bld');
-                btn.type = 'button';
-                btn.dataset.value = b.id;
-                btn.title = b.campus ? b.campus + ' · ' + b.name : b.name;
-                if (b.accent) btn.style.setProperty('--b-accent', b.accent);
-                var ico = el('span', 'rm-bld-ico'); ico.appendChild(icon(b.icon));
-                var txt = el('span', '');
-                txt.appendChild(el('span', 'rm-bld-t', b.name));
-                txt.appendChild(el('span', 'rm-bld-s', b.count + (b.count === 1 ? ' room' : ' rooms')));
-                btn.appendChild(ico); btn.appendChild(txt);
-                pillsEl.appendChild(btn);
+            var sig = opts.map(function (o) { return o.join('|'); }).join('~');
+            if (sig !== lastPillSig) {
+                pillsEl.textContent = '';
+                opts.forEach(function (o) { pillsEl.appendChild(pill('rm-bld', o[0], o[1], false)); });
+                lastPillSig = sig;
+            }
+            Array.prototype.forEach.call(pillsEl.children, function (b) {
+                b.setAttribute('aria-pressed', b.dataset.value === bld.value ? 'true' : 'false');
             });
         }
 
@@ -4460,44 +4415,33 @@ function psSelectFmt(btn) {
             /* only worth showing when a building is picked and it has 2+ floors */
             if (flr.disabled || flr.options.length < 3) return;
             Array.prototype.forEach.call(flr.options, function (o) {
-                var b = el('button', 'rm-chip rm-chip--sm', o.value === 'all' ? 'All floors' : o.textContent.trim());
-                b.type = 'button';
-                b.dataset.value = o.value;
-                b.setAttribute('aria-pressed', flr.value === o.value ? 'true' : 'false');
-                floorsEl.appendChild(b);
+                floorsEl.appendChild(pill('rm-chip rm-chip--sm', o.value,
+                    o.value === 'all' ? 'All floors' : o.textContent.trim(), flr.value === o.value));
             });
         }
 
         function sync() {
-            var counts = { all: 0, Available: 0, Maintenance: 0, 'Not Bookable': 0 };
             var rows = roomRows(), shown = 0;
-            rows.forEach(function (r) {
-                if (inScope(r)) { counts.all++; counts[r.dataset.roomStatus] = (counts[r.dataset.roomStatus] || 0) + 1; }
-                if (r.style.display !== 'none') shown++;
-            });
-            buildStatusChips(counts);
+            rows.forEach(function (r) { if (r.style.display !== 'none') shown++; });
+            buildPills();
             buildFloors();
 
-            var list = buildingInfo();
-            var sig = list.map(function (b) { return [b.id, b.name, b.icon, b.accent, b.count].join('|'); }).join('~');
-            if (sig !== lastPillSig) { buildPills(list); lastPillSig = sig; }
-            Array.prototype.forEach.call(pillsEl.children, function (b) {
-                b.setAttribute('aria-pressed', b.dataset.value === bld.value ? 'true' : 'false');
-            });
-
-            tb.classList.toggle('rm-searching', (search.value || '').trim().length > 0);
-            if (showingEl) showingEl.textContent = shown === rows.length ? rows.length + ' rooms' : shown + ' of ' + rows.length + ' rooms';
+            var searching = (search.value || '').trim().length > 0;
+            tb.classList.toggle('rm-searching', searching);
+            /* one building on screen -> its name is dropped from every floor heading */
+            table.classList.toggle('rm-one-bld', bld.value !== 'all' && !searching);
+            if (showingEl) showingEl.textContent = shown === rows.length
+                ? rows.length + (rows.length === 1 ? ' room' : ' rooms')
+                : shown + ' of ' + rows.length + ' rooms';
             tb.classList.add('rm-enhanced');
         }
 
-        /* chips / pills -> write to the real selects */
+        /* pills / chips -> write to the real selects */
         tb.addEventListener('click', function (e) {
             var c = e.target.closest('.rm-chip, .rm-bld');
             if (!c || !tb.contains(c)) return;
-            var v = c.dataset.value;
-            if (c.closest('#rmStatusChips')) setSelect(st, v);
-            else if (c.closest('#rmBuildingPills')) setSelect(bld, v);
-            else if (c.closest('#rmFloorChips')) setSelect(flr, v);
+            if (c.closest('#rmBuildingPills')) setSelect(bld, c.dataset.value);
+            else if (c.closest('#rmFloorChips')) setSelect(flr, c.dataset.value);
         });
 
         /* keep in step with every change the filter module reacts to

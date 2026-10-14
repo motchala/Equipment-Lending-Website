@@ -133,7 +133,7 @@ CREATE TABLE `tbl_buildings` (
 
 INSERT INTO `tbl_buildings` (`building_id`, `campus_id`, `building_key`, `name`, `wing`, `floor_count`, `image_path`, `icon`, `description`, `sort_order`, `created_at`) VALUES
 (1, 1, 'main-building-a', 'Building A (Old)', 'South Wing', 5, 'assets/images/faculty/pup-main-building-a-image.jpg', 'domain', 'Administrative offices, lecture halls, organization rooms, and specialized laboratories spread across 5 floors.', 1, '2026-10-01 13:05:16'),
-(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 5, 'assets/images/faculty/pup-main-building-b-image.jpg', 'business', 'Modern laboratories, smart classrooms, and collaborative study spaces.', 2, '2026-10-01 13:05:16'),
+(2, 1, 'main-building-b', 'Building B (New)', 'North Wing', 4, 'assets/images/faculty/pup-main-building-b-image.jpg', 'business', 'Modern laboratories, smart classrooms, and collaborative study spaces.', 2, '2026-10-01 13:05:16'),
 (3, 2, 'cite-main', 'PUP CITE Building', 'Main Block', 4, 'assets/images/faculty/pup-cite-image.jpg', 'engineering', 'Technical laboratories, computer labs, and specialized engineering facilities spread across 4 floors.', 1, '2026-10-01 13:05:16');
 
 -- --------------------------------------------------------
@@ -472,15 +472,6 @@ INSERT INTO `tbl_rooms` (`room_id`, `building_id`, `room_name`, `floor_number`, 
 (39, 2, 'Room 402', 4, '4th Floor', NULL, NULL, 'Available', 0, 2, '2026-10-01 13:05:16'),
 (40, 2, 'AVR 1', 4, '4th Floor', NULL, NULL, 'Available', 0, 3, '2026-10-01 13:05:16'),
 (41, 2, 'Room 405', 4, '4th Floor', NULL, NULL, 'Available', 0, 4, '2026-10-01 13:05:16'),
-(42, 2, 'Room 501', 5, '5th Floor', NULL, NULL, 'Available', 1, 1, '2026-10-01 13:05:16'),
-(43, 2, 'Room 502', 5, '5th Floor', NULL, NULL, 'Available', 1, 2, '2026-10-01 13:05:16'),
-(44, 2, 'Room 503', 5, '5th Floor', NULL, NULL, 'Available', 1, 3, '2026-10-01 13:05:16'),
-(45, 2, 'Room 504', 5, '5th Floor', NULL, NULL, 'Available', 1, 4, '2026-10-01 13:05:16'),
-(46, 2, 'Room 505', 5, '5th Floor', NULL, NULL, 'Available', 1, 5, '2026-10-01 13:05:16'),
-(47, 2, 'Room 506', 5, '5th Floor', NULL, NULL, 'Available', 1, 6, '2026-10-01 13:05:16'),
-(48, 2, 'Room 507', 5, '5th Floor', NULL, NULL, 'Available', 1, 7, '2026-10-01 13:05:16'),
-(49, 2, 'Room 508', 5, '5th Floor', NULL, NULL, 'Available', 1, 8, '2026-10-01 13:05:16'),
-(50, 2, 'Room 509', 5, '5th Floor', NULL, NULL, 'Available', 1, 9, '2026-10-01 13:05:16'),
 (51, 3, 'Prayer Room', 1, '1st Floor', NULL, NULL, 'Not Bookable', 0, 1, '2026-10-01 13:05:16'),
 (52, 3, 'Audiovisual Room', 1, '1st Floor', NULL, NULL, 'Available', 0, 2, '2026-10-01 13:05:16'),
 (53, 3, 'Testing Area', 1, '1st Floor', NULL, NULL, 'Not Bookable', 0, 3, '2026-10-01 13:05:16'),
