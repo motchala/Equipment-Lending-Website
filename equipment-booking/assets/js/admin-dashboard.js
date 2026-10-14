@@ -178,10 +178,15 @@
 
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.remove('active'));
         const panel = document.getElementById('panel-' + tabName);
-        if (panel) panel.classList.add('active');
+        // If the pre-paint script already activated this panel (no flash), skip
+        // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
+        const alreadyActive = panel && panel.classList.contains('active');
+        if (!alreadyActive || clickedEl !== false) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            if (panel) panel.classList.add('active');
+        }
+        document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.remove('active'));
         // Highlight the specific element that was clicked, or fall back to first match
         const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
@@ -2107,12 +2112,12 @@
             });
         }
 
-        function fetchPage(scroll) {
+        function fetchPage(scroll, showLoading) {
             const p = cfg.params();
             const myToken = ++token;
             lastKey = '';
             lastList = null;
-            message('hourglass_top', 'Loading activity\u2026');
+            if (showLoading !== false) message('hourglass_top', 'Loading activity\u2026');
             const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
                 '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
             fetch(url, { credentials: 'same-origin' })
@@ -2154,9 +2159,9 @@
         });
 
         /* load(true) = filters changed → back to page 1 */
-        function load(resetPage) {
+        function load(resetPage, showLoading) {
             if (resetPage) page = 1;
-            fetchPage(false);
+            fetchPage(false, showLoading);
         }
 
         return { load: load };
@@ -2434,7 +2439,7 @@
             if (!chip || !current) return;
             filter = chip.getAttribute('data-filter');
             document.querySelectorAll('#am-chips .act-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
-            adminFeed.load(true);
+            adminFeed.load(true, false);
         });
 
         document.getElementById('am-open-activity').addEventListener('click', function () {
@@ -2751,7 +2756,7 @@
             const chip = e.target.closest('.act-chip');
             if (!chip) return;
             setChip(chip.getAttribute('data-filter'));
-            feed.load(true);
+            feed.load(true, false);
         });
         actorSel.addEventListener('change', function () { feed.load(true); });
         rangeSel.addEventListener('change', function () { feed.load(true); });
@@ -2777,7 +2782,7 @@
             setChip(opts.filter || 'all');
             loaded = true;
             if (nav) nav.click();
-            feed.load(true);
+            feed.load(true, false);
         };
 
         /* Links elsewhere in the portal: <button data-act-open="auto|me"> */
@@ -2862,7 +2867,7 @@
                     }
                     closeAdminCancelRrModal();
                     showToast('Reservation cancelled. Faculty and waitlist notified.');
-                    setTimeout(() => location.reload(), 1200);
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(() => {
                     this.disabled = false;
@@ -2935,7 +2940,7 @@
                 }
                 closeIssueReviewModal();
                 showToast('Issue report ' + resolution.toLowerCase() + '.');
-                setTimeout(() => location.reload(), 1200);
+                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
             })
             .catch(() => {
                 document.getElementById('resolveIssueBtn').disabled = false;
@@ -3671,7 +3676,7 @@
                         psCloseModal('ps-approve-modal');
                         psCloseModal('ps-decline-modal');
                         psCloseModal('ps-req-detail-modal');
-                        setTimeout(function () { location.reload(); }, 900);
+                        if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
                         btn.disabled = false;

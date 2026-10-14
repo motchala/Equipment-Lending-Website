@@ -959,6 +959,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
+    <script>
+        /* Keep the default dashboard from appearing while the restored tab loads. */
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var tab = null;
+
+            if (params.has('edit_item')) {
+                tab = 'inventory';
+            } else {
+                var view = params.get('view');
+                if (['inventory', 'faculty', 'activity', 'admins'].indexOf(view) !== -1) {
+                    tab = view;
+                } else if (params.get('tab') === 'rooms') {
+                    tab = 'rooms';
+                } else {
+                    var hash = window.location.hash;
+                    if (hash.indexOf('#tab-') === 0) tab = hash.slice(5);
+                }
+            }
+
+            if (['requests', 'rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
+            try { if (sessionStorage.getItem('adminHardRefresh') === '1') return; } catch (_) {}
+            window._preJumpTab = tab;
+            document.documentElement.classList.add('admin-tab-pending');
+        })();
+    </script>
+    <style>
+        html.admin-tab-pending #panel-dashboard {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -5624,9 +5655,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             var archiveLink = document.getElementById('eqm-archive-link');
             archiveLink.href = 'admin-dashboard.php?delete_item=' + d.itemId;
-            archiveLink.onclick = function() {
-                return confirm('Archive "' + d.itemName + '"? It will no longer be available for lending, but borrow history is preserved.');
-            };
+            archiveLink.onclick = null; // confirmation handled by delegated listener in inventory AJAX block
 
             psOpenModal('eq-edit-modal');
         });
@@ -6585,6 +6614,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         });
 
     })();
+    </script>
+    <script>
+        /* Activate the restored panel before revealing the content area. */
+        (function () {
+            var tab = window._preJumpTab;
+            if (tab) {
+                var target = document.getElementById('panel-' + tab);
+                if (target) {
+                    var current = document.querySelector('.tab-panel.active');
+                    if (current) current.classList.remove('active');
+                    target.classList.add('active');
+
+                    document.querySelectorAll('.nav-item[data-tab]').forEach(function (item) {
+                        item.classList.toggle('active', item.dataset.tab === tab);
+                    });
+                    var accountToggle = document.getElementById('navAccountToggle');
+                    if (accountToggle) accountToggle.classList.toggle('active', tab === 'settings');
+                }
+            }
+            document.documentElement.classList.remove('admin-tab-pending');
+        })();
     </script>
 </body>
 

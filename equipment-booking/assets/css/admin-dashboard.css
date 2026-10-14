@@ -1370,6 +1370,11 @@ button.nav-item {
     transform: translateX(2px);
 }
 
+nav.sidebar .nav-item.nav-signout:hover {
+    background: #c0392b;
+    color: #ffffff;
+}
+
 .nav-item:focus-visible {
     outline: 2px solid #ffffff;
     outline-offset: 2px;

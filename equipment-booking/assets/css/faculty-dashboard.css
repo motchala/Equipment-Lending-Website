@@ -8264,8 +8264,8 @@ body .side-nav .side-nav-footer .side-nav-item.side-nav-signout .material-symbol
 }
 
 body .side-nav .side-nav-footer .side-nav-item.side-nav-signout:hover {
-    background: var(--nav-hover-bg) !important;
-    color: var(--nav-on-hover) !important;
+    background: #c0392b !important;
+    color: #ffffff !important;
 }
 
 /* ── Account tab ─────────────────────────────────────────────────── */
