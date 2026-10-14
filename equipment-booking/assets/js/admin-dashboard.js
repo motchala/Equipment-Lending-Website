@@ -190,6 +190,14 @@
         const acctToggle = document.getElementById('navAccountToggle');
         if (acctToggle) acctToggle.classList.toggle('active', tabName === 'settings');
         _closeMobileSidebar();
+        // Write hash for F5 persistence. clickedEl === false signals a popstate / initView
+        // restore — skip rewriting so we don't redundantly overwrite the hash or trigger loops.
+        if (clickedEl !== false) {
+            var newHash = '#tab-' + tabName;
+            if (window.location.hash !== newHash) {
+                history.replaceState(history.state, '', window.location.pathname + window.location.search + newHash);
+            }
+        }
     }
 
     /* ── Lending sub-nav ─────────────────────────────────────── */
@@ -1505,13 +1513,18 @@
                     break;
                 }
                 case 'hide-item-form': {
+                    // Drop any ?edit_item= param from the URL without reloading.
                     const editParam = new URLSearchParams(window.location.search).get('edit_item');
                     if (editParam) {
-                        window.location.href = 'admin-dashboard.php?view=inventory';
-                    } else {
-                        const fw = document.getElementById('item-form-wrap');
-                        if (fw) fw.classList.add('hidden');
+                        const p2 = new URLSearchParams(window.location.search);
+                        p2.delete('edit_item');
+                        const qs2 = p2.toString();
+                        history.replaceState({ tab: 'inventory' }, '',
+                            window.location.pathname + (qs2 ? '?' + qs2 : '') + window.location.hash);
                     }
+                    _exitEditMode();
+                    const fw = document.getElementById('item-form-wrap');
+                    if (fw) fw.classList.add('hidden');
                     break;
                 }
                 case 'show-room-form': {
@@ -1527,13 +1540,17 @@
                 case 'hide-room-form': {
                     const editRoomParam = new URLSearchParams(window.location.search).get('edit_room');
                     if (editRoomParam) {
-                        window.location.href = 'admin-dashboard.php?tab=rooms';
-                    } else {
-                        const rfw = document.getElementById('room-form-wrap');
-                        const addRoomBtn = document.getElementById('addRoomBtn');
-                        if (rfw) rfw.classList.add('hidden');
-                        if (addRoomBtn) addRoomBtn.style.display = '';
+                        const p3 = new URLSearchParams(window.location.search);
+                        p3.delete('edit_room');
+                        const qs3 = p3.toString();
+                        history.replaceState({ tab: 'rooms' }, '',
+                            window.location.pathname + (qs3 ? '?' + qs3 : '') + window.location.hash);
                     }
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) rfw.classList.add('hidden');
+                    if (addRoomBtn) addRoomBtn.style.display = '';
+                    if (window.psResetRoomForm) window.psResetRoomForm();
                     break;
                 }
                 case 'apply-theme':
@@ -1696,9 +1713,14 @@
         document.body.appendChild(ov);
 
         setTimeout(function () {
-            // ?view=faculty makes the dashboard open on the Faculty tab (a plain reload
-            // would drop back to the default tab).
-            window.location.href = window.location.pathname + '?view=faculty';
+            // Switch to Faculty tab in-place — no page reload needed.
+            document.body.removeChild(ov);
+            _switchTabDOM('faculty');
+            // Reset the create-account form so it's blank for the next account.
+            var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
+            if (form) form.reset();
+            // Trigger a live-render poll so the new account appears in the table immediately.
+            if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
         }, FAC_CREATED_OVERLAY_MS);
     }
 
@@ -3106,10 +3128,26 @@
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
+        // Hard-refresh flag: Ctrl+Shift+R / Ctrl+F5 sets this before the page unloads.
+        // On load we honour it by skipping hash restore, effectively landing on Dashboard.
+        try {
+            if (sessionStorage.getItem('adminHardRefresh') === '1') {
+                sessionStorage.removeItem('adminHardRefresh');
+                history.replaceState({ tab: 'dashboard' }, '');
+                return; // leave the default dashboard panel active
+            }
+        } catch (_) {}
+
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
         const editItem = params.get('edit_item');
 
+        // ── Hash-based restore (F5 / normal reload) ───────────────────────
+        const hash = window.location.hash; // e.g. '#tab-inventory'
+        const hashTab = hash.startsWith('#tab-') ? hash.slice(5) : null;
+
+        // URL params take priority over hash (they come from PHP redirects/links
+        // and carry more context, e.g. edit_item). Hash is the F5 restore path.
         if (editItem) {
             _switchTabDOM('inventory', false);
             _enterEditMode();
@@ -3147,6 +3185,12 @@
                     switchRoomsTab('rooms-archived');
                 }
                 history.replaceState({ tab: 'rooms' }, '');
+            } else if (hashTab && hashTab !== 'dashboard') {
+                // Hash restore: covers rooms, inventory, faculty, activity, admins, settings, lending, requests, etc.
+                _switchTabDOM(hashTab, false);
+                if (hashTab === 'activity' && typeof window.psActivityReady === 'function') window.psActivityReady();
+                if (hashTab === 'admins' && typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+                history.replaceState({ tab: hashTab }, '');
             } else {
                 history.replaceState({ tab: 'dashboard' }, '');
             }
@@ -3168,6 +3212,21 @@
 
     /* ── Init ────────────────────────────────────────────────── */
     function init() {
+        // Expose helpers for inline AJAX scripts in admin-dashboard.php
+        window._setupInventoryListFn = setupInventoryList;
+        window._exitEditModeFn = _exitEditMode;
+
+        // Hard-refresh detection: set flag on Ctrl+Shift+R / Ctrl+F5 so initView
+        // can skip hash restore and land on Dashboard (mimics a true fresh load).
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && (
+                (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
+                e.key === 'F5'
+            )) {
+                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) {}
+            }
+        });
+
         restoreState();
 
         initView();
@@ -3204,23 +3263,35 @@
         setupInventoryList(); // client-side search + 10-per-page pagination — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
-        // ── Arbitration log search (server-side, reload with query param) ──
+        // ── Arbitration log search (client-side filter) ──────────────────
         const arbLogSearchInput = document.getElementById('arbLogSearch');
         if (arbLogSearchInput) {
+            // Client-side filter — avoids a full page reload for every keystroke.
             let arbLogTimer;
             arbLogSearchInput.addEventListener('keyup', function () {
                 clearTimeout(arbLogTimer);
-                const q = this.value.trim();
-                arbLogTimer = setTimeout(() => {
+                const q = this.value.trim().toLowerCase();
+                arbLogTimer = setTimeout(function () {
+                    const tbody = document.getElementById('arb-log-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(function (row) {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = (q === '' || text.includes(q)) ? '' : 'none';
+                    });
+                    // Update URL param silently so a refresh re-applies the filter.
                     const url = new URL(window.location.href);
-                    url.searchParams.set('arb_log_search', q);
-                    window.location.href = url.toString();
-                }, 600);
+                    if (q) { url.searchParams.set('arb_log_search', q); }
+                    else   { url.searchParams.delete('arb_log_search'); }
+                    history.replaceState(history.state, '', url.toString());
+                }, 300);
             });
-            // Pre-fill from URL param
-            const urlParams = new URLSearchParams(window.location.search);
-            const existingSearch = urlParams.get('arb_log_search');
-            if (existingSearch) arbLogSearchInput.value = existingSearch;
+            // Pre-fill from URL param and apply immediately
+            const urlParams2 = new URLSearchParams(window.location.search);
+            const existingSearch = urlParams2.get('arb_log_search');
+            if (existingSearch) {
+                arbLogSearchInput.value = existingSearch;
+                arbLogSearchInput.dispatchEvent(new Event('keyup'));
+            }
         }
 
         // ── Save Arbitration Config ───────────────────────────────────────

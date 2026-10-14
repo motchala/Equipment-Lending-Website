@@ -429,6 +429,7 @@ if (isset($_GET['restore_room'])) {
     $stmt->execute();
     $stmt->close();
     admin_log_activity($conn, 'room', 'Restored room: ' . admin_activity_room_name($conn, $room_id));
+    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Room restored.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_restored=1");
     exit();
