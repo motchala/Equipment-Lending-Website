@@ -2619,7 +2619,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             'start_fmt'    => $ar['start_fmt'],
                             'end_fmt'      => $ar['end_fmt'],
                             'label'        => !empty($ar['purpose']) ? $ar['purpose'] : $ar['faculty_name'],
+                            'purpose'      => (string)($ar['purpose'] ?? ''),
                             'faculty'      => $ar['faculty_name'],
+                            'submitted_as' => (string)($ar['submitted_as'] ?? ''),
+                            'submitted_by' => (string)($ar['submitted_by_name'] ?? ''),
                             'status'       => $ar['status'],
                         ];
                     }, $admin_room_reservations ?? []),
@@ -2637,48 +2640,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         const PS_ROOMS = <?php echo json_encode(array_values($ps_rooms_json)); ?>;
                         const PS_RSVP = <?php echo json_encode($ps_rsvp_json); ?>;
 
-                        /* — Time slots shown in the grid — */
-                        const SLOTS = [{
-                                label: '7–8 AM',
-                                h: 7
-                            },
-                            {
-                                label: '8–9 AM',
-                                h: 8
-                            },
-                            {
-                                label: '9–10 AM',
-                                h: 9
-                            },
-                            {
-                                label: '10–11 AM',
-                                h: 10
-                            },
-                            {
-                                label: '11 AM–12 PM',
-                                h: 11
-                            },
-                            {
-                                label: '12–1 PM',
-                                h: 12
-                            },
-                            {
-                                label: '1–2 PM',
-                                h: 13
-                            },
-                            {
-                                label: '2–3 PM',
-                                h: 14
-                            },
-                            {
-                                label: '3–4 PM',
-                                h: 15
-                            },
-                            {
-                                label: '4–5 PM',
-                                h: 16
-                            },
-                        ];
+                        /* — Grid geometry —
+                           Reservations run 7 AM – 8 PM, Monday to Saturday (Sunday is closed; see
+                           submit-faculty-reserve.php). The time axis starts at those hours and only
+                           grows if a reservation ever falls outside them, so nothing is ever hidden. */
+                        const AXIS_START = 7 * 60;
+                        const AXIS_END = 20 * 60;
+                        const HOUR_PX = 42; // height of one hour on screen (13 h fits one screen)
+                        const REFRESH_MS = 30000; // re-pull reservations while the modal is open
+                        const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
                         ];
@@ -2687,118 +2657,437 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         let _roomId = null;
                         let _roomName = '';
                         let _weekOff = 0; // 0 = current week
+                        let _mobDay = 1; // 1 = Mon … 7 = Sun (mobile single-day view)
+                        let _rows = []; // normalized approved reservations for the open room
+                        let _timer = null;
+                        let _reqToken = 0;
+                        let _lastSig = '';
 
-                        /* — Helpers — */
-                        function parseHour(fmt) {
-                            if (!fmt) return 0;
-                            const [timePart, period] = fmt.trim().split(/\s+/);
-                            let [h] = (timePart || '0:00').split(':').map(Number);
-                            if ((period || '').toUpperCase() === 'PM' && h !== 12) h += 12;
-                            if ((period || '').toUpperCase() === 'AM' && h === 12) h = 0;
-                            return h;
+                        /* — Small helpers — */
+                        function $(id) {
+                            return document.getElementById(id);
                         }
 
-                        function getMondayDate(offset) {
-                            const today = new Date();
-                            const d = today.getDay(); // 0=Sun
-                            const diff = d === 0 ? -6 : (1 - d); // to Monday
-                            const mon = new Date(today);
-                            mon.setDate(today.getDate() + diff + offset * 7);
-                            mon.setHours(0, 0, 0, 0);
-                            return mon;
+                        function el(tag, cls, text) {
+                            const n = document.createElement(tag);
+                            if (cls) n.className = cls;
+                            if (text != null) n.textContent = text;
+                            return n;
                         }
 
-                        function getWeekDates(offset) {
-                            const mon = getMondayDate(offset);
-                            return Array.from({
-                                length: 5
-                            }, (_, i) => {
-                                const d = new Date(mon);
-                                d.setDate(mon.getDate() + i);
-                                return d;
+                        function pad2(n) {
+                            return String(n).padStart(2, '0');
+                        }
+
+                        /* Dates are plain 'YYYY-MM-DD' strings handled in UTC, so the browser's own
+                           time zone can never shift a day. "Today" is always Manila time. */
+                        function isoToMs(iso) {
+                            const p = iso.split('-').map(Number);
+                            return Date.UTC(p[0], p[1] - 1, p[2]);
+                        }
+
+                        function msToISO(ms) {
+                            const d = new Date(ms);
+                            return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+                        }
+
+                        function addDays(iso, n) {
+                            return msToISO(isoToMs(iso) + n * 86400000);
+                        }
+
+                        function mondayOf(iso) {
+                            const dow = new Date(isoToMs(iso)).getUTCDay(); // 0 = Sun
+                            return addDays(iso, dow === 0 ? -6 : 1 - dow);
+                        }
+
+                        function weekOffsetOf(iso, todayISO) {
+                            return Math.round((isoToMs(mondayOf(iso)) - isoToMs(mondayOf(todayISO))) / (7 * 86400000));
+                        }
+
+                        function manilaNow() {
+                            try {
+                                const parts = new Intl.DateTimeFormat('en-CA', {
+                                    timeZone: 'Asia/Manila',
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hourCycle: 'h23'
+                                }).formatToParts(new Date());
+                                const g = t => (parts.find(p => p.type === t) || {}).value;
+                                return {
+                                    iso: g('year') + '-' + g('month') + '-' + g('day'),
+                                    min: (+g('hour')) * 60 + (+g('minute'))
+                                };
+                            } catch (e) {
+                                const d = new Date();
+                                return {
+                                    iso: d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()),
+                                    min: d.getHours() * 60 + d.getMinutes()
+                                };
+                            }
+                        }
+
+                        /* "09:30 AM", "09:30" or "09:30:00" → minutes since midnight */
+                        function parseMin(v) {
+                            const m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                            if (!m) return null;
+                            let h = +m[1];
+                            const mi = +m[2];
+                            const ap = (m[3] || '').toUpperCase();
+                            if (ap === 'PM' && h !== 12) h += 12;
+                            if (ap === 'AM' && h === 12) h = 0;
+                            return h * 60 + mi;
+                        }
+
+                        function hm12(min) {
+                            const h = Math.floor(min / 60) % 24;
+                            return (h % 12 || 12) + ':' + pad2(min % 60);
+                        }
+
+                        function period(min) {
+                            return Math.floor(min / 60) % 24 >= 12 ? 'PM' : 'AM';
+                        }
+
+                        function fmtRange(s, e) {
+                            if (period(s) === period(e)) return hm12(s) + '–' + hm12(e) + ' ' + period(e);
+                            return hm12(s) + ' ' + period(s) + '–' + hm12(e) + ' ' + period(e);
+                        }
+
+                        function hourLabel(min) {
+                            const h = Math.floor(min / 60) % 24;
+                            return (h % 12 || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
+                        }
+
+                        function monthDay(iso) {
+                            return MONTHS[+iso.slice(5, 7) - 1] + ' ' + (+iso.slice(8, 10));
+                        }
+
+                        function makeRow(id, date, s, e, faculty, purpose, asType, by) {
+                            if (!date || s == null || e == null || e <= s) return null;
+                            return {
+                                id: id,
+                                date: date,
+                                s: s,
+                                e: e,
+                                faculty: faculty || '',
+                                purpose: purpose || '',
+                                asType: asType || '',
+                                by: by || ''
+                            };
+                        }
+
+                        /* Rows embedded in the page when it loaded (instant first paint) */
+                        function embeddedRows() {
+                            return PS_RSVP
+                                .filter(r => (_roomId && r.room_id != null) ? (r.room_id === _roomId) : (r.room_name === _roomName))
+                                .map(r => makeRow(r.id, r.date, parseMin(r.start_fmt), parseMin(r.end_fmt),
+                                    r.faculty, r.purpose, r.submitted_as, r.submitted_by))
+                                .filter(Boolean);
+                        }
+
+                        /* Rows from the live endpoint (every approved reservation, all weeks) */
+                        function apiRows(list) {
+                            return list
+                                .map(r => makeRow(r.id, r.date, parseMin(r.start), parseMin(r.end),
+                                    r.faculty, r.purpose, r.submitted_as, r.submitted_by))
+                                .filter(Boolean);
+                        }
+
+                        /* How far the week arrows may go: back to the earliest reservation, forward to
+                           the latest one (always allowing at least next week). The system sets no
+                           upper limit on how far ahead a room can be reserved, so the schedule follows
+                           the actual bookings instead of a fixed number of weeks. */
+                        function weekBounds(todayISO) {
+                            let lo = 0,
+                                hi = 1;
+                            _rows.forEach(r => {
+                                const o = weekOffsetOf(r.date, todayISO);
+                                if (o < lo) lo = o;
+                                if (o > hi) hi = o;
                             });
+                            return {
+                                lo: lo,
+                                hi: hi
+                            };
                         }
 
-                        function toISO(d) {
-                            const y = d.getFullYear();
-                            const m = String(d.getMonth() + 1).padStart(2, '0');
-                            const day = String(d.getDate()).padStart(2, '0');
-                            return `${y}-${m}-${day}`;
+                        /* Place overlapping reservations side by side instead of on top of each other */
+                        function layoutLanes(rows) {
+                            let cluster = [],
+                                clusterEnd = -1;
+
+                            function flush() {
+                                if (!cluster.length) return;
+                                const laneEnds = [];
+                                cluster.forEach(r => {
+                                    let l = laneEnds.findIndex(end => end <= r.s);
+                                    if (l === -1) {
+                                        l = laneEnds.length;
+                                        laneEnds.push(r.e);
+                                    } else {
+                                        laneEnds[l] = r.e;
+                                    }
+                                    r._lane = l;
+                                });
+                                cluster.forEach(r => {
+                                    r._lanes = laneEnds.length;
+                                });
+                                cluster = [];
+                            }
+                            rows.forEach(r => {
+                                if (cluster.length && r.s >= clusterEnd) flush();
+                                clusterEnd = cluster.length ? Math.max(clusterEnd, r.e) : r.e;
+                                cluster.push(r);
+                            });
+                            flush();
                         }
 
-                        function weekLabel(offset) {
-                            const dates = getWeekDates(offset);
-                            const s = dates[0],
-                                e = dates[4];
-                            if (s.getMonth() === e.getMonth())
-                                return `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`;
-                            return `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+                        function whoLabel(r) {
+                            return (r.asType === 'student' && r.by) ? (r.by + ' (via ' + r.faculty + ')') : r.faculty;
+                        }
+
+                        function buildBlock(r, axisStart, now) {
+                            const top = (r.s - axisStart) / 60 * HOUR_PX;
+                            const h = Math.max((r.e - r.s) / 60 * HOUR_PX, 22);
+                            const title = r.purpose || r.faculty || 'Reserved';
+                            const who = whoLabel(r);
+
+                            const b = el('div', 'rsm-block');
+                            b.tabIndex = 0;
+                            b.style.top = (top + 1) + 'px';
+                            b.style.height = (h - 2) + 'px';
+                            b.style.minHeight = (h - 2) + 'px';
+                            const lanes = r._lanes || 1,
+                                lane = r._lane || 0;
+                            b.style.left = 'calc(' + (lane * 100 / lanes) + '% + 2px)';
+                            b.style.width = 'calc(' + (100 / lanes) + '% - 4px)';
+                            if (h < 34) b.classList.add('rsm-block--xs');
+                            else if (h < 52) b.classList.add('rsm-block--sm');
+                            if (r.date < now.iso || (r.date === now.iso && r.e <= now.min)) b.classList.add('is-past');
+
+                            b.appendChild(el('span', 'rsm-block-time', fmtRange(r.s, r.e)));
+                            b.appendChild(el('span', 'rsm-block-title', title));
+                            if (r.purpose && who) b.appendChild(el('span', 'rsm-block-sub', who));
+
+                            b.title = [fmtRange(r.s, r.e), r.purpose, who].filter(Boolean).join('\n');
+                            return b;
+                        }
+
+                        function weekRangeLabel(first, last) {
+                            const sy = first.slice(0, 4),
+                                ey = last.slice(0, 4);
+                            if (first.slice(0, 7) === last.slice(0, 7))
+                                return monthDay(first) + '–' + (+last.slice(8, 10)) + ', ' + ey;
+                            if (sy === ey) return monthDay(first) + ' – ' + monthDay(last) + ', ' + ey;
+                            return monthDay(first) + ', ' + sy + ' – ' + monthDay(last) + ', ' + ey;
+                        }
+
+                        function relativeWeek(off) {
+                            if (off === 0) return 'This week';
+                            if (off === 1) return 'Next week';
+                            if (off === -1) return 'Last week';
+                            return off > 0 ? 'In ' + off + ' weeks' : Math.abs(off) + ' weeks ago';
+                        }
+
+                        function todayColumn(now) {
+                            const dow = new Date(isoToMs(now.iso)).getUTCDay(); // 0 = Sun
+                            return dow >= 1 && dow <= 6 ? dow : 1; // Sunday is closed → Monday
+                        }
+
+                        function applyMobileDay(dayCount) {
+                            if (_mobDay > dayCount) _mobDay = dayCount;
+                            if (_mobDay < 1) _mobDay = 1;
+                            const grid = $('rsm-grid');
+                            if (grid) {
+                                grid.querySelectorAll('[data-day]').forEach(n => {
+                                    n.classList.toggle('is-mobile-active', +n.dataset.day === _mobDay);
+                                });
+                            }
+                            document.querySelectorAll('#rsm-daytabs .rsm-daytab-btn').forEach(b => {
+                                const on = +b.dataset.day === _mobDay;
+                                b.classList.toggle('active', on);
+                                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                            });
                         }
 
                         /* — Render the weekly grid — */
-                        function renderGrid() {
-                            const dates = getWeekDates(_weekOff);
-                            const dateISOs = dates.map(toISO);
+                        function renderGrid(opts) {
+                            opts = opts || {};
+                            const head = $('rsm-grid-head'),
+                                body = $('rsm-grid-body'),
+                                grid = $('rsm-grid');
+                            if (!head || !body || !grid) return;
 
-                            // Update week label
-                            const lbl = document.getElementById('rsm-week-lbl');
-                            if (lbl) lbl.textContent = weekLabel(_weekOff);
+                            const now = manilaNow();
+                            const bounds = weekBounds(now.iso);
+                            if (_weekOff < bounds.lo) _weekOff = bounds.lo;
+                            if (_weekOff > bounds.hi) _weekOff = bounds.hi;
 
-                            // Filter reservations for this room & week
-                            const rsvps = PS_RSVP.filter(r => {
-                                const sameRoom = _roomId ?
-                                    (r.room_id === _roomId) :
-                                    (r.room_name === _roomName);
-                                return sameRoom && dateISOs.includes(r.date);
-                            });
+                            const monday = addDays(mondayOf(now.iso), _weekOff * 7);
+                            const sunday = addDays(monday, 6);
+                            const wk = _rows.filter(r => r.date >= monday && r.date <= sunday);
 
-                            // Build lookup: dateISO → [ reservations ]
-                            const lookup = {};
-                            rsvps.forEach(r => {
-                                if (!lookup[r.date]) lookup[r.date] = [];
-                                lookup[r.date].push(r);
-                            });
-
-                            // Build rows
-                            const gridBody = document.getElementById('rsm-grid-body');
-                            if (!gridBody) return;
-                            gridBody.innerHTML = '';
-
-                            SLOTS.forEach(slot => {
-                                const row = document.createElement('div');
-                                row.className = 'rsm-grid-row';
-
-                                // Time label cell
-                                const tc = document.createElement('div');
-                                tc.className = 'rsm-grid-time';
-                                tc.textContent = slot.label;
-                                row.appendChild(tc);
-
-                                // Day cells
-                                dates.forEach((date, di) => {
-                                    const cell = document.createElement('div');
-                                    cell.className = 'rsm-grid-cell';
-
-                                    const dayRsvps = lookup[dateISOs[di]] || [];
-                                    const hit = dayRsvps.find(r => {
-                                        const sh = parseHour(r.start_fmt);
-                                        const eh = parseHour(r.end_fmt);
-                                        return slot.h >= sh && slot.h < eh;
-                                    });
-
-                                    if (hit) {
-                                        const blk = document.createElement('span');
-                                        blk.className = 'rsm-block';
-                                        const txt = (hit.label || hit.faculty || 'Reserved').substring(0, 20);
-                                        blk.textContent = txt;
-                                        blk.title = `${hit.faculty} — ${hit.label || ''}`.replace(/^—\s*/, '');
-                                        cell.appendChild(blk);
-                                    }
-                                    row.appendChild(cell);
+                            /* Mon–Sat always; Sunday only if a reservation somehow sits on it */
+                            const dayCount = wk.some(r => r.date === sunday) ? 7 : 6;
+                            const days = [];
+                            for (let i = 0; i < dayCount; i++) {
+                                const iso = addDays(monday, i);
+                                days.push({
+                                    idx: i + 1,
+                                    iso: iso,
+                                    name: DAY_NAMES[i],
+                                    num: +iso.slice(8, 10)
                                 });
+                            }
 
-                                gridBody.appendChild(row);
+                            /* Time axis */
+                            let a0 = AXIS_START,
+                                a1 = AXIS_END;
+                            wk.forEach(r => {
+                                a0 = Math.min(a0, Math.floor(r.s / 60) * 60);
+                                a1 = Math.max(a1, Math.ceil(r.e / 60) * 60);
                             });
+                            a1 = Math.min(a1, 24 * 60);
+                            const totalPx = (a1 - a0) / 60 * HOUR_PX;
+
+                            grid.style.setProperty('--rsm-days', String(dayCount));
+                            grid.style.setProperty('--rsm-hour', HOUR_PX + 'px');
+                            body.style.setProperty('--rsm-total', totalPx + 'px');
+
+                            /* Header row */
+                            head.textContent = '';
+                            head.appendChild(el('div', 'rsm-grid-th rsm-grid-th--time', ''));
+                            days.forEach(d => {
+                                const th = el('div', 'rsm-grid-th');
+                                th.dataset.day = d.idx;
+                                if (d.iso === now.iso) th.classList.add('is-today');
+                                th.appendChild(el('span', 'rsm-th-name', d.name));
+                                th.appendChild(el('span', 'rsm-th-num', String(d.num)));
+                                head.appendChild(th);
+                            });
+
+                            /* Body: hour labels + one column per day */
+                            body.textContent = '';
+                            const tcol = el('div', 'rsm-time-col');
+                            for (let m = a0; m < a1; m += 60) {
+                                const lbl = el('div', 'rsm-hour-lbl', hourLabel(m));
+                                lbl.style.top = ((m - a0) / 60 * HOUR_PX) + 'px';
+                                tcol.appendChild(lbl);
+                            }
+                            body.appendChild(tcol);
+
+                            days.forEach(d => {
+                                const col = el('div', 'rsm-day-col');
+                                col.dataset.day = d.idx;
+                                if (d.iso === now.iso) col.classList.add('is-today');
+                                const dayRows = wk.filter(r => r.date === d.iso)
+                                    .sort((x, y) => (x.s - y.s) || (x.e - y.e));
+                                layoutLanes(dayRows);
+                                dayRows.forEach(r => col.appendChild(buildBlock(r, a0, now)));
+                                if (d.iso === now.iso && now.min >= a0 && now.min <= a1) {
+                                    const nl = el('div', 'rsm-now');
+                                    nl.style.top = ((now.min - a0) / 60 * HOUR_PX) + 'px';
+                                    col.appendChild(nl);
+                                }
+                                body.appendChild(col);
+                            });
+
+                            if (!wk.length) {
+                                const empty = el('div', 'rsm-empty');
+                                empty.appendChild(el('span', '', 'No reservations this week'));
+                                body.appendChild(empty);
+                            }
+
+                            /* Week label, counter and arrows */
+                            const lbl = $('rsm-week-lbl');
+                            if (lbl) lbl.textContent = weekRangeLabel(days[0].iso, days[days.length - 1].iso);
+                            const sub = $('rsm-week-sub');
+                            if (sub) {
+                                sub.textContent = relativeWeek(_weekOff) + ' · ' +
+                                    (wk.length ? wk.length + (wk.length === 1 ? ' reservation' : ' reservations') : 'none reserved');
+                            }
+                            const prev = $('rsm-prev'),
+                                next = $('rsm-next');
+                            if (prev) prev.disabled = _weekOff <= bounds.lo;
+                            if (next) next.disabled = _weekOff >= bounds.hi;
+
+                            /* Day tabs for the phone layout (one day at a time) */
+                            const tabs = $('rsm-daytabs');
+                            if (tabs) {
+                                tabs.textContent = '';
+                                days.forEach(d => {
+                                    const b = el('button', 'rsm-daytab-btn');
+                                    b.type = 'button';
+                                    b.dataset.day = d.idx;
+                                    b.appendChild(el('span', '', d.name + ' ' + d.num));
+                                    const n = wk.filter(r => r.date === d.iso).length;
+                                    if (n) b.appendChild(el('span', 'rsm-daytab-count', String(n)));
+                                    tabs.appendChild(b);
+                                });
+                            }
+                            applyMobileDay(dayCount);
+
+                            /* Bring the first reservation of the week into view */
+                            if (opts.scroll) {
+                                const sc = $('rsm-body');
+                                if (sc) {
+                                    sc.scrollTop = wk.length ?
+                                        Math.max(0, (Math.min.apply(null, wk.map(r => r.s)) - a0) / 60 * HOUR_PX - HOUR_PX / 2) :
+                                        0;
+                                }
+                            }
+                            _lastSig = signature(now);
+                        }
+
+                        function signature(now) {
+                            return JSON.stringify(_rows) + '|' + _weekOff + '|' + now.iso + '|' + Math.floor(now.min / 5);
+                        }
+
+                        /* — Pull the latest reservations from the server — */
+                        function setSyncNote(show) {
+                            const n = $('rsm-sync-note');
+                            if (n) n.classList.toggle('hidden', !show);
+                        }
+
+                        function fetchFresh() {
+                            if (!_roomId) return;
+                            const token = ++_reqToken;
+                            const rid = _roomId;
+                            fetch('room-reservation/api/admin-room-schedule.php?room_id=' + encodeURIComponent(rid), {
+                                    credentials: 'same-origin',
+                                    cache: 'no-store',
+                                    headers: {
+                                        'Accept': 'application/json'
+                                    }
+                                })
+                                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                                .then(j => {
+                                    if (token !== _reqToken || rid !== _roomId) return; // closed or switched room
+                                    if (!j || !Array.isArray(j.reservations)) throw new Error('Bad response');
+                                    _rows = apiRows(j.reservations);
+                                    setSyncNote(false);
+                                    if (signature(manilaNow()) !== _lastSig) renderGrid();
+                                })
+                                .catch(err => {
+                                    if (token !== _reqToken) return;
+                                    console.warn('Room schedule refresh failed:', err);
+                                    setSyncNote(true);
+                                });
+                        }
+
+                        function stopRefresh() {
+                            _reqToken++;
+                            if (_timer) {
+                                clearInterval(_timer);
+                                _timer = null;
+                            }
+                        }
+
+                        function startRefresh() {
+                            stopRefresh();
+                            _timer = setInterval(fetchFresh, REFRESH_MS);
                         }
 
                         /* — Public API — */
@@ -2809,32 +3098,66 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             _roomId = parseInt(card.dataset.roomId) || null;
                             _roomName = card.dataset.roomName || '';
                             _weekOff = 0;
-                            const title = document.getElementById('rsm-title');
+                            _mobDay = todayColumn(manilaNow());
+                            _rows = embeddedRows();
+                            const title = $('rsm-title');
                             if (title) title.textContent = 'Room Schedule – ' + _roomName;
-                            const meta = document.getElementById('rsm-meta');
+                            const meta = $('rsm-meta');
                             if (meta) {
                                 const campus = card.dataset.roomCampus || '';
                                 const floor = card.dataset.roomFloor || '';
                                 meta.textContent = [campus, floor].filter(Boolean).join(' – ');
                             }
-                            const modal = document.getElementById('roomScheduleModal');
+                            setSyncNote(false);
+                            const modal = $('roomScheduleModal');
                             if (modal) modal.classList.remove('hidden');
                             try {
-                                renderGrid();
+                                renderGrid({
+                                    scroll: true
+                                });
                             } catch (e) {
                                 console.warn('renderGrid error:', e);
                             }
+                            startRefresh();
+                            fetchFresh(); // swap in the latest data as soon as it arrives
                         };
 
                         window.psCloseSchedule = function() {
-                            const modal = document.getElementById('roomScheduleModal');
+                            const modal = $('roomScheduleModal');
                             if (modal) modal.classList.add('hidden');
+                            stopRefresh();
                         };
 
                         window.psScheduleNav = function(dir) {
                             _weekOff += dir;
-                            renderGrid();
+                            renderGrid({
+                                scroll: true
+                            });
                         };
+
+                        document.addEventListener('click', function(e) {
+                            const modal = $('roomScheduleModal');
+                            if (!modal || modal.classList.contains('hidden')) return;
+                            if (e.target.closest('[data-action="room-schedule-today"]')) {
+                                _weekOff = 0;
+                                _mobDay = todayColumn(manilaNow());
+                                renderGrid({
+                                    scroll: true
+                                });
+                                return;
+                            }
+                            const tab = e.target.closest('.rsm-daytab-btn');
+                            if (tab) {
+                                _mobDay = +tab.dataset.day || 1;
+                                applyMobileDay(document.querySelectorAll('#rsm-daytabs .rsm-daytab-btn').length);
+                            }
+                        });
+
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key !== 'Escape') return;
+                            const modal = $('roomScheduleModal');
+                            if (modal && !modal.classList.contains('hidden')) window.psCloseSchedule();
+                        });
 
                         /* ── Whole tile opens the schedule ──────────────────────────
                            The tile itself is the "view schedule" control. Clicks inside
@@ -5873,7 +6196,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <!-- ══════════════════════════════════════════════════════
          ROOM SCHEDULE MODAL
          ══════════════════════════════════════════════════════ -->
-    <div id="roomScheduleModal" class="hidden">
+    <div id="roomScheduleModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rsm-title">
         <div class="rsm-card">
             <div class="rsm-head">
                 <div class="rsm-head-icon">
@@ -5887,37 +6210,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="rsm-info-row">
                 <span class="rsm-room-meta" id="rsm-meta"></span>
                 <div class="rsm-week-ctrl">
-                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="-1" title="Previous week">
+                    <button type="button" class="rsm-today-btn" data-action="room-schedule-today">Today</button>
+                    <button class="rsm-week-nav-btn" id="rsm-prev" data-action="room-schedule-nav" data-dir="-1" title="Previous week" aria-label="Previous week">
                         <span class="material-symbols-outlined">chevron_left</span>
                     </button>
-                    <span class="rsm-week-lbl" id="rsm-week-lbl"></span>
-                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="1" title="Next week">
+                    <span class="rsm-week-lbl" aria-live="polite">
+                        <b id="rsm-week-lbl"></b>
+                        <small id="rsm-week-sub"></small>
+                    </span>
+                    <button class="rsm-week-nav-btn" id="rsm-next" data-action="room-schedule-nav" data-dir="1" title="Next week" aria-label="Next week">
                         <span class="material-symbols-outlined">chevron_right</span>
                     </button>
                 </div>
             </div>
-            <div class="rsm-body">
-                <div class="rsm-grid">
-                    <div class="rsm-grid-head">
-                        <div class="rsm-grid-th">TIME</div>
-                        <div class="rsm-grid-th">MON</div>
-                        <div class="rsm-grid-th">TUE</div>
-                        <div class="rsm-grid-th">WED</div>
-                        <div class="rsm-grid-th">THU</div>
-                        <div class="rsm-grid-th">FRI</div>
-                    </div>
-                    <div id="rsm-grid-body"></div>
-                </div>
-            </div>
-            <div class="rsm-legend">
-                <div class="rsm-legend-item">
-                    <div class="rsm-legend-dot reserved"></div> Reserved
-                </div>
-                <div class="rsm-legend-item">
-                    <div class="rsm-legend-dot avail"></div> Available
+            <div class="rsm-mobile-daytabs" id="rsm-daytabs" role="group" aria-label="Day of the week"></div>
+            <div class="rsm-sync-note hidden" id="rsm-sync-note">Couldn't refresh just now — showing the reservations loaded with this page. Reopen the schedule or reload to retry.</div>
+            <div class="rsm-body" id="rsm-body">
+                <div class="rsm-grid" id="rsm-grid">
+                    <div class="rsm-grid-head" id="rsm-grid-head"></div>
+                    <div class="rsm-grid-body" id="rsm-grid-body"></div>
                 </div>
             </div>
             <div class="rsm-foot">
+                <div class="rsm-legend">
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot reserved"></div> Reserved
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot past"></div> Already finished
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot avail"></div> Available
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-line"></div> Now
+                    </div>
+                </div>
                 <button type="button" class="btn-cancel-acc" data-action="close-room-schedule">Close</button>
             </div>
         </div><!-- /.rsm-card -->

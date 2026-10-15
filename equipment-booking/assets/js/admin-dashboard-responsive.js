@@ -8,15 +8,13 @@
      A. Table -> card labels. Copies each column's header text onto
         every <td> as data-label, and tags the title / thumbnail /
         actions cells (see CSS §3).
-     B. Room Schedule day tabs. Injects a Mon-Fri tab strip into the
-        existing schedule modal and sets data-mobile-day on the grid
-        so the CSS shows one day at a time (see CSS §4).
+     B. (Room Schedule day tabs moved into the schedule module itself,
+        in admin-dashboard.php, so they follow the days it renders —
+        Mon-Sat. See CSS §4.)
 
-   Loaded with `defer`, so the whole page (including the inline
-   Room Schedule module and its modal markup) is already parsed when
-   this runs. Nothing in admin-dashboard.js, admin-live-render.js or
-   the inline modules is modified — this file only observes the DOM
-   and wraps window.psOpenSchedule.
+   Loaded with `defer`, so the whole page is already parsed when this
+   runs. Nothing in admin-dashboard.js, admin-live-render.js or the
+   inline modules is modified — this file only observes the DOM.
 ================================================================ */
 (function () {
     'use strict';
@@ -88,68 +86,11 @@
 
 
     /* ------------------------------------------------------------
-       B. ROOM SCHEDULE — day tabs for the mobile agenda view
+       B. ROOM SCHEDULE — day tabs
+       Handled by the schedule module in admin-dashboard.php (it builds
+       #rsm-daytabs and marks the selected day with .is-mobile-active).
+       Nothing to do here any more.
     ------------------------------------------------------------ */
-    var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-
-    function grid() {
-        return document.querySelector('#roomScheduleModal .rsm-grid');
-    }
-
-    function setMobileDay(n) {
-        var g = grid();
-        if (!g) return;
-        g.setAttribute('data-mobile-day', String(n));
-        Array.prototype.forEach.call(document.querySelectorAll('.rsm-daytab-btn'), function (b) {
-            var on = b.getAttribute('data-day') === String(n);
-            b.classList.toggle('active', on);
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
-        });
-    }
-
-    function buildDayTabs() {
-        var infoRow = document.querySelector('#roomScheduleModal .rsm-info-row');
-        if (!infoRow || !grid() || document.querySelector('.rsm-mobile-daytabs')) return;
-
-        var wrap = document.createElement('div');
-        wrap.className = 'rsm-mobile-daytabs';
-        wrap.setAttribute('role', 'group');
-        wrap.setAttribute('aria-label', 'Day of the week');
-
-        DAYS.forEach(function (name, i) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'rsm-daytab-btn';
-            b.textContent = name;
-            b.setAttribute('data-day', String(i + 1));
-            b.addEventListener('click', function () { setMobileDay(i + 1); });
-            wrap.appendChild(b);
-        });
-        infoRow.insertAdjacentElement('afterend', wrap);
-    }
-
-    // Open on today's weekday (weekends -> Monday, the first column).
-    function todayColumn() {
-        var d = new Date().getDay();            // 0 = Sun … 6 = Sat
-        return d >= 1 && d <= 5 ? d : 1;
-    }
-
-    buildDayTabs();
-    setMobileDay(1);
-
-    // Wrap the existing opener so each open resets to today. The click
-    // handler looks window.psOpenSchedule up at call time, so replacing
-    // it here is picked up without touching the inline module.
-    if (typeof window.psOpenSchedule === 'function' && !window.psOpenSchedule._rsWrapped) {
-        var original = window.psOpenSchedule;
-        var wrapped = function () {
-            var result = original.apply(this, arguments);
-            setMobileDay(todayColumn());
-            return result;
-        };
-        wrapped._rsWrapped = true;
-        window.psOpenSchedule = wrapped;
-    }
 
     /* ------------------------------------------------------------
        C. SETTINGS — size class from the panel's own width

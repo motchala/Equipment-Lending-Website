@@ -854,7 +854,7 @@ $rooms_archived = ps_load_archived_rooms($conn);
 
 // ── All room reservations (admin read-only view) ──────────────────────────
 $admin_room_reservations_result = $conn->query(
-    "SELECT rr.id, rr.reservation_date,
+    "SELECT rr.id, rr.room_id, rr.reservation_date,
             TIME_FORMAT(rr.start_time, '%h:%i %p') AS start_fmt,
             TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,
             rr.faculty_name, rr.submitted_as, rr.submitted_by_name,
