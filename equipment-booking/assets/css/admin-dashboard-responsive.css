@@ -364,42 +364,21 @@ table {
         flex: 1 1 auto;
         justify-content: center;
     }
-
-    /* admin-dashboard.css hides the Rooms Registry's Capacity column
-       at <=640px (display:none on td/th:nth-child(2), plus
-       visibility:collapse on .pr-col-capacity) because a 4-column
-       table was too tight. That pre-dates the card view: a card has
-       room for the row, so show it again. The selectors below
-       deliberately repeat the originals' "tbody" so they carry the
-       same specificity and win by source order. */
-    #panel-rooms .pr-rooms-table .pr-col-capacity {
-        visibility: visible;
-    }
-
-    #panel-rooms .pr-rooms-table tbody td:nth-child(2) {
-        display: flex;
-    }
-
-    #panel-rooms .pr-rooms-table tbody tr.pr-floor-divider td:nth-child(2) {
-        display: none;
-    }
 }
 
 
 /* ================================================================
    § 4  ROOM SCHEDULE — weekly timeline -> single-day agenda (< 768px)
    ----------------------------------------------------------------
-   The desktop grid (admin-dashboard.php, inline "PUPSync Room
-   Schedule module") is a CSS Grid: 6 equal-order children per row
-   — TIME, MON, TUE, WED, THU, FRI — repeated for .rsm-grid-head
-   and every .rsm-grid-row. admin-dashboard-responsive.js adds a
-   day-tab strip and sets data-mobile-day="1..5" on .rsm-grid; the
-   rules below hide every day column except the selected one. With
-   only two children left (TIME + the one selected day), the same
-   6-column grid definition below is overridden to a 2-column one,
-   so what remains reads as a plain vertical time-ordered agenda —
-   no change to the render logic that builds the grid, no new
-   markup structure, just fewer (CSS-hidden) columns.
+   The desktop schedule (admin-dashboard.php, inline "PUPSync Room
+   Schedule module") is a time-axis grid: a TIME column plus one
+   column per day (Mon–Sat; Sun only if something is booked on it).
+   The module renders the day-tab strip (#rsm-daytabs) itself and
+   marks the selected day's header + column with .is-mobile-active.
+   On phones every day column without that class is hidden, which
+   leaves TIME + one day: a plain vertical agenda. Columns carry a
+   data-day attribute, so any number of days works with no
+   positional (nth-child) rules.
 ================================================================ */
 @media (max-width: 768px) {
     .rsm-card {
@@ -411,6 +390,17 @@ table {
 
     #roomScheduleModal {
         padding: 0;
+    }
+
+    .rsm-week-ctrl {
+        width: 100%;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .rsm-week-lbl {
+        min-width: 0;
+        flex: 1;
     }
 
     .rsm-mobile-daytabs {
@@ -428,17 +418,20 @@ table {
     }
 
     .rsm-daytab-btn {
-        flex: 1 0 auto;
-        min-width: 44px;
-        padding: 7px 12px;
+        position: relative;
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 7px 2px;
         border-radius: 8px;
         border: 1px solid var(--khaki-border);
         background: var(--card-bg);
         color: var(--text-dark);
-        font-size: 11.5px;
+        font-size: 11px;
         font-weight: 700;
+        text-align: center;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.2px;
+        white-space: nowrap;
         cursor: pointer;
         transition: all 0.15s;
     }
@@ -449,104 +442,64 @@ table {
         color: #fff;
     }
 
+    /* Number of reservations on that day (small badge on the tab's corner) */
+    .rsm-daytab-count {
+        position: absolute;
+        top: -7px;
+        right: -4px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        box-sizing: border-box;
+        border-radius: 8px;
+        background: var(--accent-maroon);
+        color: #fff;
+        font-size: 10px;
+        line-height: 16px;
+        text-align: center;
+        letter-spacing: 0;
+    }
+
+    .rsm-daytab-btn.active .rsm-daytab-count {
+        background: #fff;
+        color: var(--accent-maroon);
+        box-shadow: 0 0 0 1px var(--accent-maroon);
+    }
+
+    .rsm-body {
+        padding: 0 0.75rem 0.75rem;
+    }
+
     .rsm-grid {
+        --rsm-time-w: 50px;
         min-width: 0;
         border-radius: 8px;
         font-size: 12.5px;
     }
 
     .rsm-grid-head,
-    .rsm-grid-row {
-        grid-template-columns: 80px 1fr;
+    .rsm-grid-body {
+        grid-template-columns: var(--rsm-time-w) 1fr;
     }
 
-    /* "11 AM-12 PM" needs ~75px at this size; the desktop column is 74px
-       with roomier padding, which clipped it once the grid got narrower. */
-    .rsm-grid-time {
-        padding: 0 3px;
-        font-size: 11px;
-        text-align: center;
-        white-space: nowrap;
+    /* Only the selected day is shown */
+    .rsm-grid [data-day]:not(.is-mobile-active) {
+        display: none;
     }
 
-    .rsm-grid-cell {
-        min-height: 40px;
-        padding: 4px 6px;
-    }
-
+    /* One wide column: let the text wrap instead of truncating */
     .rsm-block {
-        font-size: 11px;
+        font-size: 12px;
         padding: 5px 8px;
+    }
+
+    .rsm-block-title,
+    .rsm-block-sub {
         white-space: normal;
     }
 
-    /* Hide every day column except the one selected via the day
-       tabs above. Position 1 (TIME) always stays; MON..FRI sit at
-       positions 2..6 in DOM order in both .rsm-grid-head and every
-       .rsm-grid-row, so this is the same 4-of-5 hidden set either
-       way. A .rsm-grid with no data-mobile-day yet (JS hasn't run)
-       falls back to showing Monday, matching the default markup. */
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(3),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(4),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(5),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-head>:nth-child(6),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(3),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(4),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(5),
-    .rsm-grid:not([data-mobile-day]) .rsm-grid-row>:nth-child(6),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(3),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(4),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(5),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-head>:nth-child(6),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(3),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(4),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(5),
-    .rsm-grid[data-mobile-day="1"] .rsm-grid-row>:nth-child(6) {
-        display: none;
-    }
-
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(2),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(4),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(5),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-head>:nth-child(6),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(2),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(4),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(5),
-    .rsm-grid[data-mobile-day="2"] .rsm-grid-row>:nth-child(6) {
-        display: none;
-    }
-
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(2),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(3),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(5),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-head>:nth-child(6),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(2),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(3),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(5),
-    .rsm-grid[data-mobile-day="3"] .rsm-grid-row>:nth-child(6) {
-        display: none;
-    }
-
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(2),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(3),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(4),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-head>:nth-child(6),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(2),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(3),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(4),
-    .rsm-grid[data-mobile-day="4"] .rsm-grid-row>:nth-child(6) {
-        display: none;
-    }
-
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(2),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(3),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(4),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-head>:nth-child(5),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(2),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(3),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(4),
-    .rsm-grid[data-mobile-day="5"] .rsm-grid-row>:nth-child(5) {
-        display: none;
+    .rsm-block-time {
+        font-size: 11px;
     }
 }
 
@@ -598,6 +551,7 @@ table {
     .sidebar-toggle-btn,
     .ps-btn--sm,
     .qr-scan-btn,
+    .rsm-today-btn,
     .rsm-daytab-btn {
         min-height: 44px;
     }

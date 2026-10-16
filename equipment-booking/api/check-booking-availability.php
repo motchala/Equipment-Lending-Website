@@ -1,4 +1,5 @@
 <?php
+
 /**
  * equipment-booking/api/check-booking-availability.php
  *
@@ -11,6 +12,8 @@
  *   time      HH:MM        start time
  *   duration  hours (today) or days (future)
  *   items     JSON [{"n":"Projector","q":2}, ...]
+ *   rooms     1 = also report which rooms are reserved by someone else (blocked) and which
+ *             are reserved by this faculty member (suggested) during that window
  */
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -69,8 +72,16 @@ foreach ($items as $it) {
     }
     $shelf = BookingSchedule::shelfQuantity($conn, $name);
     $total = BookingSchedule::totalStock($conn, $name);
-    $row   = ['name' => $name, 'qty' => $qty, 'total' => $total, 'shelf' => $shelf, 'free' => 0,
-              'ok' => false, 'message' => '', 'earliest' => null];
+    $row   = [
+        'name' => $name,
+        'qty' => $qty,
+        'total' => $total,
+        'shelf' => $shelf,
+        'free' => 0,
+        'ok' => false,
+        'message' => '',
+        'earliest' => null
+    ];
 
     if ($shelf === null) {
         $row['message'] = 'Not available for borrowing.';
@@ -94,7 +105,11 @@ foreach ($items as $it) {
                 : 'Only ' . $free . ' free for that schedule.';
             if ($mode === 'future') {
                 $next = BookingSchedule::earliestFreeDate(
-                    $conn, $name, $qty, substr($win['borrow_time'], 0, 5), $duration,
+                    $conn,
+                    $name,
+                    $qty,
+                    substr($win['borrow_time'], 0, 5),
+                    $duration,
                     date('Y-m-d', strtotime($win['borrow_date'] . ' +1 day'))
                 );
                 if ($next) {
@@ -107,6 +122,11 @@ foreach ($items as $it) {
     $results[] = $row;
 }
 
+$rooms = null;
+if (($_GET['rooms'] ?? '') === '1') {
+    $rooms = BookingSchedule::roomsByReservation($conn, $win['start_ts'], $win['end_ts'], (string)$_SESSION['faculty_id']);
+}
+
 echo json_encode([
     'ok'      => true,
     'window'  => [
@@ -114,4 +134,5 @@ echo json_encode([
         'end'   => $win['end_ts'],
     ],
     'results' => $results,
+    'rooms'   => $rooms,
 ]);

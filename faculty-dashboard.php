@@ -141,11 +141,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         // Where + when + which items. Everything is validated BEFORE anything is saved
         // (including the optional letter), so one bad item never leaves a half-filed batch.
         $instructor = $faculty_name; // auto-filled from account name
-        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
-        if (!$room_row) bm_fail('Please choose a room from the list.');
-        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
-        $room    = BookingSchedule::roomLabel($room_row);
-        $room_id = (int)$room_row['room_id'];
+        $rr = BookingSchedule::resolveRoom($conn, (string)($_POST['room_id'] ?? ''));
+        if (!$rr['ok']) bm_fail($rr['error']);
+        $room    = $rr['label'];
+        $room_id = $rr['id'];            // null = "Outside"
 
         $raw_items = $_POST['items'] ?? [];
         if (!is_array($raw_items) || empty($raw_items)) bm_fail('Please select at least one item.');
@@ -176,6 +175,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $plan[] = ['name' => $name, 'qty' => $bk['qty'], 'bk' => $bk];
         }
         if (empty($plan)) bm_fail('Please select at least one item.');
+        // Equipment cannot go to a room that another faculty has reserved for that time
+        if ($room_id !== null) {
+            $room_msg = BookingSchedule::roomConflictMessage($conn, $room_id, $plan[0]['bk']['start_ts'], $plan[0]['bk']['end_ts'], (string)$faculty_id);
+            if ($room_msg) bm_fail($room_msg);
+        }
         $borrow_date = $plan[0]['bk']['borrow_date'];
         $return_date = $plan[0]['bk']['return_date'];
 
@@ -260,6 +264,20 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $stmt_ins->execute();
             $new_request_id = $conn->insert_id;
             $stmt_ins->close();
+            // An Organization Adviser request with a supporting letter is a
+            // Super-Admin review item.  It must not be auto-decided by the
+            // arbitration engine before that review happens.
+            if ($rel_path !== null) {
+                $hold = $conn->prepare("UPDATE tbl_requests SET reason = 'Awaiting Super Admin review.' WHERE id = ? AND status = 'Waiting'");
+                if ($hold) {
+                    $hold->bind_param('i', $new_request_id);
+                    $hold->execute();
+                    $hold->close();
+                }
+                $kept_items++;
+                continue;
+            }
+
             ArbitrationEngine::process($conn, $new_request_id);
             // A declined request is never kept: drop it and report the reason on the spot.
             $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
@@ -319,11 +337,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
 
         // Where (live room record, same tables as Facilities) and when (Today / Later rules).
         // Limits follow the account's role, read from the DB, never from the form.
-        $room_row = BookingSchedule::findRoom($conn, (int)($_POST['room_id'] ?? 0));
-        if (!$room_row) bm_fail('Please choose a room from the list.');
-        if ($room_row['status'] === 'Maintenance') bm_fail('That room is under maintenance. Please choose another room.');
-        $room    = BookingSchedule::roomLabel($room_row);
-        $room_id = (int)$room_row['room_id'];
+        $rr = BookingSchedule::resolveRoom($conn, (string)($_POST['room_id'] ?? ''));
+        if (!$rr['ok']) bm_fail($rr['error']);
+        $room    = $rr['label'];
+        $room_id = $rr['id'];            // null = "Outside"
 
         $chk = BookingSchedule::parse(
             $conn,
@@ -334,6 +351,11 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         );
         if (!$chk['ok']) bm_fail($chk['error']);
         $bk = $chk['data'];
+        // Equipment cannot go to a room that another faculty has reserved for that time
+        if ($room_id !== null) {
+            $room_msg = BookingSchedule::roomConflictMessage($conn, $room_id, $bk['start_ts'], $bk['end_ts'], (string)$faculty_id);
+            if ($room_msg) bm_fail($room_msg);
+        }
         if (BookingSchedule::freeUnits($conn, $equipment_name, $bk['start_ts'], $bk['end_ts']) < $bk['qty']) {
             $next = $bk['mode'] === 'future'
                 ? BookingSchedule::earliestFreeDate(
@@ -587,8 +609,11 @@ while ($bk_res && ($bk_row = $bk_res->fetch_assoc())) {
         'total' => (int)($bk_totals[$bk_row['item_name']] ?? $bk_row['quantity']),
     ];
 }
+$bk_mine = BookingSchedule::myUpcomingReservations($conn, (string)($_SESSION['faculty_id'] ?? ''));
 $bk_meta_json = json_encode([
     'items'   => $bk_items,
+    'rooms'   => $bk_rooms,
+    'mine'    => $bk_mine,
     'adviser' => (bool)$is_org_adviser,
     'today'   => date('Y-m-d'),
     'nowMin'  => (int)date('G') * 60 + (int)date('i'),
@@ -1006,6 +1031,928 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             margin: 4px 0 0;
             font-size: 0.875rem;
             color: var(--color-secondary);
+        }
+
+        /* ── Faculty Dashboard ─────────────────────────────────────────────────────── */
+        #panel-home .fdb {
+            --fdb-line: var(--color-outline-variant);
+            --fdb-surface: var(--color-surface-lowest);
+            --fdb-ink: var(--color-on-surface);
+            --fdb-muted: var(--color-secondary);
+        }
+
+        #panel-home .fdb-tone-ok {
+            --tone: var(--color-success);
+        }
+
+        #panel-home .fdb-tone-warn {
+            --tone: var(--color-warning);
+        }
+
+        #panel-home .fdb-tone-danger {
+            --tone: var(--color-error);
+        }
+
+        #panel-home .fdb-tone-info {
+            --tone: var(--color-primary);
+        }
+
+        #panel-home .fdb-tone-muted {
+            --tone: var(--color-secondary);
+        }
+
+        /* header (bell + avatar reuse .fd-dash-top-actions) */
+        #panel-home .fdb-head {
+            margin-bottom: 20px;
+        }
+
+        #panel-home .fdb-head-tools {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 12px 16px;
+        }
+
+        #panel-home .fdb-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #panel-home .fdb-head-tools .fd-dash-top-actions {
+            padding-left: 16px;
+            border-left: 1px solid var(--fdb-line);
+        }
+
+        #panel-home .fdb-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            height: 38px;
+            padding: 0 14px;
+            border-radius: 10px;
+            border: 1px solid var(--fdb-line);
+            background: var(--fdb-surface);
+            color: var(--fdb-ink);
+            font: 600 12.5px var(--font-sans);
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+        }
+
+        #panel-home .fdb-btn .material-symbols-outlined {
+            font-size: 18px;
+            color: var(--color-primary);
+        }
+
+        #panel-home .fdb-btn:hover {
+            background: var(--color-surface-container);
+            border-color: var(--color-primary);
+            transform: translateY(-1px);
+        }
+
+        #panel-home .fdb-btn--primary {
+            background: linear-gradient(135deg, #800000 0%, #5a0000 100%);
+            border-color: transparent;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(96, 3, 2, 0.22);
+        }
+
+        #panel-home .fdb-btn--primary .material-symbols-outlined {
+            color: #f2c14e;
+        }
+
+        #panel-home .fdb-btn--primary:hover {
+            background: linear-gradient(135deg, #800000 0%, #5a0000 100%);
+            border-color: transparent;
+            box-shadow: 0 6px 16px rgba(96, 3, 2, 0.3);
+        }
+
+        #panel-home .fdb-btn:focus-visible,
+        #panel-home .fdb-kpi:focus-visible,
+        #panel-home .fdb-link:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        /* key figures: icon + number + one-word label */
+        #panel-home .fdb-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        #panel-home .fdb-kpi {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+            padding: 16px 18px 16px 22px;
+            text-align: left;
+            background: var(--fdb-surface);
+            border: 1px solid var(--fdb-line);
+            border-radius: 16px;
+            color: var(--fdb-ink);
+            cursor: pointer;
+            overflow: hidden;
+            transition: transform 0.16s, box-shadow 0.16s, border-color 0.16s;
+        }
+
+        #panel-home .fdb-kpi::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 4px;
+            background: var(--tone);
+        }
+
+        #panel-home .fdb-kpi:hover {
+            transform: translateY(-2px);
+            border-color: color-mix(in srgb, var(--tone) 55%, var(--fdb-line));
+            box-shadow: 0 8px 22px color-mix(in srgb, var(--tone) 14%, transparent);
+        }
+
+        #panel-home .fdb-kpi-icon {
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--tone) 13%, transparent);
+            color: var(--tone);
+        }
+
+        #panel-home .fdb-kpi-icon .material-symbols-outlined {
+            font-size: 22px;
+        }
+
+        #panel-home .fdb-kpi-body {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        #panel-home .fdb-kpi-val {
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+            color: var(--fdb-ink);
+        }
+
+        #panel-home .fdb-kpi-label {
+            margin-top: 2px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--fdb-muted);
+        }
+
+        /* grid + cards */
+        #panel-home .fdb-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        #panel-home .fdb-area-chart {
+            position: relative;
+            grid-column: span 8;
+        }
+
+        #panel-home .fdb-area-code {
+            grid-column: span 4;
+        }
+
+        #panel-home .fdb-area-attn,
+        #panel-home .fdb-area-third {
+            grid-column: span 4;
+        }
+
+        #panel-home .fdb-card {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            padding: 16px 18px 14px;
+            background: var(--fdb-surface);
+            border: 1px solid var(--fdb-line);
+            border-radius: 16px;
+        }
+
+        #panel-home .fdb-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        #panel-home .fdb-card-head h2 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--fdb-ink);
+        }
+
+        #panel-home .fdb-link {
+            border: 0;
+            background: none;
+            padding: 2px 4px;
+            font: 600 12px var(--font-sans);
+            color: var(--color-primary);
+            cursor: pointer;
+            border-radius: 6px;
+        }
+
+        #panel-home .fdb-link:hover {
+            text-decoration: underline;
+        }
+
+        /* chart: borrows vs reservations, Months / Week (CSS-only toggle), details on hover / focus / tap */
+        #panel-home .fdb-range-input {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #panel-home .fdb-head-right {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px 16px;
+        }
+
+        #panel-home .fdb-legend {
+            display: flex;
+            gap: 14px;
+            font-size: 11.5px;
+            color: var(--fdb-muted);
+        }
+
+        #panel-home .fdb-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 6px;
+            border-radius: 2px;
+        }
+
+        #panel-home .fdb-dot--eq,
+        #panel-home .fdb-bar--eq {
+            background: var(--color-primary-container);
+        }
+
+        #panel-home .fdb-dot--rm,
+        #panel-home .fdb-bar--rm {
+            background: #d9a521;
+        }
+
+        #panel-home .fdb-seg {
+            display: inline-flex;
+            gap: 2px;
+            padding: 3px;
+            border-radius: 10px;
+            border: 1px solid var(--fdb-line);
+            background: var(--color-surface-container);
+        }
+
+        #panel-home .fdb-seg label {
+            padding: 4px 12px;
+            border-radius: 7px;
+            font: 600 11.5px var(--font-sans);
+            color: var(--fdb-muted);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        #panel-home #fdbRangeMonths:checked~.fdb-card-head label[for="fdbRangeMonths"],
+        #panel-home #fdbRangeWeek:checked~.fdb-card-head label[for="fdbRangeWeek"] {
+            background: var(--fdb-surface);
+            color: var(--color-primary);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+        }
+
+        #panel-home #fdbRangeMonths:focus-visible~.fdb-card-head label[for="fdbRangeMonths"],
+        #panel-home #fdbRangeWeek:focus-visible~.fdb-card-head label[for="fdbRangeWeek"] {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 1px;
+        }
+
+        /* Months and Week are stacked in the same cell and only their visibility is switched, so the
+           card keeps the same height (the Week view's) and nothing around it moves when you toggle. */
+        #panel-home .fdb-views {
+            display: grid;
+            flex: 1;
+            min-width: 0;
+        }
+
+        #panel-home .fdb-view {
+            grid-area: 1 / 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            visibility: hidden;
+        }
+
+        #panel-home #fdbRangeMonths:checked~.fdb-views .fdb-view--months,
+        #panel-home #fdbRangeWeek:checked~.fdb-views .fdb-view--week {
+            visibility: visible;
+        }
+
+        #panel-home .fdb-plot {
+            --fdb-plot-h: 176px;
+            flex: 1;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr);
+            column-gap: 10px;
+            align-content: start;
+            padding-top: 8px;
+        }
+
+        /* vertical axis: whole-number counts */
+        #panel-home .fdb-yaxis {
+            position: relative;
+            width: 22px;
+            height: var(--fdb-plot-h);
+        }
+
+        #panel-home .fdb-yaxis span {
+            position: absolute;
+            right: 0;
+            transform: translateY(50%);
+            font-size: 10.5px;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            color: var(--fdb-muted);
+        }
+
+        #panel-home .fdb-plotarea {
+            position: relative;
+            min-width: 0;
+        }
+
+        #panel-home .fdb-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--fdb-plot-h);
+            pointer-events: none;
+        }
+
+        #panel-home .fdb-lines i {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--fdb-line);
+            opacity: 0.7;
+        }
+
+        #panel-home .fdb-lines i:first-child {
+            opacity: 1;
+        }
+
+        #panel-home .fdb-chart {
+            position: relative;
+            display: grid;
+            gap: 6px;
+        }
+
+        #panel-home .fdb-chart-col {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border-radius: 10px;
+            outline: none;
+        }
+
+        #panel-home .fdb-chart-bars {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 5px;
+            height: var(--fdb-plot-h);
+            border-radius: 10px 10px 0 0;
+            transition: background 0.12s;
+        }
+
+        #panel-home .fdb-chart-col:hover .fdb-chart-bars,
+        #panel-home .fdb-chart-col:focus .fdb-chart-bars {
+            background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+        }
+
+        #panel-home .fdb-chart-col:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        #panel-home .fdb-bar {
+            display: block;
+            width: min(24px, 38%);
+            border-radius: 5px 5px 1px 1px;
+            transition: height 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.12s;
+        }
+
+        #panel-home .fdb-chart-col:hover .fdb-bar,
+        #panel-home .fdb-chart-col:focus .fdb-bar {
+            filter: brightness(1.1);
+        }
+
+        #panel-home .fdb-bar.is-zero {
+            height: 2px !important;
+            opacity: 0.3;
+        }
+
+        #panel-home .fdb-chart-x {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.25;
+            min-height: 28px;
+            color: var(--fdb-muted);
+        }
+
+        #panel-home .fdb-chart-x small {
+            font-size: 10.5px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+
+        #panel-home .fdb-chart-col.is-now .fdb-chart-x {
+            color: var(--color-primary);
+            font-weight: 700;
+        }
+
+        /* hover card (same look as the admin Dashboard chart) */
+        #panel-home .fdb-tip {
+            position: absolute;
+            z-index: 5;
+            top: 4px;
+            left: 50%;
+            min-width: 138px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: #2b0f12;
+            color: #fff;
+            font-size: 11.5px;
+            line-height: 1.5;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, 4px);
+            transition: opacity 0.12s, transform 0.12s;
+        }
+
+        #panel-home .fdb-chart-col:nth-child(-n+2) .fdb-tip {
+            left: 0;
+            transform: translate(0, 4px);
+        }
+
+        #panel-home .fdb-chart-col:nth-last-child(-n+2) .fdb-tip {
+            left: auto;
+            right: 0;
+            transform: translate(0, 4px);
+        }
+
+        #panel-home .fdb-chart-col:hover .fdb-tip,
+        #panel-home .fdb-chart-col:focus .fdb-tip {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        #panel-home .fdb-chart-col:nth-child(-n+2):hover .fdb-tip,
+        #panel-home .fdb-chart-col:nth-child(-n+2):focus .fdb-tip,
+        #panel-home .fdb-chart-col:nth-last-child(-n+2):hover .fdb-tip,
+        #panel-home .fdb-chart-col:nth-last-child(-n+2):focus .fdb-tip {
+            transform: translate(0, 0);
+        }
+
+        #panel-home .fdb-tip>b {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        #panel-home .fdb-tip>span {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        /* needs your attention: icon + one short line */
+        #panel-home .fdb-attn {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        #panel-home .fdb-attn-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 9px 11px;
+            text-align: left;
+            font: 600 12.5px var(--font-sans);
+            color: var(--fdb-ink);
+            background: color-mix(in srgb, var(--tone) 7%, transparent);
+            border: 1px solid color-mix(in srgb, var(--tone) 24%, var(--fdb-line));
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+
+        #panel-home .fdb-attn-item:hover {
+            transform: translateX(2px);
+            border-color: var(--tone);
+        }
+
+        #panel-home .fdb-attn-item:focus-visible {
+            outline: 2px solid var(--color-primary);
+            outline-offset: 2px;
+        }
+
+        #panel-home .fdb-attn-icon {
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            background: color-mix(in srgb, var(--tone) 15%, transparent);
+            color: var(--tone);
+        }
+
+        #panel-home .fdb-attn-icon .material-symbols-outlined {
+            font-size: 18px;
+        }
+
+        #panel-home .fdb-attn-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #panel-home .fdb-attn-go {
+            font-size: 18px;
+            color: var(--fdb-muted);
+        }
+
+        /* lists: schedule + recent activity */
+        #panel-home .fdb-list {
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        #panel-home .fdb-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-top: 1px solid var(--fdb-line);
+        }
+
+        #panel-home .fdb-row:first-child {
+            border-top: 0;
+        }
+
+        #panel-home .fdb-row.is-past {
+            opacity: 0.5;
+        }
+
+        #panel-home .fdb-row-icon {
+            flex-shrink: 0;
+            display: grid;
+            place-items: center;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--tone, var(--color-primary)) 13%, var(--color-surface-container));
+            color: var(--tone, var(--color-primary));
+        }
+
+        #panel-home .fdb-row-icon .material-symbols-outlined {
+            font-size: 18px;
+        }
+
+        #panel-home .fdb-row-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        #panel-home .fdb-row-main strong {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--fdb-ink);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #panel-home .fdb-row-main small {
+            font-size: 11.5px;
+            color: var(--fdb-muted);
+        }
+
+        #panel-home .fdb-time {
+            flex-shrink: 0;
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--fdb-ink);
+        }
+
+        #panel-home .fdb-pill {
+            flex-shrink: 0;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--tone, var(--color-secondary));
+            background: color-mix(in srgb, var(--tone, var(--color-secondary)) 13%, transparent);
+        }
+
+        /* empty states: one icon, one short line */
+        #panel-home .fdb-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 26px 8px;
+            font-size: 13px;
+            color: var(--fdb-muted);
+        }
+
+        #panel-home .fdb-empty .material-symbols-outlined {
+            font-size: 22px;
+            opacity: 0.7;
+        }
+
+        #panel-home .fdb-empty--ok .material-symbols-outlined {
+            color: var(--color-success);
+            opacity: 1;
+        }
+
+        /* Student Access Code card sits in the grid as-is (its own styles + script) */
+        #panel-home .fdb-area-code .dash-code-card {
+            box-sizing: border-box;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border-radius: 16px;
+        }
+
+        /* Header at the top, button at the bottom, and the code block centred in the space between */
+        #panel-home .fdb-area-code .dash-code-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 0;
+            text-align: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-code-display {
+            display: flex;
+            width: 100%;
+            gap: 8px !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
+        #panel-home .fdb-area-code .fcc-code-value {
+            flex: 0 1 auto !important;
+            text-align: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-copy-btn {
+            margin-top: 0 !important;
+        }
+
+        #panel-home .fdb-area-code .fcc-status-row {
+            display: flex;
+            justify-content: center;
+        }
+
+        #panel-home .fdb-area-code .fcc-no-code,
+        #panel-home .fdb-area-code .fcc-used-info {
+            text-align: center;
+        }
+
+        @media (max-width: 1180px) {
+            #panel-home .fdb-kpis {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            #panel-home .fdb-area-chart {
+                grid-column: span 12;
+            }
+
+            #panel-home .fdb-area-code,
+            #panel-home .fdb-area-attn,
+            #panel-home .fdb-area-third {
+                grid-column: span 6;
+            }
+        }
+
+        @media (max-width: 768px) {
+
+            #panel-home .fdb-area-code,
+            #panel-home .fdb-area-attn,
+            #panel-home .fdb-area-third {
+                grid-column: span 12;
+            }
+
+            #panel-home .fdb-card-head {
+                flex-wrap: wrap;
+            }
+
+            #panel-home .fdb-head-right {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            #panel-home .fdb-plot {
+                --fdb-plot-h: 150px;
+            }
+
+            #panel-home .fdb-chart {
+                gap: 3px;
+            }
+
+            #panel-home .fdb-head-tools {
+                justify-content: stretch;
+            }
+
+            #panel-home .fdb-head-tools .fd-dash-top-actions {
+                order: 1;
+                margin-left: auto;
+                padding-left: 0;
+                border-left: 0;
+            }
+
+            #panel-home .fdb-actions {
+                order: 2;
+                width: 100%;
+            }
+
+            #panel-home .fdb-actions .fdb-btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 520px) {
+            #panel-home .fdb-kpis {
+                gap: 10px;
+            }
+
+            #panel-home .fdb-kpi {
+                padding: 14px 12px 14px 18px;
+                gap: 10px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            #panel-home .fdb *,
+            #panel-home .fdb-kpi {
+                transition: none !important;
+            }
+        }
+
+        /* ── Settings: one unified screen (Account / Appearance / Notifications & Data)
+              + Help & Support kept as its own view ─────────────────────────── */
+        #settingsOverlay .sx-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px 24px;
+        }
+
+        #settingsOverlay .sx-head-text {
+            min-width: 0;
+        }
+
+        #settingsOverlay .sov-pagehead-sub {
+            margin: 4px 0 0;
+            font-size: 0.875rem;
+            color: var(--color-secondary);
+        }
+
+        #settingsOverlay .sx-switch {
+            margin: 0;
+        }
+
+        #settingsOverlay .sx-section {
+            margin: 0 0 36px;
+        }
+
+        #settingsOverlay .sx-section:last-child {
+            margin-bottom: 0;
+        }
+
+        #settingsOverlay .sx-section-head {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 0 0 16px;
+        }
+
+        #settingsOverlay .sx-section-icon {
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            font-size: 22px;
+            border-radius: 12px;
+            color: var(--color-primary);
+            background: var(--color-surface-container);
+            border: 1px solid var(--color-outline-variant);
+        }
+
+        #settingsOverlay .sx-section-title {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 1.15rem;
+            font-weight: 700;
+            line-height: 1.25;
+            letter-spacing: -0.01em;
+            color: var(--color-on-surface);
+        }
+
+        #settingsOverlay .sx-section-sub {
+            margin: 2px 0 0;
+            font-size: 0.85rem;
+            color: var(--color-secondary);
+        }
+
+        #settingsOverlay .sx-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        #settingsOverlay .sx-grid--lead {
+            grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        }
+
+        @media (max-width: 1024px) {
+
+            #settingsOverlay .sx-grid,
+            #settingsOverlay .sx-grid--lead {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #settingsOverlay .sx-head-text {
+                flex: 1 1 100%;
+            }
+
+            #settingsOverlay .sx-switch {
+                width: 100%;
+            }
+
+            #settingsOverlay .sx-switch .sov-nav-item {
+                flex: 1;
+                justify-content: center;
+            }
+
+            #settingsOverlay .sx-section {
+                margin-bottom: 28px;
+            }
+
+            #settingsOverlay .sx-section-icon {
+                width: 36px;
+                height: 36px;
+            }
         }
 
         /* ── Page Header ──────────────────────────────────────────── */
@@ -1748,22 +2695,28 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         </div>
 
         <div class="side-nav-links">
-            <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
-                <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
-                <span>Dashboard</span>
-            </a>
-            <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
-                <span class="material-symbols-outlined">inventory_2</span>
-                <span>Equipment</span>
-            </a>
-            <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
-                <span class="material-symbols-outlined">meeting_room</span>
-                <span>Facilities</span>
-            </a>
-            <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
-                <span class="material-symbols-outlined">history</span>
-                <span>My Activity</span>
-            </a>
+            <div class="side-nav-section" role="group" aria-labelledby="fnavg-overview">
+                <span class="side-nav-section-title" id="fnavg-overview">Overview</span>
+                <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+                    <span>Dashboard</span>
+                </a>
+                <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">
+                    <span class="material-symbols-outlined">history</span>
+                    <span>My Activity</span>
+                </a>
+            </div>
+            <div class="side-nav-section" role="group" aria-labelledby="fnavg-operations">
+                <span class="side-nav-section-title" id="fnavg-operations">Operations</span>
+                <a class="side-nav-item" id="nav-lending" data-tab="lending" href="#">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span>Equipment</span>
+                </a>
+                <a class="side-nav-item" id="nav-rooms" data-tab="rooms" href="#">
+                    <span class="material-symbols-outlined">meeting_room</span>
+                    <span>Facilities</span>
+                </a>
+            </div>
         </div>
 
         <div class="side-nav-footer">
@@ -1864,239 +2817,394 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
          TAB: DASHBOARD (HOME)  — Redesigned v3
     ============================================================ -->
             <div class="tab-panel active" id="panel-home">
-
-                <!-- ── Flat Header ──────────────────────────────────── -->
-                <div class="dash-flat-header">
-                    <div class="dash-flat-titles">
-                        <h1 class="dash-flat-title">Good <?php
-                                                            $h = (int)date('H');
-                                                            echo $h < 12 ? 'morning' : ($h < 17 ? 'afternoon' : 'evening');
-                                                            ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
-                        <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?> &mdash; Your loans, reservations and reminders at a glance.</p>
-                    </div>
-                    <!-- Dashboard-only shortcuts (same as the admin Dashboard). They live inside #panel-home, so
-                         they only show on this tab. The badge keeps id="notifBadge": the notification code in
-                         faculty-dashboard.js updates it. The avatar has .avatar-btn so name / photo changes reach it. -->
-                    <div class="fd-dash-top-actions">
-                        <button type="button" class="fd-top-btn" id="dashNotifBtn" data-action="open-notif-modal"
-                            aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>"
-                            title="Notifications">
-                            <span class="material-symbols-outlined">notifications</span>
-                            <b class="fd-top-badge" id="notifBadge"
-                                <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
-                        </button>
-                        <button type="button" class="avatar-btn fd-top-avatar" id="dashAvatarBtn"
-                            data-action="open-overlay" data-target="settingsOverlay"
-                            aria-label="Open my account" title="My account"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></button>
-                    </div>
-                </div>
-
-                <!-- ── Top Two-Column: [Stats+Bentos] | [Code Card] ── -->
-                <div class="dash-top-grid">
-
-                    <!-- LEFT col: stats bar + bento buttons -->
-                    <div class="dash-top-left">
-
-                        <!-- Stats -->
-                        <div class="dash-stats" id="dashStats">
-                            <button type="button" class="stat-tile" data-stat="approved"
-                                data-action="go-tab" data-tab="activity">
-                                <span class="stat-tile-value"><?php echo $stat_approved; ?></span>
-                                <span class="stat-tile-label">Active Borrowings</span>
-                            </button>
-                            <?php if ($stat_overdue > 0): ?>
-                                <button type="button" class="stat-tile stat-tile--overdue" data-stat="overdue"
-                                    data-action="go-tab" data-tab="activity">
-                                    <span class="stat-tile-value" id="statOverdueVal"><?php echo $stat_overdue; ?></span>
-                                    <span class="stat-tile-label">Overdue</span>
-                                </button>
-                            <?php else: ?>
-                                <div class="stat-tile stat-tile--total" data-stat="total">
-                                    <span class="stat-tile-value"><?php echo $stat_total; ?></span>
-                                    <span class="stat-tile-label">Total Requests</span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Bento Action Buttons -->
-                        <div class="dash-bento-row">
-                            <div class="dash-bento-btn" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                <div class="dash-bento-icon">
-                                    <span class="material-symbols-outlined">add_shopping_cart</span>
-                                </div>
-                                <div class="dash-bento-label">Borrow Equipment</div>
-                            </div>
-                            <div class="dash-bento-btn" data-action="go-tab" data-tab="rooms">
-                                <div class="dash-bento-icon">
-                                    <span class="material-symbols-outlined">meeting_room</span>
-                                </div>
-                                <div class="dash-bento-label">Reserve Room</div>
-                            </div>
-                        </div>
-
-                    </div><!-- /dash-top-left -->
-
-                    <!-- RIGHT col: Student Access Code card -->
-                    <div class="dash-top-right">
-                        <div class="dash-code-card" id="facultyCodePanel">
-                            <div class="dash-code-card-header">
-                                <span class="dash-code-card-title">Student Access Code</span>
-                                <span class="dash-code-active-badge" id="fccBadge">ACTIVE</span>
-                            </div>
-                            <div class="dash-code-body" id="fccBody">
-                                <div class="fcc-loading" style="padding:20px 0;">
-                                    <span class="material-symbols-outlined" style="font-size:1.2rem;opacity:.4;animation:spin 1s linear infinite;">sync</span>
-                                </div>
-                            </div>
-                            <button class="dash-code-generate-btn" id="btnGenerateCode">
-                                Generate New Code
-                            </button>
-                        </div>
-                    </div><!-- /dash-top-right -->
-
-                </div><!-- /dash-top-grid -->
-
-                <!-- ── Activity Overview ─────────────────────────────── -->
                 <?php
-                $timeline_raw = mysqli_query($conn, "SELECT equipment_name, status, request_date FROM tbl_requests WHERE faculty_id='$uid_safe' ORDER BY request_date DESC LIMIT 3");
-                $timeline_items = [];
-                if ($timeline_raw) while ($tr = mysqli_fetch_assoc($timeline_raw)) $timeline_items[] = $tr;
+                // ── Faculty Dashboard ──────────────────────────────────────────────────
+                // Built from this faculty member's own loans ($requests_js), room reservations
+                // ($room_reservations) and notification count, all already loaded by this page.
+                $fdb_h        = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+                $fdb_pl       = fn(int $n, string $w) => $n . ' ' . $w . ($n === 1 ? '' : 's');
+                $fdb_today    = date('Y-m-d');
+                $fdb_now_hms  = date('H:i:s');
+                $fdb_t12      = fn(?string $t) => $t ? date('g:i A', strtotime($t)) : '';
+                $fdb_ago      = function (?string $dt): string {
+                    $t = $dt ? strtotime($dt) : 0;
+                    if (!$t) return '';
+                    $d = time() - $t;
+                    if ($d < 60)     return 'Just now';
+                    if ($d < 3600)   return floor($d / 60) . ' min ago';
+                    if ($d < 86400)  return floor($d / 3600) . ' hr ago';
+                    if ($d < 604800) {
+                        $n = (int)floor($d / 86400);
+                        return $n . ' day' . ($n === 1 ? '' : 's') . ' ago';
+                    }
+                    return date('M j', $t);
+                };
 
-                $monthly_counts = [];
-                $month_labels = [];
-                for ($i = 9; $i >= 0; $i--) {
-                    $ts = strtotime("-$i months");
-                    $month_labels[] = date('M', $ts);
-                    $y = date('Y', $ts);
-                    $m = date('m', $ts);
-                    $cnt = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as c FROM tbl_requests WHERE faculty_id='$uid_safe' AND YEAR(request_date)=$y AND MONTH(request_date)=$m"))['c'] ?? 0;
-                    $monthly_counts[] = (int)$cnt;
+                // Loans + rooms: counts for the cards, today's schedule
+                $fdb_due_today = 0;
+                $fdb_rooms_n   = 0;
+                $fdb_sched     = [];
+                foreach ($requests_js as $fdb_v_r) {
+                    $fdb_v_st = trim((string)($fdb_v_r['status'] ?? ''));
+                    if ($fdb_v_st !== 'Approved' || substr((string)$fdb_v_r['return_date'], 0, 10) !== $fdb_today) continue;
+                    $fdb_due_today++;
+                    $fdb_v_qty = max(1, (int)($fdb_v_r['borrow_qty'] ?? 1));
+                    $fdb_sched[] = [
+                        'sort'  => !empty($fdb_v_r['return_time']) ? $fdb_v_r['return_time'] : '99:99:99',
+                        'time'  => !empty($fdb_v_r['return_time']) ? $fdb_t12($fdb_v_r['return_time']) : 'Due',
+                        'icon'  => 'inventory_2',
+                        'title' => $fdb_v_r['equipment_name'] . ($fdb_v_qty > 1 ? ' ×' . $fdb_v_qty : ''),
+                        'meta'  => 'Return',
+                        'past'  => false,
+                    ];
                 }
-                $max_count = max(1, max($monthly_counts));
-                $highlight_idx = array_search(max($monthly_counts), $monthly_counts);
+                foreach ($room_reservations as $fdb_v_rr) {
+                    if (($fdb_v_rr['status'] ?? '') !== 'Approved') continue;
+                    $fdb_v_d = (string)$fdb_v_rr['reservation_date'];
+                    $fdb_v_over = ($fdb_v_d === $fdb_today && (string)$fdb_v_rr['end_time'] < $fdb_now_hms);
+                    if ($fdb_v_d > $fdb_today || ($fdb_v_d === $fdb_today && !$fdb_v_over)) $fdb_rooms_n++;
+                    if ($fdb_v_d !== $fdb_today) continue;
+                    $fdb_sched[] = [
+                        'sort'  => $fdb_v_rr['start_time'],
+                        'time'  => $fdb_t12($fdb_v_rr['start_time']),
+                        'icon'  => 'meeting_room',
+                        'title' => $fdb_v_rr['room_name'],
+                        'meta'  => 'Until ' . $fdb_t12($fdb_v_rr['end_time']),
+                        'past'  => $fdb_v_over,
+                    ];
+                }
+                usort($fdb_sched, fn($a, $b) => strcmp($a['sort'], $b['sort']));
+                $fdb_sched = array_slice($fdb_sched, 0, 5);
+
+                // Chart data: borrows (equipment requests) and room reservations, counted on the day
+                // they are for (borrow date / reservation date). Declined and cancelled ones don't count.
+                $fdb_by_day = [];
+                foreach ($requests_js as $fdb_v_r) {
+                    if (in_array(trim((string)($fdb_v_r['status'] ?? '')), ['Declined', 'Cancelled'], true)) continue;
+                    $fdb_v_d = substr((string)($fdb_v_r['borrow_date'] ?? ''), 0, 10);
+                    if ($fdb_v_d === '') continue;
+                    $fdb_by_day[$fdb_v_d]['eq'] = ($fdb_by_day[$fdb_v_d]['eq'] ?? 0) + 1;
+                }
+                foreach ($room_reservations as $fdb_v_rr) {
+                    if (in_array((string)($fdb_v_rr['status'] ?? ''), ['Declined', 'Cancelled'], true)) continue;
+                    $fdb_v_d = substr((string)($fdb_v_rr['reservation_date'] ?? ''), 0, 10);
+                    if ($fdb_v_d === '') continue;
+                    $fdb_by_day[$fdb_v_d]['rm'] = ($fdb_by_day[$fdb_v_d]['rm'] ?? 0) + 1;
+                }
+                // Months view: last 6 months (this month included)
+                $fdb_months = [];
+                for ($fdb_v_i = 5; $fdb_v_i >= 0; $fdb_v_i--) {
+                    $fdb_v_ts = strtotime(date('Y-m-01') . " -$fdb_v_i months");
+                    $fdb_months[date('Y-m', $fdb_v_ts)] = [
+                        'label' => date('M', $fdb_v_ts),
+                        'sub' => '',
+                        'long' => date('F Y', $fdb_v_ts),
+                        'now' => date('Y-m', $fdb_v_ts) === date('Y-m'),
+                        'eq' => 0,
+                        'rm' => 0
+                    ];
+                }
+                foreach ($fdb_by_day as $fdb_v_d => $fdb_v_c) {
+                    $fdb_v_k = substr($fdb_v_d, 0, 7);
+                    if (!isset($fdb_months[$fdb_v_k])) continue;
+                    $fdb_months[$fdb_v_k]['eq'] += $fdb_v_c['eq'] ?? 0;
+                    $fdb_months[$fdb_v_k]['rm'] += $fdb_v_c['rm'] ?? 0;
+                }
+                // Week view: Monday to Sunday of this week
+                $fdb_week = [];
+                $fdb_mon  = strtotime('-' . ((int)date('N') - 1) . ' days', strtotime($fdb_today));
+                for ($fdb_v_i = 0; $fdb_v_i < 7; $fdb_v_i++) {
+                    $fdb_v_ts = strtotime("+$fdb_v_i days", $fdb_mon);
+                    $fdb_v_d  = date('Y-m-d', $fdb_v_ts);
+                    $fdb_week[] = [
+                        'label' => date('D', $fdb_v_ts),
+                        'sub' => date('j', $fdb_v_ts),
+                        'long' => date('l, F j', $fdb_v_ts),
+                        'now' => $fdb_v_d === $fdb_today,
+                        'eq' => (int)($fdb_by_day[$fdb_v_d]['eq'] ?? 0),
+                        'rm' => (int)($fdb_by_day[$fdb_v_d]['rm'] ?? 0)
+                    ];
+                }
+                $fdb_has_chart = array_sum(array_column($fdb_months, 'eq')) + array_sum(array_column($fdb_months, 'rm'))
+                    + array_sum(array_column($fdb_week, 'eq')) + array_sum(array_column($fdb_week, 'rm')) > 0;
+
+                // Vertical axis: whole numbers only, 2 or 4 even steps up to the biggest value
+                $fdb_axis = function (array $rows): array {
+                    $max = max(1, max(array_merge(array_column($rows, 'eq'), array_column($rows, 'rm'))));
+                    if ($max <= 2) return [1, 2];
+                    $step = (int)ceil($max / 4);
+                    foreach ([1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000] as $nice) {
+                        if ($nice >= $step) {
+                            $step = $nice;
+                            break;
+                        }
+                    }
+                    return [$step, 4];
+                };
+                // One chart (numbered vertical axis + two bars per column + hover card)
+                $fdb_chart = function (array $rows, string $label) use ($fdb_axis, $fdb_h): string {
+                    [$step, $n] = $fdb_axis($rows);
+                    $top = $step * $n;
+                    ob_start(); ?>
+                    <div class="fdb-plot">
+                        <div class="fdb-yaxis" aria-hidden="true">
+                            <?php for ($i = 0; $i <= $n; $i++): ?><span style="bottom:<?php echo round($i / $n * 100, 2); ?>%"><?php echo $i * $step; ?></span><?php endfor; ?>
+                        </div>
+                        <div class="fdb-plotarea">
+                            <div class="fdb-lines" aria-hidden="true">
+                                <?php for ($i = 0; $i <= $n; $i++): ?><i style="bottom:<?php echo round($i / $n * 100, 2); ?>%"></i><?php endfor; ?>
+                            </div>
+                            <div class="fdb-chart" role="group" aria-label="<?php echo $fdb_h($label); ?>" style="grid-template-columns:repeat(<?php echo count($rows); ?>,minmax(0,1fr))">
+                                <?php foreach ($rows as $c): ?>
+                                    <div class="fdb-chart-col<?php echo $c['now'] ? ' is-now' : ''; ?>" tabindex="0"
+                                        aria-label="<?php echo $fdb_h($c['long']); ?> - Borrows: <?php echo (int)$c['eq']; ?>, Reservations: <?php echo (int)$c['rm']; ?>">
+                                        <div class="fdb-tip" role="presentation">
+                                            <b><?php echo $fdb_h($c['long']); ?></b>
+                                            <span><span><i class="fdb-dot fdb-dot--eq"></i>Borrows</span><b><?php echo (int)$c['eq']; ?></b></span>
+                                            <span><span><i class="fdb-dot fdb-dot--rm"></i>Reservations</span><b><?php echo (int)$c['rm']; ?></b></span>
+                                        </div>
+                                        <div class="fdb-chart-bars">
+                                            <span class="fdb-bar fdb-bar--eq<?php echo $c['eq'] ? '' : ' is-zero'; ?>" style="height:<?php echo $c['eq'] ? max(3, round($c['eq'] / $top * 100, 1)) : 0; ?>%"></span>
+                                            <span class="fdb-bar fdb-bar--rm<?php echo $c['rm'] ? '' : ' is-zero'; ?>" style="height:<?php echo $c['rm'] ? max(3, round($c['rm'] / $top * 100, 1)) : 0; ?>%"></span>
+                                        </div>
+                                        <span class="fdb-chart-x"><?php echo $fdb_h($c['label']); ?><?php if ($c['sub'] !== '') echo '<small>' . $fdb_h($c['sub']) . '</small>'; ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php return ob_get_clean();
+                };
+
+                // Recent activity (requests + reservations, newest first)
+                $fdb_recent = [];
+                $fdb_req_map = [
+                    'Waiting' => ['Pending', 'warn'],
+                    'Approved' => ['Active', 'ok'],
+                    'Overdue' => ['Overdue', 'danger'],
+                    'Returned' => ['Returned', 'muted'],
+                    'Declined' => ['Declined', 'danger']
+                ];
+                foreach ($requests_js as $fdb_v_r) {
+                    $fdb_v_st = trim((string)($fdb_v_r['status'] ?? ''));
+                    [$fdb_v_lbl, $fdb_v_tone] = $fdb_req_map[$fdb_v_st] ?? [$fdb_v_st !== '' ? $fdb_v_st : 'Request', 'muted'];
+                    $fdb_v_qty = max(1, (int)($fdb_v_r['borrow_qty'] ?? 1));
+                    $fdb_recent[] = [
+                        'ts' => strtotime((string)$fdb_v_r['request_date']),
+                        'dt' => $fdb_v_r['request_date'],
+                        'icon' => 'inventory_2',
+                        'title' => $fdb_v_r['equipment_name'] . ($fdb_v_qty > 1 ? ' ×' . $fdb_v_qty : ''),
+                        'lbl' => $fdb_v_lbl,
+                        'tone' => $fdb_v_tone
+                    ];
+                }
+                $fdb_room_map = ['Approved' => ['Reserved', 'info'], 'Cancelled' => ['Cancelled', 'muted'], 'Declined' => ['Declined', 'danger']];
+                foreach ($room_reservations as $fdb_v_rr) {
+                    $fdb_v_st = (string)($fdb_v_rr['status'] ?? '');
+                    [$fdb_v_lbl, $fdb_v_tone] = $fdb_room_map[$fdb_v_st] ?? [$fdb_v_st, 'muted'];
+                    $fdb_recent[] = [
+                        'ts' => strtotime((string)$fdb_v_rr['request_date']),
+                        'dt' => $fdb_v_rr['request_date'],
+                        'icon' => 'meeting_room',
+                        'title' => $fdb_v_rr['room_name'],
+                        'lbl' => $fdb_v_lbl,
+                        'tone' => $fdb_v_tone
+                    ];
+                }
+                usort($fdb_recent, fn($a, $b) => $b['ts'] <=> $a['ts']);
+                $fdb_recent = array_slice($fdb_recent, 0, 5);
+
+                // Needs your attention (one short line each)
+                $fdb_attn = [];
+                if ($stat_overdue > 0)  $fdb_attn[] = ['tone' => 'danger', 'icon' => 'schedule',        'act' => 'activity', 'title' => $fdb_pl((int)$stat_overdue, 'overdue return')];
+                if ($fdb_due_today > 0) $fdb_attn[] = ['tone' => 'warn',   'icon' => 'event_available', 'act' => 'activity', 'title' => $fdb_due_today . ' due back today'];
+                if ($stat_waiting > 0)  $fdb_attn[] = ['tone' => 'warn',   'icon' => 'hourglass_top',   'act' => 'activity', 'title' => $fdb_pl((int)$stat_waiting, 'pending request')];
+                if ((int)$notif_count > 0) $fdb_attn[] = ['tone' => 'info', 'icon' => 'notifications',  'act' => 'notif',    'title' => (int)$notif_count . ' unread'];
+
+                $fdb_kpis = [
+                    ['tone' => 'ok',                                'icon' => 'swap_horiz',    'label' => 'Active loans', 'val' => (int)$stat_approved, 'stat' => 'approved', 'id' => ''],
+                    ['tone' => $stat_overdue > 0 ? 'danger' : 'ok', 'icon' => 'schedule',      'label' => 'Overdue',      'val' => (int)$stat_overdue,  'stat' => 'overdue',  'id' => 'statOverdueVal'],
+                    ['tone' => $stat_waiting > 0 ? 'warn' : 'ok',   'icon' => 'hourglass_top', 'label' => 'Pending',      'val' => (int)$stat_waiting,  'stat' => 'waiting',  'id' => ''],
+                    ['tone' => 'info',                              'icon' => 'meeting_room',  'label' => 'Reservations', 'val' => $fdb_rooms_n,        'stat' => '',         'id' => ''],
+                ];
                 ?>
 
-                <div class="dash-section-title">Activity Overview</div>
-                <div class="dash-activity-overview-grid">
+                <div class="fdb" id="fdb">
 
-                    <!-- Recent Activity -->
-                    <div class="dash-activity-card">
-                        <div class="dash-activity-card-head">
-                            <span class="dash-activity-card-title">Recent Activity</span>
-                            <button class="dash-activity-card-btn">Timeline <span style="font-size:10px;">▾</span></button>
+                    <!-- Header: greeting, date, quick actions, bell + avatar -->
+                    <div class="dash-flat-header fdb-head">
+                        <div class="dash-flat-titles">
+                            <h1 class="dash-flat-title">Good <?php
+                                                                $fdb_v_h = (int)date('H');
+                                                                echo $fdb_v_h < 12 ? 'morning' : ($fdb_v_h < 17 ? 'afternoon' : 'evening');
+                                                                ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                            <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?></p>
                         </div>
-                        <div class="dash-timeline">
-                            <?php if (!empty($timeline_items)):
-                                foreach ($timeline_items as $idx => $ti): ?>
-                                    <div class="dash-timeline-item">
-                                        <div class="dash-timeline-dot <?php echo $idx === 0 ? 'dot-active' : ''; ?>"></div>
-                                        <div class="dash-timeline-time"><?php echo date('g:i A', strtotime($ti['request_date'])); ?></div>
-                                        <div class="dash-timeline-body">
-                                            <div class="dash-timeline-title"><?php echo htmlspecialchars($ti['equipment_name']); ?></div>
-                                            <div class="dash-timeline-date"><?php echo date('F j, Y', strtotime($ti['request_date'])); ?></div>
+                        <div class="fdb-head-tools">
+                            <div class="fdb-actions">
+                                <button type="button" class="fdb-btn fdb-btn--primary" data-action="go-tab" data-tab="lending" data-lending="browse">
+                                    <span class="material-symbols-outlined" aria-hidden="true">add_shopping_cart</span>Borrow
+                                </button>
+                                <button type="button" class="fdb-btn" data-action="go-tab" data-tab="rooms">
+                                    <span class="material-symbols-outlined" aria-hidden="true">meeting_room</span>Reserve a room
+                                </button>
+                            </div>
+                            <!-- Dashboard-only shortcuts (same as the admin Dashboard). They live inside #panel-home, so
+                             they only show on this tab. The badge keeps id="notifBadge": the notification code in
+                             faculty-dashboard.js updates it. The avatar has .avatar-btn so name / photo changes reach it. -->
+                            <div class="fd-dash-top-actions">
+                                <button type="button" class="fd-top-btn" id="dashNotifBtn" data-action="open-notif-modal"
+                                    aria-label="Open notifications<?php echo $notif_count > 0 ? ' — ' . $notif_count . ' unread' : ''; ?>"
+                                    title="Notifications">
+                                    <span class="material-symbols-outlined">notifications</span>
+                                    <b class="fd-top-badge" id="notifBadge"
+                                        <?php if ($notif_count <= 0) echo 'hidden'; ?>><?php echo $notif_count; ?></b>
+                                </button>
+                                <button type="button" class="avatar-btn fd-top-avatar" id="dashAvatarBtn"
+                                    data-action="open-overlay" data-target="settingsOverlay"
+                                    aria-label="Open my account" title="My account"><?php if ($profile_pic_url): ?><img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile" class="avatar-img" onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');"><span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span><?php else: ?><?php echo htmlspecialchars($initials); ?><?php endif; ?></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key figures -->
+                    <section class="fdb-kpis" id="dashStats" aria-label="Key figures">
+                        <?php foreach ($fdb_kpis as $fdb_v_k): ?>
+                            <button type="button" class="fdb-kpi fdb-tone-<?php echo $fdb_h($fdb_v_k['tone']); ?>"
+                                <?php if ($fdb_v_k['stat'] !== '') echo 'data-stat="' . $fdb_h($fdb_v_k['stat']) . '"'; ?>
+                                data-action="go-tab" data-tab="activity">
+                                <span class="fdb-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_k['icon']); ?></span></span>
+                                <span class="fdb-kpi-body">
+                                    <span class="fdb-kpi-val" <?php if ($fdb_v_k['id'] !== '') echo ' id="' . $fdb_h($fdb_v_k['id']) . '"'; ?>><?php echo (int)$fdb_v_k['val']; ?></span>
+                                    <span class="fdb-kpi-label"><?php echo $fdb_h($fdb_v_k['label']); ?></span>
+                                </span>
+                            </button>
+                        <?php endforeach; ?>
+                    </section>
+
+                    <div class="fdb-grid">
+
+                        <!-- My activity: borrows + reservations, Months / Week (CSS-only toggle), hover for details -->
+                        <section class="fdb-card fdb-area-chart" aria-labelledby="fdbChartTitle">
+                            <?php if ($fdb_has_chart): ?>
+                                <input type="radio" name="fdbRange" id="fdbRangeMonths" class="fdb-range-input" checked>
+                                <input type="radio" name="fdbRange" id="fdbRangeWeek" class="fdb-range-input">
+                            <?php endif; ?>
+                            <header class="fdb-card-head">
+                                <h2 id="fdbChartTitle">My activity</h2>
+                                <?php if ($fdb_has_chart): ?>
+                                    <div class="fdb-head-right">
+                                        <div class="fdb-legend">
+                                            <span><i class="fdb-dot fdb-dot--eq"></i>Borrows</span>
+                                            <span><i class="fdb-dot fdb-dot--rm"></i>Reservations</span>
+                                        </div>
+                                        <div class="fdb-seg" role="radiogroup" aria-label="Chart range">
+                                            <label for="fdbRangeMonths">Months</label>
+                                            <label for="fdbRangeWeek">Week</label>
                                         </div>
                                     </div>
-                                <?php endforeach;
-                            else: ?>
-                                <div class="dash-timeline-item">
-                                    <div class="dash-timeline-dot"></div>
-                                    <div class="dash-timeline-time">—</div>
-                                    <div class="dash-timeline-body">
-                                        <div class="dash-timeline-title">No recent activity</div>
-                                    </div>
+                                <?php endif; ?>
+                            </header>
+                            <?php if ($fdb_has_chart): ?>
+                                <div class="fdb-views">
+                                    <div class="fdb-view fdb-view--months"><?php echo $fdb_chart(array_values($fdb_months), 'Borrows and reservations per month'); ?></div>
+                                    <div class="fdb-view fdb-view--week"><?php echo $fdb_chart($fdb_week, 'Borrows and reservations per day this week'); ?></div>
                                 </div>
+                            <?php else: ?>
+                                <div class="fdb-empty"><span class="material-symbols-outlined" aria-hidden="true">bar_chart</span><span>No activity yet</span></div>
                             <?php endif; ?>
-                        </div>
-                    </div>
+                        </section>
 
-                    <!-- My Activity Bar Chart -->
-                    <div class="dash-activity-card">
-                        <div class="dash-activity-card-head">
-                            <span class="dash-activity-card-title">My Activity</span>
-                            <button class="dash-activity-card-btn">Charts <span style="font-size:10px;">▾</span></button>
-                        </div>
-                        <div class="dash-bar-chart">
-                            <div class="dash-bar-chart-y">
-                                <span><?php echo ceil($max_count * 1.25); ?></span>
-                                <span><?php echo ceil($max_count * 1.0); ?></span>
-                                <span><?php echo ceil($max_count * 0.5); ?></span>
-                                <span>0</span>
-                            </div>
-                            <div class="dash-bar-chart-grid">
-                                <div class="dash-bar-chart-grid-line"></div>
-                                <div class="dash-bar-chart-grid-line"></div>
-                                <div class="dash-bar-chart-grid-line"></div>
-                                <div class="dash-bar-chart-grid-line"></div>
-                            </div>
-                            <div class="dash-bar-chart-area">
-                                <?php foreach ($monthly_counts as $idx => $cnt):
-                                    $h = $cnt > 0 ? round(($cnt / ($max_count * 1.25)) * 100) : 4;
-                                    $isHL = ($idx == $highlight_idx && $cnt > 0);
-                                ?>
-                                    <div class="dash-bar <?php echo $isHL ? 'highlight' : ''; ?>" style="height:<?php echo $h; ?>%;"></div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="dash-bar-chart-x">
-                                <?php foreach ($month_labels as $ml): ?>
-                                    <span><?php echo $ml; ?></span>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-
-                </div><!-- /dash-activity-overview-grid -->
-
-                <!-- ── Active Now ─────────────────────────────────────── -->
-                <?php
-                $active_raw = mysqli_query($conn, "SELECT * FROM tbl_requests WHERE faculty_id='$uid_safe' AND status IN ('Approved','Overdue') ORDER BY return_date ASC LIMIT 4");
-                $active_items = [];
-                if ($active_raw) while ($ar = mysqli_fetch_assoc($active_raw)) $active_items[] = $ar;
-                ?>
-                <?php if (!empty($active_items)): ?>
-                    <div class="dash-section-title" style="margin-top:32px;">Active Now</div>
-                    <div class="active-cards-grid">
-                        <?php foreach ($active_items as $ai):
-                            $isOverdue = $ai['status'] === 'Overdue';
-                            $chipClass = $isOverdue ? 'chip-error' : 'chip-success';
-                            $chipLabel = $isOverdue ? 'OVERDUE' : 'ACTIVE';
-                            $borrowTs = strtotime($ai['borrow_date']);
-                            $returnTs = strtotime($ai['return_date']);
-                            $nowTs = time();
-                            $totalDays = max(1, $returnTs - $borrowTs);
-                            $usedDays = max(0, min($nowTs - $borrowTs, $totalDays));
-                            $progress = round(($usedDays / $totalDays) * 100);
-                            $aiImage = actEquipImage($ai['equipment_name']);
-                        ?>
-                            <div class="active-card <?php echo $isOverdue ? 'active-card-overdue' : ''; ?>">
-                                <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;">
-                                    <div class="active-card-thumb">
-                                        <?php if ($aiImage): ?>
-                                            <img src="<?php echo $aiImage; ?>" alt="<?php echo htmlspecialchars($ai['equipment_name']); ?>">
-                                        <?php else: ?>
-                                            <span class="material-symbols-outlined"><?php echo actEquipIcon($ai['equipment_name']); ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <span class="status-chip <?php echo $chipClass; ?>" style="font-size:0.65rem;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;">
-                                        <span class="chip-dot"></span><?php echo $chipLabel; ?>
-                                    </span>
+                        <!-- Student Access Code (faculty-only; filled in by the existing code script) -->
+                        <section class="fdb-area-code" aria-label="Student access code">
+                            <div class="dash-code-card" id="facultyCodePanel">
+                                <div class="dash-code-card-header">
+                                    <span class="dash-code-card-title">Student Access Code</span>
+                                    <span class="dash-code-active-badge" id="fccBadge">ACTIVE</span>
                                 </div>
-                                <div class="active-card-body">
-                                    <div class="active-card-meta">Equipment</div>
-                                    <div class="active-card-title"><?php echo htmlspecialchars($ai['equipment_name']); ?></div>
-                                </div>
-                                <div class="active-card-footer">
-                                    <span class="active-card-due">Due dated: <?php echo date('F j, Y', strtotime($ai['return_date'])); ?><?php echo !empty($ai['return_time']) ? ' &middot; ' . BookingSchedule::fmtTime($ai['return_time']) : ''; ?></span>
-                                    <div class="active-card-progress">
-                                        <div class="active-card-progress-fill" style="width:<?php echo $progress; ?>%;<?php echo $isOverdue ? 'background:#dc2626;' : ''; ?>"></div>
+                                <div class="dash-code-body" id="fccBody">
+                                    <div class="fcc-loading" style="padding:20px 0;">
+                                        <span class="material-symbols-outlined" style="font-size:1.2rem;opacity:.4;animation:spin 1s linear infinite;">sync</span>
                                     </div>
                                 </div>
+                                <button class="dash-code-generate-btn" id="btnGenerateCode">
+                                    Generate New Code
+                                </button>
                             </div>
-                        <?php endforeach; ?>
-                        <?php if (count($active_items) < 3): ?>
-                            <div class="dash-empty-active-slot">No other active items</div>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
+                        </section>
+
+                        <!-- Needs your attention -->
+                        <section class="fdb-card fdb-area-attn" aria-labelledby="fdbAttnTitle">
+                            <header class="fdb-card-head">
+                                <h2 id="fdbAttnTitle">Needs your attention</h2>
+                            </header>
+                            <?php if ($fdb_attn): ?>
+                                <ul class="fdb-attn">
+                                    <?php foreach ($fdb_attn as $fdb_v_a): ?>
+                                        <li>
+                                            <button type="button" class="fdb-attn-item fdb-tone-<?php echo $fdb_h($fdb_v_a['tone']); ?>"
+                                                <?php echo $fdb_v_a['act'] === 'notif' ? 'data-action="open-notif-modal"' : 'data-action="go-tab" data-tab="activity"'; ?>>
+                                                <span class="fdb-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_a['icon']); ?></span></span>
+                                                <span class="fdb-attn-text"><?php echo $fdb_h($fdb_v_a['title']); ?></span>
+                                                <span class="material-symbols-outlined fdb-attn-go" aria-hidden="true">chevron_right</span>
+                                            </button>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <div class="fdb-empty fdb-empty--ok"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span><span>All caught up</span></div>
+                            <?php endif; ?>
+                        </section>
+
+                        <!-- My schedule today -->
+                        <section class="fdb-card fdb-area-third" aria-labelledby="fdbSchedTitle">
+                            <header class="fdb-card-head">
+                                <h2 id="fdbSchedTitle">My schedule today</h2>
+                            </header>
+                            <?php if ($fdb_sched): ?>
+                                <ul class="fdb-list">
+                                    <?php foreach ($fdb_sched as $fdb_v_s): ?>
+                                        <li class="fdb-row<?php echo $fdb_v_s['past'] ? ' is-past' : ''; ?>">
+                                            <span class="fdb-row-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_s['icon']); ?></span></span>
+                                            <span class="fdb-row-main">
+                                                <strong><?php echo $fdb_h($fdb_v_s['title']); ?></strong>
+                                                <small><?php echo $fdb_h($fdb_v_s['meta']); ?></small>
+                                            </span>
+                                            <span class="fdb-time"><?php echo $fdb_h($fdb_v_s['time']); ?></span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <div class="fdb-empty"><span class="material-symbols-outlined" aria-hidden="true">event_available</span><span>Nothing scheduled today</span></div>
+                            <?php endif; ?>
+                        </section>
+
+                        <!-- Recent activity -->
+                        <section class="fdb-card fdb-area-third" aria-labelledby="fdbRecentTitle">
+                            <header class="fdb-card-head">
+                                <h2 id="fdbRecentTitle">Recent activity</h2>
+                                <button type="button" class="fdb-link" data-action="go-tab" data-tab="activity">View all</button>
+                            </header>
+                            <?php if ($fdb_recent): ?>
+                                <ul class="fdb-list">
+                                    <?php foreach ($fdb_recent as $fdb_v_ev): ?>
+                                        <li class="fdb-row fdb-tone-<?php echo $fdb_h($fdb_v_ev['tone']); ?>">
+                                            <span class="fdb-row-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo $fdb_h($fdb_v_ev['icon']); ?></span></span>
+                                            <span class="fdb-row-main">
+                                                <strong><?php echo $fdb_h($fdb_v_ev['title']); ?></strong>
+                                                <small><?php echo $fdb_h($fdb_ago($fdb_v_ev['dt'])); ?></small>
+                                            </span>
+                                            <span class="fdb-pill"><?php echo $fdb_h($fdb_v_ev['lbl']); ?></span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php else: ?>
+                                <div class="fdb-empty"><span class="material-symbols-outlined" aria-hidden="true">history</span><span>No activity yet</span></div>
+                            <?php endif; ?>
+                        </section>
+
+                    </div><!-- /fdb-grid -->
+                </div><!-- /fdb -->
 
             </div><!-- /panel-home -->
 
@@ -3133,16 +4241,31 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         <!-- Shell -->
         <div class="sov-shell">
 
-            <!-- ── Page heading ──────────────────────────────────── -->
-            <div class="sov-pagehead">
-                <h1 class="sov-pagehead-title">Settings</h1>
+            <!-- -- Page heading + view switch ------------------------ -->
+            <div class="sov-pagehead sx-head">
+                <div class="sx-head-text">
+                    <h1 class="sov-pagehead-title">Settings</h1>
+                    <p class="sov-pagehead-sub">Manage your profile, security, appearance and notifications in one place.</p>
+                </div>
+                <!-- Two views only: the unified Settings screen, and Help &amp; Support kept on its own.
+                     (Same .sov-nav-item / data-sov-tab hooks the existing tab script already handles.) -->
+                <nav class="acct-tabs sx-switch" id="sovSidenav" aria-label="Settings views">
+                    <button type="button" class="sov-nav-item active" data-sov-tab="sov-tab-settings">
+                        <span class="material-symbols-outlined">tune</span>
+                        Settings
+                    </button>
+                    <button type="button" class="sov-nav-item" data-sov-tab="sov-tab-help">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        Help &amp; Support
+                    </button>
+                </nav>
             </div>
 
-            <!-- ── Body ─────────────────────────────────────────── -->
+            <!-- -- Body ------------------------------------------- -->
             <div class="sov-body">
 
                 <?php
-                $acct_meta_parts = array_filter([$db_faculty_rank, $db_department]);
+                $acct_meta_parts = array_filter([$db_department]);
                 $acct_meta = $acct_meta_parts ? implode(' &middot; ', array_map('htmlspecialchars', $acct_meta_parts)) : 'PUPSync Faculty';
                 ?>
 
@@ -3159,310 +4282,304 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </span>
                         </div>
                     </div>
-                    <button type="button" class="sov-nav-item acct-banner-edit-btn" data-sov-tab="sov-tab-account">
-                        <span class="material-symbols-outlined">edit</span>
-                        Edit Profile
-                    </button>
                 </div>
 
-                <!-- Horizontal tab bar -->
-                <nav class="acct-tabs" id="sovSidenav">
-                    <button type="button" class="sov-nav-item active" data-sov-tab="sov-tab-account">
-                        <span class="material-symbols-outlined">person</span>
-                        Account
-                    </button>
-                    <button type="button" class="sov-nav-item" data-sov-tab="sov-tab-appearance">
-                        <span class="material-symbols-outlined">palette</span>
-                        Appearance
-                    </button>
-                    <button type="button" class="sov-nav-item" data-sov-tab="sov-tab-privacy">
-                        <span class="material-symbols-outlined">privacy_tip</span>
-                        Privacy
-                    </button>
-                    <button type="button" class="sov-nav-item" data-sov-tab="sov-tab-help">
-                        <span class="material-symbols-outlined">help_outline</span>
-                        Help &amp; Support
-                    </button>
-                </nav>
-
-                <!-- Tab content -->
+                <!-- Views -->
                 <div class="sov-content">
 
-                    <!-- ══ TAB: Account (Personal Information + Security) ══ -->
-                    <div class="sov-tab-panel active" id="sov-tab-account">
-                        <div class="acct-grid">
+                    <!-- VIEW: Settings -- Account, Appearance and Notifications & Data on ONE screen -->
+                    <div class="sov-tab-panel active" id="sov-tab-settings">
 
-                            <!-- Personal Information -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">badge</span>
-                                    <h3>Personal Information</h3>
+                        <section class="sx-section" aria-labelledby="sxAccountTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">person</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxAccountTitle">Account</h2>
+                                    <p class="sx-section-sub">Your profile details and sign-in security.</p>
                                 </div>
-                                <div class="acct-rows">
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Full Name</span>
-                                        <div class="acct-row-value">
-                                            <input class="acct-row-input" id="sovFullName" type="text"
-                                                value="<?php echo htmlspecialchars($fullname); ?>"
-                                                data-sov-field="fullname">
-                                        </div>
+                            </header>
+                            <div class="sx-grid sx-grid--lead">
+
+                                <!-- Personal Information -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">badge</span>
+                                        <h3>Personal Information</h3>
                                     </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Faculty ID</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Full Name</span>
+                                            <div class="acct-row-value">
+                                                <input class="acct-row-input" id="sovFullName" type="text"
+                                                    value="<?php echo htmlspecialchars($fullname); ?>"
+                                                    data-sov-field="fullname">
+                                            </div>
                                         </div>
-                                        <?php if ($fid_unset): ?>
-                                            <button class="sov-btn-outline" data-action="open-faculty-id-modal">Add</button>
-                                        <?php else: ?>
-                                            <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Email Address</span>
-                                        <div class="acct-row-value">
-                                            <input class="acct-row-input" id="sovEmail" type="email"
-                                                value="<?php echo htmlspecialchars($db_email); ?>"
-                                                data-sov-field="email">
-                                        </div>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Department</span>
-                                        <div class="acct-row-value">
-                                            <?php if ($department_locked): ?>
-                                                <span class="acct-row-static" id="sovDepartment"><?php echo htmlspecialchars($db_department); ?></span>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Faculty ID</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                                            </div>
+                                            <?php if ($fid_unset): ?>
+                                                <button class="sov-btn-outline" data-action="open-faculty-id-modal">Add</button>
                                             <?php else: ?>
-                                                <select class="acct-row-input" id="sovDepartment" data-sov-field="department">
-                                                    <option value="">Select Department&hellip;</option>
-                                                    <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
-                                                        <option value="<?php echo $p; ?>" <?php echo $db_department === $p ? 'selected' : ''; ?>>
-                                                            <?php echo $p; ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                                <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
                                             <?php endif; ?>
                                         </div>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Position / Rank</span>
-                                        <div class="acct-row-value">
-                                            <select class="acct-row-input" id="sovRank" data-sov-field="faculty_rank">
-                                                <option value="">Select Position&hellip;</option>
-                                                <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
-                                                    <option value="<?php echo $rank; ?>" <?php echo $db_faculty_rank === $rank ? 'selected' : ''; ?>>
-                                                        <?php echo $rank; ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Mobile Number</span>
-                                        <div class="acct-row-value">
-                                            <input class="acct-row-input" id="sovPhone" type="tel"
-                                                value="<?php echo htmlspecialchars($db_phone); ?>"
-                                                placeholder="+63 912 345 6789"
-                                                data-sov-field="phone">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="acct-card-foot">
-                                    <button class="sov-btn-primary" data-action="contact-save">Save Changes</button>
-                                </div>
-                            </div>
-
-                            <!-- Password & Security -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">lock</span>
-                                    <h3>Password &amp; Security</h3>
-                                </div>
-                                <div class="acct-rows">
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Password</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
-                                        </div>
-                                        <button class="sov-btn-outline" data-action="open-pw-modal">Change</button>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Backup Email</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static">
-                                                <?php echo $masked_backup ? htmlspecialchars($masked_backup) : 'Not set'; ?>
-                                            </span>
-                                        </div>
-                                        <button class="sov-btn-outline" data-action="open-backup-email-modal">
-                                            <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
-                                        </button>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Session Status</span>
-                                        <div class="acct-row-value">
-                                            <span class="sov-badge sov-badge-success">
-                                                <span class="acct-status-dot"></span>
-                                                Active
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="acct-row acct-row-note">
-                                        <span class="acct-row-label">This Device</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted"><?php echo htmlspecialchars($_SERVER['HTTP_USER_AGENT'] ? substr($_SERVER['HTTP_USER_AGENT'], 0, 44) . '…' : 'Unknown'); ?></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div><!-- /sov-tab-account -->
-
-                    <!-- ══ TAB: Appearance ═══════════════════════════════ -->
-                    <div class="sov-tab-panel" id="sov-tab-appearance">
-                        <div class="acct-grid">
-
-                            <!-- Theme -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">palette</span>
-                                    <h3>Theme</h3>
-                                </div>
-                                <div class="sov-theme-row">
-                                    <div class="sov-theme-option" data-action="apply-theme" data-theme="light">
-                                        <div class="sov-theme-swatch sov-swatch-light">
-                                            <div class="sov-swatch-topbar"></div>
-                                            <div class="sov-swatch-body">
-                                                <div class="sov-swatch-sidebar"></div>
-                                                <div class="sov-swatch-content"></div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Email Address</span>
+                                            <div class="acct-row-value">
+                                                <input class="acct-row-input" id="sovEmail" type="email"
+                                                    value="<?php echo htmlspecialchars($db_email); ?>"
+                                                    data-sov-field="email">
                                             </div>
                                         </div>
-                                        <div class="sov-theme-check" id="tc-light">
-                                            <span class="material-symbols-outlined">check</span>
-                                        </div>
-                                        <span class="sov-theme-name">Light</span>
-                                    </div>
-                                    <div class="sov-theme-option" data-action="apply-theme" data-theme="dark">
-                                        <div class="sov-theme-swatch sov-swatch-dark">
-                                            <div class="sov-swatch-topbar"></div>
-                                            <div class="sov-swatch-body">
-                                                <div class="sov-swatch-sidebar"></div>
-                                                <div class="sov-swatch-content"></div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Department</span>
+                                            <div class="acct-row-value">
+                                                <?php if ($department_locked): ?>
+                                                    <span class="acct-row-static" id="sovDepartment"><?php echo htmlspecialchars($db_department); ?></span>
+                                                <?php else: ?>
+                                                    <select class="acct-row-input" id="sovDepartment" data-sov-field="department">
+                                                        <option value="">Select Department&hellip;</option>
+                                                        <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                                            <option value="<?php echo $p; ?>" <?php echo $db_department === $p ? 'selected' : ''; ?>>
+                                                                <?php echo $p; ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
-                                        <div class="sov-theme-check" id="tc-dark">
-                                            <span class="material-symbols-outlined">check</span>
-                                        </div>
-                                        <span class="sov-theme-name">Dark</span>
-                                    </div>
-                                    <div class="sov-theme-option" data-action="apply-theme" data-theme="high-contrast">
-                                        <div class="sov-theme-swatch sov-swatch-hc">
-                                            <div class="sov-swatch-topbar"></div>
-                                            <div class="sov-swatch-body">
-                                                <div class="sov-swatch-sidebar"></div>
-                                                <div class="sov-swatch-content"></div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Mobile Number</span>
+                                            <div class="acct-row-value">
+                                                <input class="acct-row-input" id="sovPhone" type="tel"
+                                                    value="<?php echo htmlspecialchars($db_phone); ?>"
+                                                    placeholder="+63 912 345 6789"
+                                                    data-sov-field="phone">
                                             </div>
                                         </div>
-                                        <div class="sov-theme-check" id="tc-hc">
-                                            <span class="material-symbols-outlined">check</span>
-                                        </div>
-                                        <span class="sov-theme-name">High Contrast</span>
+                                    </div>
+                                    <div class="acct-card-foot">
+                                        <button class="sov-btn-primary" data-action="contact-save">Save Changes</button>
                                     </div>
                                 </div>
-                                <!-- Hidden legacy elements kept for JS compatibility -->
-                                <select id="themeSelectUnified" style="display:none;">
-                                    <option value="light">Light</option>
-                                    <option value="dark">Dark</option>
-                                    <option value="high-contrast">High Contrast</option>
-                                </select>
-                                <div style="display:none;">
-                                    <div id="tp-light"></div>
-                                    <div id="tp-dark"></div>
-                                    <div id="tp-hc"></div>
+
+
+                                <!-- Password & Security -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">lock</span>
+                                        <h3>Password &amp; Security</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Password</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+                                            </div>
+                                            <button class="sov-btn-outline" data-action="open-pw-modal">Change</button>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Backup Email</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static">
+                                                    <?php echo $masked_backup ? htmlspecialchars($masked_backup) : 'Not set'; ?>
+                                                </span>
+                                            </div>
+                                            <button class="sov-btn-outline" data-action="open-backup-email-modal">
+                                                <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
+                                            </button>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Session Status</span>
+                                            <div class="acct-row-value">
+                                                <span class="sov-badge sov-badge-success">
+                                                    <span class="acct-status-dot"></span>
+                                                    Active
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="acct-row acct-row-note">
+                                            <span class="acct-row-label">This Device</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted"><?php echo htmlspecialchars($_SERVER['HTTP_USER_AGENT'] ? substr($_SERVER['HTTP_USER_AGENT'], 0, 44) . '…' : 'Unknown'); ?></span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
+
                             </div>
+                        </section>
 
-                            <!-- Text Size -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">text_fields</span>
-                                    <h3>Text Size</h3>
+                        <section class="sx-section" aria-labelledby="sxAppearanceTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">palette</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxAppearanceTitle">Appearance</h2>
+                                    <p class="sx-section-sub">How PUPSync looks on your screen.</p>
                                 </div>
-                                <div class="sov-font-row">
-                                    <button class="sov-font-btn sov-font-sm" data-scale="80">A</button>
-                                    <button class="sov-font-btn sov-font-md font-scale-active" data-scale="100">A</button>
-                                    <button class="sov-font-btn sov-font-lg" data-scale="120">A</button>
+                            </header>
+                            <div class="sx-grid sx-grid--lead">
+
+                                <!-- Theme -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">palette</span>
+                                        <h3>Theme</h3>
+                                    </div>
+                                    <div class="sov-theme-row">
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="light">
+                                            <div class="sov-theme-swatch sov-swatch-light">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-light">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">Light</span>
+                                        </div>
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="dark">
+                                            <div class="sov-theme-swatch sov-swatch-dark">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-dark">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">Dark</span>
+                                        </div>
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="high-contrast">
+                                            <div class="sov-theme-swatch sov-swatch-hc">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-hc">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">High Contrast</span>
+                                        </div>
+                                    </div>
+                                    <!-- Hidden legacy elements kept for JS compatibility -->
+                                    <select id="themeSelectUnified" style="display:none;">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="high-contrast">High Contrast</option>
+                                    </select>
+                                    <div style="display:none;">
+                                        <div id="tp-light"></div>
+                                        <div id="tp-dark"></div>
+                                        <div id="tp-hc"></div>
+                                    </div>
+                                    <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
                                 </div>
-                                <p class="sov-desc-small">Current size: <strong><span id="fontSizeLbl">100%</span></strong></p>
-                                <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" style="display:none;">
-                                <!-- Legacy font-scale-btn kept for JS compatibility (hidden) -->
-                                <div style="display:none;">
-                                    <button class="font-scale-btn" data-scale="80">A</button>
-                                    <button class="font-scale-btn font-scale-active" data-scale="100">A</button>
-                                    <button class="font-scale-btn" data-scale="120">A</button>
+
+
+                                <!-- Text Size -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">text_fields</span>
+                                        <h3>Text Size</h3>
+                                    </div>
+                                    <div class="sov-font-row">
+                                        <button class="sov-font-btn sov-font-sm" data-scale="80">A</button>
+                                        <button class="sov-font-btn sov-font-md font-scale-active" data-scale="100">A</button>
+                                        <button class="sov-font-btn sov-font-lg" data-scale="120">A</button>
+                                    </div>
+                                    <p class="sov-desc-small">Current size: <strong><span id="fontSizeLbl">100%</span></strong></p>
+                                    <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" style="display:none;">
+                                    <!-- Legacy font-scale-btn kept for JS compatibility (hidden) -->
+                                    <div style="display:none;">
+                                        <button class="font-scale-btn" data-scale="80">A</button>
+                                        <button class="font-scale-btn font-scale-active" data-scale="100">A</button>
+                                        <button class="font-scale-btn" data-scale="120">A</button>
+                                    </div>
                                 </div>
+
                             </div>
+                        </section>
 
-                        </div>
-                    </div><!-- /sov-tab-appearance -->
-
-                    <!-- ══ TAB: Privacy ══════════════════════════════════ -->
-                    <div class="sov-tab-panel" id="sov-tab-privacy">
-                        <div class="acct-grid">
-
-                            <!-- Notification Preferences -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">notifications</span>
-                                    <h3>Notification Preferences</h3>
+                        <section class="sx-section" aria-labelledby="sxNotifTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">notifications</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxNotifTitle">Notifications &amp; Data</h2>
+                                    <p class="sx-section-sub">Choose what you hear about, and manage your data.</p>
                                 </div>
-                                <div class="acct-rows">
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Email Alerts</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">Overdue reminders via email</span>
-                                        </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                            </header>
+                            <div class="sx-grid ">
+
+                                <!-- Notification Preferences -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">notifications</span>
+                                        <h3>Notification Preferences</h3>
                                     </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Reservation Reminders</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">24 hours before a booking</span>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Email Alerts</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Overdue reminders via email</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
                                         </div>
-                                        <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
-                                    </div>
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Account Activity</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">Security &amp; login notifications</span>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Reservation Reminders</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">24 hours before a booking</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
                                         </div>
-                                        <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Account Activity</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Security &amp; login notifications</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                        </div>
                                     </div>
                                 </div>
+
+
+                                <!-- Data Management -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">database</span>
+                                        <h3>Data Management</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Export Data</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Download your activity &amp; profile</span>
+                                            </div>
+                                            <button class="sov-btn-outline" data-action="toast" data-msg="Data export coming soon!">Export</button>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
+                        </section>
+                    </div><!-- /sov-tab-settings -->
 
-                            <!-- Data Management -->
-                            <div class="acct-card">
-                                <div class="acct-card-head">
-                                    <span class="material-symbols-outlined">database</span>
-                                    <h3>Data Management</h3>
-                                </div>
-                                <div class="acct-rows">
-                                    <div class="acct-row">
-                                        <span class="acct-row-label">Export Data</span>
-                                        <div class="acct-row-value">
-                                            <span class="acct-row-static acct-row-static-muted">Download your activity &amp; profile</span>
-                                        </div>
-                                        <button class="sov-btn-outline" data-action="toast" data-msg="Data export coming soon!">Export</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div><!-- /sov-tab-privacy -->
-
-                    <!-- ══ TAB: Help & Support ═══════════════════════════ -->
                     <div class="sov-tab-panel" id="sov-tab-help">
+                        <header class="sx-section-head">
+                            <span class="sx-section-icon material-symbols-outlined">support_agent</span>
+                            <div>
+                                <h2 class="sx-section-title">Help &amp; Support</h2>
+                                <p class="sx-section-sub">Answers to common questions, and how to reach the administrator.</p>
+                            </div>
+                        </header>
                         <div class="acct-card acct-card-full">
                             <div class="acct-card-head">
                                 <span class="material-symbols-outlined">help_outline</span>
@@ -3530,8 +4647,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Open the <strong>Account</strong> tab above. From there you can update your profile
-                                        picture, name, department, and change your password securely.
+                                        Open <strong>Settings</strong> from the sidebar. Under <strong>Account</strong> you can update your
+                                        name, email, department and mobile number, and change your password securely.
                                     </div>
                                 </details>
 
@@ -3712,8 +4829,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <?= csrf_field() ?>
                         <input type="hidden" name="equipment_name" id="selectedItem">
                         <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
-                        <?= BookingSchedule::renderRoomSelect('borrow_room', $bk_rooms) ?>
                         <?= BookingSchedule::renderSchedule('bm1', false) ?>
+                        <?= BookingSchedule::renderRoomPicker('borrow_room') ?>
                         <?php if ($is_org_adviser): ?>
                             <div class="form-group">
                                 <span class="form-label">Request Letter <span class="bm-opt">Optional</span></span>
@@ -3795,8 +4912,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <input type="hidden" name="equipment_name" id="selectedItem">
                             <input type="hidden" name="instructor" value="<?php echo htmlspecialchars($fullname); ?>">
                             <input type="hidden" name="submitted_as" value="personal">
-                            <?= BookingSchedule::renderRoomSelect('bm2Room', $bk_rooms) ?>
                             <?= BookingSchedule::renderSchedule('bm2', false) ?>
+                            <?= BookingSchedule::renderRoomPicker('bm2Room') ?>
                             <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
                             <div class="bm-actions">
                                 <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
@@ -3855,8 +4972,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </div>
 
                             <!-- Shared fields -->
-                            <?= BookingSchedule::renderRoomSelect('adv_room', $bk_rooms) ?>
                             <?= BookingSchedule::renderSchedule('bm3', true) ?>
+                            <?= BookingSchedule::renderRoomPicker('adv_room') ?>
 
                             <!-- Document upload — optional -->
                             <div class="form-group">

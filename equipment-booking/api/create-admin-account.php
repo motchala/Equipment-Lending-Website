@@ -152,6 +152,9 @@ if (!$ins_stmt->execute()) {
 $new_id = (int)$ins_stmt->insert_id;
 $ins_stmt->close();
 
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity($conn, 'account', 'Created admin account for ' . $full_name);
+
 // ── Success ───────────────────────────────────────────────────────────────────
 $remaining = 5 - ($current_count + 1);
 http_response_code(201);

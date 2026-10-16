@@ -100,6 +100,11 @@ if ($req_datetime === false || $req_datetime <= $now_manila) {
     echo json_encode(['error' => 'Reservation date and time cannot be in the past.']);
     exit();
 }
+// Closed day — no room reservations on Sundays
+if ($req_datetime->format('N') === '7') {
+    echo json_encode(['error' => 'Reservations are not available on Sundays. Please choose another day.']);
+    exit();
+}
 if ($end_time <= $start_time) {
     echo json_encode(['error' => 'End time must be after start time.']);
     exit();
@@ -230,15 +235,27 @@ if ($doc_tmp !== null) {
 
 // ── Insert reservation ────────────────────────────────────────────────────
 $notes_val = $notes !== '' ? $notes : null;
+$initial_status = $document_path !== null ? 'Waiting' : 'Approved';
+
+// The legacy schema used an ENUM without Waiting even though the application
+// already recognises pending room reservations. Add the value once when a
+// supporting-letter review is first submitted.
+if ($initial_status === 'Waiting') {
+    $status_col = $conn->query("SHOW COLUMNS FROM tbl_room_reservations LIKE 'status'");
+    $status_def = $status_col ? (string)(($status_col->fetch_assoc()['Type'] ?? '')) : '';
+    if (stripos($status_def, "'waiting'") === false) {
+        $conn->query("ALTER TABLE tbl_room_reservations MODIFY status ENUM('Waiting','Approved','Declined','Cancelled') NOT NULL DEFAULT 'Approved'");
+    }
+}
 $ins = $conn->prepare(
     "INSERT INTO tbl_room_reservations
         (room_id, faculty_id, faculty_name, submitted_as,
          purpose, attendees, reservation_date, start_time, end_time,
          notes, document_path, status, request_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW())"
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
 );
 $ins->bind_param(
-    'issssisssss',
+    'issssissssss',
     $room_id,
     $faculty_id,
     $faculty_name,
@@ -249,7 +266,8 @@ $ins->bind_param(
     $start_time,
     $end_time,
     $notes_val,
-    $document_path
+    $document_path,
+    $initial_status
 );
 
 if (!$ins->execute()) {
@@ -266,11 +284,16 @@ $reservation_id = $conn->insert_id;
 $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
-require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+if ($initial_status !== 'Waiting') {
+    require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
+    ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+}
 
 // ── A declined reservation is never kept: tell the user on the spot ───────
-$declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
+$declined_reason = null;
+if ($initial_status !== 'Waiting') {
+    $declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
+}
 if ($declined_reason !== null) {
     fcty_quota_unlock($conn, $faculty_id);
     echo json_encode(['error' => $declined_reason]);

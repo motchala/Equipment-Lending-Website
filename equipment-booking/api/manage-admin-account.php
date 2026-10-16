@@ -1,12 +1,13 @@
 <?php
+
 /**
  * manage-admin-account.php
  *
  * Super-Admin-only actions on OTHER admin accounts (Settings → Manage Admins):
  *
  *   action=update      edit full name / email / password
- *   action=dormant     make the account unusable for 1–30 days
- *   action=reactivate  end a dormancy early
+ *   action=dormant     lock the account for 1–30 days
+ *   action=reactivate  unlock a locked account early
  *   action=delete      remove the account (frees a seat)
  *
  * Rules enforced here (never trusted to the UI):
@@ -15,7 +16,7 @@
  *   • Only accounts with the plain "Admin" role can be managed; Super Admin
  *     accounts (including the original main@admin.edu) are protected.
  *   • update / delete require the acting Super Admin's own password again.
- *   • Dormancy is capped at ADMIN_DORMANT_MAX_DAYS (30) days.
+ *   • Locks are capped at ADMIN_DORMANT_MAX_DAYS (30) days.
  *   • Credential changes and dormancy end the target's active sessions
  *     (see config/admin-auth.php → admin_session_guard()).
  */
@@ -84,6 +85,7 @@ csrf_verify();
 
 date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/admin-activity.php';
 $conn = getDB();
 admin_accounts_ensure_schema($conn);
 
@@ -122,7 +124,7 @@ if ((int)$target['id'] === (int)$actor['id']) {
     respond(403, 'error', 'You cannot change your own account here. Use Settings → My Account.');
 }
 if ($target['role'] !== 'Admin') {
-    respond(403, 'error', 'Super Admin accounts are protected and cannot be edited, made dormant or deleted here.');
+    respond(403, 'error', 'Super Admin accounts are protected and cannot be edited, locked or deleted here.');
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -180,9 +182,21 @@ switch ($action) {
         $sets   = [];
         $types  = '';
         $params = [];
-        if ($name_changed)  { $sets[] = 'fullName = ?'; $types .= 's'; $params[] = $full_name; }
-        if ($email_changed) { $sets[] = 'email = ?';    $types .= 's'; $params[] = $email; }
-        if ($pw_changed)    { $sets[] = 'password = ?'; $types .= 's'; $params[] = password_hash($new_pw, PASSWORD_BCRYPT); }
+        if ($name_changed) {
+            $sets[] = 'fullName = ?';
+            $types .= 's';
+            $params[] = $full_name;
+        }
+        if ($email_changed) {
+            $sets[] = 'email = ?';
+            $types .= 's';
+            $params[] = $email;
+        }
+        if ($pw_changed) {
+            $sets[] = 'password = ?';
+            $types .= 's';
+            $params[] = password_hash($new_pw, PASSWORD_BCRYPT);
+        }
         if ($email_changed || $pw_changed) {
             $sets[]   = 'session_epoch = ?';
             $types   .= 'i';
@@ -206,16 +220,23 @@ switch ($action) {
         }
         $st->close();
 
-        error_log(sprintf('[manage-admin] %s updated admin #%d (name:%d email:%d password:%d)',
-            $_SESSION['admin_email'], $target_id, $name_changed, $email_changed, $pw_changed));
+        error_log(sprintf(
+            '[manage-admin] %s updated admin #%d (name:%d email:%d password:%d)',
+            $_SESSION['admin_email'],
+            $target_id,
+            $name_changed,
+            $email_changed,
+            $pw_changed
+        ));
 
+        admin_log_activity($conn, 'account', 'Edited login details of ' . $target['fullName']);
         respond(200, 'success', 'Admin account updated.', [
             'full_name'     => $full_name,
             'email'         => $email,
             'signed_out'    => ($email_changed || $pw_changed),
         ]);
 
-    // --------------------------------------------------------------- dormant
+        // ------------------------------------------------------------------ lock
     case 'dormant':
         $days = filter_var($_POST['days'] ?? null, FILTER_VALIDATE_INT);
         if ($days === false || $days === null || $days < 1 || $days > ADMIN_DORMANT_MAX_DAYS) {
@@ -226,32 +247,34 @@ switch ($action) {
         $st = $conn->prepare("UPDATE tbl_accounts SET dormant_until = ? WHERE id = ? AND role = 'Admin'");
         $st->bind_param('ii', $until, $target_id);
         if (!$st->execute()) {
-            error_log('[manage-admin] dormant failed: ' . $st->error);
+            error_log('[manage-admin] lock failed: ' . $st->error);
             respond(500, 'error', 'Could not update the account. Please try again.');
         }
         $st->close();
 
-        error_log(sprintf('[manage-admin] %s made admin #%d dormant for %d day(s)', $_SESSION['admin_email'], $target_id, $days));
+        error_log(sprintf('[manage-admin] %s locked admin #%d for %d day(s)', $_SESSION['admin_email'], $target_id, $days));
 
-        respond(200, 'success', 'Account is now dormant for ' . $days . ' day' . ($days === 1 ? '' : 's') . '.', [
+        admin_log_activity($conn, 'account', 'Locked ' . $target['fullName'] . ' for ' . $days . ' day' . ($days === 1 ? '' : 's'));
+        respond(200, 'success', 'Account is now locked for ' . $days . ' day' . ($days === 1 ? '' : 's') . '.', [
             'dormant_until' => $until,
             'dormant_label' => admin_format_time($until),
         ]);
 
-    // ------------------------------------------------------------ reactivate
+        // ---------------------------------------------------------------- unlock
     case 'reactivate':
         $st = $conn->prepare("UPDATE tbl_accounts SET dormant_until = NULL WHERE id = ? AND role = 'Admin'");
         $st->bind_param('i', $target_id);
         if (!$st->execute()) {
-            error_log('[manage-admin] reactivate failed: ' . $st->error);
+            error_log('[manage-admin] unlock failed: ' . $st->error);
             respond(500, 'error', 'Could not update the account. Please try again.');
         }
         $st->close();
 
-        error_log(sprintf('[manage-admin] %s reactivated admin #%d', $_SESSION['admin_email'], $target_id));
-        respond(200, 'success', 'Account reactivated.');
+        error_log(sprintf('[manage-admin] %s unlocked admin #%d', $_SESSION['admin_email'], $target_id));
+        admin_log_activity($conn, 'account', 'Unlocked ' . $target['fullName']);
+        respond(200, 'success', 'Account unlocked.');
 
-    // ---------------------------------------------------------------- delete
+        // ---------------------------------------------------------------- delete
     case 'delete':
         require_reauth($actor['password']);
 
@@ -264,5 +287,6 @@ switch ($action) {
         $st->close();
 
         error_log(sprintf('[manage-admin] %s deleted admin #%d (%s)', $_SESSION['admin_email'], $target_id, $target['email']));
+        admin_log_activity($conn, 'account', 'Deleted admin account of ' . $target['fullName']);
         respond(200, 'success', 'Admin account deleted.', seat_counts($conn));
 }

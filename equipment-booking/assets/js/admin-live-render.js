@@ -123,10 +123,12 @@
                 <td><span class="status-pill ${pillClass}">${pillText}</span></td>
                 <td class="action-cell">
                     <div class="action-btns">
-                        <a href="admin-dashboard.php?action=return_confirm&id=${esc(r.id)}"
+                        <button type="button"
                             class="btn-return-confirm"
-                            title="Confirm item has been returned"
-                            onclick="return confirm('${confirmMsg}')">
+                            data-action="return-confirm"
+                            data-request-id="${esc(r.id)}"
+                            data-confirm-msg="${esc(confirmMsg)}"
+                            title="Confirm item has been returned">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                                 stroke-linejoin="round" width="13" height="13">
@@ -134,7 +136,7 @@
                                 <path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
                             </svg>
                             Returned
-                        </a>
+                        </button>
                     </div>
                 </td>
                 <td>${buildOverrideBtn(r.id, actualStatus, r.equipment_name, r.faculty_name)}</td>
@@ -299,9 +301,37 @@
                 .catch(function () { });
         }
 
+        window.adminDoPoll = doPoll;   // expose globally for inventory/faculty AJAX callers
         doPoll();              // ← fire immediately on page load
         setInterval(doPoll, INTERVAL);  // ← then every 8 seconds
     }
+
+    /* ── Delegated handler for return-confirm buttons (rendered dynamically by renderReturnBody) ── */
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-action="return-confirm"]');
+        if (!btn) return;
+        var reqId = btn.dataset.requestId;
+        var msg = btn.dataset.confirmMsg || 'Confirm this item has been returned?';
+        if (!confirm(msg)) return;
+        btn.disabled = true;
+        fetch('admin-dashboard.php?action=return_confirm&id=' + encodeURIComponent(reqId) + '&ajax=1', {
+            credentials: 'same-origin'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            btn.disabled = false;
+            if (data.status === 'success') {
+                showAdminToast('✅ Return confirmed.');
+                if (typeof window.adminDoPoll === 'function') window.adminDoPoll(); // refresh the return-body table immediately
+            } else {
+                showAdminToast('⚠️ ' + (data.message || 'Could not confirm return.'));
+            }
+        })
+        .catch(function () {
+            btn.disabled = false;
+            showAdminToast('⚠️ Network error. Please try again.');
+        });
+    });
 
     // Kick off after the page is ready
     if (document.readyState === 'loading') {

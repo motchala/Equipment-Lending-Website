@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/cancel-reservation.php
  * Cancel an Approved room reservation.
@@ -87,6 +88,22 @@ $result = RoomCancellation::cancel($conn, $reservationId, $actor);
 if (!$result['success']) {
     echo json_encode(['error' => $result['error']]);
     exit();
+}
+
+// Activity log: only manual cancellations by an admin (faculty cancelling their own booking is not admin activity).
+if ($isAdmin) {
+    require_once __DIR__ . '/../../config/admin-activity.php';
+    $label = 'Cancelled reservation #' . $reservationId;
+    if ($q = $conn->prepare('SELECT r.room_name, rr.faculty_name FROM tbl_room_reservations rr LEFT JOIN tbl_rooms r ON r.room_id = rr.room_id WHERE rr.id = ? LIMIT 1')) {
+        $q->bind_param('i', $reservationId);
+        $q->execute();
+        $q->bind_result($log_room, $log_faculty);
+        if ($q->fetch()) {
+            $label = 'Cancelled reservation #' . $reservationId . ': ' . $log_room . ' for ' . $log_faculty;
+        }
+        $q->close();
+    }
+    admin_log_activity($conn, 'room', $label, null, ['action' => 'room_cancelled', 'ref_type' => 'reservation', 'ref_id' => $reservationId]);
 }
 
 echo json_encode(['success' => true]);

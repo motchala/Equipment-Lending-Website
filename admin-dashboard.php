@@ -3,6 +3,923 @@
 <?php require_once __DIR__ . '/equipment-booking/core/notif-functions.php'; ?>
 <?php require_once __DIR__ . '/config/role-splash.php'; ?>
 <?php
+// ================= DASHBOARD TAB (home screen) =================
+// Data + markup for the Dashboard tab. Read-only: nothing here writes to the database
+// (the overdue / auto-decline housekeeping stays in admin-functions.php and
+// poll-requests-data.php).
+//   dash_collect($conn)  -> every number / list the dashboard shows
+//   dash_render($d)      -> echoes the stat cards + panels
+// Used twice so first paint and live refresh can never disagree:
+//   • the Dashboard panel further down this file
+//   • "admin-dashboard.php?fragment=dashboard" (handled right after the functions), which
+//     returns the same markup; admin-dashboard.js swaps it into #dashLive every 15 s.
+// Every query is wrapped, so a missing table shows zeros instead of breaking the page.
+
+if (!function_exists('dash_h')) {
+    function dash_h($v): string
+    {
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+/** Run a SELECT and return all rows ([] on any failure). */
+if (!function_exists('dash_rows')) {
+    function dash_rows(mysqli $conn, string $sql, string $types = '', array $params = []): array
+    {
+        try {
+            if ($types === '') {
+                $res = $conn->query($sql);
+            } else {
+                $st = $conn->prepare($sql);
+                $st->bind_param($types, ...$params);
+                $st->execute();
+                $res = $st->get_result();
+            }
+            $rows = [];
+            if ($res) {
+                while ($r = $res->fetch_assoc()) {
+                    $rows[] = $r;
+                }
+            }
+            return $rows;
+        } catch (Throwable $e) {
+            error_log('[PUPSync] dashboard query failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
+
+/** First column of the first row as an int (0 on failure). */
+if (!function_exists('dash_scalar')) {
+    function dash_scalar(mysqli $conn, string $sql, string $types = '', array $params = []): int
+    {
+        $rows = dash_rows($conn, $sql, $types, $params);
+        return $rows ? (int)array_values($rows[0])[0] : 0;
+    }
+}
+
+if (!function_exists('dash_pl')) {
+    /** "1 request" / "3 requests" */
+    function dash_pl(int $n, string $word, ?string $plural = null): string
+    {
+        return $n . ' ' . ($n === 1 ? $word : ($plural ?? $word . 's'));
+    }
+}
+
+/**
+ * "just now", "12 min ago", "3 h ago", "Yesterday", "Oct 8".
+ * $ageSeconds comes from the database (TIMESTAMPDIFF(SECOND, col, NOW())) so it
+ * is right whatever timezone the DB server runs in; $datetime is only used to
+ * print the calendar date once something is older than two days.
+ */
+if (!function_exists('dash_ago')) {
+    function dash_ago($ageSeconds, ?string $datetime = null): string
+    {
+        if ($ageSeconds === null || $ageSeconds === '') {
+            return $datetime ? date('M j', strtotime($datetime)) : '';
+        }
+        $diff = (int)$ageSeconds;
+        if ($diff < 60)      return 'just now';
+        if ($diff < 3600)    return floor($diff / 60) . ' min ago';
+        if ($diff < 86400)   return floor($diff / 3600) . ' h ago';
+        if ($diff < 172800)  return 'Yesterday';
+        return $datetime ? date('M j', strtotime($datetime)) : floor($diff / 86400) . ' d ago';
+    }
+}
+
+/** Admin-facing wording for the reason code stored on a declined request. */
+if (!function_exists('dash_decline_label')) {
+    function dash_decline_label(?string $rule): string
+    {
+        $rule = trim((string)$rule);
+        if ($rule === '' || $rule === 'other') return 'Other / unspecified';
+        static $map = [
+            'rule_out_of_stock'          => 'Out of stock',
+            'rule_archived'              => 'Item no longer available',
+            'rule_overdue_block'         => 'Borrower has an overdue item',
+            'rule_overdue_block_enabled' => 'Borrower has an overdue item',
+            'rule_duplicate_block'       => 'Duplicate request',
+            'rule_duplicate_block_enabled' => 'Duplicate request',
+            'rule_missing_doc_hold'      => 'Supporting document missing',
+            'rule_past_datetime'         => 'Date/time already passed',
+            'rule_schedule_conflict'     => 'Schedule conflict',
+            'override'                   => 'Declined manually by an admin',
+        ];
+        if (isset($map[$rule])) return $map[$rule];
+        // rule_1_fifo … rule_5_id_order = the request lost a priority contest
+        if (preg_match('/^rule_[1-5]_/', $rule)) return 'Lost to a higher-priority request';
+        return ucfirst(trim(str_replace('_', ' ', preg_replace('/^rule_(\d+_)?/', '', $rule))));
+    }
+}
+
+/** Collect everything the dashboard shows. */
+function dash_collect(mysqli $conn): array
+{
+    $today = date('Y-m-d');
+    $nowT  = date('H:i:s');
+    $d     = ['today' => $today];
+
+    // ── Equipment requests ───────────────────────────────────────────────
+    $d['waiting']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Waiting'");
+    $d['active']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved'");
+    $d['due_today'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Approved' AND return_date = ?", 's', [$today]);
+    $d['overdue']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_requests WHERE status='Overdue'");
+
+    $d['overdue_days'] = 0;
+    $old = dash_rows($conn, "SELECT MIN(return_date) AS m FROM tbl_requests WHERE status='Overdue'");
+    if ($old && !empty($old[0]['m'])) {
+        $d['overdue_days'] = max(0, (int)floor((strtotime($today) - strtotime($old[0]['m'])) / 86400));
+    }
+
+    // ── Inventory ────────────────────────────────────────────────────────
+    $d['inv_total'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0");
+    $d['inv_out']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0 AND quantity<=0");
+    $d['inv_low']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_inventory WHERE is_archived=0 AND quantity>0 AND quantity<=2");
+    $d['stock']     = dash_rows($conn, "SELECT item_name, category, quantity FROM tbl_inventory WHERE is_archived=0 AND quantity<=2 ORDER BY quantity ASC, item_name ASC LIMIT 5");
+
+    // ── Rooms ────────────────────────────────────────────────────────────
+    $d['rooms_bookable'] = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_rooms WHERE is_archived=0 AND status='Available'");
+    $d['rooms_today']    = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
+    $d['rooms_in_use']   = dash_scalar($conn, "SELECT COUNT(DISTINCT room_id) FROM tbl_room_reservations WHERE reservation_date = ? AND status='Approved'", 's', [$today]);
+    $d['rooms_issues']   = dash_scalar($conn, "SELECT COUNT(*) FROM tbl_room_issues WHERE status='Open'");
+    $d['rooms_pct']      = $d['rooms_bookable'] > 0
+        ? (int)min(100, round($d['rooms_in_use'] / $d['rooms_bookable'] * 100))
+        : 0;
+    $d['upcoming'] = dash_rows(
+        $conn,
+        "SELECT r.reservation_date, r.start_time, r.end_time, r.purpose, r.faculty_name,
+                rm.room_name, b.name AS building
+           FROM tbl_room_reservations r
+      LEFT JOIN tbl_rooms rm     ON rm.room_id = r.room_id
+      LEFT JOIN tbl_buildings b  ON b.building_id = rm.building_id
+          WHERE r.status='Approved'
+            AND (r.reservation_date > ? OR (r.reservation_date = ? AND r.end_time >= ?))
+       ORDER BY r.reservation_date ASC, r.start_time ASC
+          LIMIT 4",
+        'sss',
+        [$today, $today, $nowT]
+    );
+
+    // ── Activity chart: 60 days of history, both datasets. The 7D / 14D / 30D toggle is client-side;
+    //    the extra days let each range be compared with the period right before it. ──
+    $labels = [];
+    for ($i = 59; $i >= 0; $i--) {
+        $labels[] = date('Y-m-d', strtotime("-$i day", strtotime($today)));
+    }
+    $idx   = array_flip($labels);
+    $zeros = array_fill(0, 60, 0);
+    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros];
+    $rm    = ['approved' => $zeros, 'declined' => $zeros, 'cancelled' => $zeros];
+    $from  = $labels[0] . ' 00:00:00';
+    $from30 = $labels[30] . ' 00:00:00';   // the 30-day panels below (Most requested) keep a 30-day window
+
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_requests WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        // Approved / Overdue / Returned all started life as an approval.
+        $k = in_array($r['status'], ['Approved', 'Overdue', 'Returned'], true) ? 'approved'
+            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : null));
+        if ($k) $eq[$k][$idx[$r['d']]] += (int)$r['c'];
+    }
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_room_reservations WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        $k = strtolower($r['status']);
+        if (isset($rm[$k])) $rm[$k][$idx[$r['d']]] += (int)$r['c'];
+    }
+    // Context behind the chart: why requests were declined, and which rooms are booked most.
+    // Each row carries one count per day (same 60-day axis) so the browser can total it for any range.
+    $reasons = [];
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, COALESCE(NULLIF(arbitration_rule,''),'other') AS r, COUNT(*) AS c FROM tbl_requests WHERE status='Declined' AND request_date >= ? GROUP BY DATE(request_date), COALESCE(NULLIF(arbitration_rule,''),'other')", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        $lab = dash_decline_label($r['r']);
+        if (!isset($reasons[$lab])) $reasons[$lab] = ['label' => $lab, 'values' => $zeros];
+        $reasons[$lab]['values'][$idx[$r['d']]] += (int)$r['c'];
+    }
+    $roomsTop = [];
+    foreach (
+        dash_rows($conn, "SELECT DATE(r.request_date) AS d, r.room_id, rm.room_name, b.name AS building, COUNT(*) AS c
+                                 FROM tbl_room_reservations r
+                            LEFT JOIN tbl_rooms rm    ON rm.room_id = r.room_id
+                            LEFT JOIN tbl_buildings b ON b.building_id = rm.building_id
+                                WHERE r.status='Approved' AND r.request_date >= ?
+                             GROUP BY DATE(r.request_date), r.room_id, rm.room_name, b.name", 's', [$from]) as $r
+    ) {
+        if (!isset($idx[$r['d']])) continue;
+        $key = (string)$r['room_id'];
+        if (!isset($roomsTop[$key])) {
+            $roomsTop[$key] = ['label' => $r['room_name'] ?: ('Room #' . $r['room_id']), 'sub' => (string)($r['building'] ?? ''), 'values' => $zeros];
+        }
+        $roomsTop[$key]['values'][$idx[$r['d']]] += (int)$r['c'];
+    }
+    $byTotal = static function (array $rows, int $keep): array {
+        usort($rows, static fn($a, $b) => array_sum($b['values']) <=> array_sum($a['values']));
+        return array_values(array_slice($rows, 0, $keep));
+    };
+
+    $d['chart'] = [
+        'labels' => $labels,
+        'sets'   => [
+            'equipment' => ['title' => 'Equipment requests', 'unit' => 'request', 'series' => [
+                ['key' => 'approved', 'label' => 'Approved', 'values' => $eq['approved']],
+                ['key' => 'declined', 'label' => 'Declined', 'values' => $eq['declined']],
+                ['key' => 'waiting',  'label' => 'Waiting',  'values' => $eq['waiting']],
+            ]],
+            'rooms' => ['title' => 'Room bookings', 'unit' => 'booking', 'series' => [
+                ['key' => 'approved',  'label' => 'Approved',  'values' => $rm['approved']],
+                ['key' => 'declined',  'label' => 'Declined',  'values' => $rm['declined']],
+                ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $rm['cancelled']],
+            ]],
+        ],
+        'extras' => [
+            'equipment' => ['title' => 'Top decline reason', 'rows' => $byTotal($reasons, 4)],
+            'rooms'     => ['title' => 'Most booked room',   'rows' => $byTotal($roomsTop, 5)],
+        ],
+    ];
+
+    // ── Most requested equipment (30 days) ───────────────────────────────
+    $d['top'] = dash_rows(
+        $conn,
+        "SELECT equipment_name, COUNT(*) AS total,
+                SUM(status IN ('Approved','Overdue','Returned')) AS ok
+           FROM tbl_requests
+          WHERE request_date >= ?
+       GROUP BY equipment_name
+       ORDER BY total DESC, equipment_name ASC
+          LIMIT 5",
+        's',
+        [$from30]
+    );
+
+    // ── Latest requests + decision log ───────────────────────────────────
+    // Same visibility rule the rest of the admin portal uses: auto-declined
+    // requests are hidden; only manual overrides of a decline show.
+    $d['latest'] = dash_rows($conn, "SELECT faculty_name, faculty_id, equipment_name, borrow_date, return_date, status, request_date,
+                                            TIMESTAMPDIFF(SECOND, request_date, NOW()) AS age_s
+                                       FROM tbl_requests
+                                      WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')
+                                   ORDER BY request_date DESC, id DESC LIMIT 6");
+    // Same timeline as the Activity page: decisions by admins AND by the rules engine, with who made them.
+    $d['log'] = [];
+    try {
+        $d['log'] = admin_activity_feed($conn, [
+            'viewer_id'  => admin_current_id($conn) ?? 0,
+            'is_super'   => ($_SESSION['admin_role'] ?? '') === 'Super Admin',
+            'actor_mode' => 'all',
+            'filter'     => 'decisions',
+            'since'      => null,
+            'offset'     => 0,
+            'limit'      => 6,
+        ])['items'];
+    } catch (Throwable $e) {
+        error_log('[dashboard] activity card: ' . $e->getMessage());
+    }
+
+    return $d;
+}
+
+/** Items for the "Needs attention" panel, most urgent first. */
+function dash_attention(array $d): array
+{
+    $a = [];
+    if ($d['overdue'] > 0) {
+        $a[] = [
+            'tone' => 'danger',
+            'icon' => 'schedule',
+            'title' => dash_pl($d['overdue'], 'overdue return'),
+            'sub'   => $d['overdue_days'] > 0 ? 'Oldest is ' . dash_pl($d['overdue_days'], 'day') . ' past due' : 'Past its return date',
+            'go' => 'requests',
+            'chip' => 'rq-overdue'
+        ];
+    }
+    if ($d['waiting'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'assignment',
+            'title' => dash_pl($d['waiting'], 'request') . ' awaiting approval',
+            'sub'   => 'Review and approve or decline',
+            'go' => 'requests',
+            'chip' => 'rq-waiting'
+        ];
+    }
+    if ($d['due_today'] > 0) {
+        $a[] = [
+            'tone' => 'info',
+            'icon' => 'event_available',
+            'title' => dash_pl($d['due_today'], 'item') . ' due back today',
+            'sub'   => 'Expect returns by end of day',
+            'go' => 'requests',
+            'chip' => 'rq-active'
+        ];
+    }
+    if ($d['rooms_issues'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'build',
+            'title' => dash_pl($d['rooms_issues'], 'open room issue'),
+            'sub'   => 'Reported by faculty, not yet resolved',
+            'go' => 'rooms',
+            'chip' => ''
+        ];
+    }
+    if ($d['inv_out'] > 0) {
+        $names = [];
+        foreach ($d['stock'] as $s) {
+            if ((int)$s['quantity'] <= 0 && count($names) < 2) $names[] = $s['item_name'];
+        }
+        $a[] = [
+            'tone' => 'danger',
+            'icon' => 'inventory_2',
+            'title' => dash_pl($d['inv_out'], 'item') . ' out of stock',
+            'sub'   => $names ? implode(', ', $names) . ($d['inv_out'] > count($names) ? ' and more' : '') : 'Cannot be lent until restocked',
+            'go' => 'inventory',
+            'chip' => ''
+        ];
+    }
+    if ($d['inv_low'] > 0) {
+        $a[] = [
+            'tone' => 'warn',
+            'icon' => 'production_quantity_limits',
+            'title' => dash_pl($d['inv_low'], 'item') . ' running low',
+            'sub'   => '2 units or fewer remaining',
+            'go' => 'inventory',
+            'chip' => ''
+        ];
+    }
+    return $a;
+}
+
+/** Echo the dashboard body. */
+function dash_render(array $d): void
+{
+    $attn   = dash_attention($d);
+    $alerts = $d['inv_out'] + $d['inv_low'];
+    $tomorrow = date('Y-m-d', strtotime('+1 day', strtotime($d['today'])));
+
+    $kpis = [
+        [
+            'tone' => $d['waiting'] > 0 ? 'warn' : 'ok',
+            'icon' => 'assignment',
+            'label' => 'Pending approvals',
+            'val' => $d['waiting'],
+            'sub' => $d['waiting'] > 0 ? 'Needs your review' : 'Queue is clear',
+            'go' => 'requests',
+            'chip' => 'rq-waiting',
+        ],
+        [
+            'tone' => 'ok',
+            'icon' => 'swap_horiz',
+            'label' => 'Active loans',
+            'val' => $d['active'],
+            'sub' => $d['due_today'] > 0 ? dash_pl($d['due_today'], 'item') . ' due back today' : 'None due today',
+            'go' => 'requests',
+            'chip' => 'rq-active',
+        ],
+        [
+            'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
+            'icon' => 'schedule',
+            'label' => 'Overdue returns',
+            'val' => $d['overdue'],
+            'sub' => $d['overdue'] > 0
+                ? ($d['overdue_days'] > 0 ? 'Oldest ' . dash_pl($d['overdue_days'], 'day') . ' late' : 'Needs follow-up')
+                : 'Nothing overdue',
+            'go' => 'requests',
+            'chip' => 'rq-overdue',
+        ],
+        [
+            'tone' => 'info',
+            'icon' => 'meeting_room',
+            'label' => 'Rooms today',
+            'val' => $d['rooms_today'],
+            'sub' => $d['rooms_bookable'] > 0
+                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' rooms in use (' . $d['rooms_pct'] . '%)'
+                : 'No bookable rooms yet',
+            'go' => 'rooms',
+            'chip' => '',
+        ],
+        [
+            'tone' => $d['inv_out'] > 0 ? 'danger' : ($alerts > 0 ? 'warn' : 'ok'),
+            'icon' => 'inventory_2',
+            'label' => 'Stock alerts',
+            'val' => $alerts,
+            'sub' => $alerts > 0
+                ? $d['inv_out'] . ' out · ' . $d['inv_low'] . ' low · of ' . $d['inv_total'] . ' items'
+                : 'All ' . $d['inv_total'] . ' items stocked',
+            'go' => 'inventory',
+            'chip' => '',
+        ],
+    ];
+?>
+    <!-- ── Stat cards ─────────────────────────────────────────────── -->
+    <section class="dash-kpis" aria-label="Key figures">
+        <?php foreach ($kpis as $k): ?>
+            <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
+                data-dash-go="<?php echo dash_h($k['go']); ?>" data-dash-chip="<?php echo dash_h($k['chip']); ?>">
+                <span class="dash-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($k['icon']); ?></span></span>
+                <span class="dash-kpi-body">
+                    <span class="dash-kpi-label"><?php echo dash_h($k['label']); ?></span>
+                    <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
+                    <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
+                </span>
+                <span class="material-symbols-outlined dash-kpi-go" aria-hidden="true">arrow_outward</span>
+            </button>
+        <?php endforeach; ?>
+    </section>
+
+    <div class="dash-grid">
+
+        <!-- ── Activity chart ─────────────────────────────────────── -->
+        <section class="dash-card dash-area-chart" aria-labelledby="dashChartTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashChartTitle">Demand &amp; decisions</h2>
+                    <p>New requests per day, split by how they were decided</p>
+                </div>
+                <div class="dash-controls">
+                    <div class="dash-seg" role="group" aria-label="Dataset">
+                        <button type="button" class="dash-seg-btn active" data-dash-set="equipment" aria-pressed="true">Equipment</button>
+                        <button type="button" class="dash-seg-btn" data-dash-set="rooms" aria-pressed="false">Rooms</button>
+                    </div>
+                    <div class="dash-seg" role="group" aria-label="Range">
+                        <button type="button" class="dash-seg-btn" data-dash-range="7" aria-pressed="false">7D</button>
+                        <button type="button" class="dash-seg-btn active" data-dash-range="14" aria-pressed="true">14D</button>
+                        <button type="button" class="dash-seg-btn" data-dash-range="30" aria-pressed="false">30D</button>
+                    </div>
+                </div>
+            </header>
+            <div class="dash-chart-wrap" data-chart="<?php echo dash_h(json_encode($d['chart'], JSON_UNESCAPED_UNICODE)); ?>">
+                <div class="dash-chart-sum" data-dash-summary></div>
+                <div class="dash-chart" data-dash-chart role="img" aria-label="Bar chart of requests per day"></div>
+                <div class="dash-insights" data-dash-insights></div>
+            </div>
+        </section>
+
+        <!-- ── Needs attention ────────────────────────────────────── -->
+        <section class="dash-card dash-area-attn" aria-labelledby="dashAttnTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashAttnTitle">Needs attention</h2>
+                    <p>What to act on right now</p>
+                </div>
+                <?php if ($attn): ?><span class="dash-count-pill"><?php echo count($attn); ?></span><?php endif; ?>
+            </header>
+            <?php if ($attn): ?>
+                <ul class="dash-attn">
+                    <?php foreach ($attn as $a): ?>
+                        <li>
+                            <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
+                                data-dash-go="<?php echo dash_h($a['go']); ?>" data-dash-chip="<?php echo dash_h($a['chip']); ?>">
+                                <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
+                                <span class="dash-attn-text">
+                                    <strong><?php echo dash_h($a['title']); ?></strong>
+                                    <small><?php echo dash_h($a['sub']); ?></small>
+                                </span>
+                                <span class="material-symbols-outlined dash-attn-go" aria-hidden="true">chevron_right</span>
+                            </button>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty dash-empty--ok">
+                    <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+                    <strong>You're all caught up</strong>
+                    <small>No approvals, overdue returns, room issues or stock problems.</small>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Rooms today ────────────────────────────────────────── -->
+        <section class="dash-card dash-area-rooms" aria-labelledby="dashRoomsTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashRoomsTitle">Rooms</h2>
+                    <p>Today's usage and what's coming up</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="rooms">Manage</button>
+            </header>
+            <div class="dash-meter">
+                <div class="dash-meter-top">
+                    <span><strong><?php echo (int)$d['rooms_in_use']; ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> rooms in use today</span>
+                    <span class="dash-meter-pct"><?php echo (int)$d['rooms_pct']; ?>%</span>
+                </div>
+                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Room utilization today">
+                    <span style="width:<?php echo max($d['rooms_pct'] > 0 ? 2 : 0, (int)$d['rooms_pct']); ?>%"></span>
+                </div>
+                <?php if ($d['rooms_issues'] > 0): ?>
+                    <div class="dash-meter-note dash-tone-warn"><span class="material-symbols-outlined" aria-hidden="true">build</span><?php echo dash_pl($d['rooms_issues'], 'open issue'); ?> reported</div>
+                <?php endif; ?>
+            </div>
+            <?php if ($d['upcoming']): ?>
+                <ul class="dash-list">
+                    <?php foreach ($d['upcoming'] as $u):
+                        $dayLbl = $u['reservation_date'] === $d['today'] ? 'Today' : ($u['reservation_date'] === $tomorrow ? 'Tomorrow' : date('D, M j', strtotime($u['reservation_date'])));
+                    ?>
+                        <li class="dash-row">
+                            <span class="dash-row-when"><strong><?php echo dash_h($dayLbl); ?></strong><small><?php echo dash_h(date('g:i A', strtotime($u['start_time']))); ?></small></span>
+                            <span class="dash-row-main">
+                                <strong><?php echo dash_h($u['room_name'] ?? 'Room'); ?></strong>
+                                <small><?php echo dash_h(trim(($u['purpose'] ?? '') . ' · ' . ($u['faculty_name'] ?? ''), ' ·')); ?></small>
+                            </span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty"><small>No upcoming reservations.</small></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Most requested equipment ───────────────────────────── -->
+        <section class="dash-card dash-area-top" aria-labelledby="dashTopTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashTopTitle">Most requested</h2>
+                    <p>Equipment demand, last 30 days</p>
+                </div>
+            </header>
+            <?php if ($d['top']):
+                $max = max(1, (int)$d['top'][0]['total']); ?>
+                <ul class="dash-list dash-bars">
+                    <?php foreach ($d['top'] as $t):
+                        $tot = (int)$t['total'];
+                        $ok  = (int)$t['ok']; ?>
+                        <li>
+                            <div class="dash-bars-top"><span><?php echo dash_h($t['equipment_name']); ?></span><strong><?php echo $tot; ?></strong></div>
+                            <div class="dash-bar dash-bar--two" title="<?php echo $ok; ?> approved of <?php echo $tot; ?>">
+                                <span class="dash-bar-all" style="width:<?php echo round($tot / $max * 100); ?>%"></span>
+                                <span class="dash-bar-ok" style="width:<?php echo round($ok / $max * 100); ?>%"></span>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+                <p class="dash-foot"><span class="dash-dot dash-dot--ok"></span>Approved <span class="dash-dot dash-dot--all"></span>All requests</p>
+            <?php else: ?>
+                <div class="dash-empty"><small>No requests in the last 30 days.</small></div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Stock watch ────────────────────────────────────────── -->
+        <section class="dash-card dash-area-stock" aria-labelledby="dashStockTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashStockTitle">Stock watch</h2>
+                    <p>Items with 2 or fewer units available</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="inventory">Manage</button>
+            </header>
+            <?php if ($d['stock']): ?>
+                <ul class="dash-list">
+                    <?php foreach ($d['stock'] as $s):
+                        $q = (int)$s['quantity']; ?>
+                        <li class="dash-row">
+                            <span class="dash-row-main">
+                                <strong><?php echo dash_h($s['item_name']); ?></strong>
+                                <small><?php echo dash_h($s['category']); ?></small>
+                            </span>
+                            <span class="dash-qty <?php echo $q <= 0 ? 'dash-qty--out' : 'dash-qty--low'; ?>"><?php echo $q <= 0 ? 'Out' : $q . ' left'; ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty dash-empty--ok">
+                    <span class="material-symbols-outlined" aria-hidden="true">inventory</span>
+                    <strong>Stock looks healthy</strong>
+                    <small>Every item has 3 or more units.</small>
+                </div>
+            <?php endif; ?>
+            <?php if ($d['inv_total'] > 0):
+                $healthy = max(0, $d['inv_total'] - $d['inv_out'] - $d['inv_low']);
+                $pct = fn(int $n): float => round($n / $d['inv_total'] * 100, 1); ?>
+                <div class="dash-health">
+                    <div class="dash-health-top"><span>Catalog health</span><strong><?php echo (int)round($healthy / $d['inv_total'] * 100); ?>% well stocked</strong></div>
+                    <div class="dash-stack" role="img" aria-label="<?php echo $healthy; ?> well stocked, <?php echo (int)$d['inv_low']; ?> low, <?php echo (int)$d['inv_out']; ?> out of stock">
+                        <span class="dash-stack-ok" style="width:<?php echo $pct($healthy); ?>%"></span>
+                        <span class="dash-stack-low" style="width:<?php echo $pct($d['inv_low']); ?>%"></span>
+                        <span class="dash-stack-out" style="width:<?php echo $pct($d['inv_out']); ?>%"></span>
+                    </div>
+                    <p class="dash-foot dash-foot--flat"><span class="dash-dot dash-dot--ok"></span><?php echo $healthy; ?> ok<span class="dash-dot dash-dot--low"></span><?php echo (int)$d['inv_low']; ?> low<span class="dash-dot dash-dot--out"></span><?php echo (int)$d['inv_out']; ?> out</p>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- ── Latest requests ────────────────────────────────────── -->
+        <section class="dash-card dash-area-latest" aria-labelledby="dashLatestTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashLatestTitle">Latest requests</h2>
+                    <p>Most recent equipment requests</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="requests" data-dash-chip="rq-waiting">View all</button>
+            </header>
+            <div class="ps-table-wrap">
+                <table class="ps-table dash-table">
+                    <thead>
+                        <tr>
+                            <th>Requester</th>
+                            <th>Equipment</th>
+                            <th>Borrow period</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($d['latest']):
+                            foreach ($d['latest'] as $r):
+                                $badge = match ($r['status']) {
+                                    'Waiting'  => 'ps-badge--waiting',
+                                    'Approved' => 'ps-badge--active',
+                                    'Overdue'  => 'ps-badge--overdue',
+                                    default    => 'ps-badge--returned',
+                                };
+                                $b = strtotime($r['borrow_date']);
+                                $e = strtotime($r['return_date']);
+                                $period = date('M j', $b) . ($r['borrow_date'] !== $r['return_date'] ? ' – ' . date('M j', $e) : '');
+                        ?>
+                                <tr>
+                                    <td>
+                                        <div class="dash-cell-name"><?php echo dash_h($r['faculty_name']); ?></div>
+                                        <div class="dash-cell-sub"><?php echo dash_h(faculty_id_display($r['faculty_id'], 'Not set')); ?> · <?php echo dash_h(dash_ago($r['age_s'] ?? null, $r['request_date'])); ?></div>
+                                    </td>
+                                    <td><?php echo dash_h($r['equipment_name']); ?></td>
+                                    <td class="dash-cell-muted"><?php echo dash_h($period); ?></td>
+                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo dash_h($r['status']); ?></span></td>
+                                </tr>
+                            <?php endforeach;
+                        else: ?>
+                            <tr>
+                                <td colspan="4" class="dash-cell-empty">No requests yet.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!--  Recent activity (same timeline as the Activity page)  -->
+        <section class="dash-card dash-area-log" aria-labelledby="dashLogTitle">
+            <header class="dash-card-head">
+                <div class="dash-card-title">
+                    <h2 id="dashLogTitle">Recent activity</h2>
+                    <p>Decisions by admins and the rules engine</p>
+                </div>
+                <button type="button" class="dash-link" data-dash-go="activity">View all</button>
+            </header>
+            <?php if ($d['log']): ?>
+                <ul class="dash-list dash-log">
+                    <?php foreach ($d['log'] as $l):
+                        $tone = ['ok' => 'ok', 'bad' => 'danger', 'warn' => 'warn'][$l['tone']] ?? 'info';
+                        $who  = $l['actor_type'] === 'auto'
+                            ? 'Automatic' . ($l['meta'] !== '' ? ' · ' . $l['meta'] : '')
+                            : $l['actor_name'];
+                    ?>
+                        <li class="dash-row dash-tone-<?php echo $tone; ?>">
+                            <span class="dash-log-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($l['icon']); ?></span></span>
+                            <span class="dash-row-main">
+                                <strong title="<?php echo dash_h($l['text']); ?>"><?php echo dash_h($l['text']); ?></strong>
+                                <small><?php echo dash_h($who); ?></small>
+                            </span>
+                            <span class="dash-row-time"><?php echo dash_h(dash_ago(max(0, time() - (int)$l['ts']), date('Y-m-d H:i:s', (int)$l['ts']))); ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else: ?>
+                <div class="dash-empty"><small>No activity yet.</small></div>
+            <?php endif; ?>
+        </section>
+
+    </div>
+    <?php
+}
+
+// Live-refresh request from admin-dashboard.js: return just the dashboard body and stop.
+// (admin-functions.php above has already enforced the admin session.)
+if (($_GET['fragment'] ?? '') === 'dashboard') {
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    dash_render(dash_collect($conn));
+    exit;
+}
+
+// ── Inventory tbody fragment ────────────────────────────────────────────
+// Returns JSON with rendered <tbody> HTML for active and archived inventory.
+// Called by admin-dashboard.php inline scripts after any inventory AJAX mutation.
+if (($_GET['fragment'] ?? '') === 'inventory-tbody') {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+
+    $inv_rows = [];
+    $inv_result = $conn->query("SELECT * FROM tbl_inventory WHERE is_archived = 0 ORDER BY created_at DESC");
+    if ($inv_result) {
+        while ($r = $inv_result->fetch_assoc()) $inv_rows[] = $r;
+    }
+
+    $arch_rows = [];
+    $arch_result = $conn->query("SELECT * FROM tbl_inventory WHERE is_archived = 1 ORDER BY item_name ASC");
+    if ($arch_result) {
+        while ($r = $arch_result->fetch_assoc()) $arch_rows[] = $r;
+    }
+
+    // Render active tbody
+    ob_start();
+    if (empty($inv_rows)): ?>
+        <tr id="inv-empty-row">
+            <td colspan="5" class="inv-empty-cell">
+                <span class="material-symbols-outlined">inventory_2</span>
+                No equipment yet. Add your first item using the form.
+            </td>
+        </tr>
+        <?php else:
+        foreach ($inv_rows as $item):
+            $inv_qty       = (int)$item['quantity'];
+            $inv_cond      = $item['condition'] ?? 'Good';
+            $inv_condClass = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
+            if ($inv_qty === 0) {
+                $inv_stockClass = 'none';
+                $inv_stockLabel = 'No stock';
+            } elseif ($inv_qty <= 2) {
+                $inv_stockClass = 'low';
+                $inv_stockLabel = 'Low stock';
+            } else {
+                $inv_stockClass = 'ok';
+                $inv_stockLabel = 'In stock';
+            }
+            $inv_addedTs = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
+        ?>
+            <tr class="inv-row-item"
+                data-item-id="<?php echo (int)$item['item_id']; ?>"
+                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
+                data-item-quantity="<?php echo $inv_qty; ?>"
+                data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
+                data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
+                data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                <td>
+                    <div class="fac-person">
+                        <span class="inv-thumb">
+                            <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                loading="lazy">
+                            <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
+                        </span>
+                        <div class="fac-person-text">
+                            <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                            <?php if ($inv_addedTs): ?><div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div><?php endif; ?>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
+                <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
+                <td><span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span></td>
+                <td class="fac-actions">
+                    <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
+                        data-action="eq-open-edit" aria-label="Edit equipment">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        <tr id="inv-nomatch-row" class="inv-row-hidden">
+            <td colspan="5" class="inv-empty-cell">
+                <span class="material-symbols-outlined">search_off</span>
+                No equipment matches your search.
+            </td>
+        </tr>
+    <?php endif;
+    $active_html = ob_get_clean();
+
+    // Render archived tbody
+    ob_start();
+    if (empty($arch_rows)): ?>
+        <tr>
+            <td colspan="4" class="inv-empty-cell">No archived items.</td>
+        </tr>
+        <?php else:
+        foreach ($arch_rows as $item): ?>
+            <tr>
+                <td><img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>" class="item-img" onerror="this.src='../uploads/default.png'"></td>
+                <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
+                <td><?php echo htmlspecialchars($item['category']); ?></td>
+                <td class="action-cell">
+                    <div class="action-btns">
+                        <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                            class="btn-action btn-restore" title="Restore">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                            </svg>
+                        </a>
+                        <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                            class="btn-action btn-force-del" title="Delete permanently">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6" />
+                                <path d="M14 11v6" />
+                                <path d="M9 6V4h6v2" />
+                            </svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        <?php endforeach;
+    endif;
+    $archive_html = ob_get_clean();
+
+    echo json_encode([
+        'status'        => 'success',
+        'active_html'   => $active_html,
+        'archive_html'  => $archive_html,
+        'active_count'  => count($inv_rows),
+        'archive_count' => count($arch_rows),
+    ]);
+    exit();
+}
+
+// ── Faculty list tbody fragment ─────────────────────────────────────────────
+// Returns JSON with rendered <tbody> HTML for the faculty accounts list.
+// Called by admin-dashboard.php inline scripts after a faculty account is created.
+if (($_GET['fragment'] ?? '') === 'faculty-tbody') {
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+
+    $fac_rows = [];
+    $fac_result = $conn->query(
+        "SELECT u.fullname, u.email, u.backup_email, u.role,"
+            . " u.faculty_id, u.organization_id,"
+            . " o.name AS org_name"
+            . " FROM tbl_users u"
+            . " LEFT JOIN tbl_organizations o ON u.organization_id = o.id"
+            . " ORDER BY u.fullname ASC"
+    );
+    if ($fac_result) {
+        while ($r = $fac_result->fetch_assoc()) $fac_rows[] = $r;
+    }
+
+    ob_start();
+    if (empty($fac_rows)): ?>
+        <tr id="fac-empty-row">
+            <td colspan="4" style="text-align:center;padding:3rem;color:var(--text-light)">
+                <span class="material-symbols-outlined" style="font-size:40px;display:block;margin:0 auto 10px;opacity:0.3">group</span>
+                No faculty accounts yet.
+            </td>
+        </tr>
+        <?php else:
+        foreach ($fac_rows as $frow):
+            $isAdviser = ($frow['role'] === 'Organization Adviser');
+            $idUnset   = faculty_id_is_unset($frow['faculty_id']);
+            $initFac   = strtoupper(substr(trim($frow['fullname'] ?? '') ?: 'F', 0, 1));
+        ?>
+            <tr
+                data-fullname="<?= htmlspecialchars($frow['fullname']) ?>"
+                data-email="<?= htmlspecialchars($frow['email']) ?>"
+                data-backup-email="<?= htmlspecialchars($frow['backup_email'] ?? '') ?>"
+                data-faculty-id="<?= htmlspecialchars($frow['faculty_id']) ?>"
+                data-role="<?= htmlspecialchars($frow['role']) ?>"
+                data-org="<?= htmlspecialchars($frow['org_name'] ?? '') ?>"
+                data-org-id="<?= (int)($frow['organization_id'] ?? 0) ?>"
+                data-init="<?= htmlspecialchars($initFac) ?>">
+                <td>
+                    <div class="fac-person">
+                        <span class="fac-avatar"><?= htmlspecialchars($initFac) ?></span>
+                        <div class="fac-person-text">
+                            <div class="fac-person-name"><?= htmlspecialchars($frow['fullname']) ?></div>
+                            <div class="fac-person-sub"><?= htmlspecialchars($frow['email']) ?></div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <?php if ($idUnset): ?>
+                        <span class="fac-id-pending">Not set yet</span>
+                    <?php else: ?>
+                        <span class="fac-id"><?= htmlspecialchars($frow['faculty_id']) ?></span>
+                    <?php endif; ?>
+                </td>
+                <td>
+                    <?php if ($isAdviser): ?>
+                        <span class="fac-role fac-role--adviser">Org Adviser</span>
+                        <?php if (!empty($frow['org_name'])): ?>
+                            <div class="fac-person-sub"><?= htmlspecialchars($frow['org_name']) ?></div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <span class="fac-role">Faculty</span>
+                    <?php endif; ?>
+                </td>
+                <td class="fac-actions">
+                    <button class="ps-btn ps-btn--ghost ps-btn--sm fac-edit-btn" aria-label="Edit account">
+                        <span class="material-symbols-outlined">edit</span>
+                    </button>
+                </td>
+            </tr>
+<?php endforeach;
+    endif;
+    $faculty_html = ob_get_clean();
+
+    echo json_encode([
+        'status'        => 'success',
+        'faculty_html'  => $faculty_html,
+        'faculty_count' => count($fac_rows),
+    ]);
+    exit();
+}
+?>
+
+<?php
 // ================= NOTIFICATIONS (live feed) =================
 // Computed fresh on every load from tbl_requests / tbl_room_issues /
 // tbl_inventory — see notif-functions.php. $notif_unread drives every
@@ -19,9 +936,60 @@ foreach ($notifications as $n) {
 }
 ?>
 <?php
+// ── APPROVALS UI HELPERS (display only — no DB access) ───────────────────────
+// ps_doc_info(): turns a stored document_path into a safe, display-ready
+// descriptor. Only paths inside the two known upload folders are accepted
+// (no "..", no odd characters), so a bad value in the DB can never become a
+// link to something else. Returns null when there is no usable document.
+if (!function_exists('ps_doc_info')) {
+    function ps_doc_info($path)
+    {
+        $path = trim((string)$path);
+        if ($path === '' || strpos($path, '..') !== false) return null;
+        if (!preg_match('#^uploads/(request_letters|room_documents)/([A-Za-z0-9._ \-]+)$#', $path, $m)) return null;
+        $base = $m[2];
+        $ext  = strtolower(pathinfo($base, PATHINFO_EXTENSION));
+        $kind = $ext === 'pdf' ? 'pdf' : (in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true) ? 'image' : 'file');
+        return [
+            'url'  => 'uploads/' . $m[1] . '/' . rawurlencode($base),
+            'open_url' => 'views/document-viewer.php?file=' . rawurlencode($path),
+            // hide the upload timestamp prefix (e.g. "1790900630_" or "20261002_081929_")
+            'name' => preg_replace('/^(\d{8}_\d{6}_|\d{9,}_)/', '', $base),
+            'kind' => $kind,
+            'ext'  => strtoupper($ext),
+        ];
+    }
+}
+// ps_submitted_as_label(): human label for tbl_requests / tbl_room_reservations.submitted_as
+if (!function_exists('ps_submitted_as_label')) {
+    function ps_submitted_as_label($v)
+    {
+        switch ((string)$v) {
+            case 'adviser':
+                return 'Org Adviser';
+            case 'student':
+                return 'Student (via code)';
+            default:
+                return 'Faculty';
+        }
+    }
+}
+// ps_doc_icon(): Material Symbols icon name for a document kind
+if (!function_exists('ps_doc_icon')) {
+    function ps_doc_icon($kind)
+    {
+        return $kind === 'pdf' ? 'picture_as_pdf' : ($kind === 'image' ? 'image' : 'draft');
+    }
+}
+?>
+<?php
 // ── CONFIRM RETURN ─────────────────────────────────────────────
 if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GET['id'])) {
     $req_id = intval($_GET['id']);
+    $is_ajax_rc = ($_GET['ajax'] ?? '') === '1';
+    if ($is_ajax_rc) {
+        header('Content-Type: application/json');
+    }
     require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
     BookingSchedule::ensureSchema($conn);
     $res = $conn->query("SELECT equipment_name, borrow_qty, stock_applied FROM tbl_requests WHERE id = $req_id LIMIT 1");
@@ -32,6 +1000,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         $ret_qty = ((int)($row_rc['stock_applied'] ?? 1) === 1) ? max(1, (int)($row_rc['borrow_qty'] ?? 1)) : 0;
         if ($ret_qty > 0) {
             $conn->query("UPDATE tbl_inventory SET quantity = quantity + $ret_qty WHERE item_name = '$eq'");
+        }
+        if ($is_ajax_rc) {
+            echo json_encode(['status' => 'success', 'message' => 'Return confirmed.']);
+            exit();
+        }
+    } else {
+        if ($is_ajax_rc) {
+            echo json_encode(['status' => 'error', 'message' => 'Request not found.']);
+            exit();
         }
     }
     header("Location: admin-dashboard.php?view=return-confirmation");
@@ -61,6 +1038,39 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
+    <script>
+        /* Keep the default dashboard from appearing while the restored tab loads. */
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var tab = null;
+
+            if (params.has('edit_item')) {
+                tab = 'inventory';
+            } else {
+                var view = params.get('view');
+                if (['inventory', 'faculty', 'activity', 'admins'].indexOf(view) !== -1) {
+                    tab = view;
+                } else if (params.get('tab') === 'rooms') {
+                    tab = 'rooms';
+                } else {
+                    var hash = window.location.hash;
+                    if (hash.indexOf('#tab-') === 0) tab = hash.slice(5);
+                }
+            }
+
+            if (['requests', 'rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
+            try {
+                if (sessionStorage.getItem('adminHardRefresh') === '1') return;
+            } catch (_) {}
+            window._preJumpTab = tab;
+            document.documentElement.classList.add('admin-tab-pending');
+        })();
+    </script>
+    <style>
+        html.admin-tab-pending #panel-dashboard {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -120,34 +1130,52 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
 
+            <!-- Tabs are grouped by purpose: Overview (what's happening) · Operations (day-to-day work) ·
+                 Accounts (Super Admin only). Each group title shares a row with its thin separator line. -->
             <div class="sidebar-links">
-                <a class="nav-item active" data-tab="dashboard" href="#">
-                    <span class="material-symbols-outlined">dashboard</span>
-                    <span class="nav-label">Dashboard</span>
-                </a>
-                <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
-                    <span class="material-symbols-outlined">assignment</span>
-                    <span class="nav-label">Requests</span>
-                    <?php if ($stat_waiting > 0): ?>
-                        <span class="nav-badge"><?php echo $stat_waiting; ?></span>
-                    <?php endif; ?>
-                </a>
-                <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
-                    <span class="material-symbols-outlined">inventory_2</span>
-                    <span class="nav-label">Equipment</span>
-                </a>
-                <a class="nav-item" data-tab="rooms" href="#">
-                    <span class="material-symbols-outlined">meeting_room</span>
-                    <span class="nav-label">Rooms</span>
-                </a>
-                <?php if ($is_super_admin): ?>
-                    <a class="nav-item" data-tab="faculty" href="#">
-                        <span class="material-symbols-outlined">group</span>
-                        <span class="nav-label">Faculty</span>
+                <div class="nav-group" role="group" aria-labelledby="navg-overview">
+                    <span class="nav-group-title" id="navg-overview">Overview</span>
+                    <a class="nav-item active" data-tab="dashboard" href="#">
+                        <span class="material-symbols-outlined">dashboard</span>
+                        <span class="nav-label">Dashboard</span>
                     </a>
+                    <a class="nav-item" data-tab="activity" id="snav-activity" href="#">
+                        <span class="material-symbols-outlined">history</span>
+                        <span class="nav-label">Activity</span>
+                    </a>
+                </div>
+                <div class="nav-group" role="group" aria-labelledby="navg-operations">
+                    <span class="nav-group-title" id="navg-operations">Operations</span>
+                    <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
+                        <span class="material-symbols-outlined">assignment</span>
+                        <span class="nav-label">Approvals</span>
+                        <?php if ($stat_waiting > 0): ?>
+                            <span class="nav-badge"><?php echo $stat_waiting; ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
+                        <span class="material-symbols-outlined">inventory_2</span>
+                        <span class="nav-label">Equipment</span>
+                    </a>
+                    <a class="nav-item" data-tab="rooms" href="#">
+                        <span class="material-symbols-outlined">meeting_room</span>
+                        <span class="nav-label">Rooms</span>
+                    </a>
+                </div>
+                <?php if ($is_super_admin): ?>
+                    <div class="nav-group" role="group" aria-labelledby="navg-accounts">
+                        <span class="nav-group-title" id="navg-accounts">Accounts</span>
+                        <a class="nav-item" data-tab="faculty" href="#">
+                            <span class="material-symbols-outlined">group</span>
+                            <span class="nav-label">Faculty</span>
+                        </a>
+                        <a class="nav-item" data-tab="admins" id="snav-admins" href="#">
+                            <span class="material-symbols-outlined">admin_panel_settings</span>
+                            <span class="nav-label">Admins</span>
+                        </a>
+                    </div>
                 <?php endif; ?>
             </div>
-
             <div class="sidebar-footer">
                 <!-- Signed-in admin: the name only. Not a button, no avatar. Notifications and Settings
                      live in the Dashboard's top-right bell / avatar; Scan Return is a Quick Action card
@@ -182,262 +1210,59 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     ============================================================ -->
             <div class="tab-panel active" id="panel-dashboard">
 
-                <!-- Overdue + flash messages (item/room saved, archived, restored, error) are now shown as
+                <!-- Overdue + flash messages (item/room saved, archived, restored, error) are shown as
                      toasts: see #toast-queue near the bottom of this file and initToastQueue() in
                      admin-dashboard.js. -->
 
-                <!-- Page header row -->
-                <div class="ps-page-header-row">
-                    <div class="ps-page-header">
-                        <h1>Good <?php
-                                    $hour = (int)date('H');
-                                    echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
-                                    ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
-                        <p><?php echo date('l, F j, Y'); ?> &mdash; Overview of all lending activity and inventory.</p>
-                    </div>
-                    <div class="ps-dash-top-actions">
-                        <!-- Dashboard-only shortcuts (the sidebar keeps its own Notifications / account buttons).
-                             They live inside #panel-dashboard, so they are only visible on this tab. The badge
-                             uses .notif-btn-badge, which _updateBadges() in admin-dashboard.js keeps in sync. -->
-                        <button type="button" class="notif-btn ps-dash-top-btn" id="dashNotifBtn"
-                            data-action="open-notif-modal" aria-label="Open notifications" title="Notifications">
-                            <span class="material-symbols-outlined">notifications</span>
-                            <span class="notif-btn-badge" id="dashNotifBadge"
-                                style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
-                        </button>
-                        <button type="button" class="avatar-btn" id="dashAvatarBtn"
-                            data-action="open-account-settings" aria-label="Open my account" title="My account"><?php echo htmlspecialchars($initials); ?></button>
-                    </div>
-                </div>
+                <?php
+                // dash_collect() / dash_render() are defined at the top of this file; the same markup is
+                // returned by admin-dashboard.php?fragment=dashboard for the live refresh.
+                $dash_data = dash_collect($conn);
+                ?>
+                <div class="dash dash-intro" id="dash">
 
-                <!-- Stat cards -->
-                <div class="ps-stats-row">
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--maroon">
-                            <span class="material-symbols-outlined">assignment</span>
+                    <!-- Header: greeting + primary actions + bell/avatar.
+                         Everything here is static (never swapped by the live refresh), so the ids that
+                         admin-dashboard.js binds to — greetName, dashNotifBtn, dashNotifBadge, dashAvatarBtn,
+                         openQrScannerBtn — stay put. -->
+                    <header class="dash-head">
+                        <div class="dash-head-text">
+                            <h1>Good <?php
+                                        $hour = (int)date('H');
+                                        echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
+                                        ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
+                            <p><?php echo date('l, F j, Y'); ?></p>
                         </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_waiting; ?></div>
-                            <div class="ps-stat-lbl">Waiting Requests</div>
-                            <?php if ($stat_waiting > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn">Needs action</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">All clear</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--green">
-                            <span class="material-symbols-outlined">check_circle</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_approved; ?></div>
-                            <div class="ps-stat-lbl">Active Borrowings</div>
-                            <div class="ps-stat-sub">Currently out</div>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--red">
-                            <span class="material-symbols-outlined">schedule</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_overdue; ?></div>
-                            <div class="ps-stat-lbl">Overdue Items</div>
-                            <?php if ($stat_overdue > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn">Immediate attention</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">None overdue</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="ps-stat-card">
-                        <div class="ps-stat-icon ps-stat-icon--orange">
-                            <span class="material-symbols-outlined">inventory_2</span>
-                        </div>
-                        <div class="ps-stat-body">
-                            <div class="ps-stat-val"><?php echo $stat_inv_total; ?></div>
-                            <div class="ps-stat-lbl">Total Inventory</div>
-                            <?php if ($stat_inv_low > 0): ?>
-                                <div class="ps-stat-sub ps-stat-sub--warn"><?php echo $stat_inv_low; ?> low stock</div>
-                            <?php else: ?>
-                                <div class="ps-stat-sub">Stock OK</div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Actions label -->
-                <div class="ps-section-label">
-                    <span class="material-symbols-outlined">bolt</span> Quick Actions
-                </div>
-
-                <!-- Quick Action cards -->
-                <div class="ps-quick-actions">
-                    <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="waiting" style="cursor:pointer">
-                        <span class="material-symbols-outlined">assignment_turned_in</span>
-                        <strong>Review Requests</strong>
-                        <small><?php echo $stat_waiting; ?> waiting for approval</small>
-                    </div>
-                    <div class="ps-qa-card ps-qa-card--dark" data-action="go-lending" data-lending="inventory" style="cursor:pointer">
-                        <span class="material-symbols-outlined">add_box</span>
-                        <strong>Add Equipment</strong>
-                        <small>Update inventory catalog</small>
-                    </div>
-                    <!-- Scan Return (moved here from the sidebar). Keeps id="openQrScannerBtn": initQrScanner() in
-                         admin-dashboard.js binds to it. -->
-                    <button type="button" class="ps-qa-card ps-qa-card--dark" id="openQrScannerBtn">
-                        <span class="material-symbols-outlined">qr_code_scanner</span>
-                        <strong>Scan Return</strong>
-                        <small>Scan a QR code to confirm a return</small>
-                    </button>
-                </div>
-
-                <!-- Two-col: Room Status + Faculty Overview (sits between Quick Actions and the Recent tables) -->
-                <div class="ps-two-col" style="margin-bottom:1.25rem;">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">meeting_room</span> Room Status</h3>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-rooms">Manage</button>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_rooms WHERE is_archived=0");
-                            $rooms_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_issues WHERE status='Open'");
-                            $rooms_issues = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_room_reservations WHERE DATE(reservation_date)=CURDATE() AND status <> 'Declined'");
-                            $rooms_today  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $rooms_total; ?></div>
-                                    <div class="ps-mini-lbl">Active Rooms</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--warning)"><?php echo $rooms_issues; ?></div>
-                                    <div class="ps-mini-lbl">Reported Issues</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $rooms_today; ?></div>
-                                    <div class="ps-mini-lbl">Reservations Today</div>
-                                </div>
+                        <div class="dash-head-tools">
+                            <!-- One quick action left on purpose: confirming a return by QR code has no other entry point
+                                 on this screen. "Review approvals" and "Add equipment" were removed because the
+                                 Pending approvals card and the Needs attention list already lead to the same places.
+                                 Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
+                            <div class="dash-actions">
+                                <button type="button" class="dash-btn dash-btn--primary" id="openQrScannerBtn">
+                                    <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>Scan return
+                                </button>
+                            </div>
+                            <div class="dash-head-user">
+                                <!-- .notif-btn-badge is kept in sync by _updateBadges() in admin-dashboard.js -->
+                                <button type="button" class="notif-btn ps-dash-top-btn" id="dashNotifBtn"
+                                    data-action="open-notif-modal" aria-label="Open notifications" title="Notifications">
+                                    <span class="material-symbols-outlined">notifications</span>
+                                    <span class="notif-btn-badge" id="dashNotifBadge"
+                                        style="<?php echo $notif_unread > 0 ? '' : 'display:none;'; ?>"><?php echo (int)$notif_unread; ?></span>
+                                </button>
+                                <button type="button" class="avatar-btn" id="dashAvatarBtn"
+                                    data-action="open-account-settings" aria-label="Open my account" title="My account"><?php echo htmlspecialchars($initials); ?></button>
                             </div>
                         </div>
+                    </header>
+
+                    <!-- Live region: stat cards + panels. Re-rendered by the dashboard block at the end of admin-dashboard.js. -->
+                    <div id="dashLive">
+                        <?php dash_render($dash_data); ?>
                     </div>
 
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">group</span> Faculty Overview</h3>
-                            <?php if ($is_super_admin): ?>
-                                <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-faculty">Manage</button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users");
-                            $fac_total  = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role != 'Organization Adviser'");
-                            $fac_active = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            $q = mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role = 'Organization Adviser'");
-                            $fac_org    = $q ? (mysqli_fetch_assoc($q)['c'] ?? 0) : 0;
-                            ?>
-                            <div class="ps-mini-stats">
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val"><?php echo $fac_total; ?></div>
-                                    <div class="ps-mini-lbl">Total Faculty</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--success)"><?php echo $fac_active; ?></div>
-                                    <div class="ps-mini-lbl">Active</div>
-                                </div>
-                                <div class="ps-mini-stat">
-                                    <div class="ps-mini-val" style="color:var(--accent-maroon)"><?php echo $fac_org; ?></div>
-                                    <div class="ps-mini-lbl">Org Advisers</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Two-col: Recent Requests + Recent Activity -->
-                <div class="ps-two-col">
-
-                    <!-- Recent Requests -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">assignment</span> Recent Requests</h3>
-                            <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="go-lending" data-lending="waiting">View All</button>
-                        </div>
-                        <div class="ps-card-body" style="padding:0">
-                            <div class="ps-table-wrap">
-                                <table class="ps-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Requester</th>
-                                            <th>Equipment</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php
-                                        $recent_req = mysqli_query($conn, "SELECT faculty_name, faculty_id, equipment_name, status FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 5");
-                                        if ($recent_req && mysqli_num_rows($recent_req) > 0):
-                                            while ($rr = mysqli_fetch_assoc($recent_req)):
-                                                $badge = match ($rr['status']) {
-                                                    'Waiting'  => 'ps-badge--waiting',
-                                                    'Approved' => 'ps-badge--active',
-                                                    'Overdue'  => 'ps-badge--overdue',
-                                                    'Returned' => 'ps-badge--returned',
-                                                    default    => 'ps-badge--returned',
-                                                };
-                                        ?>
-                                                <tr>
-                                                    <td>
-                                                        <div style="font-weight:600"><?php echo htmlspecialchars($rr['faculty_name']); ?></div>
-                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($rr['faculty_id'], 'Not set')); ?></div>
-                                                    </td>
-                                                    <td><?php echo htmlspecialchars($rr['equipment_name']); ?></td>
-                                                    <td><span class="ps-badge ps-badge--dot <?php echo $badge; ?>"><?php echo htmlspecialchars($rr['status']); ?></span></td>
-                                                </tr>
-                                            <?php endwhile;
-                                        else: ?>
-                                            <tr>
-                                                <td colspan="3" style="text-align:center;color:var(--text-light);padding:1.5rem">No requests yet.</td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Recent Activity -->
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Recent Activity</h3>
-                        </div>
-                        <div class="ps-card-body">
-                            <?php
-                            $recent_act = mysqli_query($conn, "SELECT faculty_name, equipment_name, status, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') ORDER BY request_date DESC LIMIT 6");
-                            if ($recent_act && mysqli_num_rows($recent_act) > 0):
-                                while ($ra = mysqli_fetch_assoc($recent_act)):
-                                    $dot_active = in_array($ra['status'], ['Approved', 'Returned']) ? '' : 'ps-feed-dot--gray';
-                            ?>
-                                    <div class="ps-feed-item">
-                                        <div class="ps-feed-dot <?php echo $dot_active; ?>"></div>
-                                        <div class="ps-feed-body">
-                                            <div class="ps-feed-title"><?php echo htmlspecialchars($ra['equipment_name']); ?> — <?php echo htmlspecialchars($ra['status']); ?></div>
-                                            <div class="ps-feed-meta"><?php echo htmlspecialchars($ra['faculty_name']); ?></div>
-                                        </div>
-                                        <div class="ps-feed-time"><?php echo date('M d', strtotime($ra['request_date'])); ?></div>
-                                    </div>
-                                <?php endwhile;
-                            else: ?>
-                                <p style="color:var(--text-light);font-size:0.83rem;text-align:center;padding:1rem">No activity yet.</p>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
+                </div><!-- /dash -->
 
             </div><!-- /panel-dashboard -->
 
@@ -450,8 +1275,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Page header -->
                 <div class="ps-page-header-row">
                     <div class="ps-page-header">
-                        <h1>Equipment Requests</h1>
-                        <p>Review, approve, or decline borrow requests submitted by faculty and students.</p>
+                        <h1>Approvals</h1>
+                        <p>Review special requests that need a policy override, mainly Organization Adviser submissions with supporting documents. Standard requests are processed automatically.</p>
                     </div>
                     <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
                         <span class="material-symbols-outlined">download</span> Export
@@ -485,65 +1310,106 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rq-sub-panel active" id="rq-waiting">
                     <div class="ps-help-note">
                         <span class="material-symbols-outlined">info</span>
-                        These requests are pending your approval. Approve to issue the item, or decline with an optional reason.
+                        Standard requests are approved automatically. Only requests that need a policy override appear here, usually from Organization Advisers with a supporting document. Open the document, then approve or decline.
                     </div>
                     <div class="ps-card">
                         <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">pending</span> Waiting for Approval</h3>
+                            <h3><span class="material-symbols-outlined">pending</span> Pending Review</h3>
                             <div style="display:flex;gap:6px">
                                 <input class="ps-form-control" style="width:200px" placeholder="Search requester..." id="rq-waiting-search">
                             </div>
                         </div>
                         <div class="ps-table-wrap">
-                            <table class="ps-table" id="rq-waiting-table">
+                            <table class="ps-table ps-appr-table" id="rq-waiting-table">
                                 <thead>
                                     <tr>
-                                        <th>Request ID</th>
-                                        <th>Requester</th>
-                                        <th>Student/Faculty ID</th>
-                                        <th>Equipment</th>
-                                        <th>Date Requested</th>
-                                        <th>Date Needed</th>
-                                        <th>Actions</th>
+                                        <th>Request</th>
+                                        <th>Item</th>
+                                        <th>Document</th>
+                                        <th>Status</th>
+                                        <th class="ps-appr-th-act">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
+                                    // Collect rows, count batch sizes, and list rows WITH a document first
+                                    // (attachment-first workflow). Order within each group stays newest-first.
                                     mysqli_data_seek($waiting_result, 0);
-                                    if (mysqli_num_rows($waiting_result) > 0):
-                                        while ($r = mysqli_fetch_assoc($waiting_result)):
+                                    $ps_w_with = [];
+                                    $ps_w_without = [];
+                                    $ps_w_batch = [];
+                                    while ($rw = mysqli_fetch_assoc($waiting_result)) {
+                                        if (!empty($rw['batch_id'])) {
+                                            $ps_w_batch[$rw['batch_id']] = ($ps_w_batch[$rw['batch_id']] ?? 0) + 1;
+                                        }
+                                        if (ps_doc_info($rw['document_path'] ?? '')) $ps_w_with[] = $rw;
+                                        else $ps_w_without[] = $rw;
+                                    }
+                                    $ps_w_rows = array_merge($ps_w_with, $ps_w_without);
+                                    if (count($ps_w_rows) > 0):
+                                        foreach ($ps_w_rows as $r):
+                                            $doc      = ps_doc_info($r['document_path'] ?? '');
+                                            $qty      = max(1, (int)($r['borrow_qty'] ?? 1));
+                                            $who_type = ps_submitted_as_label($r['submitted_as'] ?? '');
+                                            $batch_n  = !empty($r['batch_id']) ? (int)($ps_w_batch[$r['batch_id']] ?? 1) : 1;
                                     ?>
-                                            <tr class="ps-req-row"
+                                            <tr class="ps-req-row ps-appr-row<?php echo $doc ? ' has-doc' : ''; ?>"
                                                 data-id="<?php echo (int)$r['id']; ?>"
                                                 data-status="Waiting"
                                                 data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
                                                 data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
                                                 data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="Faculty"
+                                                data-req-type="<?php echo htmlspecialchars($who_type); ?>"
                                                 data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                data-qty="<?php echo $qty; ?>"
+                                                data-batch-n="<?php echo $batch_n; ?>"
                                                 data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
                                                 data-room="<?php echo htmlspecialchars($r['room']); ?>"
                                                 data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
                                                 data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
                                                 data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
                                                 data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
+                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
+                                                data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
+                                                data-doc-url="<?php echo $doc ? htmlspecialchars($doc['url']) : ''; ?>"
+                                                data-doc-open-url="<?php echo $doc ? htmlspecialchars($doc['open_url']) : ''; ?>"
+                                                data-doc-name="<?php echo $doc ? htmlspecialchars($doc['name']) : ''; ?>"
+                                                data-doc-kind="<?php echo $doc ? $doc['kind'] : ''; ?>">
                                                 <td>
-                                                    <strong style="color:var(--accent-maroon);cursor:pointer"
-                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal">
-                                                        #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
-                                                    </strong>
+                                                    <button type="button" class="ps-appr-id"
+                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal"
+                                                        title="Open review panel">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
+                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($who_type); ?> &middot; <?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></div>
                                                 </td>
                                                 <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)">Faculty</div>
+                                                    <div class="ps-appr-item">
+                                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                                        <?php if ($qty > 1): ?><span class="ps-appr-qty">&times;<?php echo $qty; ?></span><?php endif; ?>
+                                                    </div>
+                                                    <div class="ps-appr-sub">
+                                                        Needed <?php echo date('M d', strtotime($r['borrow_date'])); ?>
+                                                        <?php if ($batch_n > 1): ?><span class="ps-appr-batch" title="Part of one submission with <?php echo $batch_n; ?> items">Batch of <?php echo $batch_n; ?></span><?php endif; ?>
+                                                    </div>
                                                 </td>
-                                                <td><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></td>
-                                                <td><?php echo date('M d, g:i A', strtotime($r['borrow_date'])); ?></td>
                                                 <td>
-                                                    <div style="display:flex;gap:6px">
+                                                    <?php if ($doc): ?>
+                                                        <a class="ps-doc-chip ps-doc-chip--<?php echo $doc['kind']; ?>"
+                                                            href="<?php echo htmlspecialchars($doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                            title="Open <?php echo htmlspecialchars($doc['name']); ?> in a new tab">
+                                                            <span class="material-symbols-outlined"><?php echo ps_doc_icon($doc['kind']); ?></span>
+                                                            <span class="ps-doc-chip__name"><?php echo htmlspecialchars($doc['name']); ?></span>
+                                                            <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <span class="ps-doc-chip ps-doc-chip--none">
+                                                            <span class="material-symbols-outlined">block</span> No document
+                                                        </span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span></td>
+                                                <td>
+                                                    <div class="ps-appr-actions">
                                                         <button class="ps-btn ps-btn--success ps-btn--sm"
                                                             data-action="ps-open-modal" data-modal="ps-approve-modal">
                                                             <span class="material-symbols-outlined">check</span> Approve
@@ -555,13 +1421,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     </div>
                                                 </td>
                                             </tr>
-                                        <?php endwhile;
+                                        <?php endforeach;
                                     else: ?>
                                         <tr>
-                                            <td colspan="7">
+                                            <td colspan="5">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">assignment_turned_in</span>
-                                                    <p>No pending requests. All caught up!</p>
+                                                    <p>Nothing needs your review. Standard requests are processed automatically.</p>
                                                 </div>
                                             </td>
                                         </tr>
@@ -587,11 +1453,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Equipment</th>
                                         <th>Issued</th>
                                         <th>Due</th>
+                                        <th>Approved by</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php
+                                    // Who approved each request (an admin, or the rules engine) — shared with every admin.
+                                    $_act_ids = [];
+                                    mysqli_data_seek($approved_result, 0);
+                                    while ($_r = mysqli_fetch_assoc($approved_result)) {
+                                        $_act_ids[] = (int)$_r['id'];
+                                    }
+                                    $_act_dec = admin_request_decisions($conn, $_act_ids);
                                     mysqli_data_seek($approved_result, 0);
                                     if (mysqli_num_rows($approved_result) > 0):
                                         while ($r = mysqli_fetch_assoc($approved_result)):
@@ -607,6 +1481,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td style="<?php echo $isOD ? 'color:var(--danger);font-weight:600' : ''; ?>">
                                                     <?php echo date('M d', strtotime($r['return_date'])); ?>
                                                 </td>
+                                                <td><?php echo admin_decider_html($_act_dec[(int)$r['id']]['approved'] ?? null); ?></td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm"
                                                         data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
@@ -615,7 +1490,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <?php endwhile;
                                     else: ?>
                                         <tr>
-                                            <td colspan="5">
+                                            <td colspan="6">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">inventory_2</span>
                                                     <p>No active borrowings at the moment.</p>
@@ -651,6 +1526,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Equipment</th>
                                         <th>Due Date</th>
                                         <th>Days Overdue</th>
+                                        <th>Approved by</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -661,6 +1537,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
                                         WHERE tbl_requests.status='Overdue' OR (tbl_requests.status='Approved' AND tbl_requests.return_date < CURDATE())
                                         ORDER BY tbl_requests.return_date ASC");
+                                    $_od_ids = [];
+                                    if ($overdue_q) {
+                                        while ($_r = mysqli_fetch_assoc($overdue_q)) {
+                                            $_od_ids[] = (int)$_r['id'];
+                                        }
+                                        mysqli_data_seek($overdue_q, 0);
+                                    }
+                                    $_od_dec = admin_request_decisions($conn, $_od_ids);
                                     if ($overdue_q && mysqli_num_rows($overdue_q) > 0):
                                         while ($r = mysqli_fetch_assoc($overdue_q)):
                                             $days_od = max(0, (int)floor((strtotime($today) - strtotime($r['return_date'])) / 86400));
@@ -673,6 +1557,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td style="color:var(--danger);font-weight:600"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
                                                 <td><span class="ps-badge ps-badge--overdue"><?php echo $days_od; ?> days</span></td>
+                                                <td><?php echo admin_decider_html($_od_dec[(int)$r['id']]['approved'] ?? null); ?></td>
                                                 <td>
                                                     <div style="display:flex;gap:6px">
                                                         <button class="ps-btn ps-btn--ghost ps-btn--sm"
@@ -685,7 +1570,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <?php endwhile;
                                     else: ?>
                                         <tr>
-                                            <td colspan="5">
+                                            <td colspan="6">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">check_circle</span>
                                                     <p>No overdue items. Great job!</p>
@@ -722,6 +1607,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>Borrower</th>
                                         <th>Equipment</th>
                                         <th>Returned</th>
+                                        <th>Returned by</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -732,6 +1618,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
                                         WHERE tbl_requests.status='Returned'
                                         ORDER BY tbl_requests.return_date DESC LIMIT 100");
+                                    $_ret_ids = [];
+                                    if ($all_q) {
+                                        while ($_r = mysqli_fetch_assoc($all_q)) {
+                                            $_ret_ids[] = (int)$_r['id'];
+                                        }
+                                        mysqli_data_seek($all_q, 0);
+                                    }
+                                    $_ret_dec = admin_request_decisions($conn, $_ret_ids);
                                     if ($all_q && mysqli_num_rows($all_q) > 0):
                                         while ($r = mysqli_fetch_assoc($all_q)):
                                     ?>
@@ -757,6 +1651,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
                                                 <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
                                                 <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
+                                                <td><?php echo admin_decider_html($_ret_dec[(int)$r['id']]['returned'] ?? null); ?></td>
                                                 <td>
                                                     <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                 </td>
@@ -764,7 +1659,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <?php endwhile;
                                     else: ?>
                                         <tr>
-                                            <td colspan="5">
+                                            <td colspan="6">
                                                 <div class="ps-empty-state">
                                                     <span class="material-symbols-outlined">list_alt</span>
                                                     <p>No requests found.</p>
@@ -794,23 +1689,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="pr-page-header-row">
                     <div>
                         <h1 class="pr-page-title">Room Management</h1>
-                        <p class="pr-page-subtitle">Manage campus rooms, reservations, and reported issues. <?php echo $stat_rooms_total; ?> active room<?php echo $stat_rooms_total !== 1 ? 's' : ''; ?> — <?php echo $stat_rooms_available; ?> Available, <?php echo $stat_rooms_maintenance; ?> Maintenance, <?php echo $stat_rooms_notbookable; ?> Not Bookable.</p>
+                        <p class="pr-page-subtitle">Browse rooms, reservations and reported issues.</p>
                     </div>
-                    <div style="display:flex;gap:8px;flex-shrink:0;">
-                        <button class="pr-btn pr-btn-ghost pr-btn-sm" data-rooms-tab="rooms-archived" title="View archived rooms">
-                            <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
-                            Archived
-                            <?php if (!empty($rooms_archived)): ?>
-                                <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo count($rooms_archived); ?></span>
-                            <?php endif; ?>
+                    <?php if ($is_super_admin): ?>
+                        <button type="button" class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
+                            <span class="material-symbols-outlined">add</span>
+                            Add Room
                         </button>
-                        <?php if ($is_super_admin): ?>
-                            <button class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
-                                <span class="material-symbols-outlined">add</span>
-                                Add Room
-                            </button>
-                        <?php endif; ?>
-                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- ── Add / Edit Room form (hidden by default) ────────── -->
@@ -843,94 +1729,38 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <input type="hidden" name="room_id" id="room-form-id"
                                     value="<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>">
 
-                                <!-- Row 1: Building | Room Name -->
+                                <!-- Building | Room name -->
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>Building <span class="req-star" aria-label="required">*</span></label>
-                                        <select name="building_id" class="form-control-custom" required>
-                                            <option value="">— Select building —</option>
+                                        <label for="rf-building">Building <span class="req-star" aria-label="required">*</span></label>
+                                        <select name="building_id" id="rf-building" class="form-control-custom" required>
+                                            <option value="">Select building</option>
                                             <?php foreach ($rooms_buildings as $bid => $b): ?>
                                                 <option value="<?php echo (int)$bid; ?>"
                                                     <?php echo ($edit_room && (int)$edit_room['building_id'] === $bid) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($b['campus_name'] . ' › ' . $b['name']); ?>
+                                                    <?php echo htmlspecialchars($b['name']); ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label>Room Name <span class="req-star" aria-label="required">*</span></label>
-                                        <input type="text" name="room_name" class="form-control-custom"
+                                        <label for="rf-name">Room name <span class="req-star" aria-label="required">*</span></label>
+                                        <input type="text" name="room_name" id="rf-name" class="form-control-custom"
                                             value="<?php echo $edit_room ? htmlspecialchars($edit_room['room_name']) : ''; ?>"
-                                            placeholder="e.g. Computer Laboratory 1" required>
+                                            placeholder="e.g. Computer Lab 1" required>
                                     </div>
                                 </div>
 
-                                <!-- Row 2: Floor Number | Display Name for Floor -->
+                                <!-- Floor | Status -->
                                 <div class="form-row">
                                     <div class="form-group">
-                                        <label>
-                                            Floor Number <span class="req-star" aria-label="required">*</span>
-                                            <span class="field-tip" data-tip="The floor this room is on (e.g. enter 2 for 2nd Floor)." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">The floor this room is on (e.g. enter 2 for 2nd Floor).</span>
-                                            </span>
-                                        </label>
-                                        <input type="number" name="floor_number" class="form-control-custom" min="1" max="20"
+                                        <label for="rf-floor">Floor <span class="req-star" aria-label="required">*</span></label>
+                                        <input type="number" name="floor_number" id="rf-floor" class="form-control-custom" min="1" max="20"
                                             value="<?php echo $edit_room ? (int)$edit_room['floor_number'] : 1; ?>" required>
                                     </div>
                                     <div class="form-group">
-                                        <label>
-                                            Display Name for Floor <small class="field-optional">(optional)</small>
-                                            <span class="field-tip" data-tip="Only needed if this floor has a special name, like &#39;Ground Floor&#39; or &#39;Mezzanine&#39;. Leave blank to use the floor number automatically." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">Only needed if this floor has a special name, like &lsquo;Ground Floor&rsquo; or &lsquo;Mezzanine&rsquo;. Leave blank to use the floor number automatically.</span>
-                                            </span>
-                                        </label>
-                                        <input type="text" name="floor_label" class="form-control-custom"
-                                            value="<?php echo $edit_room ? htmlspecialchars($edit_room['floor_label'] ?? '') : ''; ?>"
-                                            placeholder="e.g. Ground Floor">
-                                    </div>
-                                </div>
-
-                                <!-- Row 3: Seating Capacity | Room Status -->
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>
-                                            Seating Capacity <small class="field-optional">(optional)</small>
-                                            <span class="field-tip" data-tip="How many people this room can hold. Leave blank if unknown." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">How many people this room can hold. Leave blank if unknown.</span>
-                                            </span>
-                                        </label>
-                                        <input type="number" name="seating_capacity" class="form-control-custom" min="1"
-                                            value="<?php echo ($edit_room && $edit_room['seating_capacity'] !== null) ? (int)$edit_room['seating_capacity'] : ''; ?>"
-                                            placeholder="e.g. 40">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>
-                                            Room Status <span class="req-star" aria-label="required">*</span>
-                                            <span class="field-tip" data-tip="Available = open for booking. Maintenance = temporarily closed. Not Bookable = this room cannot be reserved." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">Available = open for booking. Maintenance = temporarily closed. Not Bookable = this room cannot be reserved.</span>
-                                            </span>
-                                        </label>
-                                        <select name="status" class="form-control-custom">
+                                        <label for="rf-status">Status</label>
+                                        <select name="status" id="rf-status" class="form-control-custom">
                                             <?php foreach (['Available', 'Maintenance', 'Not Bookable'] as $s): ?>
                                                 <option value="<?php echo $s; ?>"
                                                     <?php echo ($edit_room && $edit_room['status'] === $s) ? 'selected' : (!$edit_room && $s === 'Available' ? 'selected' : ''); ?>>
@@ -940,58 +1770,49 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </select>
                                     </div>
                                 </div>
+                                <p class="rf-hint rf-hint-flush">Maintenance and Not Bookable rooms can&rsquo;t be reserved.</p>
 
-                                <!-- Row 4: Display Position (left only, right empty — mirrors Quantity row in equipment form) -->
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label>
-                                            Display Position <small class="field-optional">(optional)</small>
-                                            <span class="field-tip" data-tip="Controls which room appears first when browsing this floor. Leave as 0 if you don&#39;t have a preference — rooms will sort by the order they were added." aria-label="More information" tabindex="0">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                    <circle cx="12" cy="12" r="10" />
-                                                    <line x1="12" y1="16" x2="12" y2="12" />
-                                                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                </svg>
-                                                <span class="field-tip-box" role="tooltip">Controls which room appears first when browsing this floor. Leave as 0 if you don&rsquo;t have a preference &mdash; rooms will sort by the order they were added.</span>
-                                            </span>
-                                        </label>
-                                        <input type="number" name="sort_order" class="form-control-custom" min="0"
-                                            value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
-                                    </div>
-                                    <div class="form-group"><!-- empty right column --></div>
-                                </div>
-
-                                <!-- Row 5: Room Features (full width) -->
+                                <!-- Features -->
+                                <?php
+                                $preset_amenities = ['WiFi', 'A/C', 'Projector', 'PA System', 'Running Water', 'Safety Kit', 'Whiteboard', 'Smart TV'];
+                                $checked_amenities = [];
+                                if ($edit_room && !empty($edit_room['amenities'])) {
+                                    $decoded = json_decode($edit_room['amenities'], true);
+                                    $checked_amenities = is_array($decoded) ? $decoded : [];
+                                }
+                                ?>
                                 <div class="form-group">
-                                    <label>
-                                        Room Features <small class="field-optional">(optional)</small>
-                                        <span class="field-tip" data-tip="Tick everything this room has. These details appear on the room information screen." aria-label="More information" tabindex="0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" aria-hidden="true">
-                                                <circle cx="12" cy="12" r="10" />
-                                                <line x1="12" y1="16" x2="12" y2="12" />
-                                                <line x1="12" y1="8" x2="12.01" y2="8" />
-                                            </svg>
-                                            <span class="field-tip-box" role="tooltip">Tick everything this room has. These details appear on the room information screen.</span>
-                                        </span>
-                                    </label>
-                                    <?php
-                                    $preset_amenities = ['WiFi', 'A/C', 'Projector', 'PA System', 'Running Water', 'Safety Kit', 'Whiteboard', 'Smart TV'];
-                                    $checked_amenities = [];
-                                    if ($edit_room && !empty($edit_room['amenities'])) {
-                                        $decoded = json_decode($edit_room['amenities'], true);
-                                        $checked_amenities = is_array($decoded) ? $decoded : [];
-                                    }
-                                    ?>
-                                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+                                    <label>Features <small class="field-optional">(optional)</small></label>
+                                    <div class="rf-chips">
                                         <?php foreach ($preset_amenities as $am): ?>
-                                            <label style="display:flex;align-items:center;gap:4px;font-weight:400;cursor:pointer;font-size:0.85rem;background:var(--surface-alt);padding:4px 10px;border-radius:20px;border:1px solid var(--border);">
+                                            <label class="rf-chip">
                                                 <input type="checkbox" name="amenities[]" value="<?php echo htmlspecialchars($am); ?>"
                                                     <?php echo in_array($am, $checked_amenities, true) ? 'checked' : ''; ?>>
-                                                <?php echo htmlspecialchars($am); ?>
+                                                <span><?php echo htmlspecialchars($am); ?></span>
                                             </label>
                                         <?php endforeach; ?>
                                     </div>
                                 </div>
+
+                                <!-- Rarely needed -->
+                                <details class="rf-more" id="room-more-opts"
+                                    <?php echo ($edit_room && (!empty($edit_room['floor_label']) || (int)$edit_room['sort_order'] > 0)) ? 'open' : ''; ?>>
+                                    <summary>More options</summary>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="rf-floor-label">Floor name</label>
+                                            <input type="text" name="floor_label" id="rf-floor-label" class="form-control-custom"
+                                                value="<?php echo $edit_room ? htmlspecialchars($edit_room['floor_label'] ?? '') : ''; ?>"
+                                                placeholder="e.g. Ground Floor">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="rf-sort">Display order</label>
+                                            <input type="number" name="sort_order" id="rf-sort" class="form-control-custom" min="0"
+                                                value="<?php echo $edit_room ? (int)$edit_room['sort_order'] : 0; ?>">
+                                        </div>
+                                    </div>
+                                    <p class="rf-hint">Floor name replaces the number in lists. Lower display order appears first.</p>
+                                </details>
 
                                 <!-- Row 6: Submit button -->
                                 <button type="submit" id="room-form-submit-inner"
@@ -1005,14 +1826,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </button>
                             </form>
 
-                            <!-- Archive zone: always in DOM, shown/hidden by JS -->
+                            <!-- Room actions zone (edit mode only): always in DOM, shown/hidden by JS.
+                                 Lock / Unlock: Admin + Super Admin.  Archive: Super Admin only
+                                 (the link is not even rendered for a regular Admin; the server checks too). -->
+                            <?php $edit_locked = $edit_room && !empty($edit_room['is_locked']); ?>
                             <div class="rmod-archive-zone<?php echo $edit_room ? '' : ' hidden'; ?>" id="room-archive-zone">
-                                <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
-                                    id="room-archive-link"
-                                    class="pr-btn pr-btn-danger pr-btn-sm">
-                                    <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
-                                    Archive Room
-                                </a>
+                                <button type="button" id="room-lock-btn"
+                                    class="pr-btn pr-btn-ghost pr-btn-sm"
+                                    data-action="toggle-room-lock"
+                                    data-lock="<?php echo $edit_locked ? '0' : '1'; ?>">
+                                    <span class="material-symbols-outlined" id="room-lock-icon" style="font-size:15px;"><?php echo $edit_locked ? 'lock_open' : 'lock'; ?></span>
+                                    <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Room' : 'Lock Room'; ?></span>
+                                </button>
+                                <?php if ($is_super_admin): ?>
+                                    <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
+                                        id="room-archive-link"
+                                        class="pr-btn pr-btn-danger pr-btn-sm">
+                                        <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
+                                        Archive Room
+                                    </a>
+                                <?php endif; ?>
                             </div>
 
                         </div><!-- /.form-card-body -->
@@ -1031,105 +1864,40 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div><!-- /.eq-card.form-card -->
                 </div><!-- /#room-form-wrap -->
 
-                <!-- ── Tab navigation (streamlined: 2 tabs — Rooms + Issues) ── -->
-                <div class="pr-sub-tabs" id="rooms-toggle-wrap">
-                    <button class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
-                    <button class="pr-sub-tab" data-rooms-tab="rooms-issues">
-                        Issues
-                        <?php if (!empty($admin_room_issues_open)): ?>
-                            <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
-                        <?php endif; ?>
-                    </button>
+                <!-- Tabs: main tabs on the left, Archived in its own container on the far right -->
+                <div class="rm-tabbar">
+                    <div class="pr-sub-tabs" id="rooms-toggle-wrap">
+                        <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
+                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-reservations">
+                            Reservations
+                            <?php
+                            $rm_resv_approved = count(array_filter($admin_room_reservations ?? [], function ($r) {
+                                return ($r['status'] ?? '') === 'Approved';
+                            }));
+                            if ($rm_resv_approved > 0): ?>
+                                <span class="pr-tab-badge" style="background:var(--text-light);"><?php echo $rm_resv_approved; ?></span>
+                            <?php endif; ?>
+                        </button>
+                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-issues">
+                            Issues
+                            <?php if (!empty($admin_room_issues_open)): ?>
+                                <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
+                            <?php endif; ?>
+                        </button>
+                    </div>
+                    <div class="pr-sub-tabs rm-tabs-solo" id="rooms-archived-tab-wrap">
+                        <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived">
+                            Archived
+                            <span class="pr-tab-badge" id="roomsArchivedBadge" style="background:var(--text-light);<?php echo empty($rooms_archived) ? 'display:none;' : ''; ?>"><?php echo count($rooms_archived); ?></span>
+                        </button>
+                    </div>
                 </div>
 
-                <!-- ════════════════════════════════════════════════════
-                     SUB-PANEL: ACTIVE ROOMS
-                     ════════════════════════════════════════════════════ -->
+                <!-- ROOMS -->
                 <div class="rooms-sub-panel active" id="rooms-active-panel">
-
-                    <div class="pr-card">
-                        <div class="pr-card-header">
-                            <h3>
-                                <span class="material-symbols-outlined">calendar_month</span>
-                                Reservations
-                            </h3>
-                        </div>
-                        <div class="pr-tbl-wrap">
-                            <table class="pr-table">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Room</th>
-                                        <th>Location</th>
-                                        <th>Date</th>
-                                        <th>Time</th>
-                                        <th>Faculty</th>
-                                        <th>Submitted As</th>
-                                        <th>Purpose</th>
-                                        <th>Status</th>
-                                        <th>Reason</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($admin_room_reservations)): ?>
-                                        <tr>
-                                            <td colspan="11" style="text-align:center;padding:2.5rem;color:var(--text-light);">No reservations yet.</td>
-                                        </tr>
-                                        <?php else: foreach ($admin_room_reservations as $ar):
-                                            $ar_pill = 'pr-pill-approved';
-                                            if ($ar['status'] === 'Declined')  $ar_pill = 'pr-pill-declined';
-                                            if ($ar['status'] === 'Cancelled') $ar_pill = 'pr-pill-cancelled';
-
-                                            $ar_submitted = match ($ar['submitted_as']) {
-                                                'adviser' => 'Adviser',
-                                                'student' => 'Student (via code)',
-                                                default   => 'Personal',
-                                            };
-                                            $ar_who = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name'])
-                                                ? htmlspecialchars($ar['submitted_by_name']) . '<br><small style="color:var(--text-light);">via ' . htmlspecialchars($ar['faculty_name']) . '</small>'
-                                                : htmlspecialchars($ar['faculty_name']);
-                                        ?>
-                                            <tr>
-                                                <td class="td-sm">#<?php echo (int)$ar['id']; ?></td>
-                                                <td class="td-fw"><?php echo htmlspecialchars($ar['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($ar['floor_label'] . ', ' . $ar['building_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></td>
-                                                <td style="white-space:nowrap;"><?php echo htmlspecialchars($ar['start_fmt'] . ' – ' . $ar['end_fmt']); ?></td>
-                                                <td><?php echo $ar_who; ?></td>
-                                                <td><?php echo htmlspecialchars($ar_submitted); ?></td>
-                                                <td><?php echo htmlspecialchars($ar['purpose']); ?></td>
-                                                <td><span class="pr-pill <?php echo $ar_pill; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
-                                                <td class="td-sm"><?php echo $ar['reason'] ? htmlspecialchars($ar['reason']) : '—'; ?></td>
-                                                <td>
-                                                    <?php if ($ar['status'] === 'Approved'): ?>
-                                                        <button class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
-                                                            data-action="admin-cancel-reservation"
-                                                            data-rr-id="<?php echo (int)$ar['id']; ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
-                                                            data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
-                                                            title="Cancel this reservation">
-                                                            <span class="material-symbols-outlined" style="font-size:14px;">cancel</span>
-                                                            Cancel
-                                                        </button>
-                                                    <?php else: ?>
-                                                        <span class="td-sm">—</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                    <?php endforeach;
-                                    endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
                     <?php
-                    // ── Group active rooms by building → floor, and assign each
-                    //    building a display accent color. Shared with the AJAX
-                    //    responses in admin-rooms-functions.php via
-                    //    ps_prepare_rooms_registry_view() so both paths compute
-                    //    this identically. ─────────────────────────────────────
+                    // Group active rooms by building -> floor. Shared with the AJAX responses in
+                    // admin-rooms-functions.php via ps_prepare_rooms_registry_view().
                     $rv = ps_prepare_rooms_registry_view($rooms_buildings, $rooms_list);
                     $rooms_grouped         = $rv['grouped'];
                     $floors_by_building_js = $rv['floors_by_building'];
@@ -1138,68 +1906,65 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     ?>
 
                     <?php if (empty($rooms_buildings)): ?>
-                        <div class="pr-card" style="margin-top:1.75rem;">
-                            <div class="pr-card-header">
-                                <h3>
-                                    <span class="material-symbols-outlined">meeting_room</span>
-                                    All Rooms
-                                </h3>
-                            </div>
-                            <div class="pr-empty">
-                                No rooms in the registry yet. Click <strong>Add Room</strong> to get started.
-                            </div>
+                        <div class="pr-card rm-rooms-card">
+                            <div class="pr-empty">No rooms yet. Click <strong>Add Room</strong> to get started.</div>
                         </div>
                     <?php else: ?>
-
-                        <div class="pr-card" style="margin-top:1.75rem;">
+                        <div class="pr-card rm-rooms-card">
                             <div class="pr-card-header">
-                                <h3>
-                                    <span class="material-symbols-outlined">meeting_room</span>
-                                    All Rooms
-                                </h3>
+                                <h3><span class="material-symbols-outlined">meeting_room</span> All Rooms</h3>
+                                <span class="rm-showing" id="rmShowing" aria-live="polite"></span>
                             </div>
-
-                            <!-- ── Toolbar: search + Building / Floor / Status filters ── -->
-                            <div class="pr-rooms-toolbar">
-                                <div class="pr-search-wrap">
-                                    <span class="material-symbols-outlined">search</span>
-                                    <input type="text" id="roomSearchInput" placeholder="Search rooms…" autocomplete="off">
+                            <!-- Filters: building + floor pills, search, status -->
+                            <div class="rm-toolbar" id="rmToolbar">
+                                <div class="rm-tb-row">
+                                    <div class="rm-bld-pills" id="rmBuildingPills" role="group" aria-label="Building"></div>
+                                    <div class="pr-search-wrap">
+                                        <span class="material-symbols-outlined">search</span>
+                                        <input type="text" id="roomSearchInput" placeholder="Search rooms" autocomplete="off">
+                                    </div>
                                 </div>
-                                <select id="roomBuildingSelect" class="pr-filter-select">
-                                    <option value="all">All Buildings</option>
-                                    <?php foreach ($rooms_buildings as $bid => $b): ?>
-                                        <option value="<?php echo (int)$bid; ?>" <?php echo $bid === $first_building_id ? ' selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($b['campus_name'] . ' · ' . $b['name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <select id="roomFloorSelect" class="pr-filter-select">
-                                    <option value="all">All Floors</option>
-                                    <?php foreach (($floors_by_building_js[$first_building_id] ?? []) as $f): ?>
-                                        <option value="<?php echo (int)$f['num']; ?>"><?php echo htmlspecialchars($f['label']); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <select id="roomStatusSelect" class="pr-filter-select">
-                                    <option value="all">All Statuses</option>
-                                    <option value="Available">Available</option>
-                                    <option value="Maintenance">Maintenance</option>
-                                    <option value="Not Bookable">Not Bookable</option>
-                                </select>
+                                <div class="rm-tb-row">
+                                    <div class="rm-floor-chips" id="rmFloorChips" role="group" aria-label="Floor"></div>
+                                    <div class="rm-tb-end">
+                                        <select id="roomStatusSelect" class="pr-filter-select" aria-label="Status">
+                                            <option value="all">All statuses</option>
+                                            <option value="Available">Available</option>
+                                            <option value="Maintenance">Maintenance</option>
+                                            <option value="Not Bookable">Not bookable</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <!-- Plain dropdowns: the pills above read and write these. Hidden once JS runs. -->
+                                <div class="rm-native-filters">
+                                    <select id="roomBuildingSelect" class="pr-filter-select" aria-label="Building">
+                                        <option value="all">All buildings</option>
+                                        <?php foreach ($rooms_buildings as $bid => $b): ?>
+                                            <option value="<?php echo (int)$bid; ?>" <?php echo $bid === $first_building_id ? ' selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($b['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <select id="roomFloorSelect" class="pr-filter-select" aria-label="Floor">
+                                        <option value="all">All floors</option>
+                                        <?php foreach (($floors_by_building_js[$first_building_id] ?? []) as $f): ?>
+                                            <option value="<?php echo (int)$f['num']; ?>"><?php echo htmlspecialchars($f['label']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
                             </div>
 
-                            <!-- ── One flat, floor-grouped table for every building ────── -->
+                            <!-- One floor-grouped list for every building (drawn as tiles) -->
                             <div class="pr-tbl-wrap">
-                                <table class="pr-table pr-rooms-table" id="roomsRegistryTable">
+                                <table class="pr-rooms-table rm-grid" id="roomsRegistryTable" aria-label="Rooms">
                                     <colgroup>
                                         <col>
-                                        <col class="pr-col-capacity" style="width:110px;">
                                         <col style="width:150px;">
                                         <col style="width:132px;">
                                     </colgroup>
                                     <thead>
                                         <tr>
                                             <th>Room</th>
-                                            <th>Capacity</th>
                                             <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
@@ -1209,7 +1974,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </tbody>
                                 </table>
                             </div>
-                        </div><!-- /.pr-card (All Rooms) -->
+                        </div>
 
                         <script nonce="<?php echo $csp_nonce; ?>">
                             /* ── PUPSync Room Registry filter module ─────────────────
@@ -1349,6 +2114,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     const addRoomBtn = document.getElementById('addRoomBtn');
                                     if (rfw) rfw.classList.add('hidden');
                                     if (addRoomBtn) addRoomBtn.style.display = '';
+                                    if (window.psResetRoomForm) window.psResetRoomForm();
                                     // If the modal was opened via ?edit_room=ID, drop that
                                     // param now — otherwise a later refresh would silently
                                     // reopen the modal on a room that's already saved.
@@ -1361,10 +2127,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 }
 
                                 function afterMutation(json) {
+                                    json = normalizeReply(json);
                                     if (json && json.status === 'success') {
                                         if (window.psRefreshRoomsRegistry) {
                                             window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
                                         }
+                                        refreshArchived(json);
                                         closeRoomModal();
                                         if (typeof showToast === 'function') showToast(json.message || 'Saved.');
                                     } else {
@@ -1377,6 +2145,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 function onNetworkError() {
                                     if (typeof showToast === 'function') showToast('Network error — please try again.');
                                 }
+
+                                /* Server replies for a bad CSRF token use {error:...}; everything else {message:...}. */
+                                function normalizeReply(json) {
+                                    if (json && json.status === 'error' && !json.message && json.error) json.message = json.error;
+                                    return json;
+                                }
+
+                                /* Keep the Archived tab (rows + count badge) in step with the server. */
+                                function refreshArchived(json) {
+                                    if (!json || typeof json.archived_html !== 'string') return;
+                                    const body = document.getElementById('rooms-archived-body');
+                                    if (body) body.innerHTML = json.archived_html;
+                                    const badge = document.getElementById('roomsArchivedBadge');
+                                    if (badge) {
+                                        const n = parseInt(json.archived_count, 10) || 0;
+                                        badge.textContent = n;
+                                        badge.style.display = n > 0 ? '' : 'none';
+                                    }
+                                }
+
+                                /* Lock button in the Edit modal: label + icon + next action. */
+                                window.psSetLockButton = function(isLocked) {
+                                    const btn = document.getElementById('room-lock-btn');
+                                    if (!btn) return;
+                                    btn.dataset.lock = isLocked ? '0' : '1';
+                                    const ico = document.getElementById('room-lock-icon');
+                                    const lbl = document.getElementById('room-lock-label');
+                                    if (ico) ico.textContent = isLocked ? 'lock_open' : 'lock';
+                                    if (lbl) lbl.textContent = isLocked ? 'Unlock Room' : 'Lock Room';
+                                };
 
                                 const submitBtns = ['room-form-submit-inner', 'room-form-submit-foot']
                                     .map(function(id) {
@@ -1446,96 +2244,391 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         .then(afterMutation)
                                         .catch(onNetworkError);
                                 });
+
+                                /* Restore: intercept restore_room= links in the Archived sub-panel. */
+                                document.addEventListener('click', function(e) {
+                                    const link = e.target.closest('a[href*="restore_room="]');
+                                    if (!link) return;
+                                    e.preventDefault();
+                                    if (!confirm('Restore this room? It will reappear in the active registry.')) return;
+
+                                    const href = link.getAttribute('href');
+                                    const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+
+                                    fetch(url, {
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                if (typeof showToast === 'function') showToast(json.message || 'Room restored.');
+                                                if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-active');
+                                            } else {
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not restore room.');
+                                            }
+                                        })
+                                        .catch(onNetworkError);
+                                });
+
+                                /* Lock / Unlock (Edit modal). The modal stays open so unsaved edits
+                                   are not lost; the tiles behind it refresh straight away. */
+                                document.addEventListener('click', function(e) {
+                                    const btn = e.target.closest('[data-action="toggle-room-lock"]');
+                                    if (!btn) return;
+                                    const idEl = document.getElementById('room-form-id');
+                                    const roomId = idEl ? idEl.value : '';
+                                    if (!roomId) return;
+                                    const lock = btn.dataset.lock === '1' ? '1' : '0';
+                                    const tok = roomForm.querySelector('input[name="csrf_token"]');
+
+                                    const fd = new FormData();
+                                    fd.set('toggle_room_lock', '1');
+                                    fd.set('room_id', roomId);
+                                    fd.set('lock', lock);
+                                    fd.set('ajax', '1');
+                                    if (tok) fd.set('csrf_token', tok.value);
+
+                                    btn.disabled = true;
+                                    fetch('admin-dashboard.php', {
+                                            method: 'POST',
+                                            body: fd,
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            btn.disabled = false;
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                window.psSetLockButton(lock === '1');
+                                                if (typeof showToast === 'function') showToast(json.message || (lock === '1' ? 'Room locked.' : 'Room unlocked.'));
+                                            } else if (typeof showToast === 'function') {
+                                                showToast((json && json.message) || 'Could not change the lock. Please try again.');
+                                            }
+                                        })
+                                        .catch(function() {
+                                            btn.disabled = false;
+                                            onNetworkError();
+                                        });
+                                });
+
+                                /* Permanent delete (Archived tab, Super Admin). The button only opens
+                                   a confirmation dialog; nothing is sent until the box is ticked and
+                                   "Delete permanently" is pressed. The server re-checks everything. */
+                                /* The dialog lives at the end of <body> (after this script runs), so it
+                                   is looked up when needed, never once at load. */
+                                let delRoomId = '';
+                                const delEl = function(id) {
+                                    return document.getElementById(id);
+                                };
+
+                                function closeDeleteModal() {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (m) m.classList.add('hidden');
+                                    delRoomId = '';
+                                }
+
+                                document.addEventListener('click', function(e) {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (!m) return; // regular Admins never get the dialog
+
+                                    const openBtn = e.target.closest('[data-action="delete-room-permanent"]');
+                                    if (openBtn) {
+                                        delRoomId = openBtn.dataset.roomId || '';
+                                        const n = parseInt(openBtn.dataset.reservations, 10) || 0;
+                                        delEl('rdc-room-name').textContent = openBtn.dataset.roomName || '';
+                                        delEl('rdc-resv').textContent =
+                                            n === 0 ? 'No reservation records' : (n === 1 ? '1 reservation record' : n + ' reservation records');
+                                        delEl('rdc-ack').checked = false;
+                                        delEl('rdc-confirm').disabled = true;
+                                        m.classList.remove('hidden');
+                                        delEl('rdc-ack').focus();
+                                        return;
+                                    }
+                                    if (e.target.closest('[data-action="close-room-delete"]') || e.target === m) {
+                                        closeDeleteModal();
+                                        return;
+                                    }
+
+                                    /* Confirm: only acts once the box is ticked. */
+                                    const go = e.target.closest('#rdc-confirm');
+                                    if (!go) return;
+                                    const ack = delEl('rdc-ack');
+                                    if (!ack.checked || !delRoomId || go.disabled) return;
+
+                                    const tok = roomForm.querySelector('input[name="csrf_token"]');
+                                    const fd = new FormData();
+                                    fd.set('delete_room_permanently', '1');
+                                    fd.set('room_id', delRoomId);
+                                    fd.set('confirm', 'yes');
+                                    fd.set('ajax', '1');
+                                    if (tok) fd.set('csrf_token', tok.value);
+
+                                    go.disabled = true;
+                                    fetch('admin-dashboard.php', {
+                                            method: 'POST',
+                                            body: fd,
+                                            credentials: 'same-origin'
+                                        })
+                                        .then(function(res) {
+                                            return res.json();
+                                        })
+                                        .then(function(json) {
+                                            json = normalizeReply(json);
+                                            if (json && json.status === 'success') {
+                                                if (window.psRefreshRoomsRegistry) {
+                                                    window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
+                                                }
+                                                refreshArchived(json);
+                                                closeDeleteModal();
+                                                if (typeof showToast === 'function') showToast(json.message || 'Room permanently deleted.');
+                                            } else {
+                                                go.disabled = !ack.checked;
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not delete the room.');
+                                            }
+                                        })
+                                        .catch(function() {
+                                            go.disabled = !ack.checked;
+                                            onNetworkError();
+                                        });
+                                });
+
+                                document.addEventListener('keydown', function(e) {
+                                    const m = delEl('roomDeleteConfirm');
+                                    if (e.key === 'Escape' && m && !m.classList.contains('hidden')) closeDeleteModal();
+                                });
+
+                                document.addEventListener('change', function(e) {
+                                    if (e.target && e.target.id === 'rdc-ack') {
+                                        const go = delEl('rdc-confirm');
+                                        if (go) go.disabled = !e.target.checked;
+                                    }
+                                });
                             })();
                         </script>
-
                     <?php endif; ?>
-
-
                 </div><!-- /#rooms-active-panel -->
 
-                <!-- ════════════════════════════════════════════════════
-                     SUB-PANEL: ARCHIVED ROOMS
-                     ════════════════════════════════════════════════════ -->
-                <div class="rooms-sub-panel" id="rooms-archived-panel">
+                <!-- RESERVATIONS -->
+                <div class="rooms-sub-panel" id="rooms-reservations-panel">
                     <div class="pr-card">
                         <div class="pr-card-header">
-                            <h3>
-                                <span class="material-symbols-outlined">archive</span>
-                                Archived Rooms
-                            </h3>
+                            <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
+                            <div class="pr-search-wrap">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="rrSearch" placeholder="Search room or name" autocomplete="off" aria-label="Search reservations">
+                            </div>
+                        </div>
+                        <div class="rr-status-bar">
+                            <button type="button" class="rm-chip rr-active-chip" id="rrActiveToday" aria-pressed="false">
+                                <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today
+                            </button>
+                            <select id="rrStatus" class="pr-filter-select" aria-label="Reservation status">
+                                <option value="all">All statuses</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Cancelled">Cancelled</option>
+                                <option value="Declined">Declined</option>
+                            </select>
                         </div>
                         <div class="pr-tbl-wrap">
-                            <table class="pr-table">
+                            <table class="pr-table rm-table" id="rrTable">
                                 <thead>
                                     <tr>
-                                        <th>Room Name</th>
-                                        <th>Location</th>
-                                        <th>Status at Archive</th>
-                                        <th>Actions</th>
+                                        <th>Room</th>
+                                        <th>When</th>
+                                        <th>Requested by</th>
+                                        <th>Status</th>
+                                        <th><span class="rm-sr">Actions</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (empty($rooms_archived)): ?>
+                                    <?php if (empty($admin_room_reservations)): ?>
                                         <tr>
-                                            <td colspan="4" style="text-align:center;padding:2.5rem;color:var(--text-light);">No archived rooms.</td>
+                                            <td colspan="5" class="rm-empty-cell">No reservations yet.</td>
                                         </tr>
-                                        <?php else: foreach ($rooms_archived as $ar):
-                                            $ar_floor = !empty($ar['floor_label']) ? $ar['floor_label'] : $ar['floor_number'] . 'F';
-                                            $ar_pill_cls = $ar['status'] === 'Available' ? 'pr-pill-avail' : 'pr-pill-maint';
+                                        <?php else: foreach ($admin_room_reservations as $ar):
+                                            $ar_badge = 'ps-badge--active';
+                                            if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
+                                            if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
+
+                                            $ar_type    = ps_submitted_as_label($ar['submitted_as']);
+                                            $ar_is_stud = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name']);
+                                            $ar_name    = $ar_is_stud ? $ar['submitted_by_name'] : $ar['faculty_name'];
+                                            $ar_sub     = $ar_is_stud ? 'Student via ' . $ar['faculty_name'] : $ar_type;
+                                            $ar_doc     = ps_doc_info($ar['document_path'] ?? '');
+                                            $ar_where   = $ar['floor_label'] . ', ' . $ar['building_name'];
+                                            $ar_time    = $ar['start_fmt'] . ' - ' . $ar['end_fmt'];
+                                            // Cancellable: Approved AND the reservation end hasn't passed yet
+                                            $ar_end_ts  = !empty($ar['end_time']) ? strtotime($ar['reservation_date'] . ' ' . $ar['end_time']) : 0;
+                                            $ar_cancellable = $ar['status'] === 'Approved' && $ar_end_ts > time();
                                         ?>
-                                            <tr>
-                                                <td class="td-fw"><?php echo htmlspecialchars($ar['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($ar_floor . ', ' . $ar['building_name'] . ' — ' . $ar['campus_name']); ?></td>
-                                                <td><span class="pr-pill <?php echo $ar_pill_cls; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
+                                            <tr class="ps-rr-row<?php echo $ar_doc ? ' has-doc' : ''; ?>"
+                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                data-room="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                data-where="<?php echo htmlspecialchars($ar_where); ?>"
+                                                data-date="<?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?>"
+                                                data-time="<?php echo htmlspecialchars($ar_time); ?>"
+                                                data-who="<?php echo htmlspecialchars($ar_name); ?>"
+                                                data-who-sub="<?php echo htmlspecialchars($ar_sub); ?>"
+                                                data-type="<?php echo htmlspecialchars($ar_type); ?>"
+                                                data-purpose="<?php echo htmlspecialchars($ar['purpose'] ?? ''); ?>"
+                                                data-attendees="<?php echo (int)($ar['attendees'] ?? 0); ?>"
+                                                data-status="<?php echo htmlspecialchars($ar['status']); ?>"
+                                                data-reason="<?php echo htmlspecialchars($ar['reason'] ?? ''); ?>"
+                                                data-notes="<?php echo htmlspecialchars($ar['notes'] ?? ''); ?>"
+                                                data-submitted="<?php echo !empty($ar['request_date']) ? date('M d, Y g:i A', strtotime($ar['request_date'])) : ''; ?>"
+                                                data-doc-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['url']) : ''; ?>"
+                                                data-doc-open-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['open_url']) : ''; ?>"
+                                                data-doc-name="<?php echo $ar_doc ? htmlspecialchars($ar_doc['name']) : ''; ?>"
+                                                data-doc-kind="<?php echo $ar_doc ? $ar_doc['kind'] : ''; ?>"
+                                                data-iso-date="<?php echo htmlspecialchars($ar['reservation_date']); ?>"
+                                                data-start-time="<?php echo htmlspecialchars($ar['start_time']); ?>"
+                                                data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
+                                                data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
+                                                data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
+                                                data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
                                                 <td>
-                                                    <a href="admin-dashboard.php?restore_room=<?php echo (int)$ar['room_id']; ?>"
-                                                        class="pr-tbl-btn restore">
-                                                        <span class="material-symbols-outlined" style="font-size:14px;">unarchive</span>
-                                                        Restore
-                                                    </a>
+                                                    <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
+                                                    <div class="rm-subline"><?php echo htmlspecialchars($ar_where); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="rm-main"><?php echo date('M d, Y', strtotime($ar['reservation_date'])); ?></div>
+                                                    <div class="rm-subline rm-nowrap"><?php echo htmlspecialchars($ar_time); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="rm-main">
+                                                        <?php echo htmlspecialchars($ar_name); ?>
+                                                        <?php if ($ar_doc): ?>
+                                                            <a class="rm-clip" href="<?php echo htmlspecialchars($ar_doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                                title="Open attachment: <?php echo htmlspecialchars($ar_doc['name']); ?>">
+                                                                <span class="material-symbols-outlined">attach_file</span>
+                                                            </a>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="rm-subline"><?php echo htmlspecialchars($ar_sub); ?></div>
+                                                </td>
+                                                <td><span class="ps-badge ps-badge--dot <?php echo $ar_badge; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
+                                                <td>
+                                                    <div class="rm-actions">
+                                                        <?php if ($ar_cancellable): ?>
+                                                            <button type="button" class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
+                                                                data-action="admin-cancel-reservation"
+                                                                data-rr-id="<?php echo (int)$ar['id']; ?>"
+                                                                data-room-name="<?php echo htmlspecialchars($ar['room_name']); ?>"
+                                                                data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
+                                                                title="Cancel this reservation">Cancel</button>
+                                                        <?php endif; ?>
+                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>View</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                     <?php endforeach;
                                     endif; ?>
+                                    <tr id="rrNoMatch" style="display:none;">
+                                        <td colspan="5" class="rm-empty-cell">No reservations match.</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
-                </div><!-- /#rooms-archived-panel -->
+                    <script nonce="<?php echo $csp_nonce; ?>">
+                        (function() {
+                            'use strict';
+                            var tbl = document.getElementById('rrTable');
+                            var q = document.getElementById('rrSearch');
+                            var st = document.getElementById('rrStatus');
+                            var activeToday = document.getElementById('rrActiveToday');
+                            var activeOnly = false;
+                            var none = document.getElementById('rrNoMatch');
+                            if (!tbl || !q || !st || !activeToday) return;
 
-                <!-- ════════════════════════════════════════════════════
-                     SUB-PANEL: ROOM ISSUES
-                     ════════════════════════════════════════════════════ -->
+                            function apply() {
+                                var s = (q.value || '').trim().toLowerCase();
+                                var f = st.value;
+                                var any = false;
+                                var nowISO = (function() {
+                                    try {
+                                        var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+                                        var g = function(t) { return (parts.find(function(p) { return p.type === t; }) || {}).value; };
+                                        return { iso: g('year') + '-' + g('month') + '-' + g('day'), min: (+g('hour')) * 60 + (+g('minute')) };
+                                    } catch(e) { var d = new Date(); return { iso: d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2), min: d.getHours()*60+d.getMinutes() }; }
+                                })();
+                                function parseMin(v) {
+                                    var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                                    if (!m) return null;
+                                    var h = +m[1], mi = +m[2], ap = (m[3] || '').toUpperCase();
+                                    if (ap === 'PM' && h !== 12) h += 12;
+                                    if (ap === 'AM' && h === 12) h = 0;
+                                    return h * 60 + mi;
+                                }
+                                tbl.querySelectorAll('tbody tr.ps-rr-row').forEach(function(r) {
+                                    var d = r.dataset;
+                                    var hay = ((d.room || '') + ' ' + (d.who || '') + ' ' + (d.whoSub || '') + ' ' + (d.purpose || '')).toLowerCase();
+                                    var show;
+                                    if (activeOnly) {
+                                        var sMin = parseMin(d.startTime);
+                                        var eMin = parseMin(d.endTime);
+                                        show = d.status === 'Approved' && d.isoDate === nowISO.iso
+                                            && sMin !== null && eMin !== null
+                                            && sMin <= nowISO.min && eMin > nowISO.min;
+                                    } else {
+                                        show = (f === 'all' || d.status === f);
+                                    }
+                                    show = show && (!s || hay.indexOf(s) !== -1);
+                                    r.style.display = show ? '' : 'none';
+                                    if (show) any = true;
+                                });
+                                var hasRows = tbl.querySelector('tbody tr.ps-rr-row');
+                                if (none) none.style.display = (hasRows && !any) ? '' : 'none';
+                            }
+                            q.addEventListener('input', apply);
+                            st.addEventListener('change', function() {
+                                activeOnly = false;
+                                activeToday.setAttribute('aria-pressed', 'false');
+                                apply();
+                            });
+                            activeToday.addEventListener('click', function() {
+                                activeOnly = !activeOnly;
+                                activeToday.setAttribute('aria-pressed', activeOnly ? 'true' : 'false');
+                                if (activeOnly) st.value = 'all';
+                                apply();
+                            });
+                        })();
+                    </script>
+                </div><!-- /#rooms-reservations-panel -->
+
+                <!-- ISSUES -->
                 <div class="rooms-sub-panel" id="rooms-issues-panel">
                     <div class="pr-card">
                         <div class="pr-card-header">
-                            <h3>
-                                <span class="material-symbols-outlined">report_problem</span>
-                                Room Issues
-                                <?php if (!empty($admin_room_issues_open)): ?>
-                                    <span class="pr-tab-badge" style="background:var(--warning);"><?php echo (int)$admin_room_issues_open; ?> open</span>
-                                <?php endif; ?>
-                            </h3>
+                            <h3><span class="material-symbols-outlined">report_problem</span> Room Issues</h3>
                         </div>
                         <div class="pr-tbl-wrap">
-                            <table class="pr-table">
+                            <table class="pr-table rm-table">
                                 <thead>
                                     <tr>
-                                        <th>#</th>
                                         <th>Room</th>
-                                        <th>Location</th>
-                                        <th>Reported By</th>
-                                        <th>Description</th>
+                                        <th>Report</th>
                                         <th>Status</th>
-                                        <th>Reported At</th>
-                                        <th>Actions</th>
+                                        <th><span class="rm-sr">Actions</span></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($admin_room_issues)): ?>
                                         <tr>
-                                            <td colspan="8" style="text-align:center;padding:2.5rem;color:var(--text-light);">No issue reports yet.</td>
+                                            <td colspan="4" class="rm-empty-cell">No issue reports yet.</td>
                                         </tr>
                                         <?php else: foreach ($admin_room_issues as $issue):
                                             $iss_pill = 'pr-pill-open';
@@ -1543,32 +2636,29 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             if ($issue['status'] === 'Dismissed') $iss_pill = 'pr-pill-dismissed';
                                         ?>
                                             <tr>
-                                                <td class="td-sm">#<?php echo (int)$issue['id']; ?></td>
-                                                <td class="td-fw"><?php echo htmlspecialchars($issue['room_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($issue['floor_label'] . ', ' . $issue['building_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($issue['reported_by_name']); ?></td>
-                                                <td style="max-width:220px;font-size:.82rem;"><?php echo htmlspecialchars($issue['description']); ?></td>
+                                                <td>
+                                                    <div class="rm-main"><?php echo htmlspecialchars($issue['room_name']); ?></div>
+                                                    <div class="rm-subline"><?php echo htmlspecialchars($issue['floor_label'] . ', ' . $issue['building_name']); ?></div>
+                                                </td>
+                                                <td>
+                                                    <div class="rm-clamp" title="<?php echo htmlspecialchars($issue['description']); ?>"><?php echo htmlspecialchars($issue['description']); ?></div>
+                                                    <div class="rm-subline"><?php echo htmlspecialchars($issue['reported_by_name']); ?> &middot; <?php echo date('M d, Y', strtotime($issue['created_at'])); ?></div>
+                                                    <?php if (!empty($issue['admin_notes'])): ?>
+                                                        <div class="rm-subline rm-note" title="<?php echo htmlspecialchars($issue['admin_notes']); ?>">Note: <?php echo htmlspecialchars(mb_substr($issue['admin_notes'], 0, 60)); ?><?php echo mb_strlen($issue['admin_notes']) > 60 ? '&hellip;' : ''; ?></div>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td><span class="pr-pill <?php echo $iss_pill; ?>"><?php echo htmlspecialchars($issue['status']); ?></span></td>
-                                                <td class="td-sm" style="white-space:nowrap;"><?php echo date('M d, Y g:i A', strtotime($issue['created_at'])); ?></td>
                                                 <td>
                                                     <?php if ($issue['status'] === 'Open'): ?>
-                                                        <button class="pr-tbl-btn review btn-action btn-override-req"
-                                                            data-action="open-issue-review"
-                                                            data-issue-id="<?php echo (int)$issue['id']; ?>"
-                                                            data-room-name="<?php echo htmlspecialchars($issue['room_name']); ?>"
-                                                            data-reporter="<?php echo htmlspecialchars($issue['reported_by_name']); ?>"
-                                                            data-description="<?php echo htmlspecialchars($issue['description']); ?>"
-                                                            title="Review this issue report">
-                                                            <span class="material-symbols-outlined" style="font-size:14px;">rate_review</span>
-                                                            Review
-                                                        </button>
-                                                    <?php else: ?>
-                                                        <span class="td-sm">
-                                                            <?php echo $issue['status']; ?>
-                                                            <?php if ($issue['admin_notes']): ?>
-                                                                <br><small><?php echo htmlspecialchars(mb_substr($issue['admin_notes'], 0, 60)); ?><?php echo strlen($issue['admin_notes']) > 60 ? '…' : ''; ?></small>
-                                                            <?php endif; ?>
-                                                        </span>
+                                                        <div class="rm-actions">
+                                                            <button type="button" class="pr-tbl-btn review"
+                                                                data-action="open-issue-review"
+                                                                data-issue-id="<?php echo (int)$issue['id']; ?>"
+                                                                data-room-name="<?php echo htmlspecialchars($issue['room_name']); ?>"
+                                                                data-reporter="<?php echo htmlspecialchars($issue['reported_by_name']); ?>"
+                                                                data-description="<?php echo htmlspecialchars($issue['description']); ?>"
+                                                                title="Review this issue report">Review</button>
+                                                        </div>
                                                     <?php endif; ?>
                                                 </td>
                                             </tr>
@@ -1579,6 +2669,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
                 </div><!-- /#rooms-issues-panel -->
+
+                <!-- ARCHIVED -->
+                <div class="rooms-sub-panel" id="rooms-archived-panel">
+                    <div class="pr-card">
+                        <div class="pr-card-header">
+                            <h3><span class="material-symbols-outlined">archive</span> Archived Rooms</h3>
+                        </div>
+                        <div class="pr-tbl-wrap">
+                            <table class="pr-table rm-table">
+                                <thead>
+                                    <tr>
+                                        <th>Room</th>
+                                        <th><span class="rm-sr">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rooms-archived-body">
+                                    <?php echo ps_render_archived_tbody($rooms_archived, $is_super_admin); ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div><!-- /#rooms-archived-panel -->
+
+                <!-- /#rooms-issues-panel (end of sub-panels) -->
 
 
 
@@ -1593,7 +2707,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         'campus'     => $r['campus_name'],
                         'building'   => $r['building_name'],
                         'floor'      => !empty($r['floor_label']) ? $r['floor_label'] : ($r['floor_number'] . 'F'),
-                        'capacity'   => $r['seating_capacity'],
                     ];
                 }, $rooms_list ?? []);
 
@@ -1608,7 +2721,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             'start_fmt'    => $ar['start_fmt'],
                             'end_fmt'      => $ar['end_fmt'],
                             'label'        => !empty($ar['purpose']) ? $ar['purpose'] : $ar['faculty_name'],
+                            'purpose'      => (string)($ar['purpose'] ?? ''),
                             'faculty'      => $ar['faculty_name'],
+                            'submitted_as' => (string)($ar['submitted_as'] ?? ''),
+                            'submitted_by' => (string)($ar['submitted_by_name'] ?? ''),
                             'status'       => $ar['status'],
                         ];
                     }, $admin_room_reservations ?? []),
@@ -1626,48 +2742,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         const PS_ROOMS = <?php echo json_encode(array_values($ps_rooms_json)); ?>;
                         const PS_RSVP = <?php echo json_encode($ps_rsvp_json); ?>;
 
-                        /* — Time slots shown in the grid — */
-                        const SLOTS = [{
-                                label: '7–8 AM',
-                                h: 7
-                            },
-                            {
-                                label: '8–9 AM',
-                                h: 8
-                            },
-                            {
-                                label: '9–10 AM',
-                                h: 9
-                            },
-                            {
-                                label: '10–11 AM',
-                                h: 10
-                            },
-                            {
-                                label: '11 AM–12 PM',
-                                h: 11
-                            },
-                            {
-                                label: '12–1 PM',
-                                h: 12
-                            },
-                            {
-                                label: '1–2 PM',
-                                h: 13
-                            },
-                            {
-                                label: '2–3 PM',
-                                h: 14
-                            },
-                            {
-                                label: '3–4 PM',
-                                h: 15
-                            },
-                            {
-                                label: '4–5 PM',
-                                h: 16
-                            },
-                        ];
+                        /* — Grid geometry —
+                           Reservations run 7 AM – 8 PM, Monday to Saturday (Sunday is closed; see
+                           submit-faculty-reserve.php). The time axis starts at those hours and only
+                           grows if a reservation ever falls outside them, so nothing is ever hidden. */
+                        const AXIS_START = 7 * 60;
+                        const AXIS_END = 20 * 60;
+                        const HOUR_PX = 42; // height of one hour on screen (13 h fits one screen)
+                        const REFRESH_MS = 30000; // re-pull reservations while the modal is open
+                        const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                         const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
                         ];
@@ -1676,156 +2759,528 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         let _roomId = null;
                         let _roomName = '';
                         let _weekOff = 0; // 0 = current week
+                        let _mobDay = 1; // 1 = Mon … 7 = Sun (mobile single-day view)
+                        let _rows = []; // normalized approved reservations for the open room
+                        let _timer = null;
+                        let _reqToken = 0;
+                        let _lastSig = '';
 
-                        /* — Helpers — */
-                        function parseHour(fmt) {
-                            if (!fmt) return 0;
-                            const [timePart, period] = fmt.trim().split(/\s+/);
-                            let [h] = (timePart || '0:00').split(':').map(Number);
-                            if ((period || '').toUpperCase() === 'PM' && h !== 12) h += 12;
-                            if ((period || '').toUpperCase() === 'AM' && h === 12) h = 0;
-                            return h;
+                        /* — Small helpers — */
+                        function $(id) {
+                            return document.getElementById(id);
                         }
 
-                        function getMondayDate(offset) {
-                            const today = new Date();
-                            const d = today.getDay(); // 0=Sun
-                            const diff = d === 0 ? -6 : (1 - d); // to Monday
-                            const mon = new Date(today);
-                            mon.setDate(today.getDate() + diff + offset * 7);
-                            mon.setHours(0, 0, 0, 0);
-                            return mon;
+                        function el(tag, cls, text) {
+                            const n = document.createElement(tag);
+                            if (cls) n.className = cls;
+                            if (text != null) n.textContent = text;
+                            return n;
                         }
 
-                        function getWeekDates(offset) {
-                            const mon = getMondayDate(offset);
-                            return Array.from({
-                                length: 5
-                            }, (_, i) => {
-                                const d = new Date(mon);
-                                d.setDate(mon.getDate() + i);
-                                return d;
+                        function pad2(n) {
+                            return String(n).padStart(2, '0');
+                        }
+
+                        /* Dates are plain 'YYYY-MM-DD' strings handled in UTC, so the browser's own
+                           time zone can never shift a day. "Today" is always Manila time. */
+                        function isoToMs(iso) {
+                            const p = iso.split('-').map(Number);
+                            return Date.UTC(p[0], p[1] - 1, p[2]);
+                        }
+
+                        function msToISO(ms) {
+                            const d = new Date(ms);
+                            return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+                        }
+
+                        function addDays(iso, n) {
+                            return msToISO(isoToMs(iso) + n * 86400000);
+                        }
+
+                        function mondayOf(iso) {
+                            const dow = new Date(isoToMs(iso)).getUTCDay(); // 0 = Sun
+                            return addDays(iso, dow === 0 ? -6 : 1 - dow);
+                        }
+
+                        function weekOffsetOf(iso, todayISO) {
+                            return Math.round((isoToMs(mondayOf(iso)) - isoToMs(mondayOf(todayISO))) / (7 * 86400000));
+                        }
+
+                        function manilaNow() {
+                            try {
+                                const parts = new Intl.DateTimeFormat('en-CA', {
+                                    timeZone: 'Asia/Manila',
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hourCycle: 'h23'
+                                }).formatToParts(new Date());
+                                const g = t => (parts.find(p => p.type === t) || {}).value;
+                                return {
+                                    iso: g('year') + '-' + g('month') + '-' + g('day'),
+                                    min: (+g('hour')) * 60 + (+g('minute'))
+                                };
+                            } catch (e) {
+                                const d = new Date();
+                                return {
+                                    iso: d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()),
+                                    min: d.getHours() * 60 + d.getMinutes()
+                                };
+                            }
+                        }
+
+                        /* "09:30 AM", "09:30" or "09:30:00" → minutes since midnight */
+                        function parseMin(v) {
+                            const m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                            if (!m) return null;
+                            let h = +m[1];
+                            const mi = +m[2];
+                            const ap = (m[3] || '').toUpperCase();
+                            if (ap === 'PM' && h !== 12) h += 12;
+                            if (ap === 'AM' && h === 12) h = 0;
+                            return h * 60 + mi;
+                        }
+
+                        function hm12(min) {
+                            const h = Math.floor(min / 60) % 24;
+                            return (h % 12 || 12) + ':' + pad2(min % 60);
+                        }
+
+                        function period(min) {
+                            return Math.floor(min / 60) % 24 >= 12 ? 'PM' : 'AM';
+                        }
+
+                        function fmtRange(s, e) {
+                            if (period(s) === period(e)) return hm12(s) + '–' + hm12(e) + ' ' + period(e);
+                            return hm12(s) + ' ' + period(s) + '–' + hm12(e) + ' ' + period(e);
+                        }
+
+                        function hourLabel(min) {
+                            const h = Math.floor(min / 60) % 24;
+                            return (h % 12 || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
+                        }
+
+                        function monthDay(iso) {
+                            return MONTHS[+iso.slice(5, 7) - 1] + ' ' + (+iso.slice(8, 10));
+                        }
+
+                        function makeRow(id, date, s, e, faculty, purpose, asType, by) {
+                            if (!date || s == null || e == null || e <= s) return null;
+                            return {
+                                id: id,
+                                date: date,
+                                s: s,
+                                e: e,
+                                faculty: faculty || '',
+                                purpose: purpose || '',
+                                asType: asType || '',
+                                by: by || ''
+                            };
+                        }
+
+                        /* Rows embedded in the page when it loaded (instant first paint) */
+                        function embeddedRows() {
+                            return PS_RSVP
+                                .filter(r => (_roomId && r.room_id != null) ? (r.room_id === _roomId) : (r.room_name === _roomName))
+                                .map(r => makeRow(r.id, r.date, parseMin(r.start_fmt), parseMin(r.end_fmt),
+                                    r.faculty, r.purpose, r.submitted_as, r.submitted_by))
+                                .filter(Boolean);
+                        }
+
+                        /* Rows from the live endpoint (every approved reservation, all weeks) */
+                        function apiRows(list) {
+                            return list
+                                .map(r => makeRow(r.id, r.date, parseMin(r.start), parseMin(r.end),
+                                    r.faculty, r.purpose, r.submitted_as, r.submitted_by))
+                                .filter(Boolean);
+                        }
+
+                        /* How far the week arrows may go: back to the earliest reservation, forward to
+                           the latest one (always allowing at least next week). The system sets no
+                           upper limit on how far ahead a room can be reserved, so the schedule follows
+                           the actual bookings instead of a fixed number of weeks. */
+                        function weekBounds(todayISO) {
+                            let lo = 0,
+                                hi = 1;
+                            _rows.forEach(r => {
+                                const o = weekOffsetOf(r.date, todayISO);
+                                if (o < lo) lo = o;
+                                if (o > hi) hi = o;
                             });
+                            return {
+                                lo: lo,
+                                hi: hi
+                            };
                         }
 
-                        function toISO(d) {
-                            const y = d.getFullYear();
-                            const m = String(d.getMonth() + 1).padStart(2, '0');
-                            const day = String(d.getDate()).padStart(2, '0');
-                            return `${y}-${m}-${day}`;
+                        /* Place overlapping reservations side by side instead of on top of each other */
+                        function layoutLanes(rows) {
+                            let cluster = [],
+                                clusterEnd = -1;
+
+                            function flush() {
+                                if (!cluster.length) return;
+                                const laneEnds = [];
+                                cluster.forEach(r => {
+                                    let l = laneEnds.findIndex(end => end <= r.s);
+                                    if (l === -1) {
+                                        l = laneEnds.length;
+                                        laneEnds.push(r.e);
+                                    } else {
+                                        laneEnds[l] = r.e;
+                                    }
+                                    r._lane = l;
+                                });
+                                cluster.forEach(r => {
+                                    r._lanes = laneEnds.length;
+                                });
+                                cluster = [];
+                            }
+                            rows.forEach(r => {
+                                if (cluster.length && r.s >= clusterEnd) flush();
+                                clusterEnd = cluster.length ? Math.max(clusterEnd, r.e) : r.e;
+                                cluster.push(r);
+                            });
+                            flush();
                         }
 
-                        function weekLabel(offset) {
-                            const dates = getWeekDates(offset);
-                            const s = dates[0],
-                                e = dates[4];
-                            if (s.getMonth() === e.getMonth())
-                                return `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`;
-                            return `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+                        function whoLabel(r) {
+                            return (r.asType === 'student' && r.by) ? (r.by + ' (via ' + r.faculty + ')') : r.faculty;
+                        }
+
+                        function buildBlock(r, axisStart, now) {
+                            const top = (r.s - axisStart) / 60 * HOUR_PX;
+                            const h = Math.max((r.e - r.s) / 60 * HOUR_PX, 22);
+                            const title = r.purpose || r.faculty || 'Reserved';
+                            const who = whoLabel(r);
+
+                            const b = el('div', 'rsm-block');
+                            b.tabIndex = 0;
+                            b.style.top = (top + 1) + 'px';
+                            b.style.height = (h - 2) + 'px';
+                            b.style.minHeight = (h - 2) + 'px';
+                            const lanes = r._lanes || 1,
+                                lane = r._lane || 0;
+                            b.style.left = 'calc(' + (lane * 100 / lanes) + '% + 2px)';
+                            b.style.width = 'calc(' + (100 / lanes) + '% - 4px)';
+                            if (h < 34) b.classList.add('rsm-block--xs');
+                            else if (h < 52) b.classList.add('rsm-block--sm');
+                            if (r.date < now.iso || (r.date === now.iso && r.e <= now.min)) b.classList.add('is-past');
+
+                            b.appendChild(el('span', 'rsm-block-time', fmtRange(r.s, r.e)));
+                            b.appendChild(el('span', 'rsm-block-title', title));
+                            if (r.purpose && who) b.appendChild(el('span', 'rsm-block-sub', who));
+
+                            b.title = [fmtRange(r.s, r.e), r.purpose, who].filter(Boolean).join('\n');
+                            return b;
+                        }
+
+                        function weekRangeLabel(first, last) {
+                            const sy = first.slice(0, 4),
+                                ey = last.slice(0, 4);
+                            if (first.slice(0, 7) === last.slice(0, 7))
+                                return monthDay(first) + '–' + (+last.slice(8, 10)) + ', ' + ey;
+                            if (sy === ey) return monthDay(first) + ' – ' + monthDay(last) + ', ' + ey;
+                            return monthDay(first) + ', ' + sy + ' – ' + monthDay(last) + ', ' + ey;
+                        }
+
+                        function relativeWeek(off) {
+                            if (off === 0) return 'This week';
+                            if (off === 1) return 'Next week';
+                            if (off === -1) return 'Last week';
+                            return off > 0 ? 'In ' + off + ' weeks' : Math.abs(off) + ' weeks ago';
+                        }
+
+                        function todayColumn(now) {
+                            const dow = new Date(isoToMs(now.iso)).getUTCDay(); // 0 = Sun
+                            return dow >= 1 && dow <= 6 ? dow : 1; // Sunday is closed → Monday
+                        }
+
+                        function applyMobileDay(dayCount) {
+                            if (_mobDay > dayCount) _mobDay = dayCount;
+                            if (_mobDay < 1) _mobDay = 1;
+                            const grid = $('rsm-grid');
+                            if (grid) {
+                                grid.querySelectorAll('[data-day]').forEach(n => {
+                                    n.classList.toggle('is-mobile-active', +n.dataset.day === _mobDay);
+                                });
+                            }
+                            document.querySelectorAll('#rsm-daytabs .rsm-daytab-btn').forEach(b => {
+                                const on = +b.dataset.day === _mobDay;
+                                b.classList.toggle('active', on);
+                                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                            });
                         }
 
                         /* — Render the weekly grid — */
-                        function renderGrid() {
-                            const dates = getWeekDates(_weekOff);
-                            const dateISOs = dates.map(toISO);
+                        function renderGrid(opts) {
+                            opts = opts || {};
+                            const head = $('rsm-grid-head'),
+                                body = $('rsm-grid-body'),
+                                grid = $('rsm-grid');
+                            if (!head || !body || !grid) return;
 
-                            // Update week label
-                            const lbl = document.getElementById('rsm-week-lbl');
-                            if (lbl) lbl.textContent = weekLabel(_weekOff);
+                            const now = manilaNow();
+                            const bounds = weekBounds(now.iso);
+                            if (_weekOff < bounds.lo) _weekOff = bounds.lo;
+                            if (_weekOff > bounds.hi) _weekOff = bounds.hi;
 
-                            // Filter reservations for this room & week
-                            const rsvps = PS_RSVP.filter(r => {
-                                const sameRoom = _roomId ?
-                                    (r.room_id === _roomId) :
-                                    (r.room_name === _roomName);
-                                return sameRoom && dateISOs.includes(r.date);
-                            });
+                            const monday = addDays(mondayOf(now.iso), _weekOff * 7);
+                            const sunday = addDays(monday, 6);
+                            const wk = _rows.filter(r => r.date >= monday && r.date <= sunday);
 
-                            // Build lookup: dateISO → [ reservations ]
-                            const lookup = {};
-                            rsvps.forEach(r => {
-                                if (!lookup[r.date]) lookup[r.date] = [];
-                                lookup[r.date].push(r);
-                            });
-
-                            // Build rows
-                            const gridBody = document.getElementById('rsm-grid-body');
-                            if (!gridBody) return;
-                            gridBody.innerHTML = '';
-
-                            SLOTS.forEach(slot => {
-                                const row = document.createElement('div');
-                                row.className = 'rsm-grid-row';
-
-                                // Time label cell
-                                const tc = document.createElement('div');
-                                tc.className = 'rsm-grid-time';
-                                tc.textContent = slot.label;
-                                row.appendChild(tc);
-
-                                // Day cells
-                                dates.forEach((date, di) => {
-                                    const cell = document.createElement('div');
-                                    cell.className = 'rsm-grid-cell';
-
-                                    const dayRsvps = lookup[dateISOs[di]] || [];
-                                    const hit = dayRsvps.find(r => {
-                                        const sh = parseHour(r.start_fmt);
-                                        const eh = parseHour(r.end_fmt);
-                                        return slot.h >= sh && slot.h < eh;
-                                    });
-
-                                    if (hit) {
-                                        const blk = document.createElement('span');
-                                        blk.className = 'rsm-block';
-                                        const txt = (hit.label || hit.faculty || 'Reserved').substring(0, 20);
-                                        blk.textContent = txt;
-                                        blk.title = `${hit.faculty} — ${hit.label || ''}`.replace(/^—\s*/, '');
-                                        cell.appendChild(blk);
-                                    }
-                                    row.appendChild(cell);
+                            /* Mon–Sat always; Sunday only if a reservation somehow sits on it */
+                            const dayCount = wk.some(r => r.date === sunday) ? 7 : 6;
+                            const days = [];
+                            for (let i = 0; i < dayCount; i++) {
+                                const iso = addDays(monday, i);
+                                days.push({
+                                    idx: i + 1,
+                                    iso: iso,
+                                    name: DAY_NAMES[i],
+                                    num: +iso.slice(8, 10)
                                 });
+                            }
 
-                                gridBody.appendChild(row);
+                            /* Time axis */
+                            let a0 = AXIS_START,
+                                a1 = AXIS_END;
+                            wk.forEach(r => {
+                                a0 = Math.min(a0, Math.floor(r.s / 60) * 60);
+                                a1 = Math.max(a1, Math.ceil(r.e / 60) * 60);
                             });
+                            a1 = Math.min(a1, 24 * 60);
+                            const totalPx = (a1 - a0) / 60 * HOUR_PX;
+
+                            grid.style.setProperty('--rsm-days', String(dayCount));
+                            grid.style.setProperty('--rsm-hour', HOUR_PX + 'px');
+                            body.style.setProperty('--rsm-total', totalPx + 'px');
+
+                            /* Header row */
+                            head.textContent = '';
+                            head.appendChild(el('div', 'rsm-grid-th rsm-grid-th--time', ''));
+                            days.forEach(d => {
+                                const th = el('div', 'rsm-grid-th');
+                                th.dataset.day = d.idx;
+                                if (d.iso === now.iso) th.classList.add('is-today');
+                                th.appendChild(el('span', 'rsm-th-name', d.name));
+                                th.appendChild(el('span', 'rsm-th-num', String(d.num)));
+                                head.appendChild(th);
+                            });
+
+                            /* Body: hour labels + one column per day */
+                            body.textContent = '';
+                            const tcol = el('div', 'rsm-time-col');
+                            for (let m = a0; m < a1; m += 60) {
+                                const lbl = el('div', 'rsm-hour-lbl', hourLabel(m));
+                                lbl.style.top = ((m - a0) / 60 * HOUR_PX) + 'px';
+                                tcol.appendChild(lbl);
+                            }
+                            body.appendChild(tcol);
+
+                            days.forEach(d => {
+                                const col = el('div', 'rsm-day-col');
+                                col.dataset.day = d.idx;
+                                if (d.iso === now.iso) col.classList.add('is-today');
+                                const dayRows = wk.filter(r => r.date === d.iso)
+                                    .sort((x, y) => (x.s - y.s) || (x.e - y.e));
+                                layoutLanes(dayRows);
+                                dayRows.forEach(r => col.appendChild(buildBlock(r, a0, now)));
+                                if (d.iso === now.iso && now.min >= a0 && now.min <= a1) {
+                                    const nl = el('div', 'rsm-now');
+                                    nl.style.top = ((now.min - a0) / 60 * HOUR_PX) + 'px';
+                                    col.appendChild(nl);
+                                }
+                                body.appendChild(col);
+                            });
+
+                            if (!wk.length) {
+                                const empty = el('div', 'rsm-empty');
+                                empty.appendChild(el('span', '', 'No reservations this week'));
+                                body.appendChild(empty);
+                            }
+
+                            /* Week label, counter and arrows */
+                            const lbl = $('rsm-week-lbl');
+                            if (lbl) lbl.textContent = weekRangeLabel(days[0].iso, days[days.length - 1].iso);
+                            const sub = $('rsm-week-sub');
+                            if (sub) {
+                                sub.textContent = relativeWeek(_weekOff) + ' · ' +
+                                    (wk.length ? wk.length + (wk.length === 1 ? ' reservation' : ' reservations') : 'none reserved');
+                            }
+                            const prev = $('rsm-prev'),
+                                next = $('rsm-next');
+                            if (prev) prev.disabled = _weekOff <= bounds.lo;
+                            if (next) next.disabled = _weekOff >= bounds.hi;
+
+                            /* Day tabs for the phone layout (one day at a time) */
+                            const tabs = $('rsm-daytabs');
+                            if (tabs) {
+                                tabs.textContent = '';
+                                days.forEach(d => {
+                                    const b = el('button', 'rsm-daytab-btn');
+                                    b.type = 'button';
+                                    b.dataset.day = d.idx;
+                                    b.appendChild(el('span', '', d.name + ' ' + d.num));
+                                    const n = wk.filter(r => r.date === d.iso).length;
+                                    if (n) b.appendChild(el('span', 'rsm-daytab-count', String(n)));
+                                    tabs.appendChild(b);
+                                });
+                            }
+                            applyMobileDay(dayCount);
+
+                            /* Bring the first reservation of the week into view */
+                            if (opts.scroll) {
+                                const sc = $('rsm-body');
+                                if (sc) {
+                                    sc.scrollTop = wk.length ?
+                                        Math.max(0, (Math.min.apply(null, wk.map(r => r.s)) - a0) / 60 * HOUR_PX - HOUR_PX / 2) :
+                                        0;
+                                }
+                            }
+                            _lastSig = signature(now);
+                        }
+
+                        function signature(now) {
+                            return JSON.stringify(_rows) + '|' + _weekOff + '|' + now.iso + '|' + Math.floor(now.min / 5);
+                        }
+
+                        /* — Pull the latest reservations from the server — */
+                        function setSyncNote(show) {
+                            const n = $('rsm-sync-note');
+                            if (n) n.classList.toggle('hidden', !show);
+                        }
+
+                        function fetchFresh() {
+                            if (!_roomId) return;
+                            const token = ++_reqToken;
+                            const rid = _roomId;
+                            fetch('room-reservation/api/admin-room-schedule.php?room_id=' + encodeURIComponent(rid), {
+                                    credentials: 'same-origin',
+                                    cache: 'no-store',
+                                    headers: {
+                                        'Accept': 'application/json'
+                                    }
+                                })
+                                .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+                                .then(j => {
+                                    if (token !== _reqToken || rid !== _roomId) return; // closed or switched room
+                                    if (!j || !Array.isArray(j.reservations)) throw new Error('Bad response');
+                                    _rows = apiRows(j.reservations);
+                                    setSyncNote(false);
+                                    if (signature(manilaNow()) !== _lastSig) renderGrid();
+                                })
+                                .catch(err => {
+                                    if (token !== _reqToken) return;
+                                    console.warn('Room schedule refresh failed:', err);
+                                    setSyncNote(true);
+                                });
+                        }
+
+                        function stopRefresh() {
+                            _reqToken++;
+                            if (_timer) {
+                                clearInterval(_timer);
+                                _timer = null;
+                            }
+                        }
+
+                        function startRefresh() {
+                            stopRefresh();
+                            _timer = setInterval(fetchFresh, REFRESH_MS);
                         }
 
                         /* — Public API — */
                         window.psOpenSchedule = function(btn) {
                             const card = btn.closest('.pr-room-row');
                             if (!card) return;
+                            if (card.dataset.roomLocked === '1') return; // locked rooms never open their schedule
                             _roomId = parseInt(card.dataset.roomId) || null;
                             _roomName = card.dataset.roomName || '';
                             _weekOff = 0;
-                            const title = document.getElementById('rsm-title');
+                            _mobDay = todayColumn(manilaNow());
+                            _rows = embeddedRows();
+                            const title = $('rsm-title');
                             if (title) title.textContent = 'Room Schedule – ' + _roomName;
-                            const meta = document.getElementById('rsm-meta');
+                            const meta = $('rsm-meta');
                             if (meta) {
                                 const campus = card.dataset.roomCampus || '';
                                 const floor = card.dataset.roomFloor || '';
-                                const capacity = card.dataset.roomCapacity || '';
-                                let parts = [campus, floor].filter(Boolean).join(' – ');
-                                if (capacity) parts += ' – Capacity: ' + capacity;
-                                meta.textContent = parts;
+                                meta.textContent = [campus, floor].filter(Boolean).join(' – ');
                             }
-                            const modal = document.getElementById('roomScheduleModal');
+                            setSyncNote(false);
+                            const modal = $('roomScheduleModal');
                             if (modal) modal.classList.remove('hidden');
                             try {
-                                renderGrid();
+                                renderGrid({
+                                    scroll: true
+                                });
                             } catch (e) {
                                 console.warn('renderGrid error:', e);
                             }
+                            startRefresh();
+                            fetchFresh(); // swap in the latest data as soon as it arrives
                         };
 
                         window.psCloseSchedule = function() {
-                            const modal = document.getElementById('roomScheduleModal');
+                            const modal = $('roomScheduleModal');
                             if (modal) modal.classList.add('hidden');
+                            stopRefresh();
                         };
 
                         window.psScheduleNav = function(dir) {
                             _weekOff += dir;
-                            renderGrid();
+                            renderGrid({
+                                scroll: true
+                            });
                         };
+
+                        document.addEventListener('click', function(e) {
+                            const modal = $('roomScheduleModal');
+                            if (!modal || modal.classList.contains('hidden')) return;
+                            if (e.target.closest('[data-action="room-schedule-today"]')) {
+                                _weekOff = 0;
+                                _mobDay = todayColumn(manilaNow());
+                                renderGrid({
+                                    scroll: true
+                                });
+                                return;
+                            }
+                            const tab = e.target.closest('.rsm-daytab-btn');
+                            if (tab) {
+                                _mobDay = +tab.dataset.day || 1;
+                                applyMobileDay(document.querySelectorAll('#rsm-daytabs .rsm-daytab-btn').length);
+                            }
+                        });
+
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key !== 'Escape') return;
+                            const modal = $('roomScheduleModal');
+                            if (modal && !modal.classList.contains('hidden')) window.psCloseSchedule();
+                        });
+
+                        /* ── Whole tile opens the schedule ──────────────────────────
+                           The tile itself is the "view schedule" control. Clicks inside
+                           the actions cell (the Edit icon) are skipped so Edit keeps
+                           working on its own. Delegated on document, so tiles swapped in
+                           by the AJAX refresh work without re-binding. */
+                        document.addEventListener('click', function(e) {
+                            var tile = e.target.closest('#roomsRegistryTable tr.pr-room-row');
+                            if (!tile) return;
+                            if (e.target.closest('.pr-row-actions')) return;
+                            if (tile.dataset.roomLocked === '1') return; // locked: schedule stays closed
+                            window.psOpenSchedule(tile);
+                        });
+                        document.addEventListener('keydown', function(e) {
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            var tile = e.target.closest ? e.target.closest('#roomsRegistryTable tr.pr-room-row') : null;
+                            if (!tile || e.target !== tile) return;
+                            e.preventDefault();
+                            if (tile.dataset.roomLocked === '1') return;
+                            window.psOpenSchedule(tile);
+                        });
 
                         /* ── edit-room-inline: populate & show form without page reload ── */
                         document.addEventListener('click', function(e) {
@@ -1854,14 +3309,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             el = form.querySelector('input[name="floor_label"]');
                             if (el) el.value = d.roomFloorLabel || '';
 
-                            el = form.querySelector('input[name="seating_capacity"]');
-                            if (el) el.value = d.roomCapacity || '';
-
                             el = form.querySelector('select[name="status"]');
                             if (el) el.value = d.roomStatus || 'Available';
 
                             el = form.querySelector('input[name="sort_order"]');
                             if (el) el.value = d.roomSort || '0';
+
+                            el = document.getElementById('room-more-opts');
+                            if (el) el.open = !!(d.roomFloorLabel || (d.roomSort && d.roomSort !== '0'));
 
                             var amenities = [];
                             try {
@@ -1892,6 +3347,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             if (az) az.classList.remove('hidden');
                             var al = document.getElementById('room-archive-link');
                             if (al) al.href = 'admin-dashboard.php?archive_room=' + encodeURIComponent(d.roomId || '');
+                            if (window.psSetLockButton) window.psSetLockButton(d.roomLocked === '1');
 
                             /* Show form and scroll */
                             var rfw = document.getElementById('room-form-wrap');
@@ -1906,9 +3362,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             }
                         });
 
-                        /* Reset form to Add-mode when Cancel/Close is clicked */
-                        document.addEventListener('click', function(e) {
-                            if (!e.target.closest('[data-action="hide-room-form"]')) return;
+                        /* Put the room form back into Add-mode with empty fields. Runs on Cancel/Close,
+                           before "Add Room" opens it, and after a successful save -- so the form can
+                           never reopen still holding the last room that was edited. */
+                        window.psResetRoomForm = function() {
+                            var form = document.getElementById('roomForm');
                             var el;
                             el = document.getElementById('room-form-title');
                             if (el) el.textContent = 'Add New Room';
@@ -1926,6 +3384,31 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             if (az) az.classList.add('hidden');
                             el = document.getElementById('room-form-id');
                             if (el) el.value = '';
+                            if (!form) return;
+                            el = form.querySelector('select[name="building_id"]');
+                            if (el) el.value = '';
+                            el = form.querySelector('input[name="room_name"]');
+                            if (el) el.value = '';
+                            el = form.querySelector('input[name="floor_number"]');
+                            if (el) el.value = '1';
+                            el = form.querySelector('input[name="floor_label"]');
+                            if (el) el.value = '';
+                            el = form.querySelector('select[name="status"]');
+                            if (el) el.value = 'Available';
+                            el = form.querySelector('input[name="sort_order"]');
+                            if (el) el.value = '0';
+                            form.querySelectorAll('input[name="amenities[]"]').forEach(function(cb) {
+                                cb.checked = false;
+                            });
+                            el = document.getElementById('room-more-opts');
+                            if (el) el.open = false;
+                        };
+
+                        document.addEventListener('click', function(e) {
+                            if (e.target.closest('[data-action="hide-room-form"]') ||
+                                e.target.closest('[data-action="show-room-form"]')) {
+                                window.psResetRoomForm();
+                            }
                         });
 
                         document.addEventListener('click', function(e) {
@@ -2195,6 +3678,232 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div><!-- /panel-faculty -->
             <?php endif; ?>
 
+            <!-- ============================================================
+         TAB: ADMINS  (Super Admin only)
+         Left: everyone with an admin account. Right: the selected admin's
+         details, actions and activity history. Driven by the "Admin Accounts
+         panel" block in admin-dashboard.js.
+    ============================================================ -->
+            <?php if ($is_super_admin): ?>
+                <div class="tab-panel" id="panel-admins">
+
+                    <div class="am-head">
+                        <div class="am-head-text">
+                            <h2 class="am-title">Admin Accounts</h2>
+                            <p class="am-sub">Control who can sign in and review what each admin has been doing.</p>
+                        </div>
+                        <div class="am-head-actions">
+                            <span class="am-seats" id="am-seats" title="Admin accounts in use">
+                                <span class="material-symbols-outlined">group</span>
+                                <span id="am-seats-text"><strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> seats used</span>
+                            </span>
+                            <button type="button" class="ps-btn ps-btn--primary" id="am-add-btn"
+                                <?php echo $admin_accounts_remaining > 0 ? '' : 'disabled title="All 5 seats are in use. Delete an account to free one."'; ?>>
+                                <span class="material-symbols-outlined">person_add</span> Add admin
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="am-layout">
+
+                        <!-- ── Admin list ── -->
+                        <section class="eq-card am-list-card" aria-label="Admin accounts">
+                            <div class="am-search">
+                                <span class="material-symbols-outlined">search</span>
+                                <input type="text" id="am-search" class="form-control-custom"
+                                    placeholder="Search admins" autocomplete="off" aria-label="Search admins">
+                            </div>
+                            <div class="am-list" id="am-list" role="listbox" aria-label="Admins">
+                                <?php foreach ($admin_accounts_list as $acct):
+                                    $am_you     = strtolower($acct['email'] ?? '') === strtolower($admin_email);
+                                    $am_until   = admin_is_dormant($acct['dormant_until'] ?? null) ? (int)$acct['dormant_until'] : 0;
+                                    $am_manage  = !$am_you && ($acct['role'] ?? '') === 'Admin';
+                                    $am_parts   = preg_split('/\s+/', trim((string)($acct['fullName'] ?? '')));
+                                    $am_ini     = strtoupper(substr($am_parts[0] ?? '?', 0, 1));
+                                    if (count($am_parts) > 1) $am_ini .= strtoupper(substr(end($am_parts), 0, 1));
+                                    $am_created = !empty($acct['created_at']) ? date('M j, Y', strtotime($acct['created_at'])) : '';
+                                    $am_login   = !empty($acct['last_login']) ? date('M j, Y, g:i A', strtotime($acct['last_login'])) : '';
+                                ?>
+                                    <button type="button" class="am-item" role="option" aria-selected="false"
+                                        data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
+                                        data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
+                                        data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>"
+                                        data-role="<?php echo htmlspecialchars($acct['role'] ?? 'Admin', ENT_QUOTES); ?>"
+                                        data-created="<?php echo htmlspecialchars($am_created, ENT_QUOTES); ?>"
+                                        data-last-login="<?php echo htmlspecialchars($am_login, ENT_QUOTES); ?>"
+                                        data-locked-until="<?php echo $am_until; ?>"
+                                        data-you="<?php echo $am_you ? '1' : '0'; ?>"
+                                        data-manage="<?php echo $am_manage ? '1' : '0'; ?>">
+                                        <span class="am-avatar"><?php echo htmlspecialchars($am_ini); ?></span>
+                                        <span class="am-item-main">
+                                            <span class="am-item-name"><?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?><?php if ($am_you): ?> <span class="am-you">You</span><?php endif; ?></span>
+                                            <span class="am-item-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></span>
+                                        </span>
+                                        <span class="material-symbols-outlined am-item-lock" <?php echo $am_until ? '' : 'hidden'; ?> title="Locked">lock</span>
+                                    </button>
+                                <?php endforeach; ?>
+                                <p class="am-list-empty" id="am-list-empty" <?php echo empty($admin_accounts_list) ? '' : 'hidden'; ?>>
+                                    <?php echo empty($admin_accounts_list) ? 'No accounts found.' : 'No admins match your search.'; ?>
+                                </p>
+                            </div>
+                        </section>
+
+                        <!-- ── Selected admin ── -->
+                        <section class="eq-card am-detail-card" id="am-detail" aria-live="polite">
+
+                            <div class="am-empty" id="am-detail-empty">
+                                <span class="material-symbols-outlined">manage_accounts</span>
+                                <p>Select an admin to see their details and activity.</p>
+                            </div>
+
+                            <div id="am-detail-body" hidden>
+                                <header class="am-profile">
+                                    <span class="am-avatar am-avatar--lg" id="am-d-avatar"></span>
+                                    <div class="am-profile-main">
+                                        <h3 class="am-d-name" id="am-d-name"></h3>
+                                        <p class="am-d-email" id="am-d-email"></p>
+                                        <div class="am-tags">
+                                            <span class="am-tag" id="am-d-role"></span>
+                                            <span class="am-tag" id="am-d-status"></span>
+                                        </div>
+                                    </div>
+                                    <div class="am-actions" id="am-d-actions" hidden>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-am-action="edit">
+                                            <span class="material-symbols-outlined">edit</span> Edit
+                                        </button>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-am-action="lock" id="am-lock-btn">
+                                            <span class="material-symbols-outlined" id="am-lock-icon">lock</span>
+                                            <span id="am-lock-label">Lock</span>
+                                        </button>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm am-danger" data-am-action="delete">
+                                            <span class="material-symbols-outlined">delete</span> Delete
+                                        </button>
+                                    </div>
+                                </header>
+
+                                <p class="am-note" id="am-d-note" hidden>
+                                    <span class="material-symbols-outlined">shield</span>
+                                    <span id="am-d-note-text"></span>
+                                </p>
+
+                                <dl class="am-facts">
+                                    <div>
+                                        <dt>Last sign-in</dt>
+                                        <dd id="am-f-login">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Added</dt>
+                                        <dd id="am-f-created">—</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Actions logged</dt>
+                                        <dd id="am-f-total">—</dd>
+                                    </div>
+                                </dl>
+
+                                <div class="am-activity">
+                                    <div class="am-activity-head">
+                                        <div class="am-activity-title">
+                                            <h4>Activity</h4>
+                                            <button type="button" class="act-open" id="am-open-activity">
+                                                Open in Activity <span class="material-symbols-outlined">arrow_forward</span>
+                                            </button>
+                                        </div>
+                                        <div class="act-chips" id="am-chips" role="group" aria-label="Filter activity">
+                                            <button type="button" class="act-chip active" data-filter="all">All</button>
+                                            <button type="button" class="act-chip" data-filter="requests">Requests</button>
+                                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                                            <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
+                                            <button type="button" class="act-chip" data-filter="system">System</button>
+                                            <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
+                                        </div>
+                                    </div>
+                                    <div class="act-feed" id="am-feed"></div>
+                                    <div class="act-pager" id="am-pager" hidden>
+                                        <span class="act-pager-info"></span>
+                                        <div class="act-pager-ctl">
+                                            <button type="button" class="act-pager-btn" data-pg="prev" aria-label="Previous page">
+                                                <span class="material-symbols-outlined">chevron_left</span>
+                                            </button>
+                                            <div class="act-pager-nums"></div>
+                                            <button type="button" class="act-pager-btn" data-pg="next" aria-label="Next page">
+                                                <span class="material-symbols-outlined">chevron_right</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </section>
+                    </div>
+                </div><!-- /panel-admins -->
+            <?php endif; ?>
+
+            <!-- ============================================================
+         TAB: ACTIVITY  (every admin)
+         One timeline for everything that happens: manual decisions (with the
+         admin's name) and automatic ones from the rules engine. Filters are
+         type chips + Who + When. Driven by the "Activity page" block in
+         admin-dashboard.js and api/admin-activity.php.
+    ============================================================ -->
+            <div class="tab-panel" id="panel-activity">
+
+                <div class="act-head">
+                    <h2 class="act-title">Activity</h2>
+                    <p class="act-sub">Every decision and change, and who made it. Automatic decisions come from the rules engine.</p>
+                </div>
+
+                <section class="eq-card act-card" aria-label="Activity timeline">
+                    <div class="act-toolbar">
+                        <div class="act-chips" id="act-chips" role="group" aria-label="Filter by type">
+                            <button type="button" class="act-chip active" data-filter="all">All</button>
+                            <button type="button" class="act-chip" data-filter="requests">Requests</button>
+                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                            <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
+                            <button type="button" class="act-chip" data-filter="system">System</button>
+                            <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
+                        </div>
+                        <div class="act-selects">
+                            <select id="act-actor" class="form-control-custom" aria-label="Who">
+                                <option value="all">Everyone</option>
+                                <option value="auto">Automatic</option>
+                                <option value="me">Me</option>
+                                <?php foreach ($admin_accounts_list as $act_acct):
+                                    if (strtolower($act_acct['email'] ?? '') === strtolower($admin_email)) continue; ?>
+                                    <option value="<?php echo (int)($act_acct['id'] ?? 0); ?>"><?php echo htmlspecialchars($act_acct['fullName'] ?? ''); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="act-range" class="form-control-custom" aria-label="When">
+                                <option value="today">Today</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d" selected>Last 30 days</option>
+                                <option value="all">All time</option>
+                            </select>
+                            <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm act-export" id="act-export"
+                                title="Download what you see here as a spreadsheet (CSV)">
+                                <span class="material-symbols-outlined">download</span> Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="act-feed" id="act-feed"></div>
+                    <div class="act-pager" id="act-pager" hidden>
+                        <span class="act-pager-info"></span>
+                        <div class="act-pager-ctl">
+                            <button type="button" class="act-pager-btn" data-pg="prev" aria-label="Previous page">
+                                <span class="material-symbols-outlined">chevron_left</span>
+                            </button>
+                            <div class="act-pager-nums"></div>
+                            <button type="button" class="act-pager-btn" data-pg="next" aria-label="Next page">
+                                <span class="material-symbols-outlined">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div><!-- /panel-activity -->
+
+
+
 
 
             <!-- ============================================================
@@ -2315,9 +4024,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </button>
                                         <?php if ($edit_item): ?>
                                             <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
-                                                class="btn-inv-delete" title="Archive item"
-                                                onclick="return confirm('Archive this item? It will no longer be available for lending, but borrow history is preserved.');">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                                                     fill="none" stroke="currentColor" stroke-width="2"
                                                     stroke-linecap="round" stroke-linejoin="round"
                                                     width="15" height="15">
@@ -2479,7 +4186,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody id="inv-archive-body">
                                             <?php if (mysqli_num_rows($archive_result) === 0): ?>
                                                 <tr>
                                                     <td colspan="4" class="text-muted"
@@ -2558,7 +4265,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <?php if ($is_super_admin): ?>
                         <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
-                        <button class="rq-sub-tab" data-sett-panel="sett-admins" id="sett-tab-admins">Manage Admins</button>
                     <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
@@ -2647,25 +4353,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <div class="info-card-head">
                                     <h3>
                                         <span class="material-symbols-outlined">bar_chart</span>
-                                        Activity Summary
+                                        My Activity
                                     </h3>
                                 </div>
+                                <?php $my_sum = admin_activity_my_summary($conn, (int)(admin_current_id($conn) ?? 0)); ?>
                                 <div class="info-row">
-                                    <span class="info-lbl">Requests Processed</span>
-                                    <span class="info-val ov-stat-val">
-                                        <?php echo $stat_total_req ?? '0'; ?> total
-                                    </span>
+                                    <span class="info-lbl">Decisions (30 days)</span>
+                                    <span class="info-val"><?php echo (int)$my_sum['approved']; ?> approved &middot; <?php echo (int)$my_sum['declined']; ?> declined</span>
                                 </div>
                                 <div class="info-row">
-                                    <span class="info-lbl">Faculty Accounts Created</span>
-                                    <span class="info-val">
-                                        <?php
-                                        $fac_count = mysqli_fetch_assoc(
-                                            mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_users WHERE role='faculty'")
-                                        )['c'] ?? 0;
-                                        echo $fac_count;
-                                        ?>
-                                    </span>
+                                    <span class="info-lbl">Returns (30 days)</span>
+                                    <span class="info-val"><?php echo (int)$my_sum['returns']; ?></span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Last Login</span>
@@ -2680,9 +4378,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         ?>
                                     </span>
                                 </div>
-                                <div class="info-row">
-                                    <span class="info-lbl">Active Equipment</span>
-                                    <span class="info-val"><?php echo $stat_inv_total ?? '0'; ?> items</span>
+                                <div class="info-row info-row--link">
+                                    <button type="button" class="act-open" data-act-open="me">
+                                        View my activity <span class="material-symbols-outlined">arrow_forward</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -2726,208 +4425,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                 </div><!-- /sett-account -->
 
-                <!-- ── MANAGE ADMINS (Super Admin only) ────────────────── -->
-                <?php if ($is_super_admin): ?>
-                    <div class="rq-sub-panel" id="sett-admins">
-
-                        <!-- Slot counter banner -->
-                        <div class="adm-slot-banner <?php echo $admin_accounts_remaining === 0 ? 'adm-slot-full' : ''; ?>">
-                            <span class="material-symbols-outlined">group</span>
-                            <span id="adm-slot-text">
-                                <strong><?php echo (int)$admin_accounts_count; ?> of 5</strong> admin accounts in use
-                                <?php if ($admin_accounts_remaining > 0): ?>
-                                    — <span id="adm-slots-remaining"><?php echo (int)$admin_accounts_remaining; ?></span>
-                                    slot<?php echo $admin_accounts_remaining !== 1 ? 's' : ''; ?> remaining
-                                <?php else: ?>
-                                    — limit reached
-                                <?php endif; ?>
-                            </span>
-                        </div>
-
-                        <!-- Add Admin form (hidden when limit reached) -->
-                        <div class="eq-card adm-form-card" id="adm-form-card" <?php echo $admin_accounts_remaining > 0 ? '' : 'hidden'; ?>>
-                            <div class="eq-card-header">
-                                <h2>
-                                    <span class="material-symbols-outlined">person_add</span>
-                                    Add New Admin
-                                </h2>
-                            </div>
-                            <div class="eq-card-body">
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
-                                        <input type="text" id="adm-fullname" name="adm_fullname"
-                                            class="form-control-custom"
-                                            placeholder="e.g. Juan dela Cruz"
-                                            maxlength="255" autocomplete="off">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="adm-email">Admin Email <span class="req-star">*</span></label>
-                                        <input type="email" id="adm-email" name="adm_email"
-                                            class="form-control-custom"
-                                            placeholder="name@admin.edu"
-                                            maxlength="255" autocomplete="off">
-                                        <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-role">Role <span class="req-star">*</span></label>
-                                        <select id="adm-role" name="adm_role" class="form-control-custom">
-                                            <option value="Admin" selected>Admin</option>
-                                            <option value="Super Admin">Super Admin</option>
-                                        </select>
-                                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
-                                    </div>
-                                </div>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="adm-password">Password <span class="req-star">*</span></label>
-                                        <div class="fac-pw-wrap">
-                                            <input type="password" id="adm-password" name="adm_password"
-                                                class="form-control-custom"
-                                                placeholder="Min. 8 characters"
-                                                autocomplete="new-password">
-                                            <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
-                                                <span class="material-symbols-outlined">visibility</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
-                                        <div class="fac-pw-wrap">
-                                            <input type="password" id="adm-confirm" name="adm_confirm"
-                                                class="form-control-custom"
-                                                placeholder="Re-enter password"
-                                                autocomplete="new-password">
-                                            <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
-                                                <span class="material-symbols-outlined">visibility</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
-
-                                <div class="adm-form-actions">
-                                    <button type="button" id="adm-submit-btn" class="ps-btn ps-btn--primary">
-                                        <span class="material-symbols-outlined">person_add</span>
-                                        Create Admin Account
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="eq-card" id="adm-max-card" <?php echo $admin_accounts_remaining > 0 ? 'hidden' : ''; ?>
-                            style="padding:1.5rem;text-align:center;color:var(--text-light);">
-                            <span class="material-symbols-outlined" style="font-size:2rem;display:block;margin-bottom:8px;">block</span>
-                            Maximum of 5 admin accounts reached. Remove an existing account to add a new one.
-                        </div>
-
-                        <!-- Existing admin accounts list -->
-                        <div class="eq-card adm-list-card">
-                            <div class="eq-card-header">
-                                <h2>
-                                    <span class="material-symbols-outlined">manage_accounts</span>
-                                    Current Admins
-                                </h2>
-                            </div>
-                            <div class="pr-tbl-wrap">
-                                <table class="pr-table adm-accounts-table" id="admAccountsTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Email</th>
-                                            <th>Role</th>
-                                            <th>Status</th>
-                                            <th>Added</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="admAccountsTbody">
-                                        <?php if (empty($admin_accounts_list)): ?>
-                                            <tr>
-                                                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-light);">
-                                                    No accounts found.
-                                                </td>
-                                            </tr>
-                                        <?php else: ?>
-                                            <?php foreach ($admin_accounts_list as $acct):
-                                                $acct_is_you  = strtolower($acct['email'] ?? '') === strtolower($admin_email);
-                                                $acct_dormant = admin_is_dormant($acct['dormant_until'] ?? null);
-                                                // Only plain "Admin" accounts other than yourself can be managed;
-                                                // Super Admins are protected (enforced again on the server).
-                                                $acct_manage  = !$acct_is_you && ($acct['role'] ?? '') === 'Admin';
-                                            ?>
-                                                <tr class="adm-account-row"
-                                                    data-id="<?php echo (int)($acct['id'] ?? 0); ?>"
-                                                    data-name="<?php echo htmlspecialchars($acct['fullName'] ?? '', ENT_QUOTES); ?>"
-                                                    data-email="<?php echo htmlspecialchars($acct['email'] ?? '', ENT_QUOTES); ?>">
-                                                    <td class="td-fw">
-                                                        <?php echo htmlspecialchars($acct['fullName'] ?? '—'); ?>
-                                                        <?php if ($acct_is_you): ?>
-                                                            <span class="adm-you-badge">You</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="adm-td-email"><?php echo htmlspecialchars($acct['email'] ?? '—'); ?></td>
-                                                    <td>
-                                                        <span class="adm-role-badge adm-role-<?php echo $acct['role'] === 'Super Admin' ? 'super' : 'admin'; ?>">
-                                                            <?php echo htmlspecialchars($acct['role'] ?? 'Admin'); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="adm-td-status">
-                                                        <?php if ($acct_dormant): ?>
-                                                            <span class="adm-status adm-status--dormant"
-                                                                title="Dormant until <?php echo htmlspecialchars(admin_format_time((int)$acct['dormant_until'])); ?>">
-                                                                <span class="material-symbols-outlined">bedtime</span>
-                                                                Dormant until <?php echo htmlspecialchars((new DateTime('@' . (int)$acct['dormant_until']))->setTimezone(new DateTimeZone('Asia/Manila'))->format('M j')); ?>
-                                                            </span>
-                                                        <?php else: ?>
-                                                            <span class="adm-status adm-status--active">Active</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="td-sm">
-                                                        <?php echo $acct['created_at']
-                                                            ? date('M j, Y', strtotime($acct['created_at']))
-                                                            : '—'; ?>
-                                                    </td>
-                                                    <td class="adm-td-actions">
-                                                        <?php if ($acct_manage): ?>
-                                                            <div class="adm-actions">
-                                                                <button type="button" class="adm-act" data-adm-action="edit"
-                                                                    title="Edit login details" aria-label="Edit login details">
-                                                                    <span class="material-symbols-outlined">edit</span>
-                                                                </button>
-                                                                <?php if ($acct_dormant): ?>
-                                                                    <button type="button" class="adm-act" data-adm-action="reactivate"
-                                                                        title="Reactivate account" aria-label="Reactivate account">
-                                                                        <span class="material-symbols-outlined">play_circle</span>
-                                                                    </button>
-                                                                <?php else: ?>
-                                                                    <button type="button" class="adm-act" data-adm-action="dormant"
-                                                                        title="Make dormant" aria-label="Make dormant">
-                                                                        <span class="material-symbols-outlined">bedtime</span>
-                                                                    </button>
-                                                                <?php endif; ?>
-                                                                <button type="button" class="adm-act adm-act--danger" data-adm-action="delete"
-                                                                    title="Delete account" aria-label="Delete account">
-                                                                    <span class="material-symbols-outlined">delete</span>
-                                                                </button>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <span class="adm-protected"
-                                                                title="<?php echo $acct_is_you ? 'This is you — use My Account' : 'Super Admin accounts are protected'; ?>">—</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                    </div><!-- /sett-admins -->
-                <?php endif; ?>
 
                 <!-- ── PREFERENCES ────────────────────────────────────── -->
                 <div class="rq-sub-panel" id="sett-prefs">
@@ -3071,10 +4568,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- ── BORROWING RULES (was the standalone Arbitration tab; Super Admin only) ── -->
                 <?php if ($is_super_admin): ?>
                     <div class="rq-sub-panel" id="sett-rules">
-                        <!-- Sub-tabs -->
-                        <div class="rq-sub-tabs" id="arbSubTabs">
-                            <button class="rq-sub-tab active" data-arb-panel="arb-sub-config">Configuration</button>
-                            <button class="rq-sub-tab" data-arb-panel="arb-sub-log">Decision Log</button>
+                        <!-- Every automatic decision is recorded in the Activity timeline (Sidebar → Activity). -->
+                        <div class="arb-note">
+                            <span class="material-symbols-outlined" aria-hidden="true">history</span>
+                            <p>Want to see what these rules decided? Every automatic decision is in the Activity timeline.</p>
+                            <button type="button" class="act-open" data-act-open="auto">
+                                View automatic decisions <span class="material-symbols-outlined">arrow_forward</span>
+                            </button>
                         </div>
 
                         <!-- ── CONFIGURATION ─────────────────────────────────────── -->
@@ -3156,73 +4656,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                         </div><!-- /arb-sub-config -->
 
-                        <!-- ── DECISION LOG ───────────────────────────────────────── -->
-                        <div class="arb-sub-panel" id="arb-sub-log">
-                            <div class="ps-card">
-                                <div class="ps-card-header">
-                                    <h3><span class="material-symbols-outlined">history</span> Decision Log</h3>
-                                    <select class="ps-form-control" style="width:160px" id="arb-log-filter">
-                                        <option value="">All decisions</option>
-                                        <option value="Approved">Auto-approved</option>
-                                        <option value="Declined">Auto-declined</option>
-                                    </select>
-                                </div>
-                                <div class="ps-table-wrap">
-                                    <table class="ps-table" id="arb-log-new-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Request ID</th>
-                                                <th>Decision</th>
-                                                <th>Rule Triggered</th>
-                                                <th>Borrower</th>
-                                                <th>Equipment</th>
-                                                <th>Timestamp</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php
-                                            if (!$arb_log_result || mysqli_num_rows($arb_log_result) === 0):
-                                            ?>
-                                                <tr>
-                                                    <td colspan="6">
-                                                        <div class="ps-empty-state">
-                                                            <span class="material-symbols-outlined">history</span>
-                                                            <p>No arbitration log entries yet.</p>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                <?php else:
-                                                mysqli_data_seek($arb_log_result, 0);
-                                                while ($r = mysqli_fetch_assoc($arb_log_result)):
-                                                    $dec    = $r['decision'];
-                                                    $dbadge = ($dec === 'Approved') ? 'ps-badge--active' : 'ps-badge--overdue';
-                                                ?>
-                                                    <tr data-decision="<?php echo htmlspecialchars($dec); ?>">
-                                                        <td style="font-weight:600;color:var(--accent-maroon)">
-                                                            <?php echo htmlspecialchars($r['request_id']); ?>
-                                                        </td>
-                                                        <td>
-                                                            <span class="ps-badge ps-badge--dot <?php echo $dbadge; ?>">
-                                                                <?php echo htmlspecialchars($dec); ?>
-                                                            </span>
-                                                        </td>
-                                                        <td style="font-size:12px;color:var(--text-light)">
-                                                            <?php echo htmlspecialchars($r['rule_applied'] ?? '—'); ?>
-                                                        </td>
-                                                        <td><?php echo htmlspecialchars($r['borrower_name']); ?></td>
-                                                        <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                        <td style="font-size:12px;color:var(--text-light)">
-                                                            <?php echo date('M d, g:i A', strtotime($r['created_at'])); ?>
-                                                        </td>
-                                                    </tr>
-                                            <?php endwhile;
-                                            endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div><!-- /arb-sub-log -->
-
                     </div><!-- /sett-rules -->
                 <?php endif; ?>
 
@@ -3247,7 +4680,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Requests</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                                                Go to <strong>Approvals</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
                                             </div>
                                         </details>
 
@@ -3267,7 +4700,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>.
+                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>. Only a Super Admin can archive a room, and only a Super Admin can permanently delete an archived room (this removes it and its reservation history for good). To keep a room visible but stop its schedule from opening, open the room's <strong>Edit</strong> window and choose <strong>Lock Room</strong> — Admins and Super Admins can lock and unlock.
                                             </div>
                                         </details>
 
@@ -3460,9 +4893,76 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     </div>
 
     <?php if ($is_super_admin): ?>
-        <!-- ═══ MANAGE ADMINS — edit / dormant / delete (Super Admin only) ═══
+        <!-- ═══ MANAGE ADMINS — edit / lock / delete (Super Admin only) ═══
          Direct children of <body>, same ps-modal system as the Requests modals.
-         Driven by the "Manage Admins" block in admin-dashboard.js. -->
+         Driven by the "Admin Accounts panel" block in admin-dashboard.js. -->
+
+        <!-- MODAL: ADD ADMIN -->
+        <div class="ps-modal-backdrop" id="amAddModal">
+            <div class="ps-modal">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--maroon">
+                        <span class="material-symbols-outlined">person_add</span>
+                    </div>
+                    <h3>Add Admin</h3>
+                    <button type="button" class="ps-modal-close" data-adm-close="amAddModal" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <div id="adm-form-alert" class="alert-banner hidden" role="alert"></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-fullname">Full Name <span class="req-star">*</span></label>
+                            <input type="text" id="adm-fullname" class="form-control-custom"
+                                placeholder="e.g. Juan dela Cruz" maxlength="255" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-email">Admin Email <span class="req-star">*</span></label>
+                            <input type="email" id="adm-email" class="form-control-custom"
+                                placeholder="name@admin.edu" maxlength="255" autocomplete="off">
+                            <small class="adm-email-hint">Must end in <code>@admin.edu</code></small>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="adm-role">Role <span class="req-star">*</span></label>
+                        <select id="adm-role" class="form-control-custom">
+                            <option value="Admin" selected>Admin</option>
+                            <option value="Super Admin">Super Admin</option>
+                        </select>
+                        <small class="adm-email-hint">Super Admins have full control. Admins have limited access.</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="adm-password">Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-password" class="form-control-custom"
+                                    placeholder="Min. 8 characters" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-password" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="adm-confirm">Confirm Password <span class="req-star">*</span></label>
+                            <div class="fac-pw-wrap">
+                                <input type="password" id="adm-confirm" class="form-control-custom"
+                                    placeholder="Re-enter password" autocomplete="new-password">
+                                <button type="button" class="fac-pw-toggle" data-target="adm-confirm" title="Show/hide password">
+                                    <span class="material-symbols-outlined">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="amAddModal">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--primary" id="adm-submit-btn">
+                        <span class="material-symbols-outlined">person_add</span> Create Admin
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- MODAL: EDIT ADMIN LOGIN DETAILS -->
         <div class="ps-modal-backdrop" id="admEditModal">
@@ -3533,14 +5033,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div>
         </div>
 
-        <!-- MODAL: MAKE ADMIN DORMANT -->
+        <!-- MODAL: LOCK ADMIN ACCOUNT -->
         <div class="ps-modal-backdrop" id="admDormantModal">
             <div class="ps-modal ps-modal--sm">
                 <div class="ps-modal-head">
                     <div class="ps-modal-head-icon ps-mhi--warning">
-                        <span class="material-symbols-outlined">bedtime</span>
+                        <span class="material-symbols-outlined">lock</span>
                     </div>
-                    <h3>Make Account Dormant</h3>
+                    <h3>Lock Account</h3>
                     <button type="button" class="ps-modal-close" data-adm-close="admDormantModal" aria-label="Close">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -3549,9 +5049,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div id="adm-dormant-alert" class="alert-banner hidden" role="alert"></div>
                     <p class="adm-modal-text">
                         <strong id="adm-dormant-name">This admin</strong> keeps their account, but will be signed out and
-                        cannot log in until the period ends. You can reactivate it any time.
+                        cannot log in until the period ends. You can unlock it any time.
                     </p>
-                    <div class="adm-days" role="radiogroup" aria-label="Dormant for">
+                    <div class="adm-days" role="radiogroup" aria-label="Locked for">
                         <?php foreach (ADMIN_DORMANT_CHOICES as $d): ?>
                             <label class="adm-day-chip">
                                 <input type="radio" name="adm-dormant-days" value="<?php echo (int)$d; ?>" <?php echo $d === 7 ? 'checked' : ''; ?>>
@@ -3576,7 +5076,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="ps-modal-foot">
                     <button type="button" class="ps-btn ps-btn--ghost" data-adm-close="admDormantModal">Cancel</button>
                     <button type="button" class="ps-btn ps-btn--primary" id="adm-dormant-save">
-                        <span class="material-symbols-outlined">bedtime</span> Make Dormant
+                        <span class="material-symbols-outlined">lock</span> Lock Account
                     </button>
                 </div>
             </div>
@@ -3791,6 +5291,174 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- DRAWER: APPROVALS REVIEW (Waiting table). Reuses the ps-modal-backdrop open/close
+         mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
+         Approve / Decline here hand off to the existing approve/decline modals. -->
+    <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
+        <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-appr-title">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">fact_check</span>
+                </div>
+                <h3 id="ps-appr-title">Review <span id="ps-appr-reqno">#0000</span></h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-appr-drawer" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-drawer-body">
+                <div class="ps-drawer-status">
+                    <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
+                    <span class="ps-drawer-muted">Submitted <span id="ps-appr-submitted">—</span></span>
+                </div>
+
+                <section class="ps-drawer-sec">
+                    <h4>Supporting document</h4>
+                    <div class="ps-doc-card" id="ps-appr-doc">
+                        <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-appr-doc-icon">draft</span></div>
+                        <div class="ps-doc-card__meta">
+                            <div class="ps-doc-card__name" id="ps-appr-doc-name">—</div>
+                            <div class="ps-drawer-muted" id="ps-appr-doc-kind">—</div>
+                        </div>
+                        <div class="ps-doc-card__btns">
+                            <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-appr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
+                                <span class="material-symbols-outlined">open_in_new</span> Open
+                            </a>
+                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-appr-doc-dl" href="#" download>
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="ps-doc-preview" id="ps-appr-doc-preview" hidden>
+                        <img id="ps-appr-doc-img" alt="Attached document preview">
+                    </div>
+                    <div class="ps-doc-none" id="ps-appr-doc-none" hidden>
+                        <span class="material-symbols-outlined">warning</span>
+                        <span>No supporting document is attached. Standard requests are handled automatically, so check why this one needs a manual decision.</span>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Requester</h4>
+                    <div class="ps-kv">
+                        <div><span>Name</span><strong id="ps-appr-who">—</strong></div>
+                        <div><span>Type</span><strong id="ps-appr-type">—</strong></div>
+                        <div><span>ID</span><strong id="ps-appr-idno">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Request</h4>
+                    <div class="ps-kv">
+                        <div><span>Item</span><strong id="ps-appr-item">—</strong></div>
+                        <div><span>Quantity</span><strong id="ps-appr-qty">—</strong></div>
+                        <div><span>Date needed</span><strong id="ps-appr-needed">—</strong></div>
+                        <div><span>Return by</span><strong id="ps-appr-return">—</strong></div>
+                        <div><span>Room</span><strong id="ps-appr-room">—</strong></div>
+                        <div><span>Instructor</span><strong id="ps-appr-instr">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec" id="ps-appr-note-sec">
+                    <h4>Notes</h4>
+                    <div class="ps-drawer-note" id="ps-appr-note">—</div>
+                </section>
+            </div>
+            <div class="ps-drawer-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-appr-drawer">Close</button>
+                <button class="ps-btn ps-btn--danger" type="button" data-appr-decide="decline">
+                    <span class="material-symbols-outlined">close</span> Decline
+                </button>
+                <button class="ps-btn ps-btn--success" type="button" data-appr-decide="approve">
+                    <span class="material-symbols-outlined">check</span> Approve
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- DRAWER: ROOM RESERVATION DETAILS (Rooms > Reservations). Same shell/CSS as the
+         approvals drawer; Cancel hands off to the existing admin cancel-reservation modal. -->
+    <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-room-drawer">
+        <aside class="ps-drawer" role="dialog" aria-modal="true" aria-labelledby="ps-rr-title">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">meeting_room</span>
+                </div>
+                <h3 id="ps-rr-title">Reservation <span id="ps-rr-no">#0</span></h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-room-drawer" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-drawer-body">
+                <div class="ps-drawer-status">
+                    <span class="ps-badge ps-badge--dot ps-badge--active" id="ps-rr-status">Approved</span>
+                    <span class="ps-drawer-muted">Submitted <span id="ps-rr-submitted">—</span></span>
+                </div>
+
+                <section class="ps-drawer-sec" id="ps-rr-doc-sec">
+                    <h4>Supporting document</h4>
+                    <div class="ps-doc-card" id="ps-rr-doc">
+                        <div class="ps-doc-card__icon"><span class="material-symbols-outlined" id="ps-rr-doc-icon">draft</span></div>
+                        <div class="ps-doc-card__meta">
+                            <div class="ps-doc-card__name" id="ps-rr-doc-name">—</div>
+                            <div class="ps-drawer-muted" id="ps-rr-doc-kind">—</div>
+                        </div>
+                        <div class="ps-doc-card__btns">
+                            <a class="ps-btn ps-btn--primary ps-btn--sm" id="ps-rr-doc-open" href="#" target="_blank" rel="noopener noreferrer">
+                                <span class="material-symbols-outlined">open_in_new</span> Open
+                            </a>
+                            <a class="ps-btn ps-btn--outline ps-btn--sm" id="ps-rr-doc-dl" href="#" download>
+                                <span class="material-symbols-outlined">download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="ps-doc-preview" id="ps-rr-doc-preview" hidden>
+                        <img id="ps-rr-doc-img" alt="Attached document preview">
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Reservation</h4>
+                    <div class="ps-kv">
+                        <div><span>Room</span><strong id="ps-rr-room">—</strong></div>
+                        <div><span>Location</span><strong id="ps-rr-where">—</strong></div>
+                        <div><span>Date</span><strong id="ps-rr-date">—</strong></div>
+                        <div><span>Time</span><strong id="ps-rr-time">—</strong></div>
+                        <div><span>Attendees</span><strong id="ps-rr-attendees">—</strong></div>
+                        <div><span>Purpose</span><strong id="ps-rr-purpose">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Requested by</h4>
+                    <div class="ps-kv">
+                        <div><span>Name</span><strong id="ps-rr-who">—</strong></div>
+                        <div><span>Type</span><strong id="ps-rr-type">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec" id="ps-rr-decision-sec">
+                    <h4>Decision</h4>
+                    <div class="ps-kv">
+                        <div><span>Method</span><strong id="ps-rr-dec-method">—</strong></div>
+                        <div id="ps-rr-dec-rule-row"><span>Rule</span><strong id="ps-rr-dec-rule">—</strong></div>
+                        <div id="ps-rr-dec-reason-row"><span>Reason</span><strong id="ps-rr-dec-reason">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec">
+                    <h4>Notes</h4>
+                    <div class="ps-drawer-note" id="ps-rr-notes">—</div>
+                </section>
+            </div>
+            <div class="ps-drawer-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
+                <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
+                    <span class="material-symbols-outlined">cancel</span> Cancel reservation
+                </button>
+            </div>
+        </aside>
     </div>
 
     <!-- MODAL: EXPORT REQUESTS -->
@@ -4630,9 +6298,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
             var archiveLink = document.getElementById('eqm-archive-link');
             archiveLink.href = 'admin-dashboard.php?delete_item=' + d.itemId;
-            archiveLink.onclick = function() {
-                return confirm('Archive "' + d.itemName + '"? It will no longer be available for lending, but borrow history is preserved.');
-            };
+            archiveLink.onclick = null; // confirmation handled by delegated listener in inventory AJAX block
 
             psOpenModal('eq-edit-modal');
         });
@@ -4641,7 +6307,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <!-- ══════════════════════════════════════════════════════
          ROOM SCHEDULE MODAL
          ══════════════════════════════════════════════════════ -->
-    <div id="roomScheduleModal" class="hidden">
+    <div id="roomScheduleModal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rsm-title">
         <div class="rsm-card">
             <div class="rsm-head">
                 <div class="rsm-head-icon">
@@ -4655,41 +6321,78 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="rsm-info-row">
                 <span class="rsm-room-meta" id="rsm-meta"></span>
                 <div class="rsm-week-ctrl">
-                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="-1" title="Previous week">
+                    <button type="button" class="rsm-today-btn" data-action="room-schedule-today">Today</button>
+                    <button class="rsm-week-nav-btn" id="rsm-prev" data-action="room-schedule-nav" data-dir="-1" title="Previous week" aria-label="Previous week">
                         <span class="material-symbols-outlined">chevron_left</span>
                     </button>
-                    <span class="rsm-week-lbl" id="rsm-week-lbl"></span>
-                    <button class="rsm-week-nav-btn" data-action="room-schedule-nav" data-dir="1" title="Next week">
+                    <span class="rsm-week-lbl" aria-live="polite">
+                        <b id="rsm-week-lbl"></b>
+                        <small id="rsm-week-sub"></small>
+                    </span>
+                    <button class="rsm-week-nav-btn" id="rsm-next" data-action="room-schedule-nav" data-dir="1" title="Next week" aria-label="Next week">
                         <span class="material-symbols-outlined">chevron_right</span>
                     </button>
                 </div>
             </div>
-            <div class="rsm-body">
-                <div class="rsm-grid">
-                    <div class="rsm-grid-head">
-                        <div class="rsm-grid-th">TIME</div>
-                        <div class="rsm-grid-th">MON</div>
-                        <div class="rsm-grid-th">TUE</div>
-                        <div class="rsm-grid-th">WED</div>
-                        <div class="rsm-grid-th">THU</div>
-                        <div class="rsm-grid-th">FRI</div>
-                    </div>
-                    <div id="rsm-grid-body"></div>
-                </div>
-            </div>
-            <div class="rsm-legend">
-                <div class="rsm-legend-item">
-                    <div class="rsm-legend-dot reserved"></div> Reserved
-                </div>
-                <div class="rsm-legend-item">
-                    <div class="rsm-legend-dot avail"></div> Available
+            <div class="rsm-mobile-daytabs" id="rsm-daytabs" role="group" aria-label="Day of the week"></div>
+            <div class="rsm-sync-note hidden" id="rsm-sync-note">Couldn't refresh just now — showing the reservations loaded with this page. Reopen the schedule or reload to retry.</div>
+            <div class="rsm-body" id="rsm-body">
+                <div class="rsm-grid" id="rsm-grid">
+                    <div class="rsm-grid-head" id="rsm-grid-head"></div>
+                    <div class="rsm-grid-body" id="rsm-grid-body"></div>
                 </div>
             </div>
             <div class="rsm-foot">
+                <div class="rsm-legend">
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot reserved"></div> Reserved
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot past"></div> Already finished
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-dot avail"></div> Available
+                    </div>
+                    <div class="rsm-legend-item">
+                        <div class="rsm-legend-line"></div> Now
+                    </div>
+                </div>
                 <button type="button" class="btn-cancel-acc" data-action="close-room-schedule">Close</button>
             </div>
         </div><!-- /.rsm-card -->
     </div><!-- /#roomScheduleModal -->
+
+    <?php if ($is_super_admin): ?>
+        <!-- Permanent-delete confirmation (Super Admin only). Direct <body> child on purpose. -->
+        <div id="roomDeleteConfirm" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rdc-title">
+            <div class="rdc-card">
+                <div class="rdc-head">
+                    <div class="rdc-icon"><span class="material-symbols-outlined">delete_forever</span></div>
+                    <h3 id="rdc-title">Delete room permanently?</h3>
+                </div>
+                <div class="rdc-body">
+                    <p class="rdc-room" id="rdc-room-name"></p>
+                    <p>This cannot be undone. The room and the following will be removed for good:</p>
+                    <ul class="rdc-list">
+                        <li id="rdc-resv">No reservation records</li>
+                        <li>Its issue reports and waitlist entries</li>
+                    </ul>
+                    <p class="rdc-note">Equipment requests that mention this room are kept.</p>
+                    <label class="rdc-check">
+                        <input type="checkbox" id="rdc-ack">
+                        <span>I understand this cannot be undone</span>
+                    </label>
+                </div>
+                <div class="rdc-foot">
+                    <button type="button" class="rdc-btn rdc-btn-ghost" data-action="close-room-delete">Cancel</button>
+                    <button type="button" class="rdc-btn rdc-btn-danger" id="rdc-confirm" disabled>
+                        <span class="material-symbols-outlined">delete_forever</span>
+                        Delete permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
 
 
@@ -5161,6 +6864,28 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             }
 
+            /* Refresh the faculty list tbody from the server fragment endpoint.
+               Called after in-place account creation so the new row appears without
+               a full page reload. Exposed globally so admin-dashboard.js can call it. */
+            window.adminRefreshFacultyList = function() {
+                fetch('admin-dashboard.php?fragment=faculty-tbody', {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status !== 'success') return;
+                        if (_facTbody) _facTbody.innerHTML = json.faculty_html;
+                        // Edit buttons are wired via delegated listener on #fac-list-table,
+                        // so no per-row re-binding is needed after the innerHTML swap.
+                        _facRefreshCount();
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Could not refresh the faculty list. Please reload the page.');
+                    });
+            };
+
             /* Save Changes */
             var facEditSaveBtn = document.getElementById('fac-edit-save');
             if (facEditSaveBtn) {
@@ -5398,6 +7123,239 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             });
 
         }());
+    </script>
+
+    <!-- ── Inventory AJAX: intercept add/edit/archive/restore/force_delete without page reload ── -->
+    <script nonce="<?php echo $csp_nonce; ?>">
+        (function() {
+            'use strict';
+
+            /* ── Refresh inventory tbodies from the fragment endpoint ─────────── */
+            function refreshInventoryTbody(onDone) {
+                fetch('admin-dashboard.php?fragment=inventory-tbody', {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status !== 'success') return;
+
+                        var activeBody = document.getElementById('inventory-body');
+                        if (activeBody) activeBody.innerHTML = json.active_html;
+
+                        var archBody = document.getElementById('inv-archive-body');
+                        if (archBody) archBody.innerHTML = json.archive_html;
+
+                        var badge = document.getElementById('inv-count-badge');
+                        if (badge) badge.textContent = '(' + json.active_count + ')';
+
+                        // Re-wire pagination/search since rows are brand new DOM nodes
+                        if (typeof window._setupInventoryListFn === 'function') {
+                            window._setupInventoryListFn();
+                        }
+
+                        if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+
+                        if (typeof onDone === 'function') onDone();
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Could not refresh inventory. Please reload.');
+                    });
+            }
+
+            /* ── Intercept itemForm (Add Equipment) ───────────────────────────── */
+            var itemForm = document.getElementById('itemForm');
+            if (itemForm) {
+                itemForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var fd = new FormData(itemForm);
+                    fd.set('ajax', '1');
+
+                    var submitBtn = itemForm.querySelector('[name="add_item"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Saving\u2026';
+                    }
+
+                    fetch('admin-dashboard.php', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin'
+                        })
+                        .then(function(r) {
+                            return r.json();
+                        })
+                        .then(function(json) {
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'Add Equipment';
+                            }
+                            if (json.status === 'success') {
+                                if (typeof showToast === 'function') showToast(json.message || 'Saved.');
+                                itemForm.reset();
+                                var preview = document.getElementById('imagePreview');
+                                if (preview) {
+                                    preview.src = '';
+                                    preview.style.display = 'none';
+                                }
+                                if (typeof window._exitEditModeFn === 'function') window._exitEditModeFn();
+                                var fw = document.getElementById('item-form-wrap');
+                                if (fw) fw.classList.add('hidden');
+                                refreshInventoryTbody();
+                            } else {
+                                if (typeof showToast === 'function') showToast(json.message || 'Error saving equipment.');
+                            }
+                        })
+                        .catch(function() {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                        });
+                });
+            }
+
+            /* ── Intercept eqEditForm (Edit Equipment modal) ──────────────────── */
+            var eqEditForm = document.getElementById('eqEditForm');
+            if (eqEditForm) {
+                eqEditForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    var fd = new FormData(eqEditForm);
+                    fd.set('update_item', '1');
+                    fd.set('ajax', '1');
+
+                    var submitBtn = document.querySelector('button[form="eqEditForm"][name="update_item"]');
+                    if (submitBtn) submitBtn.disabled = true;
+
+                    fetch('admin-dashboard.php', {
+                            method: 'POST',
+                            body: fd,
+                            credentials: 'same-origin'
+                        })
+                        .then(function(r) {
+                            return r.json();
+                        })
+                        .then(function(json) {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (json.status === 'success') {
+                                if (typeof psCloseModal === 'function') psCloseModal('eq-edit-modal');
+                                if (typeof showToast === 'function') showToast(json.message || 'Equipment updated.');
+                                refreshInventoryTbody();
+                            } else {
+                                if (typeof showToast === 'function') showToast(json.message || 'Could not update equipment.');
+                            }
+                        })
+                        .catch(function() {
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                        });
+                });
+            }
+
+            /* ── Intercept archive (delete_item) links ────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="delete_item="]');
+                if (!link) return;
+                e.preventDefault();
+                var msg = 'Archive this item? It will no longer be available for lending, but borrow history is preserved.';
+                if (!confirm(msg)) return;
+
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status === 'success') {
+                            if (typeof psCloseModal === 'function') psCloseModal('eq-edit-modal');
+                            if (typeof showToast === 'function') showToast(json.message || 'Item archived.');
+                            refreshInventoryTbody();
+                        } else {
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not archive item.');
+                        }
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                    });
+            });
+
+            /* ── Intercept restore_item links ─────────────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="restore_item="]');
+                if (!link) return;
+                e.preventDefault();
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status === 'success') {
+                            if (typeof showToast === 'function') showToast(json.message || 'Item restored.');
+                            refreshInventoryTbody();
+                        } else {
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not restore item.');
+                        }
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                    });
+            });
+
+            /* ── Intercept force_delete links ─────────────────────────────────── */
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('a[href*="force_delete="]');
+                if (!link) return;
+                e.preventDefault();
+                if (!confirm('Permanently delete? This cannot be undone.')) return;
+                var href = link.getAttribute('href');
+                var url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
+                fetch(url, {
+                        credentials: 'same-origin'
+                    })
+                    .then(function(r) {
+                        return r.json();
+                    })
+                    .then(function(json) {
+                        if (json.status === 'success') {
+                            if (typeof showToast === 'function') showToast(json.message || 'Item permanently deleted.');
+                            refreshInventoryTbody();
+                        } else {
+                            if (typeof showToast === 'function') showToast(json.message || 'Could not delete item.');
+                        }
+                    })
+                    .catch(function() {
+                        if (typeof showToast === 'function') showToast('Network error. Please try again.');
+                    });
+            });
+
+        })();
+    </script>
+    <script>
+        /* Activate the restored panel before revealing the content area. */
+        (function() {
+            var tab = window._preJumpTab;
+            if (tab) {
+                var target = document.getElementById('panel-' + tab);
+                if (target) {
+                    var current = document.querySelector('.tab-panel.active');
+                    if (current) current.classList.remove('active');
+                    target.classList.add('active');
+
+                    document.querySelectorAll('.nav-item[data-tab]').forEach(function(item) {
+                        item.classList.toggle('active', item.dataset.tab === tab);
+                    });
+                    var accountToggle = document.getElementById('navAccountToggle');
+                    if (accountToggle) accountToggle.classList.toggle('active', tab === 'settings');
+                }
+            }
+            document.documentElement.classList.remove('admin-tab-pending');
+        })();
     </script>
 </body>
 

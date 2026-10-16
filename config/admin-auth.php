@@ -6,7 +6,7 @@
  * Central place for the rules that decide whether an admin account may
  * still be used:
  *
- *   • dormant_until  – unix time until which the account is dormant
+ *   • dormant_until  – unix time until which the account is locked
  *                      (exists, but cannot log in / keep a session).
  *   • session_epoch  – unix time of the last credential change made by a
  *                      Super Admin. Any session that started before it is
@@ -21,7 +21,7 @@
  * any logged-out visitor.
  */
 
-/** Maximum number of days an account can be made dormant. */
+/** Maximum number of days an account can be locked. */
 const ADMIN_DORMANT_MAX_DAYS = 30;
 
 /** Quick-pick durations offered in the UI (days). */
@@ -71,10 +71,10 @@ function admin_format_time(int $ts): string
     return $dt->format('M j, Y, g:i A');
 }
 
-/** Message shown on the landing page for a dormant account. */
+/** Message shown on the landing page for a locked account. */
 function admin_dormant_message(int $until): string
 {
-    return 'This account is dormant until ' . admin_format_time($until)
+    return 'This account is locked until ' . admin_format_time($until)
         . '. Please contact a Super Admin if you need access sooner.';
 }
 
@@ -102,7 +102,7 @@ function admin_session_end(string $message): void
 
 /**
  * Re-check the logged-in admin against the database.
- * Fails closed for accounts that were deleted, made dormant, or had their
+ * Fails closed for accounts that were deleted, locked, or had their
  * credentials changed after this session started.
  */
 function admin_session_guard(): void

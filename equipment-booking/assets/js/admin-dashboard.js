@@ -178,10 +178,15 @@
 
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.remove('active'));
         const panel = document.getElementById('panel-' + tabName);
-        if (panel) panel.classList.add('active');
+        // If the pre-paint script already activated this panel (no flash), skip
+        // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
+        const alreadyActive = panel && panel.classList.contains('active');
+        if (!alreadyActive || clickedEl !== false) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            if (panel) panel.classList.add('active');
+        }
+        document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.remove('active'));
         // Highlight the specific element that was clicked, or fall back to first match
         const btn = clickedEl || document.querySelector('.nav-item[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
@@ -190,6 +195,14 @@
         const acctToggle = document.getElementById('navAccountToggle');
         if (acctToggle) acctToggle.classList.toggle('active', tabName === 'settings');
         _closeMobileSidebar();
+        // Write hash for F5 persistence. clickedEl === false signals a popstate / initView
+        // restore — skip rewriting so we don't redundantly overwrite the hash or trigger loops.
+        if (clickedEl !== false) {
+            var newHash = '#tab-' + tabName;
+            if (window.location.hash !== newHash) {
+                history.replaceState(history.state, '', window.location.pathname + window.location.search + newHash);
+            }
+        }
     }
 
     /* ── Lending sub-nav ─────────────────────────────────────── */
@@ -1505,13 +1518,18 @@
                     break;
                 }
                 case 'hide-item-form': {
+                    // Drop any ?edit_item= param from the URL without reloading.
                     const editParam = new URLSearchParams(window.location.search).get('edit_item');
                     if (editParam) {
-                        window.location.href = 'admin-dashboard.php?view=inventory';
-                    } else {
-                        const fw = document.getElementById('item-form-wrap');
-                        if (fw) fw.classList.add('hidden');
+                        const p2 = new URLSearchParams(window.location.search);
+                        p2.delete('edit_item');
+                        const qs2 = p2.toString();
+                        history.replaceState({ tab: 'inventory' }, '',
+                            window.location.pathname + (qs2 ? '?' + qs2 : '') + window.location.hash);
                     }
+                    _exitEditMode();
+                    const fw = document.getElementById('item-form-wrap');
+                    if (fw) fw.classList.add('hidden');
                     break;
                 }
                 case 'show-room-form': {
@@ -1527,13 +1545,17 @@
                 case 'hide-room-form': {
                     const editRoomParam = new URLSearchParams(window.location.search).get('edit_room');
                     if (editRoomParam) {
-                        window.location.href = 'admin-dashboard.php?tab=rooms';
-                    } else {
-                        const rfw = document.getElementById('room-form-wrap');
-                        const addRoomBtn = document.getElementById('addRoomBtn');
-                        if (rfw) rfw.classList.add('hidden');
-                        if (addRoomBtn) addRoomBtn.style.display = '';
+                        const p3 = new URLSearchParams(window.location.search);
+                        p3.delete('edit_room');
+                        const qs3 = p3.toString();
+                        history.replaceState({ tab: 'rooms' }, '',
+                            window.location.pathname + (qs3 ? '?' + qs3 : '') + window.location.hash);
                     }
+                    const rfw = document.getElementById('room-form-wrap');
+                    const addRoomBtn = document.getElementById('addRoomBtn');
+                    if (rfw) rfw.classList.add('hidden');
+                    if (addRoomBtn) addRoomBtn.style.display = '';
+                    if (window.psResetRoomForm) window.psResetRoomForm();
                     break;
                 }
                 case 'apply-theme':
@@ -1696,9 +1718,16 @@
         document.body.appendChild(ov);
 
         setTimeout(function () {
-            // ?view=faculty makes the dashboard open on the Faculty tab (a plain reload
-            // would drop back to the default tab).
-            window.location.href = window.location.pathname + '?view=faculty';
+            // Switch to Faculty tab in-place — no page reload needed.
+            document.body.removeChild(ov);
+            _switchTabDOM('faculty');
+            // Reset the create-account form so it's blank for the next account.
+            var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
+            if (form) form.reset();
+            // Reset the flag so the submit button is re-enabled for the next account.
+            _facReloading = false;
+            // Refresh the faculty list from the server so the new account appears immediately.
+            if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
     }
 
@@ -1916,122 +1945,18 @@
         btn.addEventListener('click', function () { switchSettMainTab(this.dataset.settPanel); });
     });
 
-    /* ── Manage Admins — Add Admin form ──────────────────────────
-       Mirrors the pattern used by the Add Faculty form exactly:
-       fetch + JSON, inline alert on error, showToast on success,
-       update the slot counter and table body without a page reload. */
-    (function initAddAdminForm() {
-        const submitBtn = document.getElementById('adm-submit-btn');
-        const alertEl = document.getElementById('adm-form-alert');
-        if (!submitBtn) return; // form not rendered (slot limit reached)
-
-        /* Password eye buttons (#adm-password / #adm-confirm) are handled by the shared
-           ".fac-pw-toggle" handler near the top of this file — do not bind them again here,
-           two handlers on one button toggle twice and the field never changes. */
-
-        function setAlert(msg, isError) {
-            if (!alertEl) return;
-            alertEl.textContent = msg;
-            alertEl.className = 'alert-banner' + (isError ? ' alert-error' : ' alert-success');
-            alertEl.classList.remove('hidden');
-        }
-
-        function clearAlert() {
-            if (!alertEl) return;
-            alertEl.className = 'alert-banner hidden';
-            alertEl.textContent = '';
-        }
-
-        submitBtn.addEventListener('click', function () {
-            clearAlert();
-
-            const fullName = (document.getElementById('adm-fullname')?.value || '').trim();
-            const email = (document.getElementById('adm-email')?.value || '').trim().toLowerCase();
-            const role = document.getElementById('adm-role')?.value || 'Admin';
-            const password = document.getElementById('adm-password')?.value || '';
-            const confirm = document.getElementById('adm-confirm')?.value || '';
-
-            /* Client-side pre-flight (mirrors server checks) */
-            if (!fullName) { setAlert('Full name is required.', true); return; }
-            if (!email) { setAlert('Admin email is required.', true); return; }
-            if (!email.endsWith('@admin.edu')) {
-                setAlert('Admin emails must end in @admin.edu (e.g. name@admin.edu).', true);
-                return;
-            }
-            if (!password) { setAlert('Password is required.', true); return; }
-            if (password.length < 8) { setAlert('Password must be at least 8 characters.', true); return; }
-            if (password !== confirm) { setAlert('Passwords do not match.', true); return; }
-
-            submitBtn.disabled = true;
-            const origText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> Creating…';
-
-            const csrf = document.querySelector('input[name="csrf_token"]')?.value || '';
-            const fd = new FormData();
-            fd.append('csrf_token', csrf);
-            fd.append('full_name', fullName);
-            fd.append('email', email);
-            fd.append('role', role);
-            fd.append('password', password);
-            fd.append('confirm_password', confirm);
-
-            fetch('equipment-booking/api/create-admin-account.php', {
-                method: 'POST',
-                body: fd,
-                credentials: 'same-origin'
-            })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origText;
-
-                    if (data.status === 'success') {
-                        /* Clear the form */
-                        ['adm-fullname', 'adm-email', 'adm-password', 'adm-confirm'].forEach(function (id) {
-                            const el = document.getElementById(id);
-                            if (el) el.value = '';
-                        });
-                        admResetPwEyes(document.getElementById('adm-form-card'));
-                        const roleEl = document.getElementById('adm-role');
-                        if (roleEl) roleEl.value = 'Admin';
-
-                        showToast('✅ ' + data.message);
-                        setAlert(data.message, false);
-
-                        /* Update the slot counter / form visibility live */
-                        if (typeof data.accounts_remaining === 'number') {
-                            admUpdateSeats(5 - data.accounts_remaining, data.accounts_remaining);
-                        }
-
-                        /* Append the new row to the accounts table immediately */
-                        const tbody = document.getElementById('admAccountsTbody');
-                        if (tbody) {
-                            /* Remove the "No accounts found" placeholder if present */
-                            const placeholder = tbody.querySelector('td[colspan]');
-                            if (placeholder) placeholder.closest('tr').remove();
-
-                            tbody.appendChild(admBuildRow(data.id, fullName, email, role));
-                        }
-                    } else {
-                        setAlert(data.message || 'Something went wrong. Please try again.', true);
-                    }
-                })
-                .catch(function () {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = origText;
-                    setAlert('Network error — please check your connection and try again.', true);
-                });
-        });
-    })();
-
-    /* ▼ MANAGE-ADMINS-BEGIN ─────────────────────────────────────────────────
-       Settings → Manage Admins → Current Admins (Super Admin only).
-       Edit login details · make dormant · reactivate · delete, plus the
-       shared helpers the Add Admin form above uses (seat counter, row builder).
-       Talks to api/manage-admin-account.php; the server re-checks every rule. */
+    /* ▼ ADMIN-ACCOUNTS-PANEL-BEGIN ───────────────────────────────────────────
+       Sidebar → Admins (Super Admin only).
+       Left: list of admin accounts. Right: the selected admin's details,
+       actions (edit · lock · unlock · delete) and activity history.
+       Talks to api/manage-admin-account.php, api/create-admin-account.php and
+       api/admin-activity.php; the server re-checks every rule. */
 
     const ADM_API = 'equipment-booking/api/manage-admin-account.php';
+    const ADM_CREATE_API = 'equipment-booking/api/create-admin-account.php';
+    const ADM_ACTIVITY_API = 'equipment-booking/api/admin-activity.php';
     const ADM_MAX_DAYS = 30;
+    const ADM_TZ = 'Asia/Manila';
 
     function admEl(tag, cls, text) {
         const n = document.createElement(tag);
@@ -2041,8 +1966,8 @@
     }
 
     /* Hide every password field inside `root` again and put the eye buttons back to
-       their initial icon (same markup open-change-pass uses), so a revealed password
-       never stays on screen the next time the form / dialog is shown. */
+       their initial icon, so a revealed password never stays on screen the next time
+       a dialog is shown. */
     function admResetPwEyes(root) {
         if (!root) return;
         root.querySelectorAll('.fac-pw-toggle').forEach(function (btn) {
@@ -2060,112 +1985,213 @@
         return s;
     }
 
-    /* "Oct 7" — day shown in the Status pill (campus timezone) */
+    /* "Oct 7" — day shown in the status tag (campus timezone) */
     function admShortDate(ts) {
-        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' });
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: ADM_TZ });
     }
 
     /* "Oct 7, 2026, 3:00 PM" */
     function admLongDate(ts) {
         return new Date(ts * 1000).toLocaleString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila'
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ
         });
     }
 
-    /* Seat counter, banner, and Add-form / "maximum reached" card */
-    function admUpdateSeats(count, remaining) {
-        const text = document.getElementById('adm-slot-text');
-        if (text) {
-            text.textContent = '';
-            text.appendChild(admEl('strong', '', count + ' of 5'));
-            text.appendChild(document.createTextNode(' admin accounts in use — '));
-            if (remaining > 0) {
-                text.appendChild(admEl('span', '', String(remaining))).id = 'adm-slots-remaining';
-                text.appendChild(document.createTextNode(' slot' + (remaining !== 1 ? 's' : '') + ' remaining'));
-            } else {
-                text.appendChild(document.createTextNode('limit reached'));
+    /* ── Shared activity timeline ─────────────────────────────────
+       One renderer for the Activity page and the per-admin timeline in the
+       Admins panel. Both read api/admin-activity.php, so they always agree. */
+    function actDayKey(ts) {
+        return new Date(ts * 1000).toLocaleDateString('en-CA', { timeZone: ADM_TZ }); // YYYY-MM-DD
+    }
+    function actDayLabel(ts) {
+        const key = actDayKey(ts);
+        const nowSec = Date.now() / 1000;
+        if (key === actDayKey(nowSec)) return 'Today';
+        if (key === actDayKey(nowSec - 86400)) return 'Yesterday';
+        return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: ADM_TZ });
+    }
+    function actTimeLabel(ts) {
+        return new Date(ts * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: ADM_TZ });
+    }
+
+    /* cfg: { feed, pager, params(): {actor, filter, range}, showActor: bool, onTotals(n) }
+       Shows ONE page (15 events) at a time; the server counts the total and caps paging at the
+       3,000 most recent events, so a huge log can never slow the page down. */
+    function createActivityFeed(cfg) {
+        let page = 1;
+        let token = 0;        // ignores answers that arrive after the filters changed
+        let lastKey = '';
+        let lastList = null;
+
+        const pg = cfg.pager;
+        const infoEl = pg.querySelector('.act-pager-info');
+        const ctlEl = pg.querySelector('.act-pager-ctl');
+        const numsEl = pg.querySelector('.act-pager-nums');
+        const prevBtn = pg.querySelector('[data-pg="prev"]');
+        const nextBtn = pg.querySelector('[data-pg="next"]');
+
+        function message(icon, text, retry) {
+            cfg.feed.textContent = '';
+            const box = admEl('div', 'act-feed-msg');
+            box.appendChild(admIcon(icon));
+            box.appendChild(admEl('p', '', text));
+            if (retry) {
+                const b = admEl('button', 'ps-btn ps-btn--ghost ps-btn--sm', 'Try again');
+                b.type = 'button';
+                b.addEventListener('click', function () { fetchPage(); });
+                box.appendChild(b);
             }
+            cfg.feed.appendChild(box);
         }
-        const banner = document.querySelector('.adm-slot-banner');
-        if (banner) banner.classList.toggle('adm-slot-full', remaining <= 0);
-        const form = document.getElementById('adm-form-card');
-        if (form) form.hidden = remaining <= 0;
-        const max = document.getElementById('adm-max-card');
-        if (max) max.hidden = remaining > 0;
-    }
 
-    function admStatusCell(dormantUntil) {
-        const td = admEl('td', 'adm-td-status');
-        if (dormantUntil) {
-            const pill = admEl('span', 'adm-status adm-status--dormant');
-            pill.title = 'Dormant until ' + admLongDate(dormantUntil);
-            pill.appendChild(admIcon('bedtime'));
-            pill.appendChild(document.createTextNode('Dormant until ' + admShortDate(dormantUntil)));
-            td.appendChild(pill);
-        } else {
-            td.appendChild(admEl('span', 'adm-status adm-status--active', 'Active'));
+        function appendEvents(events) {
+            events.forEach(function (ev) {
+                const key = actDayKey(ev.ts);
+                if (key !== lastKey) {
+                    cfg.feed.appendChild(admEl('h5', 'act-day', actDayLabel(ev.ts)));
+                    lastList = admEl('ul', 'act-events');
+                    cfg.feed.appendChild(lastList);
+                    lastKey = key;
+                }
+                const li = admEl('li', 'act-event act-event--' + (ev.tone || 'neutral'));
+                const ico = admEl('span', 'act-event-icon');
+                ico.appendChild(admIcon(ev.icon || 'history'));
+                li.appendChild(ico);
+
+                const body = admEl('div', 'act-event-body');
+                body.appendChild(admEl('div', 'act-event-text', ev.text));
+                if (ev.meta) body.appendChild(admEl('div', 'act-event-meta', ev.meta)); // e.g. the rule that applied
+                li.appendChild(body);
+                if (cfg.showActor) {
+                    // "Who" gets its own column so a wide timeline stays easy to scan.
+                    li.classList.add('act-event--who');
+                    const who = admEl('div', 'act-event-who');
+                    if (ev.actor_type === 'auto') who.appendChild(admEl('span', 'act-pill', 'Automatic'));
+                    else who.textContent = ev.actor_name;
+                    li.appendChild(who);
+                }
+                li.appendChild(admEl('time', 'act-event-time', actTimeLabel(ev.ts)));
+                lastList.appendChild(li);
+            });
         }
-        return td;
-    }
 
-    function admActButton(action, icon, label, extra) {
-        const b = admEl('button', 'adm-act' + (extra ? ' ' + extra : ''));
-        b.type = 'button';
-        b.setAttribute('data-adm-action', action);
-        b.title = label;
-        b.setAttribute('aria-label', label);
-        b.appendChild(admIcon(icon));
-        return b;
-    }
-
-    function admActionsCell(manageable, dormant) {
-        const td = admEl('td', 'adm-td-actions');
-        if (!manageable) {
-            const dash = admEl('span', 'adm-protected', '—');
-            dash.title = 'Super Admin accounts are protected';
-            td.appendChild(dash);
-            return td;
+        /* 1 … 4 5 6 … 12 — always first, last and the current page ±1 */
+        function pageList(total, current) {
+            const keep = new Set([1, total, current - 1, current, current + 1]);
+            const list = [];
+            let last = 0;
+            Array.from(keep).filter(function (n) { return n >= 1 && n <= total; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
         }
-        const wrap = admEl('div', 'adm-actions');
-        wrap.appendChild(admActButton('edit', 'edit', 'Edit login details'));
-        wrap.appendChild(dormant
-            ? admActButton('reactivate', 'play_circle', 'Reactivate account')
-            : admActButton('dormant', 'bedtime', 'Make dormant'));
-        wrap.appendChild(admActButton('delete', 'delete', 'Delete account', 'adm-act--danger'));
-        td.appendChild(wrap);
-        return td;
+
+        function renderPager(d) {
+            if (!d.total) { pg.hidden = true; return; }
+            pg.hidden = false;
+            const start = (d.page - 1) * d.per_page + 1;
+            const end = Math.min(d.page * d.per_page, d.total);
+            infoEl.textContent = 'Showing ' + start.toLocaleString() + '\u2013' + end.toLocaleString() + ' of ' + d.total.toLocaleString() +
+                (d.capped ? ' most recent \u2014 narrow the filters or Export for older activity' : '');
+            ctlEl.hidden = d.pages <= 1;
+            prevBtn.disabled = d.page <= 1;
+            nextBtn.disabled = d.page >= d.pages;
+            numsEl.textContent = '';
+            pageList(d.pages, d.page).forEach(function (n) {
+                if (n === 'gap') { numsEl.appendChild(admEl('span', 'act-pager-gap', '\u2026')); return; }
+                const btn = admEl('button', 'act-pager-btn' + (n === d.page ? ' is-active' : ''), String(n));
+                btn.type = 'button';
+                btn.setAttribute('data-page', String(n));
+                btn.setAttribute('aria-label', 'Page ' + n);
+                if (n === d.page) btn.setAttribute('aria-current', 'page');
+                numsEl.appendChild(btn);
+            });
+        }
+
+        function fetchPage(scroll, showLoading) {
+            const p = cfg.params();
+            const myToken = ++token;
+            lastKey = '';
+            lastList = null;
+            if (showLoading !== false) message('hourglass_top', 'Loading activity\u2026');
+            const url = ADM_ACTIVITY_API + '?actor=' + encodeURIComponent(p.actor) +
+                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range) + '&page=' + page;
+            fetch(url, { credentials: 'same-origin' })
+                .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { ok: res.ok, data: j }; }); })
+                .then(function (r) {
+                    if (myToken !== token) return; // the user moved on
+                    if (!r.ok || r.data.status !== 'success') {
+                        pg.hidden = true;
+                        message('error', (r.data && r.data.message) || 'Something went wrong. Please try again.', true);
+                        return;
+                    }
+                    const d = r.data;
+                    page = d.page; // the server clamps out-of-range pages
+                    cfg.feed.textContent = '';
+                    if (cfg.onTotals && d.totals && typeof d.totals.all === 'number') cfg.onTotals(d.totals.all);
+                    if (!d.items.length) {
+                        pg.hidden = true;
+                        message('history', p.filter === 'all' ? 'No activity for this selection yet.' : 'Nothing here for this filter yet.');
+                        return;
+                    }
+                    appendEvents(d.items);
+                    renderPager(d);
+                    if (scroll && cfg.feed.getBoundingClientRect().top < 0) cfg.feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                })
+                .catch(function () {
+                    if (myToken !== token) return;
+                    pg.hidden = true;
+                    message('wifi_off', 'Couldn\u2019t load activity. Check your connection.', true);
+                });
+        }
+
+        function go(n) { page = n; fetchPage(true); }
+
+        prevBtn.addEventListener('click', function () { go(page - 1); });
+        nextBtn.addEventListener('click', function () { go(page + 1); });
+        numsEl.addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-page]');
+            if (btn) go(parseInt(btn.getAttribute('data-page'), 10) || 1);
+        });
+
+        /* load(true) = filters changed → back to page 1 */
+        function load(resetPage, showLoading) {
+            if (resetPage) page = 1;
+            fetchPage(false, showLoading);
+        }
+
+        return { load: load };
     }
 
-    /* A brand-new row (Add Admin form) — same cells as the PHP-rendered rows */
-    function admBuildRow(id, fullName, email, role) {
-        const tr = admEl('tr', 'adm-account-row');
-        tr.setAttribute('data-id', String(id || ''));
-        tr.setAttribute('data-name', fullName);
-        tr.setAttribute('data-email', email);
-        tr.appendChild(admEl('td', 'td-fw', fullName));
-        tr.appendChild(admEl('td', 'adm-td-email', email));
-        const roleTd = admEl('td');
-        roleTd.appendChild(admEl('span', 'adm-role-badge ' + (role === 'Super Admin' ? 'adm-role-super' : 'adm-role-admin'), role));
-        tr.appendChild(roleTd);
-        tr.appendChild(admStatusCell(null));
-        tr.appendChild(admEl('td', 'td-sm', new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })));
-        tr.appendChild(admActionsCell(role === 'Admin' && !!id, false));
-        return tr;
-    }
-
-    (function initManageAdmins() {
-        const tbody = document.getElementById('admAccountsTbody');
+    (function initAdminAccountsPanel() {
+        const list = document.getElementById('am-list');
         const editModal = document.getElementById('admEditModal');
-        if (!tbody || !editModal) return; // not a Super Admin — nothing rendered
+        if (!list || !editModal) return; // not a Super Admin — nothing rendered
 
-        const dormantModal = document.getElementById('admDormantModal');
+        const addModal = document.getElementById('amAddModal');
+        const dormantModal = document.getElementById('admDormantModal'); // the "Lock account" dialog
         const deleteModal = document.getElementById('admDeleteModal');
-        let currentRow = null;
+        const detail = document.getElementById('am-detail');
+        const detailBody = document.getElementById('am-detail-body');
+        const detailEmpty = document.getElementById('am-detail-empty');
+        const feed = document.getElementById('am-feed');
+        const pager = document.getElementById('am-pager');
+        const listEmpty = document.getElementById('am-list-empty');
+        const addBtn = document.getElementById('am-add-btn');
+
+        let current = null;   // the selected .am-item
         let busy = false;
+        let filter = 'all';
+
+        const items = function () { return Array.from(list.querySelectorAll('.am-item')); };
 
         /* ── modal plumbing ───────────────────────────────────── */
         function openModal(m) { m.classList.add('ps-modal-open'); }
-        function closeModal(m) { m.classList.remove('ps-modal-open'); currentRow = null; busy = false; }
+        function closeModal(m) { m.classList.remove('ps-modal-open'); busy = false; }
 
         function showAlert(id, msg) {
             const el = document.getElementById(id);
@@ -2194,15 +2220,12 @@
         });
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
-            [editModal, dormantModal, deleteModal].forEach(function (m) {
+            [addModal, editModal, dormantModal, deleteModal].forEach(function (m) {
                 if (m && m.classList.contains('ps-modal-open')) closeModal(m);
             });
         });
 
-        /* Password show/hide in these dialogs is handled by the shared ".fac-pw-toggle"
-           handler (it supports comma-separated targets), so nothing to bind here. */
-
-        /* ── one POST helper for every action ─────────────────── */
+        /* One POST helper for edit / lock / unlock / delete */
         function call(fields) {
             const fd = new FormData();
             Object.keys(fields).forEach(function (k) { fd.append(k, fields[k]); });
@@ -2222,44 +2245,312 @@
             if (html !== undefined) btn.innerHTML = html;
         }
 
-        /* ── row helpers ──────────────────────────────────────── */
-        function setRowDormant(tr, until) {
-            const oldStatus = tr.querySelector('.adm-td-status');
-            const oldActions = tr.querySelector('.adm-td-actions');
-            oldStatus.replaceWith(admStatusCell(until || null));
-            oldActions.replaceWith(admActionsCell(true, !!until));
+        /* ── seats (header counter + Add button) ──────────────── */
+        /* The Activity page's "Who" list mirrors the admin accounts, so changes here show up there at once. */
+        function syncActorOption(id, name) {
+            const sel = document.getElementById('act-actor');
+            if (!sel || !id) return;
+            let opt = Array.from(sel.options).find(function (o) { return o.value === String(id); });
+            if (name === null) { if (opt) opt.remove(); return; }
+            if (!opt) { opt = document.createElement('option'); opt.value = String(id); sel.appendChild(opt); }
+            opt.textContent = name;
         }
 
-        /* ── click delegation on the table ────────────────────── */
-        tbody.addEventListener('click', function (e) {
-            const btn = e.target.closest('[data-adm-action]');
-            if (!btn || busy) return;
-            const tr = btn.closest('tr.adm-account-row');
-            if (!tr) return;
-            currentRow = tr;
-            const action = btn.getAttribute('data-adm-action');
+        function updateSeats(count, remaining) {
+            const text = document.getElementById('am-seats-text');
+            if (text) {
+                text.textContent = '';
+                text.appendChild(admEl('strong', '', count + ' of 5'));
+                text.appendChild(document.createTextNode(' seats used'));
+            }
+            if (addBtn) {
+                addBtn.disabled = remaining <= 0;
+                if (remaining <= 0) addBtn.title = 'All 5 seats are in use. Delete an account to free one.';
+                else addBtn.removeAttribute('title');
+            }
+        }
 
-            if (action === 'edit') openEdit(tr);
-            else if (action === 'dormant') openDormant(tr);
-            else if (action === 'delete') openDelete(tr);
-            else if (action === 'reactivate') doReactivate(tr, btn);
+        /* ── list ─────────────────────────────────────────────── */
+        function initials(name) {
+            const parts = String(name || '').trim().split(/\s+/);
+            let out = (parts[0] || '?').charAt(0).toUpperCase();
+            if (parts.length > 1) out += parts[parts.length - 1].charAt(0).toUpperCase();
+            return out;
+        }
+
+        function buildItem(a) {
+            const b = admEl('button', 'am-item');
+            b.type = 'button';
+            b.setAttribute('role', 'option');
+            b.setAttribute('aria-selected', 'false');
+            b.setAttribute('data-id', String(a.id || ''));
+            b.setAttribute('data-name', a.name);
+            b.setAttribute('data-email', a.email);
+            b.setAttribute('data-role', a.role);
+            b.setAttribute('data-created', a.created || '');
+            b.setAttribute('data-last-login', '');
+            b.setAttribute('data-locked-until', '0');
+            b.setAttribute('data-you', '0');
+            b.setAttribute('data-manage', a.role === 'Admin' ? '1' : '0');
+            b.appendChild(admEl('span', 'am-avatar', initials(a.name)));
+            const main = admEl('span', 'am-item-main');
+            main.appendChild(admEl('span', 'am-item-name', a.name));
+            main.appendChild(admEl('span', 'am-item-email', a.email));
+            b.appendChild(main);
+            const lock = admEl('span', 'material-symbols-outlined am-item-lock', 'lock');
+            lock.hidden = true;
+            lock.title = 'Locked';
+            b.appendChild(lock);
+            return b;
+        }
+
+        function syncItemLock(item) {
+            const lock = item.querySelector('.am-item-lock');
+            if (lock) lock.hidden = !(parseInt(item.getAttribute('data-locked-until'), 10) > 0);
+        }
+
+        function refreshListEmpty() {
+            const visible = items().filter(function (i) { return !i.hidden; }).length;
+            listEmpty.hidden = visible > 0;
+            listEmpty.textContent = items().length ? 'No admins match your search.' : 'No accounts found.';
+        }
+
+        document.getElementById('am-search').addEventListener('input', function () {
+            const q = this.value.trim().toLowerCase();
+            items().forEach(function (i) {
+                const hay = (i.getAttribute('data-name') + ' ' + i.getAttribute('data-email')).toLowerCase();
+                i.hidden = q !== '' && hay.indexOf(q) === -1;
+            });
+            refreshListEmpty();
+        });
+
+        list.addEventListener('click', function (e) {
+            const item = e.target.closest('.am-item');
+            if (item) select(item, true);
+        });
+
+        /* ↑ / ↓ move through the list */
+        list.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            const shown = items().filter(function (i) { return !i.hidden; });
+            const idx = shown.indexOf(document.activeElement);
+            if (idx === -1) return;
+            const next = shown[idx + (e.key === 'ArrowDown' ? 1 : -1)];
+            if (next) { e.preventDefault(); next.focus(); select(next, false); }
+        });
+
+        /* ── detail ───────────────────────────────────────────── */
+        function setTag(el, text, kind, icon) {
+            el.className = 'am-tag' + (kind ? ' am-tag--' + kind : '');
+            el.textContent = '';
+            if (icon) el.appendChild(admIcon(icon));
+            el.appendChild(document.createTextNode(text));
+        }
+
+        function renderDetail(item) {
+            const name = item.getAttribute('data-name');
+            const role = item.getAttribute('data-role');
+            const until = parseInt(item.getAttribute('data-locked-until'), 10) || 0;
+            const you = item.getAttribute('data-you') === '1';
+            const manage = item.getAttribute('data-manage') === '1';
+
+            document.getElementById('am-d-avatar').textContent = initials(name);
+            document.getElementById('am-d-name').textContent = name;
+            document.getElementById('am-d-email').textContent = item.getAttribute('data-email');
+            setTag(document.getElementById('am-d-role'), role, role === 'Super Admin' ? 'super' : '');
+            if (until) setTag(document.getElementById('am-d-status'), 'Locked until ' + admShortDate(until), 'locked', 'lock');
+            else setTag(document.getElementById('am-d-status'), 'Active', 'active');
+
+            document.getElementById('am-f-login').textContent = item.getAttribute('data-last-login') || 'Never';
+            document.getElementById('am-f-created').textContent = item.getAttribute('data-created') || '—';
+            document.getElementById('am-f-total').textContent = '—';
+
+            const actions = document.getElementById('am-d-actions');
+            const note = document.getElementById('am-d-note');
+            actions.hidden = !manage;
+            note.hidden = manage;
+            if (!manage) {
+                document.getElementById('am-d-note-text').textContent = you
+                    ? 'This is your account. Change your own details from Settings → My Account.'
+                    : 'Super Admin accounts are protected and can\u2019t be edited, locked or deleted here.';
+            }
+            document.getElementById('am-lock-icon').textContent = until ? 'lock_open' : 'lock';
+            document.getElementById('am-lock-label').textContent = until ? 'Unlock' : 'Lock';
+        }
+
+        function select(item, scrollOnMobile) {
+            items().forEach(function (i) {
+                const on = i === item;
+                i.classList.toggle('is-selected', on);
+                i.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            current = item;
+            detailEmpty.hidden = true;
+            detailBody.hidden = false;
+            renderDetail(item);
+            resetFeedFilter();
+            adminFeed.load(true);
+            if (scrollOnMobile && window.matchMedia('(max-width: 900px)').matches) {
+                detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function clearSelection() {
+            current = null;
+            items().forEach(function (i) { i.classList.remove('is-selected'); i.setAttribute('aria-selected', 'false'); });
+            detailBody.hidden = true;
+            detailEmpty.hidden = false;
+        }
+
+        /* Open the panel with someone already showing (first manageable admin, else the first row). */
+        function ensureSelected() {
+            if (current && document.body.contains(current)) return;
+            const all = items();
+            if (!all.length) return;
+            const first = all.find(function (i) { return i.getAttribute('data-manage') === '1'; }) || all[0];
+            select(first, false);
+        }
+
+        const navAdmins = document.querySelector('.nav-item[data-tab="admins"]');
+        if (navAdmins) navAdmins.addEventListener('click', ensureSelected);
+        if (document.getElementById('panel-admins').classList.contains('active')) ensureSelected();
+        window.psAdminsPanelReady = ensureSelected; // lets ?view=admins open it with someone selected
+
+        /* ── activity timeline (shared renderer) ──────────────── */
+        const adminFeed = createActivityFeed({
+            feed: feed,
+            pager: pager,
+            showActor: false, // the whole timeline belongs to the selected admin
+            params: function () {
+                return { actor: current ? current.getAttribute('data-id') : '0', filter: filter, range: 'all' };
+            },
+            onTotals: function (n) { document.getElementById('am-f-total').textContent = String(n); }
+        });
+
+        function resetFeedFilter() {
+            filter = 'all';
+            document.querySelectorAll('#am-chips .act-chip').forEach(function (c) {
+                c.classList.toggle('active', c.getAttribute('data-filter') === 'all');
+            });
+        }
+
+        document.getElementById('am-chips').addEventListener('click', function (e) {
+            const chip = e.target.closest('.act-chip');
+            if (!chip || !current) return;
+            filter = chip.getAttribute('data-filter');
+            document.querySelectorAll('#am-chips .act-chip').forEach(function (c) { c.classList.toggle('active', c === chip); });
+            adminFeed.load(true, false);
+        });
+
+        document.getElementById('am-open-activity').addEventListener('click', function () {
+            if (current && typeof window.psActivityOpen === 'function') window.psActivityOpen({ actor: current.getAttribute('data-id') });
+        });
+
+        /* ── actions on the selected admin ────────────────────── */
+        document.getElementById('am-d-actions').addEventListener('click', function (e) {
+            const btn = e.target.closest('[data-am-action]');
+            if (!btn || busy || !current) return;
+            const action = btn.getAttribute('data-am-action');
+            if (action === 'edit') openEdit(current);
+            else if (action === 'delete') openDelete(current);
+            else if (action === 'lock') {
+                if (parseInt(current.getAttribute('data-locked-until'), 10) > 0) doUnlock(current, btn);
+                else openLock(current);
+            }
+        });
+
+        function setLocked(item, until) {
+            item.setAttribute('data-locked-until', String(until || 0));
+            syncItemLock(item);
+            if (item === current) renderDetail(item);
+        }
+
+        /* ── ADD ──────────────────────────────────────────────── */
+        const submitBtn = document.getElementById('adm-submit-btn');
+
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                if (addBtn.disabled) return;
+                clearAlert('adm-form-alert');
+                ['adm-fullname', 'adm-email'].forEach(function (id) { document.getElementById(id).value = ''; });
+                document.getElementById('adm-role').value = 'Admin';
+                resetPasswordFields(['adm-password', 'adm-confirm'], addModal);
+                openModal(addModal);
+                document.getElementById('adm-fullname').focus();
+            });
+        }
+
+        submitBtn.addEventListener('click', function () {
+            if (busy) return;
+            clearAlert('adm-form-alert');
+
+            const fullName = document.getElementById('adm-fullname').value.trim();
+            const email = document.getElementById('adm-email').value.trim().toLowerCase();
+            const role = document.getElementById('adm-role').value || 'Admin';
+            const password = document.getElementById('adm-password').value;
+            const confirm = document.getElementById('adm-confirm').value;
+
+            /* Client-side pre-flight (mirrors the server checks) */
+            if (!fullName) return showAlert('adm-form-alert', 'Full name is required.');
+            if (!email) return showAlert('adm-form-alert', 'Admin email is required.');
+            if (!email.endsWith('@admin.edu')) return showAlert('adm-form-alert', 'Admin emails must end in @admin.edu (e.g. name@admin.edu).');
+            if (!password) return showAlert('adm-form-alert', 'Password is required.');
+            if (password.length < 8) return showAlert('adm-form-alert', 'Password must be at least 8 characters.');
+            if (password !== confirm) return showAlert('adm-form-alert', 'Passwords do not match.');
+
+            busy = true;
+            const orig = submitBtn.innerHTML;
+            setBusy(submitBtn, true, '<span class="material-symbols-outlined">hourglass_top</span> Creating…');
+
+            const fd = new FormData();
+            fd.append('csrf_token', getCsrfToken());
+            fd.append('full_name', fullName);
+            fd.append('email', email);
+            fd.append('role', role);
+            fd.append('password', password);
+            fd.append('confirm_password', confirm);
+
+            fetch(ADM_CREATE_API, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    busy = false;
+                    setBusy(submitBtn, false, orig);
+                    if (data.status !== 'success') {
+                        return showAlert('adm-form-alert', data.message || 'Something went wrong. Please try again.');
+                    }
+                    const item = buildItem({
+                        id: data.id, name: fullName, email: email, role: role,
+                        created: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: ADM_TZ })
+                    });
+                    list.insertBefore(item, listEmpty);
+                    syncActorOption(data.id, fullName);
+                    refreshListEmpty();
+                    if (typeof data.accounts_remaining === 'number') updateSeats(5 - data.accounts_remaining, data.accounts_remaining);
+                    closeModal(addModal);
+                    showToast('✅ ' + data.message);
+                    select(item, true);
+                })
+                .catch(function () {
+                    busy = false;
+                    setBusy(submitBtn, false, orig);
+                    showAlert('adm-form-alert', 'Network error — please check your connection and try again.');
+                });
         });
 
         /* ── EDIT ─────────────────────────────────────────────── */
-        function openEdit(tr) {
+        function openEdit(item) {
             clearAlert('adm-edit-alert');
-            document.getElementById('adm-edit-name').value = tr.getAttribute('data-name') || '';
-            document.getElementById('adm-edit-email').value = tr.getAttribute('data-email') || '';
+            document.getElementById('adm-edit-name').value = item.getAttribute('data-name') || '';
+            document.getElementById('adm-edit-email').value = item.getAttribute('data-email') || '';
             resetPasswordFields(['adm-edit-pw', 'adm-edit-pw2', 'adm-edit-reauth'], editModal);
             openModal(editModal);
-            currentRow = tr;
             document.getElementById('adm-edit-name').focus();
         }
 
         document.getElementById('adm-edit-save').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const name = document.getElementById('adm-edit-name').value.trim();
             const email = document.getElementById('adm-edit-email').value.trim().toLowerCase();
             const pw = document.getElementById('adm-edit-pw').value;
@@ -2277,7 +2568,7 @@
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
             call({
-                action: 'update', id: tr.getAttribute('data-id'),
+                action: 'update', id: item.getAttribute('data-id'),
                 full_name: name, email: email,
                 new_password: pw, confirm_password: pw2, current_password: reauth
             }).then(function (r) {
@@ -2287,11 +2578,13 @@
                     document.getElementById('adm-edit-reauth').value = '';
                     return showAlert('adm-edit-alert', msgOf(r));
                 }
-                tr.setAttribute('data-name', r.data.full_name);
-                tr.setAttribute('data-email', r.data.email);
-                const nameCell = tr.querySelector('td.td-fw');
-                nameCell.firstChild.textContent = r.data.full_name + ' ';
-                tr.querySelector('.adm-td-email').textContent = r.data.email;
+                item.setAttribute('data-name', r.data.full_name);
+                item.setAttribute('data-email', r.data.email);
+                item.querySelector('.am-avatar').textContent = initials(r.data.full_name);
+                item.querySelector('.am-item-name').firstChild.textContent = r.data.full_name;
+                item.querySelector('.am-item-email').textContent = r.data.email;
+                syncActorOption(item.getAttribute('data-id'), r.data.full_name);
+                if (item === current) renderDetail(item);
                 closeModal(editModal);
                 showToast(r.data.signed_out ? 'Saved. They have been signed out everywhere.' : 'Admin details saved.', 'success');
             }).catch(function () {
@@ -2301,7 +2594,7 @@
             });
         });
 
-        /* ── DORMANT ──────────────────────────────────────────── */
+        /* ── LOCK ─────────────────────────────────────────────── */
         const customWrap = document.getElementById('adm-custom-days');
         const customInput = document.getElementById('adm-dormant-custom');
         const untilText = document.getElementById('adm-dormant-until-text');
@@ -2320,7 +2613,7 @@
             customWrap.hidden = !(chosen && chosen.value === 'custom');
             const n = selectedDays();
             untilText.textContent = n
-                ? 'Dormant until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
+                ? 'Locked until ' + admLongDate(Math.floor(Date.now() / 1000) + n * 86400)
                 : 'Pick 1 to ' + ADM_MAX_DAYS + ' days (maximum ' + ADM_MAX_DAYS + ').';
         }
 
@@ -2332,21 +2625,20 @@
         });
         customInput.addEventListener('input', refreshUntil);
 
-        function openDormant(tr) {
+        function openLock(item) {
             clearAlert('adm-dormant-alert');
-            document.getElementById('adm-dormant-name').textContent = tr.getAttribute('data-name') || 'This admin';
+            document.getElementById('adm-dormant-name').textContent = item.getAttribute('data-name') || 'This admin';
             const def = document.querySelector('input[name="adm-dormant-days"][value="7"]');
             if (def) def.checked = true;
             customInput.value = '';
             refreshUntil();
             openModal(dormantModal);
-            currentRow = tr;
         }
 
         document.getElementById('adm-dormant-save').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const days = selectedDays();
             clearAlert('adm-dormant-alert');
             if (!days) return showAlert('adm-dormant-alert', 'Choose between 1 and ' + ADM_MAX_DAYS + ' days.');
@@ -2354,11 +2646,11 @@
             busy = true;
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Saving…');
-            call({ action: 'dormant', id: tr.getAttribute('data-id'), days: days }).then(function (r) {
+            call({ action: 'dormant', id: item.getAttribute('data-id'), days: days }).then(function (r) {
                 busy = false;
                 setBusy(btn, false, orig);
                 if (!r.ok || r.data.status !== 'success') return showAlert('adm-dormant-alert', msgOf(r));
-                setRowDormant(tr, r.data.dormant_until);
+                setLocked(item, r.data.dormant_until);
                 closeModal(dormantModal);
                 showToast(r.data.message, 'success');
             }).catch(function () {
@@ -2368,18 +2660,16 @@
             });
         });
 
-        /* ── REACTIVATE (reversible, so no confirmation dialog) ── */
-        function doReactivate(tr, btn) {
+        /* ── UNLOCK (reversible, so no confirmation dialog) ───── */
+        function doUnlock(item, btn) {
             busy = true;
             btn.disabled = true;
-            call({ action: 'reactivate', id: tr.getAttribute('data-id') }).then(function (r) {
+            call({ action: 'reactivate', id: item.getAttribute('data-id') }).then(function (r) {
                 busy = false;
-                if (!r.ok || r.data.status !== 'success') {
-                    btn.disabled = false;
-                    return showToast(msgOf(r), 'error');
-                }
-                setRowDormant(tr, null);
-                showToast('Account reactivated.', 'success');
+                btn.disabled = false;
+                if (!r.ok || r.data.status !== 'success') return showToast(msgOf(r), 'error');
+                setLocked(item, 0);
+                showToast('Account unlocked.', 'success');
             }).catch(function () {
                 busy = false;
                 btn.disabled = false;
@@ -2388,19 +2678,18 @@
         }
 
         /* ── DELETE ───────────────────────────────────────────── */
-        function openDelete(tr) {
+        function openDelete(item) {
             clearAlert('adm-delete-alert');
-            document.getElementById('adm-delete-name').textContent = tr.getAttribute('data-name') || 'this admin';
+            document.getElementById('adm-delete-name').textContent = item.getAttribute('data-name') || 'this admin';
             resetPasswordFields(['adm-delete-reauth'], deleteModal);
             openModal(deleteModal);
-            currentRow = tr;
             document.getElementById('adm-delete-reauth').focus();
         }
 
         document.getElementById('adm-delete-confirm').addEventListener('click', function () {
-            if (busy || !currentRow) return;
+            if (busy || !current) return;
             const btn = this;
-            const tr = currentRow;
+            const item = current;
             const reauth = document.getElementById('adm-delete-reauth').value;
             clearAlert('adm-delete-alert');
             if (!reauth) return showAlert('adm-delete-alert', 'Enter your own password to confirm.');
@@ -2408,18 +2697,23 @@
             busy = true;
             const orig = btn.innerHTML;
             setBusy(btn, true, '<span class="material-symbols-outlined">hourglass_top</span> Deleting…');
-            call({ action: 'delete', id: tr.getAttribute('data-id'), current_password: reauth }).then(function (r) {
+            call({ action: 'delete', id: item.getAttribute('data-id'), current_password: reauth }).then(function (r) {
                 busy = false;
                 setBusy(btn, false, orig);
                 if (!r.ok || r.data.status !== 'success') {
                     document.getElementById('adm-delete-reauth').value = '';
                     return showAlert('adm-delete-alert', msgOf(r));
                 }
-                tr.remove();
-                if (typeof r.data.accounts_count === 'number') {
-                    admUpdateSeats(r.data.accounts_count, r.data.accounts_remaining);
-                }
+                const all = items();
+                const pos = all.indexOf(item);
+                syncActorOption(item.getAttribute('data-id'), null);
+                item.remove();
+                if (typeof r.data.accounts_count === 'number') updateSeats(r.data.accounts_count, r.data.accounts_remaining);
                 closeModal(deleteModal);
+                refreshListEmpty();
+                const left = items();
+                if (left.length) select(left[Math.min(pos, left.length - 1)], false);
+                else clearSelection();
                 showToast('Admin account deleted. A seat is free for a new admin.', 'success');
             }).catch(function () {
                 busy = false;
@@ -2428,7 +2722,87 @@
             });
         });
     })();
-    /* ▲ MANAGE-ADMINS-END ───────────────────────────────────────────────── */
+    /* ▲ ADMIN-ACCOUNTS-PANEL-END ───────────────────────────────────────────── */
+
+    /* ▼ ACTIVITY-PAGE-BEGIN ──────────────────────────────────────────────────
+       Sidebar → Activity (every admin). Filter chips (type) + Who + When,
+       all served by api/admin-activity.php. */
+    (function initActivityPage() {
+        const feedEl = document.getElementById('act-feed');
+        const panel = document.getElementById('panel-activity');
+        if (!feedEl || !panel) return;
+
+        const actorSel = document.getElementById('act-actor');
+        const rangeSel = document.getElementById('act-range');
+        const chipsEl = document.getElementById('act-chips');
+        let filter = 'all';
+        let loaded = false;
+
+        const feed = createActivityFeed({
+            feed: feedEl,
+            pager: document.getElementById('act-pager'),
+            showActor: true,
+            params: function () { return { actor: actorSel.value, filter: filter, range: rangeSel.value }; }
+        });
+
+        function setChip(value) {
+            filter = value;
+            chipsEl.querySelectorAll('.act-chip').forEach(function (c) {
+                c.classList.toggle('active', c.getAttribute('data-filter') === value);
+            });
+        }
+
+        chipsEl.addEventListener('click', function (e) {
+            const chip = e.target.closest('.act-chip');
+            if (!chip) return;
+            setChip(chip.getAttribute('data-filter'));
+            feed.load(true, false);
+        });
+        actorSel.addEventListener('change', function () { feed.load(true); });
+        rangeSel.addEventListener('change', function () { feed.load(true); });
+
+        function ensureLoaded() {
+            if (loaded) return;
+            loaded = true;
+            feed.load(true);
+        }
+
+        const nav = document.querySelector('.nav-item[data-tab="activity"]');
+        if (nav) nav.addEventListener('click', ensureLoaded);
+        if (panel.classList.contains('active')) ensureLoaded();
+        window.psActivityReady = ensureLoaded; // lets ?view=activity open it with data
+
+        /* Open Activity with a preset — used by the Admins panel, Borrowing Rules and My Account.
+           opts: { actor: 'all' | 'auto' | 'me' | <admin id>, filter: chip key, range: today | 7d | 30d | all } */
+        window.psActivityOpen = function (opts) {
+            opts = opts || {};
+            const actor = opts.actor ? String(opts.actor) : 'all';
+            actorSel.value = Array.from(actorSel.options).some(function (o) { return o.value === actor; }) ? actor : 'all';
+            rangeSel.value = opts.range || 'all';
+            setChip(opts.filter || 'all');
+            loaded = true;
+            if (nav) nav.click();
+            feed.load(true, false);
+        };
+
+        /* Links elsewhere in the portal: <button data-act-open="auto|me"> */
+        document.addEventListener('click', function (e) {
+            const link = e.target.closest('[data-act-open]');
+            if (!link) return;
+            const which = link.getAttribute('data-act-open');
+            if (which === 'auto') window.psActivityOpen({ actor: 'auto', filter: 'requests', range: '30d' });
+            else if (which === 'me') window.psActivityOpen({ actor: 'me', range: '30d' });
+        });
+
+        /* Export exactly what the filters are showing (the server applies the same visibility rules). */
+        document.getElementById('act-export').addEventListener('click', function () {
+            const p = { actor: actorSel.value, filter: filter, range: rangeSel.value };
+            window.location.href = ADM_ACTIVITY_API + '?format=csv&actor=' + encodeURIComponent(p.actor) +
+                '&filter=' + encodeURIComponent(p.filter) + '&range=' + encodeURIComponent(p.range);
+        });
+    })();
+    /* ▲ ACTIVITY-PAGE-END ───────────────────────────────────────────────────── */
+
 
     /* ── Admin Cancel Reservation Modal ─────────────────────── */
     function openAdminCancelRrModal(rrId, roomName, facultyName) {
@@ -2493,7 +2867,7 @@
                     }
                     closeAdminCancelRrModal();
                     showToast('Reservation cancelled. Faculty and waitlist notified.');
-                    setTimeout(() => location.reload(), 1200);
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                 })
                 .catch(() => {
                     this.disabled = false;
@@ -2566,7 +2940,7 @@
                 }
                 closeIssueReviewModal();
                 showToast('Issue report ' + resolution.toLowerCase() + '.');
-                setTimeout(() => location.reload(), 1200);
+                if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
             })
             .catch(() => {
                 document.getElementById('resolveIssueBtn').disabled = false;
@@ -2761,10 +3135,26 @@
 
     /* ── Handle URL view param on load ──────────────────────── */
     function initView() {
+        // Hard-refresh flag: Ctrl+Shift+R / Ctrl+F5 sets this before the page unloads.
+        // On load we honour it by skipping hash restore, effectively landing on Dashboard.
+        try {
+            if (sessionStorage.getItem('adminHardRefresh') === '1') {
+                sessionStorage.removeItem('adminHardRefresh');
+                history.replaceState({ tab: 'dashboard' }, '');
+                return; // leave the default dashboard panel active
+            }
+        } catch (_) { }
+
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
         const editItem = params.get('edit_item');
 
+        // ── Hash-based restore (F5 / normal reload) ───────────────────────
+        const hash = window.location.hash; // e.g. '#tab-inventory'
+        const hashTab = hash.startsWith('#tab-') ? hash.slice(5) : null;
+
+        // URL params take priority over hash (they come from PHP redirects/links
+        // and carry more context, e.g. edit_item). Hash is the F5 restore path.
         if (editItem) {
             _switchTabDOM('inventory', false);
             _enterEditMode();
@@ -2775,6 +3165,14 @@
         } else if (view === 'faculty') {
             _switchTabDOM('faculty');
             history.replaceState({ tab: 'faculty' }, '');
+        } else if (view === 'activity') {
+            _switchTabDOM('activity');
+            if (typeof window.psActivityReady === 'function') window.psActivityReady();
+            history.replaceState({ tab: 'activity' }, '');
+        } else if (view === 'admins') {
+            _switchTabDOM('admins');
+            if (typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+            history.replaceState({ tab: 'admins' }, '');
         } else {
             // Check for rooms tab param
             const tab = params.get('tab');
@@ -2794,6 +3192,12 @@
                     switchRoomsTab('rooms-archived');
                 }
                 history.replaceState({ tab: 'rooms' }, '');
+            } else if (hashTab && hashTab !== 'dashboard') {
+                // Hash restore: covers rooms, inventory, faculty, activity, admins, settings, lending, requests, etc.
+                _switchTabDOM(hashTab, false);
+                if (hashTab === 'activity' && typeof window.psActivityReady === 'function') window.psActivityReady();
+                if (hashTab === 'admins' && typeof window.psAdminsPanelReady === 'function') window.psAdminsPanelReady();
+                history.replaceState({ tab: hashTab }, '');
             } else {
                 history.replaceState({ tab: 'dashboard' }, '');
             }
@@ -2815,6 +3219,21 @@
 
     /* ── Init ────────────────────────────────────────────────── */
     function init() {
+        // Expose helpers for inline AJAX scripts in admin-dashboard.php
+        window._setupInventoryListFn = setupInventoryList;
+        window._exitEditModeFn = _exitEditMode;
+
+        // Hard-refresh detection: set flag on Ctrl+Shift+R / Ctrl+F5 so initView
+        // can skip hash restore and land on Dashboard (mimics a true fresh load).
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && (
+                (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
+                e.key === 'F5'
+            )) {
+                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) { }
+            }
+        });
+
         restoreState();
 
         initView();
@@ -2851,23 +3270,35 @@
         setupInventoryList(); // client-side search + 10-per-page pagination — see note near its definition
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
-        // ── Arbitration log search (server-side, reload with query param) ──
+        // ── Arbitration log search (client-side filter) ──────────────────
         const arbLogSearchInput = document.getElementById('arbLogSearch');
         if (arbLogSearchInput) {
+            // Client-side filter — avoids a full page reload for every keystroke.
             let arbLogTimer;
             arbLogSearchInput.addEventListener('keyup', function () {
                 clearTimeout(arbLogTimer);
-                const q = this.value.trim();
-                arbLogTimer = setTimeout(() => {
+                const q = this.value.trim().toLowerCase();
+                arbLogTimer = setTimeout(function () {
+                    const tbody = document.getElementById('arb-log-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(function (row) {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = (q === '' || text.includes(q)) ? '' : 'none';
+                    });
+                    // Update URL param silently so a refresh re-applies the filter.
                     const url = new URL(window.location.href);
-                    url.searchParams.set('arb_log_search', q);
-                    window.location.href = url.toString();
-                }, 600);
+                    if (q) { url.searchParams.set('arb_log_search', q); }
+                    else { url.searchParams.delete('arb_log_search'); }
+                    history.replaceState(history.state, '', url.toString());
+                }, 300);
             });
-            // Pre-fill from URL param
-            const urlParams = new URLSearchParams(window.location.search);
-            const existingSearch = urlParams.get('arb_log_search');
-            if (existingSearch) arbLogSearchInput.value = existingSearch;
+            // Pre-fill from URL param and apply immediately
+            const urlParams2 = new URLSearchParams(window.location.search);
+            const existingSearch = urlParams2.get('arb_log_search');
+            if (existingSearch) {
+                arbLogSearchInput.value = existingSearch;
+                arbLogSearchInput.dispatchEvent(new Event('keyup'));
+            }
         }
 
         // ── Save Arbitration Config ───────────────────────────────────────
@@ -3245,7 +3676,7 @@
                         psCloseModal('ps-approve-modal');
                         psCloseModal('ps-decline-modal');
                         psCloseModal('ps-req-detail-modal');
-                        setTimeout(function () { location.reload(); }, 900);
+                        if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
                         btn.disabled = false;
@@ -3575,33 +4006,6 @@ document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
    PHASE 3 — ARBITRATION + EXPORT HELPERS
 ════════════════════════════════════════════════════════════════ */
 
-/* Arbitration sub-tab switcher */
-(function () {
-    var arbTabs = document.getElementById('arbSubTabs');
-    if (!arbTabs) return;
-    arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            arbTabs.querySelectorAll('.rq-sub-tab').forEach(function (t) { t.classList.remove('active'); });
-            document.querySelectorAll('#sett-rules .arb-sub-panel').forEach(function (p) { p.classList.remove('active'); });
-            tab.classList.add('active');
-            var panel = document.getElementById(tab.dataset.arbPanel);
-            if (panel) panel.classList.add('active');
-        });
-    });
-
-    /* Decision log filter */
-    var filterSel = document.getElementById('arb-log-filter');
-    var logTable = document.getElementById('arb-log-new-table');
-    if (filterSel && logTable) {
-        filterSel.addEventListener('change', function () {
-            var val = filterSel.value;
-            logTable.querySelectorAll('tbody tr').forEach(function (row) {
-                row.style.display = (!val || (row.dataset.decision || '') === val) ? '' : 'none';
-            });
-        });
-    }
-})();
-
 /* Export format button selector */
 function psSelectFmt(btn) {
     var row = btn.closest('.ps-export-fmt-row');
@@ -3609,3 +4013,831 @@ function psSelectFmt(btn) {
     row.querySelectorAll('.ps-export-fmt-btn').forEach(function (b) { b.classList.remove('active'); });
     btn.classList.add('active');
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   APPROVALS — review drawer for the Waiting table
+   Additive block. Opens from the request ID in each row (and from the
+   notification deep link, which clicks the same ID element). Approve /
+   Decline in the drawer hand off to the EXISTING approve / decline
+   modals by clicking the row's own buttons, so the confirm flow and the
+   admin-override.php call are untouched.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    var drawer = document.getElementById('ps-appr-drawer');
+    if (!drawer) return;
+    var currentId = null;
+
+    function el(id) { return document.getElementById(id); }
+    function txt(id, v) {
+        var n = el(id);
+        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    function openFor(row) {
+        var d = row.dataset;
+        currentId = d.id;
+
+        txt('ps-appr-reqno', '#' + String(d.id || 0).padStart(4, '0'));
+        txt('ps-appr-submitted', d.submitted);
+        txt('ps-appr-who', d.borrower);
+        txt('ps-appr-type', d.reqType);
+        txt('ps-appr-idno', d.idNumber);
+        txt('ps-appr-item', d.equipment);
+        txt('ps-appr-qty', d.qty);
+        txt('ps-appr-needed', d.dateNeeded);
+        txt('ps-appr-return', d.returnDateDisplay);
+        txt('ps-appr-room', d.room);
+        txt('ps-appr-instr', d.instructor);
+        txt('ps-appr-note', d.note);
+
+        var hasDoc = !!d.docUrl;
+        var card = el('ps-appr-doc'), none = el('ps-appr-doc-none'), prev = el('ps-appr-doc-preview');
+        if (card) card.hidden = !hasDoc;
+        if (none) none.hidden = hasDoc;
+        if (prev) prev.hidden = true;
+
+        if (hasDoc) {
+            var kind = d.docKind || 'file';
+            var icon = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
+            var ext = (d.docName.split('.').pop() || '').toUpperCase();
+            txt('ps-appr-doc-name', d.docName);
+            txt('ps-appr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
+            el('ps-appr-doc-icon').textContent = icon;
+            el('ps-appr-doc-open').setAttribute('href', d.docOpenUrl);
+            var dl = el('ps-appr-doc-dl');
+            dl.setAttribute('href', d.docUrl);
+            dl.setAttribute('download', d.docName);
+            // Keep inline previews and downloads on the original file URL; the
+            // Open link uses the branded document viewer.
+            if (kind === 'image' && prev) {
+                el('ps-appr-doc-img').setAttribute('src', d.docUrl);
+                prev.hidden = false;
+            }
+        }
+        if (typeof psOpenModal === 'function') psOpenModal('ps-appr-drawer');
+    }
+
+    // Capture phase: runs before the generic data-action handler, so the ID
+    // inside the Waiting table opens this drawer instead of the old detail modal.
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"]');
+        if (!t) return;
+        var row = t.closest('tr.ps-req-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openFor(row);
+    }, true);
+
+    drawer.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-appr-decide]');
+        if (!b || !currentId) return;
+        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"]');
+        if (!row) return;
+        var sel = b.getAttribute('data-appr-decide') === 'approve'
+            ? '[data-modal="ps-approve-modal"]'
+            : '[data-modal="ps-decline-modal"]';
+        var btn = row.querySelector(sel);
+        if (!btn) return;
+        if (typeof psCloseModal === 'function') psCloseModal('ps-appr-drawer');
+        btn.click();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
+            psCloseModal('ps-appr-drawer');
+        }
+    });
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   ROOMS — reservation details drawer (Rooms > Reservations table)
+   Additive block. "Cancel reservation" in the drawer clicks the row's
+   own Cancel button, so the existing cancel modal + API are reused.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    var drawer = document.getElementById('ps-room-drawer');
+    if (!drawer) return;
+    var currentRow = null;
+
+    function el(id) { return document.getElementById(id); }
+    function txt(id, v) {
+        var n = el(id);
+        if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    function openFor(row) {
+        var d = row.dataset;
+        currentRow = row;
+        txt('ps-rr-no', '#' + d.rrId);
+        txt('ps-rr-submitted', d.submitted);
+        txt('ps-rr-room', d.room);
+        txt('ps-rr-where', d.where);
+        txt('ps-rr-date', d.date);
+        txt('ps-rr-time', d.time);
+        txt('ps-rr-attendees', d.attendees && d.attendees !== '0' ? d.attendees : '');
+        txt('ps-rr-purpose', d.purpose);
+        txt('ps-rr-who', d.whoSub && d.whoSub.indexOf('Student via') === 0 ? d.who + ' (' + d.whoSub + ')' : d.who);
+        txt('ps-rr-type', d.type);
+
+        var badge = el('ps-rr-status');
+        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned' };
+        badge.className = 'ps-badge ps-badge--dot ' + (cls[d.status] || 'ps-badge--returned');
+        badge.textContent = d.status;
+
+        var notes = [];
+        if (d.notes) notes.push(d.notes);
+        if (d.reason) notes.push((d.status === 'Declined' ? 'Declined: ' : d.status === 'Cancelled' ? 'Cancelled: ' : 'Reason: ') + d.reason);
+        txt('ps-rr-notes', notes.join('\n\n'));
+
+        var hasDoc = !!d.docUrl;
+        el('ps-rr-doc-sec').hidden = !hasDoc;
+        var prev = el('ps-rr-doc-preview');
+        if (prev) prev.hidden = true;
+        if (hasDoc) {
+            var kind = d.docKind || 'file';
+            var ext = (d.docName.split('.').pop() || '').toUpperCase();
+            txt('ps-rr-doc-name', d.docName);
+            txt('ps-rr-doc-kind', (kind === 'pdf' ? 'PDF document' : kind === 'image' ? 'Image' : 'File') + (ext ? ' \u00b7 ' + ext : ''));
+            el('ps-rr-doc-icon').textContent = kind === 'pdf' ? 'picture_as_pdf' : (kind === 'image' ? 'image' : 'draft');
+            el('ps-rr-doc-open').setAttribute('href', d.docOpenUrl);
+            var dl = el('ps-rr-doc-dl');
+            dl.setAttribute('href', d.docUrl);
+            dl.setAttribute('download', d.docName);
+            if (kind === 'image' && prev) {
+                el('ps-rr-doc-img').setAttribute('src', d.docUrl);
+                prev.hidden = false;
+            }
+        }
+
+        // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
+        el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
+
+        // Decision context. The room arbitration log records the rule used for
+        // automatic decisions; an override/manual value denotes an admin decision.
+        var arbRule   = d.arbRule   || '';
+        var arbReason = d.arbReason || d.reason || '';
+        var hasDoc    = !!d.docUrl;
+        var decSec    = el('ps-rr-decision-sec');
+        if (decSec) {
+            var ruleMap = {
+                'rule_1_fifo':           'FIFO (first submitted)',
+                'rule_2_signatory':      'Request-letter/signatory priority',
+                'rule_3_role':           'Submitter role priority',
+                'rule_4_return_history': 'Return-history priority',
+                'rule_5_id_order':       'ID order tie-breaker',
+                'rule_past_datetime':    'Past date or time',
+                'rule_archived':          'Room availability policy',
+                'rule_missing_doc_hold':  'Supporting-document policy',
+                'rule_schedule_conflict': 'Schedule conflict',
+                'override':              'Admin override',
+                'manual':                'Manual admin decision'
+            };
+            var ruleLabel = ruleMap[arbRule] || (arbRule
+                ? arbRule.replace(/^rule_\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })
+                : 'Not recorded');
+            var isManual = arbRule === 'override' || arbRule === 'manual';
+            var isAuto   = arbRule !== '' && !isManual;
+            var methodLabel;
+            if (isManual) {
+                methodLabel = 'Manual (admin decision)';
+            } else if (isAuto) {
+                methodLabel = arbRule === 'rule_1_fifo' ? 'Automatic (FIFO)' : 'Automatic (priority rules)';
+            } else {
+                methodLabel = 'Not recorded';
+            }
+            var methodEl = el('ps-rr-dec-method');
+            if (methodEl) methodEl.textContent = methodLabel;
+
+            var ruleRow = el('ps-rr-dec-rule-row');
+            var ruleEl  = el('ps-rr-dec-rule');
+            if (ruleRow && ruleEl) {
+                ruleRow.hidden = false;
+                ruleEl.textContent = ruleLabel;
+            }
+
+            // Reason row
+            var reasonRow = el('ps-rr-dec-reason-row');
+            var reasonEl  = el('ps-rr-dec-reason');
+            if (reasonRow && reasonEl) {
+                reasonRow.hidden = false;
+                reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
+            }
+            decSec.hidden = false;
+        }
+
+        if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
+    }
+
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-rr-detail]');
+        if (!t) return;
+        var row = t.closest('tr.ps-rr-row');
+        if (!row) return;
+        e.preventDefault();
+        openFor(row);
+    });
+
+    drawer.addEventListener('click', function (e) {
+        if (!e.target.closest('[data-rr-cancel]') || !currentRow) return;
+        var btn = currentRow.querySelector('.btn-cancel-rr-admin');
+        if (!btn) return;
+        if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
+        btn.click();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer.classList.contains('ps-modal-open') && typeof psCloseModal === 'function') {
+            psCloseModal('ps-room-drawer');
+        }
+    });
+})();
+
+/* ================================================================
+   PUPSYNC ADMIN — Dashboard tab behaviour
+   ----------------------------------------------------------------
+   1. Draws the "Demand & decisions" bar chart (plain SVG, no library
+      — the page's CSP only allows scripts from this site + jsDelivr).
+   2. Makes stat cards / "needs attention" rows / "Manage" links jump
+      to the right tab (and filter chip) by clicking the real sidebar
+      item, so the tab switch, drawer-close and history logic that
+      already exist in admin-dashboard.js are reused, not copied.
+   3. Keeps the panel live: every 15 s it fetches
+      admin-dashboard.php?fragment=dashboard (same markup PHP
+      rendered) and swaps it in, pausing while the tab is hidden or
+      the Dashboard tab isn't the one being viewed.
+
+   The header (greeting, action buttons, bell, avatar) is outside the
+   swapped region on purpose: admin-dashboard.js binds to those ids.
+================================================================ */
+(function () {
+    'use strict';
+
+    var root = document.getElementById('dash');
+    var live = document.getElementById('dashLive');
+    if (!root || !live) return;
+
+    var POLL_MS = 15000;
+    var state = { set: 'equipment', range: 14 };
+    var lastHtml = null;
+    var inflight = false;
+    var stopped = false;
+
+    // The entrance animation is first-paint only.
+    setTimeout(function () { root.classList.remove('dash-intro'); }, 900);
+
+    /* ── helpers ─────────────────────────────────────────────── */
+    function esc(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function parseYmd(s) {
+        var p = s.split('-');
+        return new Date(+p[0], +p[1] - 1, +p[2]);
+    }
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    function shortDate(s) { var d = parseYmd(s); return MON[d.getMonth()] + ' ' + d.getDate(); }
+    function longDate(s) { var d = parseYmd(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
+    function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
+
+    /* ── context under the chart ─────────────────────────────── */
+    function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+    function share(a, b) { return b ? Math.round(a / b * 100) : 0; }
+    function rangeSum(vals, a, b) { var t = 0; for (var i = a; i < b; i++) t += vals[i] || 0; return t; }
+    function span(from, to) {
+        var a = parseYmd(from), b = parseYmd(to);
+        return shortDate(from) + ' – ' + (a.getMonth() === b.getMonth() ? b.getDate() : shortDate(to));
+    }
+    function trendChip(cur, prev, unitWord) {
+        // cur / prev: numbers; returns '' when there is nothing to compare
+        if (prev == null) return '';
+        if (prev === 0) return cur > 0 ? { dir: 'up', text: 'new' } : '';
+        var d = Math.round((cur - prev) / prev * 100);
+        return { dir: d > 0 ? 'up' : (d < 0 ? 'down' : 'flat'), text: d === 0 ? 'no change' : Math.abs(d) + '%' };
+    }
+    function chipHtml(t, tail) {
+        if (!t) return '';
+        var icon = t.dir === 'up' ? 'trending_up' : (t.dir === 'down' ? 'trending_down' : 'trending_flat');
+        return '<em class="dash-delta is-' + t.dir + '"><span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>' +
+            esc(t.text) + (tail ? ' <small>' + esc(tail) + '</small>' : '') + '</em>';
+    }
+
+    /* Busiest day(s) for 7D / 14D, busiest week for 30D, plus a few "at a glance" facts. */
+    function insightsHtml(c) {
+        var unit = c.set.unit, units = unit + 's', n = c.n, N = c.N;
+        var lead = '', rows = '', note = '', heading = '';
+
+        if (n <= 14) {
+            heading = 'Busiest days';
+            var order = [];
+            c.totals.forEach(function (t, i) { if (t > 0) order.push({ i: i, t: t }); });
+            order.sort(function (a, b) { return b.t - a.t || b.i - a.i; });   // ties: most recent first
+            var top = order[0].t;
+            var tied = order.filter(function (x) { return x.t === top; });
+            var dayName = function (i) { return i === n - 1 ? 'Today (' + longDate(c.labels[i]) + ')' : longDate(c.labels[i]); };
+            if (top < 2) {
+                lead = 'Activity was light: no day had more than one ' + unit + '.';
+            } else if (tied.length >= 3) {
+                lead = 'No single busiest day: <b>' + tied.length + ' days</b> tied at ' + plural(top, unit) + ' each.';
+            } else {
+                var picks = [order[0]];
+                // a second day only counts if it is close to the first (at least 60% of it, and 2+)
+                if (order[1] && order[1].t >= Math.max(2, Math.ceil(top * 0.6))) picks.push(order[1]);
+                var pt = picks.reduce(function (a, p) { return a + p.t; }, 0);
+                var chrono = picks.slice().sort(function (a, b) { return a.i - b.i; });
+                lead = chrono.map(function (p) { return '<b>' + esc(dayName(p.i)) + '</b>'; }).join(' and ') +
+                    (picks.length > 1 ? ' were the busiest days: ' + plural(pt, unit) + ' together' : ' was the busiest day: ' + plural(pt, unit)) +
+                    ', ' + share(pt, c.grand) + '% of all ' + units + '.';
+                rows = picks.map(function (p) {
+                    return '<li class="is-top"><span class="dash-rank-name">' + esc(dayName(p.i)) + '</span>' +
+                        '<span class="dash-rank-bar"><i style="width:' + Math.round(p.t / top * 100) + '%"></i></span>' +
+                        '<span class="dash-rank-val"><b>' + p.t + '</b><small>' + share(p.t, c.grand) + '%</small></span></li>';
+                }).join('');
+            }
+        } else {
+            heading = 'Busiest week';
+            var wk = [], wsum = 0, wmax = 0;
+            for (var w = 0; w < 4; w++) {
+                var st = n - 28 + w * 7, en = st + 7, tot = rangeSum(c.totals, st, en);
+                wk.push({ w: w + 1, t: tot, from: c.labels[st], to: c.labels[en - 1] });
+                wsum += tot; if (tot > wmax) wmax = tot;
+            }
+            var best = wk.filter(function (x) { return x.t === wmax; });
+            if (wsum === 0) {
+                lead = 'No ' + units + ' in the last 4 weeks.';
+            } else if (best.length === 1) {
+                lead = '<b>Week ' + best[0].w + '</b> (' + esc(span(best[0].from, best[0].to)) + ') was the busiest: ' +
+                    plural(wmax, unit) + ', ' + share(wmax, wsum) + '% of the last 4 weeks.';
+            } else if (best.length === 2) {
+                lead = '<b>Weeks ' + best[0].w + ' and ' + best[1].w + '</b> tied for busiest at ' + plural(wmax, unit) + ' each.';
+            } else {
+                lead = 'Activity was spread evenly across the weeks.';
+            }
+            var w3 = wk[2].t, w4 = wk[3].t;
+            if (wsum > 0 && (w3 > 0 || w4 > 0)) {
+                if (w3 === 0) lead += ' The latest week is the first with any activity.';
+                else {
+                    var dw = Math.round((w4 - w3) / w3 * 100);
+                    lead += ' The latest week is ' + (dw === 0 ? 'level with' : Math.abs(dw) + '% ' + (dw > 0 ? 'above' : 'below')) + ' the week before.';
+                }
+            }
+            if (wsum > 0) {
+                rows = wk.map(function (x) {
+                    var isTop = x.t === wmax && wmax > 0;
+                    return '<li' + (isTop ? ' class="is-top"' : '') + '><span class="dash-rank-name">Week ' + x.w +
+                        '<small>' + esc(span(x.from, x.to)) + (x.w === 4 ? ' · latest' : '') + '</small></span>' +
+                        '<span class="dash-rank-bar"><i style="width:' + (wmax ? Math.round(x.t / wmax * 100) : 0) + '%"></i></span>' +
+                        '<span class="dash-rank-val"><b>' + x.t + '</b><small>' + share(x.t, wsum) + '%</small></span></li>';
+                }).join('');
+                note = '<p class="dash-ins-note">Weeks are 7-day blocks counting back from today (the most recent 28 days).</p>';
+            }
+        }
+
+        /* at a glance */
+        var sers = c.set.series;
+        function outcome(a, b) {
+            var ap = 0, de = 0;
+            sers.forEach(function (s) {
+                if (s.key === 'approved') ap = rangeSum(s.values, a, b);
+                if (s.key === 'declined') de = rangeSum(s.values, a, b);
+            });
+            return { ap: ap, de: de, rate: (ap + de) > 0 ? Math.round(ap / (ap + de) * 100) : null };
+        }
+        var cur = outcome(N - n, N);
+        var prev = N >= 2 * n ? outcome(N - 2 * n, N - n) : null;
+        var rateDelta = '';
+        if (cur.rate != null && prev && prev.rate != null) {
+            var pts = cur.rate - prev.rate;
+            rateDelta = chipHtml({ dir: pts > 0 ? 'up' : (pts < 0 ? 'down' : 'flat'), text: pts === 0 ? 'no change' : Math.abs(pts) + ' pts' }, 'vs previous ' + n + ' days');
+        }
+        var quiet = c.totals.filter(function (t) { return t === 0; }).length;
+
+        var facts = '';
+        function fact(label, value, small, extra) {
+            facts += '<div class="dash-fact"><dt>' + esc(label) + '</dt><dd>' + value + (small ? ' <small>' + small + '</small>' : '') + (extra || '') + '</dd></div>';
+        }
+        fact('Daily average', '<b>' + (c.grand / n).toFixed(1) + '</b>', 'per day');
+        fact('Approval rate',
+            cur.rate == null ? '<b>—</b>' : '<b>' + cur.rate + '%</b>',
+            cur.rate == null ? 'nothing decided yet' : cur.ap + ' approved · ' + cur.de + ' declined',
+            rateDelta);
+
+        var ex = c.data.extras && c.data.extras[state.set];
+        if (ex) {
+            var bestRow = null, bestSum = 0;
+            (ex.rows || []).forEach(function (r) {
+                var t = rangeSum(r.values, N - n, N);
+                if (t > bestSum) { bestSum = t; bestRow = r; }
+            });
+            if (state.set === 'equipment') {
+                if (cur.de === 0) fact(ex.title, '<b>None</b>', 'nothing was declined');
+                else if (bestRow) fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + cur.de + ' declined');
+            } else if (bestRow) {
+                fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + plural(cur.ap, 'booking') + (bestRow.sub ? ' · ' + esc(bestRow.sub) : ''));
+            }
+        }
+        fact('Days with no activity', '<b>' + quiet + ' <span class="dash-of">of ' + n + '</span></b>');
+
+        return '<section class="dash-ins-col"><h3>' + esc(heading) + '</h3><p class="dash-ins-lead">' + lead + '</p>' +
+            (rows ? '<ul class="dash-rank">' + rows + '</ul>' : '') + note + '</section>' +
+            '<section class="dash-ins-col"><h3>At a glance</h3>' +
+            '<div class="dash-ins-more" aria-expanded="false">' +
+            '<dl class="dash-facts">' + facts + '</dl>' +
+            '</div>' +
+            '<button type="button" class="dash-ins-toggle" aria-expanded="false">' +
+            '<span class="dash-ins-toggle-label">See more</span>' +
+            '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span>' +
+            '</button>' +
+            '</section>';
+    }
+
+    /* ── chart ───────────────────────────────────────────────── */
+    function drawChart(wrap) {
+        var data = wrap._data;
+        if (!data) return;
+        var set = data.sets[state.set] || data.sets.equipment;
+        var n = state.range;
+        var labels = data.labels.slice(-n);
+        var series = set.series.map(function (s) {
+            return { key: s.key, label: s.label, values: s.values.slice(-n) };
+        });
+        var totals = labels.map(function (_, i) {
+            return series.reduce(function (t, s) { return t + (s.values[i] || 0); }, 0);
+        });
+        var grand = sum(totals);
+
+        var chartEl = wrap.querySelector('[data-dash-chart]');
+        var sumEl = wrap.querySelector('[data-dash-summary]');
+        var insEl = wrap.querySelector('[data-dash-insights]');
+        var N = data.labels.length;
+
+        /* tallest day: only used to pick a sensible (invisible) scale for the bars */
+        var peak = 0;
+        totals.forEach(function (t) { if (t > peak) peak = t; });
+
+        /* summary: ONE headline number, then how it was decided.
+           (The old approval-rate / daily-average / busiest-day tiles and the
+           separate legend are gone; per-day detail is still on hover.) */
+        var parts = series.map(function (s) {
+            return { key: s.key, label: s.label.toLowerCase(), n: sum(s.values) };
+        });
+        var unit = set.unit + (grand === 1 ? '' : 's');
+        var splitHtml = '';
+        if (grand > 0) {
+            var sx = 0;
+            splitHtml = '<div class="dash-split"><svg viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
+            parts.forEach(function (p) {
+                if (!p.n) return;
+                var w = p.n / grand * 100;
+                splitHtml += '<rect class="dash-s-' + esc(p.key) + '" x="' + sx + '" y="0" width="' + w + '" height="1"/>';
+                sx += w;
+            });
+            splitHtml += '</svg></div>';
+        }
+        /* how the headline compares with the period just before it (needs 2n days of history) */
+        var prevTotal = null;
+        if (N >= 2 * n) {
+            prevTotal = 0;
+            set.series.forEach(function (s) { prevTotal += rangeSum(s.values, N - 2 * n, N - n); });
+        }
+        sumEl.innerHTML =
+            '<div class="dash-sum-head"><strong>' + grand + '</strong><span>' + esc(unit) + ' <small>in the last ' + n + ' days</small></span>' +
+            chipHtml(trendChip(grand, prevTotal), 'vs previous ' + n + ' days') + '</div>' +
+            splitHtml +
+            (grand > 0
+                ? '<ul class="dash-sum-legend">' + parts.map(function (p) {
+                    return '<li' + (p.n ? '' : ' class="is-zero"') + '><i class="k-' + esc(p.key) + '"></i><b>' + p.n + '</b> ' + esc(p.label) + '</li>';
+                }).join('') + '</ul>'
+                : '');
+
+        chartEl.setAttribute('aria-label', set.title + ', last ' + n + ' days: ' + grand + ' total' +
+            (grand > 0 ? ' (' + parts.map(function (p) { return p.n + ' ' + p.label; }).join(', ') + ')' : '') + '.');
+
+        if (grand === 0) {
+            chartEl.innerHTML = '<div class="dash-chart-empty">No ' + esc(set.unit) + 's in the last ' + n + ' days.</div>';
+            if (insEl) insEl.innerHTML = '';
+            return;
+        }
+
+        if (insEl) {
+            insEl.innerHTML = insightsHtml({ data: data, set: set, n: n, N: N, labels: labels, totals: totals, grand: grand });
+        }
+
+        /* geometry */
+        var W = Math.max(240, chartEl.clientWidth || 600);
+        var H = Math.max(200, chartEl.clientHeight || 230);
+        var m = { l: 4, r: 4, t: 8, b: 24 };
+        var pw = W - m.l - m.r, ph = H - m.t - m.b;
+        var step = Math.max(1, Math.ceil(peak / 4));
+        var top = step * 4;
+        var slot = pw / n;
+        var bw = Math.max(4, Math.min(30, slot * 0.64));
+        var every = n <= 7 ? 1 : (n <= 14 ? 7 : 10);   // 7D: every day · 14D / 30D: just a few dates
+
+        var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
+
+        /* just a baseline: bar heights are relative, exact counts show on hover */
+        out += '<line class="dash-baseline" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (m.t + ph) + '" y2="' + (m.t + ph) + '"/>';
+
+        labels.forEach(function (lab, i) {
+            var gx = m.l + slot * i;
+            var x = gx + (slot - bw) / 2;
+            var yCursor = m.t + ph;
+            out += '<g class="dash-bar-group" data-i="' + i + '"><rect class="dash-bar-hit" x="' + gx + '" y="' + m.t + '" width="' + slot + '" height="' + ph + '" rx="6"/>';
+            series.forEach(function (s) {
+                var v = s.values[i] || 0;
+                if (!v) return;
+                var h = Math.max(2, v / top * ph);
+                yCursor -= h;
+                out += '<rect class="dash-s-' + esc(s.key) + '" x="' + x + '" y="' + yCursor + '" width="' + bw + '" height="' + h + '" rx="2"/>';
+            });
+            out += '</g>';
+            if ((n - 1 - i) % every === 0) {
+                var isToday = i === n - 1;
+                out += '<text class="dash-axis-text' + (isToday ? ' dash-today-text' : '') + '" x="' + (gx + slot / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(isToday ? 'Today' : (n <= 7 ? DOW[parseYmd(lab).getDay()] : shortDate(lab))) + '</text>';
+            }
+        });
+        out += '</svg><div class="dash-tip" role="presentation"></div>';
+        chartEl.innerHTML = out;
+
+        /* tooltip */
+        var tip = chartEl.querySelector('.dash-tip');
+        function showTip(i, groupEl) {
+            var rows = series.map(function (s) {
+                return '<span><span><i class="k-' + esc(s.key) + '"></i>' + esc(s.label) + '</span><b>' + (s.values[i] || 0) + '</b></span>';
+            }).join('');
+            tip.innerHTML = '<b>' + esc(longDate(labels[i])) + '</b>' + rows;
+            var bx = (m.l + slot * i + slot / 2) / W * chartEl.clientWidth;
+            var tw = tip.offsetWidth || 140;
+            var left = Math.min(Math.max(4, bx - tw / 2), chartEl.clientWidth - tw - 4);
+            tip.style.left = left + 'px';
+            tip.style.top = '4px';
+            tip.classList.add('on');
+            Array.prototype.forEach.call(chartEl.querySelectorAll('.dash-bar-group.is-active'), function (el) { el.classList.remove('is-active'); });
+            if (groupEl) groupEl.classList.add('is-active');
+        }
+        function hideTip() {
+            tip.classList.remove('on');
+            Array.prototype.forEach.call(chartEl.querySelectorAll('.dash-bar-group.is-active'), function (el) { el.classList.remove('is-active'); });
+        }
+        chartEl.onpointermove = function (e) {
+            var gEl = e.target.closest && e.target.closest('.dash-bar-group');
+            if (gEl) showTip(+gEl.getAttribute('data-i'), gEl); else hideTip();
+        };
+        chartEl.onpointerleave = hideTip;
+    }
+
+    function initCharts() {
+        Array.prototype.forEach.call(live.querySelectorAll('.dash-chart-wrap'), function (wrap) {
+            try { wrap._data = JSON.parse(wrap.getAttribute('data-chart')); } catch (e) { wrap._data = null; }
+            syncControls();
+            drawChart(wrap);
+        });
+    }
+    function syncControls() {
+        Array.prototype.forEach.call(live.querySelectorAll('[data-dash-set]'), function (b) {
+            var on = b.getAttribute('data-dash-set') === state.set;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        Array.prototype.forEach.call(live.querySelectorAll('[data-dash-range]'), function (b) {
+            var on = +b.getAttribute('data-dash-range') === state.range;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    /* toggle "See more" in the insights panel */
+    root.addEventListener('click', function (e) {
+        var btn = e.target.closest('.dash-ins-toggle');
+        if (!btn) return;
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        var more = btn.previousElementSibling;
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        if (more) more.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        btn.querySelector('.dash-ins-toggle-label').textContent = expanded ? 'See more' : 'See less';
+    });
+
+    /* redraw when the card's width changes (sidebar collapse, rotate, resize) */
+    if (window.ResizeObserver) {
+        var lastW = 0;
+        new ResizeObserver(function () {
+            var el = live.querySelector('[data-dash-chart]');
+            if (!el) return;
+            var w = el.clientWidth;
+            if (Math.abs(w - lastW) < 2) return;
+            lastW = w;
+            var wrap = el.closest('.dash-chart-wrap');
+            if (wrap) drawChart(wrap);
+        }).observe(root);
+    }
+
+    /* ── clicks (delegated, so they survive live swaps) ──────── */
+    root.addEventListener('click', function (e) {
+        var go = e.target.closest('[data-dash-go]');
+        if (go) {
+            var tab = go.getAttribute('data-dash-go');
+            var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
+            if (nav) {
+                nav.click();
+                var chipKey = go.getAttribute('data-dash-chip');
+                if (chipKey) {
+                    var chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + chipKey + '"]');
+                    if (chip) chip.click();
+                }
+            }
+            return;
+        }
+        var setBtn = e.target.closest('[data-dash-set]');
+        if (setBtn) {
+            state.set = setBtn.getAttribute('data-dash-set');
+            syncControls();
+            var w1 = live.querySelector('.dash-chart-wrap'); if (w1) drawChart(w1);
+            return;
+        }
+        var rangeBtn = e.target.closest('[data-dash-range]');
+        if (rangeBtn) {
+            state.range = +rangeBtn.getAttribute('data-dash-range') || 14;
+            syncControls();
+            var w2 = live.querySelector('.dash-chart-wrap'); if (w2) drawChart(w2);
+        }
+    });
+
+    /* ── live refresh ────────────────────────────────────────── */
+    function dashboardVisible() {
+        var panel = document.getElementById('panel-dashboard');
+        return !!panel && panel.classList.contains('active') && !document.hidden;
+    }
+    function refresh() {
+        if (stopped || inflight || !dashboardVisible()) return;
+        inflight = true;
+        fetch(window.location.pathname + '?fragment=dashboard', {
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: { 'X-Requested-With': 'fetch' }
+        }).then(function (r) {
+            // session ended -> the server redirects to the login page: stop quietly instead of swapping it in
+            if (r.redirected || r.status === 401) { stopped = true; return null; }
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        }).then(function (html) {
+            if (html == null) return;
+            if (html.indexOf('dash-kpis') === -1) { stopped = true; return; }
+            if (html === lastHtml) return;
+            lastHtml = html;
+
+            // keep keyboard focus on a chart toggle across the swap
+            var ae = document.activeElement, refocus = '';
+            if (ae && live.contains(ae)) {
+                if (ae.hasAttribute('data-dash-set')) refocus = '[data-dash-set="' + ae.getAttribute('data-dash-set') + '"]';
+                else if (ae.hasAttribute('data-dash-range')) refocus = '[data-dash-range="' + ae.getAttribute('data-dash-range') + '"]';
+            }
+            live.innerHTML = html;
+            initCharts();
+            if (refocus) { var f = live.querySelector(refocus); if (f) f.focus({ preventScroll: true }); }
+        }).catch(function () { /* transient network error: try again next tick */ })
+            .then(function () { inflight = false; });
+    }
+
+    setInterval(refresh, POLL_MS);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
+    // coming back to the Dashboard tab -> refresh right away (after admin-dashboard.js flips the panel)
+    document.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('.nav-item[data-tab="dashboard"]')) setTimeout(refresh, 80);
+    });
+
+    initCharts();
+})();
+
+
+/* ───────────────────────────────────────────────────────────────
+   ROOMS -- building / floor pills + clickable tiles
+   Additive block. The original Building / Floor / Status <select>s
+   and the filter module in admin-dashboard.php stay the single
+   source of truth: the pills below only READ their options and
+   WRITE their value (then fire "change"), so searching, filtering,
+   the live refresh after add / edit / archive, and the schedule
+   modal all keep working exactly as before. Without JS the plain
+   dropdowns stay visible. Status is a plain dropdown (no pills).
+   ─────────────────────────────────────────────────────────────── */
+(function () {
+    function install() {
+        var tb = document.getElementById('rmToolbar');
+        var table = document.getElementById('roomsRegistryTable');
+        var bld = document.getElementById('roomBuildingSelect');
+        var flr = document.getElementById('roomFloorSelect');
+        var st = document.getElementById('roomStatusSelect');
+        var search = document.getElementById('roomSearchInput');
+        var pillsEl = document.getElementById('rmBuildingPills');
+        var floorsEl = document.getElementById('rmFloorChips');
+        var showingEl = document.getElementById('rmShowing');
+        if (!tb || !table || !bld || !flr || !st || !search || !pillsEl || !floorsEl) return;
+
+        var lastPillSig = '';
+
+        function setSelect(sel, value) {
+            if (sel.value === value) return;
+            sel.value = value;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function roomRows() { return table.querySelectorAll('tbody tr.pr-room-row'); }
+
+        function el(tag, cls, text) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text !== undefined) n.textContent = text;
+            return n;
+        }
+
+        function pill(cls, value, label, pressed) {
+            var b = el('button', cls, label);
+            b.type = 'button';
+            b.dataset.value = value;
+            b.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+            return b;
+        }
+
+        function buildPills() {
+            var opts = Array.prototype.map.call(bld.options, function (o) {
+                return [o.value, o.value === 'all' ? 'All' : o.textContent.replace(/\s+/g, ' ').trim()];
+            });
+            var sig = opts.map(function (o) { return o.join('|'); }).join('~');
+            if (sig !== lastPillSig) {
+                pillsEl.textContent = '';
+                opts.forEach(function (o) { pillsEl.appendChild(pill('rm-bld', o[0], o[1], false)); });
+                lastPillSig = sig;
+            }
+            Array.prototype.forEach.call(pillsEl.children, function (b) {
+                b.setAttribute('aria-pressed', b.dataset.value === bld.value ? 'true' : 'false');
+            });
+        }
+
+        function buildFloors() {
+            floorsEl.textContent = '';
+            /* only worth showing when a building is picked and it has 2+ floors */
+            if (flr.disabled || flr.options.length < 3) return;
+            Array.prototype.forEach.call(flr.options, function (o) {
+                floorsEl.appendChild(pill('rm-chip rm-chip--sm', o.value,
+                    o.value === 'all' ? 'All floors' : o.textContent.trim(), flr.value === o.value));
+            });
+        }
+
+        function sync() {
+            var rows = roomRows(), shown = 0;
+            rows.forEach(function (r) { if (r.style.display !== 'none') shown++; });
+            buildPills();
+            buildFloors();
+
+            var searching = (search.value || '').trim().length > 0;
+            tb.classList.toggle('rm-searching', searching);
+            /* one building on screen -> its name is dropped from every floor heading */
+            table.classList.toggle('rm-one-bld', bld.value !== 'all' && !searching);
+            if (showingEl) showingEl.textContent = shown === rows.length
+                ? rows.length + (rows.length === 1 ? ' room' : ' rooms')
+                : shown + ' of ' + rows.length + ' rooms';
+            tb.classList.add('rm-enhanced');
+        }
+
+        /* pills / chips -> write to the real selects */
+        tb.addEventListener('click', function (e) {
+            var c = e.target.closest('.rm-chip, .rm-bld');
+            if (!c || !tb.contains(c)) return;
+            if (c.closest('#rmBuildingPills')) setSelect(bld, c.dataset.value);
+            else if (c.closest('#rmFloorChips')) setSelect(flr, c.dataset.value);
+        });
+
+        /* keep in step with every change the filter module reacts to
+           (our listeners are added later, so they run after its own) */
+        bld.addEventListener('change', sync);
+        flr.addEventListener('change', sync);
+        st.addEventListener('change', sync);
+        search.addEventListener('input', sync);
+
+        /* the live refresh after add / edit / archive swaps in new rows */
+        var orig = window.psRefreshRoomsRegistry;
+        if (typeof orig === 'function' && !orig.__rmWrapped) {
+            var wrapped = function () { var r = orig.apply(this, arguments); sync(); return r; };
+            wrapped.__rmWrapped = true;
+            window.psRefreshRoomsRegistry = wrapped;
+        }
+
+        /* a click anywhere on a tile (except its own buttons) opens that room's schedule */
+        table.addEventListener('click', function (e) {
+            var row = e.target.closest('tr.pr-room-row');
+            if (!row || e.target.closest('a, button, .pr-row-actions')) return;
+            var btn = row.querySelector('[data-action="open-room-schedule"]');
+            if (btn) btn.click();
+        });
+
+        sync();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+    else install();
+})();

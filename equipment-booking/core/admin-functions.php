@@ -26,6 +26,7 @@ if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 }
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../../config/admin-activity-feed.php'; // also loads admin-activity.php
 $conn = getDB();
 
 // Root URL: SCRIPT_NAME for admin-dashboard.php is now /Equipment-Lending-Website/admin-dashboard.php
@@ -209,6 +210,7 @@ mysqli_query($conn, "
 if (isset($_POST['add_item'])) {
     csrf_verify();
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     // Sanitize and format basic inputs
     $name = trim($_POST['item_name']);
@@ -227,12 +229,22 @@ if (isset($_POST['add_item'])) {
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 'error', 'message' => 'Only JPG and PNG images are allowed.']);
+                exit();
+            }
             header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
             exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 'error', 'message' => 'Image too large. Maximum size is 2 MB.']);
+                exit();
+            }
             header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
             exit();
         }
@@ -250,10 +262,21 @@ if (isset($_POST['add_item'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
+        admin_log_activity($conn, 'equipment', 'Added equipment: ' . $name);
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'success', 'message' => 'Equipment added successfully.']);
+            exit();
+        }
         header("Location: {$base}/admin-dashboard.php?view=inventory&added=1");
         exit();
     } else {
         error_log('[PUPSync] admin add_item DB insert failed: ' . $conn->error);
+        if ($is_ajax) {
+            header('Content-Type: application/json');
+            echo json_encode(['status' => 'error', 'message' => 'Could not save to database. Please try again.']);
+            exit();
+        }
         header("Location: {$base}/admin-dashboard.php?view=inventory&error=dberror");
         exit();
     }
@@ -265,6 +288,7 @@ if (isset($_POST['add_item'])) {
 if (isset($_POST['update_item'])) {
     csrf_verify();
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+    $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     $item_id = intval($_POST['item_id']);
     $name = $_POST['item_name'];
@@ -281,12 +305,22 @@ if (isset($_POST['update_item'])) {
         $file_type = $_FILES['item_image']['type'];
 
         if (!in_array($file_type, $allowed_types)) {
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 'error', 'message' => 'Only JPG and PNG images are allowed.']);
+                exit();
+            }
             header("Location: {$base}/admin-dashboard.php?view=inventory&error=filetype");
             exit();
         }
 
         $max_size = 2 * 1024 * 1024;
         if ($_FILES['item_image']['size'] > $max_size) {
+            if ($is_ajax) {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => 'error', 'message' => 'Image too large. Maximum size is 2 MB.']);
+                exit();
+            }
             header("Location: {$base}/admin-dashboard.php?view=inventory&error=filesize");
             exit();
         }
@@ -325,6 +359,12 @@ if (isset($_POST['update_item'])) {
     $stmt->execute();
     $stmt->close();
 
+    admin_log_activity($conn, 'equipment', 'Updated equipment: ' . $name);
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'success', 'message' => 'Equipment updated successfully.']);
+        exit();
+    }
     header("Location: {$base}/admin-dashboard.php?view=inventory&updated=1");
     exit();
 }
@@ -334,6 +374,7 @@ if (isset($_POST['update_item'])) {
 
 if (isset($_GET['delete_item'])) {
     $id = intval($_GET['delete_item']);
+    $is_ajax = ($_GET['ajax'] ?? '') === '1';
 
     // NOTE: this only archives the item (is_archived = 1) — it does NOT
     // delete the underlying image file. Archiving is reversible via
@@ -341,6 +382,12 @@ if (isset($_GET['delete_item'])) {
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 1 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Archived equipment: ' . admin_activity_item_name($conn, $id));
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'success', 'message' => 'Item archived.']);
+        exit();
+    }
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=inventory");
     exit();
@@ -351,11 +398,18 @@ if (isset($_GET['delete_item'])) {
 
 if (isset($_GET['restore_item'])) {
     $item_id = intval($_GET['restore_item']);
+    $is_ajax = ($_GET['ajax'] ?? '') === '1';
 
     $stmt = mysqli_prepare($conn, "UPDATE tbl_inventory SET is_archived = 0 WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Restored equipment: ' . admin_activity_item_name($conn, $item_id));
 
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'success', 'message' => 'Item restored.']);
+        exit();
+    }
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=archive");
     exit();
@@ -366,11 +420,19 @@ if (isset($_GET['restore_item'])) {
 
 if (isset($_GET['force_delete'])) {
     $item_id = intval($_GET['force_delete']);
+    $is_ajax = ($_GET['ajax'] ?? '') === '1';
+    $force_name = admin_activity_item_name($conn, $item_id);
 
     $stmt = mysqli_prepare($conn, "DELETE FROM tbl_inventory WHERE item_id = ?");
     mysqli_stmt_bind_param($stmt, "i", $item_id);
     mysqli_stmt_execute($stmt);
+    admin_log_activity($conn, 'equipment', 'Permanently deleted equipment: ' . $force_name);
 
+    if ($is_ajax) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'success', 'message' => 'Item permanently deleted.']);
+        exit();
+    }
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?view=archive");
     exit();
@@ -379,10 +441,19 @@ if (isset($_GET['force_delete'])) {
 
 // ================= FETCH ALL REQUESTS =================
 
+// Supporting-letter requests from Organization Advisers are reviewed only by
+// a Super Admin.  The session role was refreshed by admin_session_guard().
+$can_view_sensitive_adviser_requests = (($_SESSION['admin_role'] ?? '') === 'Super Admin');
+$sensitive_adviser_request_sql = "(tbl_requests.submitted_as = 'adviser' AND COALESCE(tbl_requests.document_path, '') <> '')";
+
 $waiting_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
                 FROM tbl_requests
                 LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
                 WHERE tbl_requests.status='Waiting'";
+
+if (!$can_view_sensitive_adviser_requests) {
+    $waiting_sql .= " AND NOT {$sensitive_adviser_request_sql}";
+}
 
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";
@@ -534,8 +605,15 @@ $admin_accounts_remaining = max(0, 5 - $admin_accounts_count);
 // Columns: fullName, email, role, created_at — id added by migration.
 $_admin_list_result = @mysqli_query(
     $conn,
-    "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    "SELECT id, fullName, email, role, created_at, last_login, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
 );
+if (!$_admin_list_result) {
+    // last_login column not migrated yet — fall back so the panel still lists everyone.
+    $_admin_list_result = @mysqli_query(
+        $conn,
+        "SELECT id, fullName, email, role, created_at, dormant_until FROM tbl_accounts ORDER BY created_at ASC, email ASC"
+    );
+}
 $admin_accounts_list = [];
 if ($_admin_list_result) {
     while ($ar = mysqli_fetch_assoc($_admin_list_result)) {
@@ -579,32 +657,6 @@ if (!empty($admin_email) && (empty($_SESSION['admin_last_login']) || $admin_last
         }
     }
 }
-
-// ================= FETCH ARBITRATION LOG =================
-
-// Show all log entries joined with the current live request status.
-// The auto-overdue transition never writes to this table, so no status
-// filtering is needed — every row here is a genuine engine or override decision.
-$arb_log_sql = "SELECT l.*, r.status AS current_request_status
-                  FROM tbl_arbitration_log l
-                  LEFT JOIN tbl_requests r ON r.id = l.request_id";
-
-if (!empty($_GET['arb_log_search'])) {
-    $search = "%" . $_GET['arb_log_search'] . "%";
-    $arb_log_sql .= " WHERE (
-        l.borrower_name LIKE ?
-        OR l.borrower_id LIKE ?
-        OR l.equipment_name LIKE ?
-    ) ORDER BY l.created_at DESC";
-    $stmt = $conn->prepare($arb_log_sql);
-    $stmt->bind_param("sss", $search, $search, $search);
-    $stmt->execute();
-    $arb_log_result = $stmt->get_result();
-} else {
-    $arb_log_sql .= " ORDER BY l.created_at DESC";
-    $arb_log_result = mysqli_query($conn, $arb_log_sql);
-}
-
 
 // ================= LOAD ARBITRATION CONFIG =================
 

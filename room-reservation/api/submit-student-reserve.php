@@ -56,6 +56,11 @@ if ($req_datetime === false || $req_datetime <= $now_manila) {
     echo json_encode(['error' => 'Reservation date and time cannot be in the past.']);
     exit();
 }
+// Closed day — no room reservations on Sundays
+if ($req_datetime->format('N') === '7') {
+    echo json_encode(['error' => 'Reservations are not available on Sundays. Please choose another day.']);
+    exit();
+}
 if ($end_time <= $start_time) {
     echo json_encode(['error' => 'End time must be after start time.']);
     exit();

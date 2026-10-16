@@ -209,6 +209,8 @@ try {
 }
 
 // -- Success ------------------------------------------------------------------------
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity($conn, 'faculty', 'Created faculty account for ' . $fullname);
 http_response_code(201);
 echo json_encode([
     'status' => 'success',

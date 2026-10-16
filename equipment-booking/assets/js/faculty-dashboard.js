@@ -296,8 +296,18 @@
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
-        // New side-nav-item support
-        document.querySelectorAll('.side-nav-item[data-tab]').forEach(b => b.classList.remove('active'));
+        // New side-nav-item support.
+        // Clear the highlight on EVERY sidebar item, not just the ones with data-tab: Settings
+        // (#nav-settings) has no data-tab, so it used to stay lit after Back/Forward closed the
+        // Settings screen. If an overlay is somehow still open, its own item keeps its highlight.
+        const overlayStillOpen = !!document.querySelector('.overlay-page.active');
+        document.querySelectorAll('.side-nav-item').forEach(b => {
+            if (b.hasAttribute('data-tab') || !overlayStillOpen) b.classList.remove('active');
+        });
+        if (!overlayStillOpen) {
+            const acctToggle = document.getElementById('navAccountToggle');
+            if (acctToggle) acctToggle.classList.remove('active');
+        }
         const sideBtn = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
         if (sideBtn) sideBtn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach(p => {
@@ -485,6 +495,207 @@
     }
 
     /* ── Borrow Form ───────────────────────────────────────────────────── */
+    /* ================================================================
+       ROOM PICKER  (Borrow Request modal)
+       ----------------------------------------------------------------
+       Your reservations (suggested) · Outside · Building tabs > floors > rooms.
+       Rooms come from window.BOOKING_META.rooms (the same tables as Facilities).
+       Rooms that another faculty has reserved for the chosen time are greyed out
+       and cannot be picked (the server checks this again).
+    ================================================================ */
+    const RoomPicker = (function () {
+        const meta = () => window.BOOKING_META || {};
+        const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+        const icon = n => { const s = el('span', 'material-symbols-outlined', n); s.setAttribute('aria-hidden', 'true'); return s; };
+        const pad2 = n => String(n).padStart(2, '0');
+        const parseTs = s => { const m = String(s || '').match(/(\d+)-(\d+)-(\d+)[ T](\d+):(\d+)/); return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null; };
+        const meridiem = d => (d.getHours() < 12 ? 'AM' : 'PM');
+        const hm = d => ((d.getHours() % 12) || 12) + (d.getMinutes() ? ':' + pad2(d.getMinutes()) : '');
+        function rangeLabel(a, b) { return meridiem(a) === meridiem(b) ? hm(a) + '–' + hm(b) + ' ' + meridiem(b) : hm(a) + ' ' + meridiem(a) + ' – ' + hm(b) + ' ' + meridiem(b); }
+        function dayLabel(d) {
+            const t = parseTs((meta().today || '') + ' 00:00'); if (!t) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 86400000);
+            return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        let index = null;   // room_id -> { id, name, building, floor, status }
+        function buildIndex() {
+            index = {};
+            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => { index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label, status: r.status }; })));
+        }
+
+        function setup(root) {
+            const st = {
+                root: root, form: root.closest('form'), input: root.querySelector('[data-bm-room-input]'),
+                trigger: root.querySelector('[data-bm-room-trigger]'), valueEl: root.querySelector('[data-bm-room-value]'),
+                hint: root.querySelector('[data-bm-room-hint]'), panel: root.querySelector('[data-bm-room-panel]'),
+                search: root.querySelector('[data-bm-room-search]'), list: root.querySelector('[data-bm-room-list]'),
+                reserved: new Set(), suggested: new Set(), tab: 0, tok: 0, open: false
+            };
+            root._rp = st;
+            build(st);
+            st.trigger.addEventListener('click', () => toggle(st, !st.open));
+            st.search.addEventListener('input', () => filter(st));
+            st.list.addEventListener('click', e => {
+                const tab = e.target.closest('[data-tab]'); if (tab) { st.tab = +tab.dataset.tab; filter(st); return; }
+                const b = e.target.closest('[data-room]'); if (!b || b.disabled) return;
+                pick(st, b.dataset.room, false);
+            });
+            root.addEventListener('keydown', e => {
+                if (e.key === 'Escape' && st.open) { e.stopPropagation(); toggle(st, false); st.trigger.focus(); return; }
+                if (!st.open || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End')) return;
+                const items = focusables(st); if (!items.length) return;
+                const cur = items.indexOf(document.activeElement); let n;
+                if (e.key === 'Home') n = 0; else if (e.key === 'End') n = items.length - 1;
+                else if (e.key === 'ArrowDown') n = cur < 0 ? 0 : Math.min(items.length - 1, cur + 1);
+                else n = cur <= 0 ? -1 : cur - 1;
+                e.preventDefault(); if (n < 0) st.search.focus(); else items[n].focus();
+            });
+            document.addEventListener('click', e => { if (st.open && !root.contains(e.target)) toggle(st, false); });
+        }
+        function focusables(st) { return Array.from(st.list.querySelectorAll('button')).filter(b => !b.disabled && !b.closest('[hidden]')); }
+
+        function build(st) {
+            const m = meta(), list = st.list; list.innerHTML = '';
+            const top = el('div', 'bm-rp-top'); list.appendChild(top);
+            (m.mine || []).forEach(r => {
+                const a = parseTs(r.start), b = parseTs(r.end); if (!a || !b) return;
+                const btn = el('button', 'bm-rp-res'); btn.type = 'button'; btn.dataset.room = r.room_id; btn.dataset.mine = '1';
+                btn.setAttribute('role', 'option');
+                btn.appendChild(icon('event_available'));
+                const t = el('span', 'bm-rp-txt'); t.appendChild(el('strong', '', r.name)); t.appendChild(el('small', '', dayLabel(a) + ' · ' + rangeLabel(a, b) + ' · ' + r.building)); btn.appendChild(t);
+                const star = el('span', 'bm-rp-sug', 'Suggested'); star.hidden = true; btn.appendChild(star);
+                top.appendChild(btn);
+            });
+            if (top.children.length) { const h = el('div', 'bm-rp-head', 'Your reservations'); top.insertBefore(h, top.firstChild); }
+            const out = el('button', 'bm-rp-res bm-rp-outside'); out.type = 'button'; out.dataset.room = 'outside'; out.setAttribute('role', 'option');
+            out.appendChild(icon('park')); const ot = el('span', 'bm-rp-txt'); ot.appendChild(el('strong', '', 'Outside')); ot.appendChild(el('small', '', 'Off-campus / outdoors')); out.appendChild(ot);
+            top.appendChild(out);
+
+            const rooms = m.rooms || [];
+            if (rooms.length > 1) {
+                const tabs = el('div', 'bm-rp-tabs'); tabs.setAttribute('role', 'tablist');
+                rooms.forEach((b, i) => { const t = el('button', 'bm-rp-tab', b.name); t.type = 'button'; t.dataset.tab = i; t.setAttribute('role', 'tab'); tabs.appendChild(t); });
+                list.appendChild(tabs);
+            }
+            rooms.forEach((b, i) => {
+                const wrap = el('div', 'bm-rp-bldg'); wrap.dataset.b = i;
+                wrap.appendChild(el('div', 'bm-rp-bhead', b.name));
+                (b.floors || []).forEach(f => {
+                    const fl = el('div', 'bm-rp-floor'); fl.appendChild(el('div', 'bm-rp-fhead', f.label));
+                    const grid = el('div', 'bm-rp-grid');
+                    (f.rooms || []).forEach(r => {
+                        const o = el('button', 'bm-rp-opt'); o.type = 'button'; o.dataset.room = r.room_id; o.setAttribute('role', 'option');
+                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
+                        o.appendChild(el('span', 'bm-rp-dot')); o.appendChild(el('span', 'bm-rp-name', r.name)); o.appendChild(el('span', 'bm-rp-tag'));
+                        o.title = r.name; grid.appendChild(o);
+                    });
+                    fl.appendChild(grid); wrap.appendChild(fl);
+                });
+                list.appendChild(wrap);
+            });
+            list.appendChild(Object.assign(el('div', 'bm-rp-empty', 'No rooms match'), { hidden: true }));
+            applyStates(st); filter(st);
+        }
+
+        function stateOf(st, id) {
+            const r = index[id]; if (!r) return 'ok';
+            if (r.status === 'Maintenance') return 'maint';
+            if (st.reserved.has(+id)) return 'reserved';
+            return r.status === 'Not Bookable' ? 'office' : 'ok';
+        }
+        function applyStates(st) {
+            st.list.querySelectorAll('.bm-rp-opt').forEach(o => {
+                const s = stateOf(st, o.dataset.room); o.dataset.state = s; o.disabled = (s === 'maint' || s === 'reserved');
+                o.querySelector('.bm-rp-tag').textContent = s === 'maint' ? 'Maintenance' : s === 'reserved' ? 'Reserved' : '';
+                o.setAttribute('aria-selected', st.input.value === o.dataset.room ? 'true' : 'false');
+                o.classList.toggle('is-selected', st.input.value === o.dataset.room);
+            });
+            st.list.querySelectorAll('.bm-rp-res').forEach(b => {
+                const id = b.dataset.room, blocked = id !== 'outside' && stateOf(st, id) !== 'ok' && stateOf(st, id) !== 'office';
+                b.disabled = blocked;
+                const star = b.querySelector('.bm-rp-sug'); if (star) star.hidden = !(st.suggested.has(+id) && !blocked);
+                b.setAttribute('aria-selected', st.input.value === id ? 'true' : 'false'); b.classList.toggle('is-selected', st.input.value === id);
+            });
+        }
+
+        function filter(st) {
+            const term = st.search.value.trim().toLowerCase(), list = st.list;
+            const tabs = list.querySelector('.bm-rp-tabs'), top = list.querySelector('.bm-rp-top');
+            if (tabs) { tabs.hidden = !!term; tabs.querySelectorAll('.bm-rp-tab').forEach(t => { const on = +t.dataset.tab === st.tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); }); }
+            let any = false;
+            top.querySelectorAll('.bm-rp-res').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) any = true; });
+            const head = top.querySelector('.bm-rp-head'); if (head) head.hidden = !!term;
+            list.querySelectorAll('.bm-rp-bldg').forEach(w => {
+                let wAny = false;
+                w.querySelectorAll('.bm-rp-floor').forEach(fl => {
+                    let fAny = false;
+                    fl.querySelectorAll('.bm-rp-opt').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) { fAny = true; } });
+                    fl.hidden = !fAny; if (fAny) wAny = true;
+                });
+                const show = term ? wAny : (+w.dataset.b === st.tab);
+                w.hidden = !show; w.classList.toggle('is-searching', !!term); if (term && wAny) any = true;
+            });
+            if (!term) any = true;
+            list.querySelector('.bm-rp-empty').hidden = any;
+        }
+
+        function toggle(st, open) {
+            st.open = open; st.panel.hidden = !open; st.trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); st.root.classList.toggle('is-open', open);
+            if (open) {
+                const cur = index[st.input.value]; if (cur) { const bi = (meta().rooms || []).findIndex(b => b.name === cur.building); if (bi > -1) st.tab = bi; }
+                st.search.value = ''; filter(st);
+                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) st.search.focus({ preventScroll: true });
+                const sel = st.list.querySelector('.is-selected'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        function show(st, value) {
+            st.valueEl.innerHTML = '';
+            if (!value) { st.valueEl.appendChild(el('span', 'bm-room-ph', 'Choose a room')); return; }
+            if (value === 'outside') { st.valueEl.appendChild(el('strong', '', 'Outside')); st.valueEl.appendChild(el('span', '', 'Off-campus / outdoors')); return; }
+            const r = index[value]; if (!r) return;
+            st.valueEl.appendChild(el('strong', '', r.name)); st.valueEl.appendChild(el('span', '', r.building + ' · ' + r.floor));
+        }
+        function setHint(st, msg, cls) { st.hint.hidden = !msg; st.hint.textContent = msg || ''; st.hint.className = 'bm-hint' + (cls ? ' ' + cls : ''); }
+
+        function pick(st, value, auto) {
+            st.input.value = value; show(st, value); applyStates(st); toggle(st, false);
+            setHint(st, auto ? 'Suggested from your reservation.' : '', auto ? 'ok' : '');
+            st.input.dispatchEvent(new Event('change', { bubbles: true }));
+            if (!auto) st.trigger.focus({ preventScroll: true });
+        }
+        function clear(st) { st.input.value = ''; show(st, ''); applyStates(st); }
+
+        function setWindow(form, query) {
+            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+            const token = ++st.tok;
+            if (!query) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
+            fetch('equipment-booking/api/check-booking-availability.php?' + query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
+                .then(r => r.json()).then(j => {
+                    if (token !== st.tok) return;
+                    if (!j || j.ok !== true || !j.rooms) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
+                    st.reserved = new Set((j.rooms.reserved || []).map(Number)); st.suggested = new Set((j.rooms.mine || []).map(Number));
+                    applyStates(st);
+                    const cur = st.input.value;
+                    if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'Reserved for that time. Pick another room.', 'bad'); }
+                    else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
+                    else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
+                }).catch(() => { });
+        }
+        function reset(form) {
+            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+            st.tok++; st.reserved = new Set(); st.suggested = new Set(); st.tab = 0;
+            st.search.value = ''; clear(st); setHint(st, ''); toggle(st, false); filter(st);
+        }
+
+        return {
+            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); },
+            setWindow: setWindow, reset: reset,
+            value: function (form) { const i = form && form.querySelector('[data-bm-room-input]'); return i ? i.value : ''; }
+        };
+    })();
+    window.RoomPicker = RoomPicker;
+
     /* ================================================================
        BORROW SCHEDULE  (Borrow Request modal: when / how long / how many)
        ----------------------------------------------------------------
@@ -696,11 +907,15 @@
             const w = windowOf(st);
             st.els.durInput.value = st.length || '';
             if (st.els.qty) clampQty(st);
-            if (!w) { st.els.summary.textContent = ''; st.els.summary.classList.remove('has'); setAvail(st, '', ''); st.ok = null; return; }
+            if (!w) { st.els.summary.textContent = ''; st.els.summary.classList.remove('has'); setAvail(st, '', ''); st.ok = null; RoomPicker.setWindow(st.form, null); return; }
             const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
             st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin)) + '</strong></span>';
             st.els.summary.classList.add('has');
-            clearTimeout(st.timer); st.timer = setTimeout(() => check(st, w), 350);
+            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st)); check(st, w); }, 350);
+        }
+        /* window as query-string, shared by the availability and room checks */
+        function windowQuery(st) {
+            return new URLSearchParams({ mode: st.mode, date: st.mode === 'future' ? st.els.date.value : '', time: st.els.time.value, duration: String(st.length) }).toString();
         }
         function setAvail(st, msg, cls) { st.els.avail.textContent = msg; st.els.avail.className = 'bm-avail' + (cls ? ' ' + cls : ''); }
 
@@ -742,6 +957,7 @@
             if (!st.els.time.value) return 'Please choose a start time.';
             if (!st.length) return st.mode === 'today' ? 'Please choose how long you need it.' : 'Please choose how many days.';
             if (st.custom && (st.length < 1 || st.length > maxCustomHours(st))) return 'Custom length must be between 1 and ' + maxCustomHours(st) + ' hours.';
+            if (!RoomPicker.value(st.form)) return 'Please choose a room.';
             if (st.ok === false) return st.els.avail.textContent || 'That schedule is not available.';
             return null;
         }
@@ -763,10 +979,11 @@
             if (st.multi) { st.form.querySelectorAll('input[name="items[]"]').forEach(cb => { cb.checked = false; }); st.form.querySelectorAll('[data-bm-item-status]').forEach(s => { s.textContent = ''; s.className = 'bm-item-status'; }); }
             setMode(st, outNow ? 'future' : 'today');
             setAvail(st, '', '');
+            RoomPicker.reset(st.form);
         }
 
         return {
-            init: function () { document.querySelectorAll('[data-bm-sched]').forEach(setup); },
+            init: function () { RoomPicker.init(); document.querySelectorAll('[data-bm-sched]').forEach(setup); },
             open: function (itemName) {
                 document.querySelectorAll('[data-bm-sched]').forEach(root => { const st = root._bm; if (!st) return; if (!st.multi) st.item = itemName; reset(st); });
             },
@@ -785,8 +1002,6 @@
             // Reset the form fields each time the modal opens
             const form = document.getElementById('borrowForm');
             if (form) {
-                const roomSel = form.querySelector('select[name="room_id"]');
-                if (roomSel) roomSel.selectedIndex = 0;
                 const fileInp = document.getElementById('request_document');
                 if (fileInp) fileInp.value = '';
                 syncBorrowDrops();
@@ -3545,12 +3760,14 @@
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
             overdue: data.filter(r => r.status === 'Overdue').length,
+            waiting: data.filter(r => r.status === 'Waiting').length,
             total: data.length,
         };
-        document.querySelectorAll('.stat-tile[data-stat]').forEach(tile => {
+        // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
+        document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
             const key = tile.dataset.stat;
             if (!(key in counts)) return;
-            const val = tile.querySelector('.stat-tile-value');
+            const val = tile.querySelector('.fdb-kpi-val, .stat-tile-value');
             if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
         });
     }

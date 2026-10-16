@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/api/check-room-availability.php
  *
@@ -65,6 +66,12 @@ $date_obj = DateTime::createFromFormat('Y-m-d', $res_date);
 if (!$date_obj || $date_obj->format('Y-m-d') !== $res_date) {
     http_response_code(400);
     echo json_encode(['error' => 'reservation_date is not a valid calendar date.']);
+    exit;
+}
+// Closed day — no room reservations on Sundays
+if ($date_obj->format('N') === '7') {
+    http_response_code(400);
+    echo json_encode(['error' => 'Reservations are not available on Sundays.']);
     exit;
 }
 

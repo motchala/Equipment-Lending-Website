@@ -111,4 +111,6 @@ $conn->close();
 
 // ── Success response ──────────────────────────────────────────────────────────
 http_response_code(200);
+require_once __DIR__ . '/../../config/admin-activity.php';
+admin_log_activity($conn, 'faculty', ($allow_org_borrowing === 1 ? 'Allowed' : 'Blocked') . ' organization borrowing for ' . $faculty_id);
 echo json_encode(['status' => 'success', 'allow_org_borrowing' => $allow_org_borrowing]);
