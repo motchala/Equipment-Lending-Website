@@ -296,8 +296,18 @@
         document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
         const btn = document.querySelector('.nav-tab[data-tab="' + tabName + '"]');
         if (btn) btn.classList.add('active');
-        // New side-nav-item support
-        document.querySelectorAll('.side-nav-item[data-tab]').forEach(b => b.classList.remove('active'));
+        // New side-nav-item support.
+        // Clear the highlight on EVERY sidebar item, not just the ones with data-tab: Settings
+        // (#nav-settings) has no data-tab, so it used to stay lit after Back/Forward closed the
+        // Settings screen. If an overlay is somehow still open, its own item keeps its highlight.
+        const overlayStillOpen = !!document.querySelector('.overlay-page.active');
+        document.querySelectorAll('.side-nav-item').forEach(b => {
+            if (b.hasAttribute('data-tab') || !overlayStillOpen) b.classList.remove('active');
+        });
+        if (!overlayStillOpen) {
+            const acctToggle = document.getElementById('navAccountToggle');
+            if (acctToggle) acctToggle.classList.remove('active');
+        }
         const sideBtn = document.querySelector('.side-nav-item[data-tab="' + tabName + '"]');
         if (sideBtn) sideBtn.classList.add('active');
         document.querySelectorAll('.tab-panel').forEach(p => {

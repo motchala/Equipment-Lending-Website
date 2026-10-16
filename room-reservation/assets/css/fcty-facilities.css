@@ -15,10 +15,12 @@
 /* ── Local tokens ───────────────────────────────────────────── */
 #rooms-browse,
 .fcty-overlay {
-    --fcty-available: #15803d;
-    --fcty-booked: #c0392b;
-    --fcty-maintenance: #b45309;
-    --fcty-static: #6b7280;
+    /* Status colours are tuned to the dashboard palette (maroon / cream / gold) instead of
+       stock traffic-light colours; each one keeps >= 4.5:1 contrast on its own tinted chip. */
+    --fcty-available: #2a7048;
+    --fcty-booked: #a53a3a;
+    --fcty-maintenance: #86590d;
+    --fcty-static: #6e6466;
 
     --fcty-card: var(--color-surface-lowest, #fff);
     --fcty-line: var(--color-outline-variant, #ddbdbd);
@@ -30,10 +32,10 @@
 
 [data-theme="dark"] #rooms-browse,
 [data-theme="dark"] .fcty-overlay {
-    --fcty-available: #4ade80;
-    --fcty-booked: #f87171;
-    --fcty-maintenance: #fbbf24;
-    --fcty-static: #9ca3af;
+    --fcty-available: #7cc99b;
+    --fcty-booked: #ee9090;
+    --fcty-maintenance: #e6c066;
+    --fcty-static: #b3a6a6;
 }
 
 [data-theme="high-contrast"] #rooms-browse,
@@ -721,35 +723,47 @@
     transform: translateX(16px);
 }
 
-/* Room cards */
+/* Room cards
+   Each room is its own raised card: generous gaps, a soft maroon-tinted shadow and a clearly
+   visible edge keep them from reading as one connected block. Availability is a status chip
+   (dot + label) rather than an edge stripe. */
 #rooms-browse .fcty-room-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(192px, 1fr));
+    gap: 16px;
 }
 
 #rooms-browse .fcty-room {
+    --room-accent: var(--fcty-available);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 16px;
-    min-height: 92px;
-    padding: 16px;
+    align-items: stretch;
+    gap: 20px;
+    min-height: 108px;
+    padding: 16px 16px 14px;
     text-align: left;
     font: inherit;
     color: inherit;
     cursor: pointer;
-    border-radius: 12px;
+    border-radius: 16px;
     background: var(--fcty-card);
-    border: 1px solid var(--fcty-line);
-    box-shadow: inset 3px 0 0 var(--fcty-available);
+    border: 1px solid color-mix(in srgb, var(--fcty-brand) 16%, var(--fcty-line));
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--fcty-brand) 10%, transparent),
+        0 10px 20px -8px color-mix(in srgb, var(--fcty-brand) 34%, transparent);
     transition: border-color .2s, box-shadow .2s, transform .2s;
 }
 
 #rooms-browse .fcty-room:hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--fcty-brand) 45%, var(--fcty-line));
-    box-shadow: inset 3px 0 0 var(--fcty-available), var(--shadow-md);
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--fcty-brand) 48%, var(--fcty-line));
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--fcty-brand) 12%, transparent),
+        0 16px 28px -10px color-mix(in srgb, var(--fcty-brand) 38%, transparent);
+}
+
+#rooms-browse .fcty-room:focus-visible {
+    outline: 2px solid var(--fcty-brand);
+    outline-offset: 3px;
 }
 
 #rooms-browse .fcty-room-name {
@@ -763,61 +777,81 @@
 #rooms-browse .fcty-room-foot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 8px;
 }
 
+/* Status chip: dot + label on a soft tint of the status colour */
 #rooms-browse .fcty-room-status {
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    padding: 4px 12px 4px 10px;
+    border-radius: 9999px;
     font-size: .75rem;
-    font-weight: 600;
-    color: var(--fcty-muted);
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: .01em;
+    color: var(--room-accent);
+    background: color-mix(in srgb, var(--room-accent) 12%, var(--fcty-card));
+}
+
+#rooms-browse .fcty-room .fcty-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--room-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--room-accent) 22%, transparent);
 }
 
 #rooms-browse .fcty-room.status-booked {
-    box-shadow: inset 3px 0 0 var(--fcty-booked);
-}
-
-#rooms-browse .fcty-room.status-booked:hover {
-    box-shadow: inset 3px 0 0 var(--fcty-booked), var(--shadow-md);
-}
-
-#rooms-browse .fcty-room.status-booked .fcty-dot {
-    background: var(--fcty-booked);
+    --room-accent: var(--fcty-booked);
 }
 
 #rooms-browse .fcty-room.status-maintenance {
-    box-shadow: inset 3px 0 0 var(--fcty-maintenance);
+    --room-accent: var(--fcty-maintenance);
 }
 
-#rooms-browse .fcty-room.status-maintenance:hover {
-    box-shadow: inset 3px 0 0 var(--fcty-maintenance), var(--shadow-md);
-}
-
-#rooms-browse .fcty-room.status-maintenance .fcty-dot {
-    background: var(--fcty-maintenance);
-}
-
+/* Not bookable: quieter and flat, but still easy to read */
 #rooms-browse .fcty-room.status-static {
+    --room-accent: var(--fcty-static);
     cursor: not-allowed;
-    background: var(--fcty-soft);
-    border-style: dashed;
+    background: color-mix(in srgb, var(--fcty-soft) 55%, var(--fcty-card));
+    border: 1px solid color-mix(in srgb, var(--fcty-line) 75%, transparent);
     box-shadow: none;
 }
 
 #rooms-browse .fcty-room.status-static:hover {
     transform: none;
-    border-color: var(--fcty-line);
-}
-
-#rooms-browse .fcty-room.status-static .fcty-dot {
-    background: var(--fcty-static);
+    border-color: color-mix(in srgb, var(--fcty-line) 75%, transparent);
+    box-shadow: none;
 }
 
 #rooms-browse .fcty-room.status-static .fcty-room-name {
     color: var(--fcty-muted);
+    font-weight: 600;
+}
+
+#rooms-browse .fcty-room.status-static .fcty-room-status {
+    background: color-mix(in srgb, var(--fcty-static) 10%, transparent);
+}
+
+#rooms-browse .fcty-room.status-static .fcty-dot {
+    box-shadow: none;
+}
+
+@media (max-width: 560px) {
+    #rooms-browse .fcty-room-grid {
+        gap: 12px;
+    }
+
+    #rooms-browse .fcty-room {
+        min-height: 96px;
+        padding: 14px 14px 12px;
+    }
+
+    #rooms-browse .fcty-room-name {
+        font-size: .875rem;
+    }
 }
 
 /* Empty state */
