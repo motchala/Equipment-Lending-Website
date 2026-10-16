@@ -441,10 +441,19 @@ if (isset($_GET['force_delete'])) {
 
 // ================= FETCH ALL REQUESTS =================
 
+// Supporting-letter requests from Organization Advisers are reviewed only by
+// a Super Admin.  The session role was refreshed by admin_session_guard().
+$can_view_sensitive_adviser_requests = (($_SESSION['admin_role'] ?? '') === 'Super Admin');
+$sensitive_adviser_request_sql = "(tbl_requests.submitted_as = 'adviser' AND COALESCE(tbl_requests.document_path, '') <> '')";
+
 $waiting_sql = "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
                 FROM tbl_requests
                 LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
                 WHERE tbl_requests.status='Waiting'";
+
+if (!$can_view_sensitive_adviser_requests) {
+    $waiting_sql .= " AND NOT {$sensitive_adviser_request_sql}";
+}
 
 if (!empty($_GET['waiting_search'])) {
     $search = "%" . $_GET['waiting_search'] . "%";

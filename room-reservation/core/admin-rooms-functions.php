@@ -852,9 +852,15 @@ foreach ($rooms_list as $r) {
 // Archived rooms (for the Archived sub-panel)
 $rooms_archived = ps_load_archived_rooms($conn);
 
+// Attached Organization Adviser reservations are confidential review items.
+// Other admins must not receive them in the Reservations table at all.
+$ps_rooms_can_view_sensitive_adviser_requests = admin_is_super_admin($conn);
+$ps_rooms_sensitive_reservation_sql = "(rr.submitted_as = 'adviser' AND COALESCE(rr.document_path, '') <> '')";
+
 // ── All room reservations (admin read-only view) ──────────────────────────
 $admin_room_reservations_result = $conn->query(
     "SELECT rr.id, rr.room_id, rr.reservation_date,
+            rr.start_time, rr.end_time,
             TIME_FORMAT(rr.start_time, '%h:%i %p') AS start_fmt,
             TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,
             rr.faculty_name, rr.submitted_as, rr.submitted_by_name,
@@ -863,12 +869,23 @@ $admin_room_reservations_result = $conn->query(
             r.room_name,
             b.name AS building_name,
             COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label,
-            c.campus_name
+            c.campus_name,
+            ral.rule_applied AS arb_rule,
+            ral.reason       AS arb_reason
        FROM tbl_room_reservations rr
        JOIN tbl_rooms     r ON r.room_id     = rr.room_id
        JOIN tbl_buildings b ON b.building_id = r.building_id
        JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
-      WHERE rr.status <> 'Declined'
+       /* A reservation may have an earlier automatic approval followed by a
+          later arbitration decision.  The drawer must show its latest one. */
+       LEFT JOIN tbl_room_arbitration_log ral ON ral.id = (
+           SELECT latest.id
+             FROM tbl_room_arbitration_log latest
+            WHERE latest.reservation_id = rr.id
+            ORDER BY latest.id DESC
+            LIMIT 1
+       )
+      " . ($ps_rooms_can_view_sensitive_adviser_requests ? '' : "WHERE NOT {$ps_rooms_sensitive_reservation_sql}") . "
       ORDER BY rr.reservation_date DESC, rr.start_time ASC"
 );
 $admin_room_reservations = [];

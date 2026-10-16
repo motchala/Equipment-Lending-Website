@@ -264,6 +264,20 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $stmt_ins->execute();
             $new_request_id = $conn->insert_id;
             $stmt_ins->close();
+            // An Organization Adviser request with a supporting letter is a
+            // Super-Admin review item.  It must not be auto-decided by the
+            // arbitration engine before that review happens.
+            if ($rel_path !== null) {
+                $hold = $conn->prepare("UPDATE tbl_requests SET reason = 'Awaiting Super Admin review.' WHERE id = ? AND status = 'Waiting'");
+                if ($hold) {
+                    $hold->bind_param('i', $new_request_id);
+                    $hold->execute();
+                    $hold->close();
+                }
+                $kept_items++;
+                continue;
+            }
+
             ArbitrationEngine::process($conn, $new_request_id);
             // A declined request is never kept: drop it and report the reason on the spot.
             $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);

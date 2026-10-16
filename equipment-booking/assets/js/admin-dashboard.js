@@ -3143,7 +3143,7 @@
                 history.replaceState({ tab: 'dashboard' }, '');
                 return; // leave the default dashboard panel active
             }
-        } catch (_) {}
+        } catch (_) { }
 
         const params = new URLSearchParams(window.location.search);
         const view = params.get('view');
@@ -3230,7 +3230,7 @@
                 (e.shiftKey && (e.key === 'r' || e.key === 'R')) ||
                 e.key === 'F5'
             )) {
-                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) {}
+                try { sessionStorage.setItem('adminHardRefresh', '1'); } catch (_) { }
             }
         });
 
@@ -3288,7 +3288,7 @@
                     // Update URL param silently so a refresh re-applies the filter.
                     const url = new URL(window.location.href);
                     if (q) { url.searchParams.set('arb_log_search', q); }
-                    else   { url.searchParams.delete('arb_log_search'); }
+                    else { url.searchParams.delete('arb_log_search'); }
                     history.replaceState(history.state, '', url.toString());
                 }, 300);
             });
@@ -4173,8 +4173,61 @@ function psSelectFmt(btn) {
             }
         }
 
-        // Cancel is only offered for Approved reservations (same rule as the table).
-        el('ps-rr-cancel-btn').hidden = !row.querySelector('.btn-cancel-rr-admin');
+        // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
+        el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
+
+        // Decision context. The room arbitration log records the rule used for
+        // automatic decisions; an override/manual value denotes an admin decision.
+        var arbRule   = d.arbRule   || '';
+        var arbReason = d.arbReason || d.reason || '';
+        var hasDoc    = !!d.docUrl;
+        var decSec    = el('ps-rr-decision-sec');
+        if (decSec) {
+            var ruleMap = {
+                'rule_1_fifo':           'FIFO (first submitted)',
+                'rule_2_signatory':      'Request-letter/signatory priority',
+                'rule_3_role':           'Submitter role priority',
+                'rule_4_return_history': 'Return-history priority',
+                'rule_5_id_order':       'ID order tie-breaker',
+                'rule_past_datetime':    'Past date or time',
+                'rule_archived':          'Room availability policy',
+                'rule_missing_doc_hold':  'Supporting-document policy',
+                'rule_schedule_conflict': 'Schedule conflict',
+                'override':              'Admin override',
+                'manual':                'Manual admin decision'
+            };
+            var ruleLabel = ruleMap[arbRule] || (arbRule
+                ? arbRule.replace(/^rule_\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })
+                : 'Not recorded');
+            var isManual = arbRule === 'override' || arbRule === 'manual';
+            var isAuto   = arbRule !== '' && !isManual;
+            var methodLabel;
+            if (isManual) {
+                methodLabel = 'Manual (admin decision)';
+            } else if (isAuto) {
+                methodLabel = arbRule === 'rule_1_fifo' ? 'Automatic (FIFO)' : 'Automatic (priority rules)';
+            } else {
+                methodLabel = 'Not recorded';
+            }
+            var methodEl = el('ps-rr-dec-method');
+            if (methodEl) methodEl.textContent = methodLabel;
+
+            var ruleRow = el('ps-rr-dec-rule-row');
+            var ruleEl  = el('ps-rr-dec-rule');
+            if (ruleRow && ruleEl) {
+                ruleRow.hidden = false;
+                ruleEl.textContent = ruleLabel;
+            }
+
+            // Reason row
+            var reasonRow = el('ps-rr-dec-reason-row');
+            var reasonEl  = el('ps-rr-dec-reason');
+            if (reasonRow && reasonEl) {
+                reasonRow.hidden = false;
+                reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
+            }
+            decSec.hidden = false;
+        }
 
         if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
     }
@@ -4252,6 +4305,157 @@ function psSelectFmt(btn) {
     function longDate(s) { var d = parseYmd(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
     function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
 
+    /* ── context under the chart ─────────────────────────────── */
+    function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+    function share(a, b) { return b ? Math.round(a / b * 100) : 0; }
+    function rangeSum(vals, a, b) { var t = 0; for (var i = a; i < b; i++) t += vals[i] || 0; return t; }
+    function span(from, to) {
+        var a = parseYmd(from), b = parseYmd(to);
+        return shortDate(from) + ' – ' + (a.getMonth() === b.getMonth() ? b.getDate() : shortDate(to));
+    }
+    function trendChip(cur, prev, unitWord) {
+        // cur / prev: numbers; returns '' when there is nothing to compare
+        if (prev == null) return '';
+        if (prev === 0) return cur > 0 ? { dir: 'up', text: 'new' } : '';
+        var d = Math.round((cur - prev) / prev * 100);
+        return { dir: d > 0 ? 'up' : (d < 0 ? 'down' : 'flat'), text: d === 0 ? 'no change' : Math.abs(d) + '%' };
+    }
+    function chipHtml(t, tail) {
+        if (!t) return '';
+        var icon = t.dir === 'up' ? 'trending_up' : (t.dir === 'down' ? 'trending_down' : 'trending_flat');
+        return '<em class="dash-delta is-' + t.dir + '"><span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>' +
+            esc(t.text) + (tail ? ' <small>' + esc(tail) + '</small>' : '') + '</em>';
+    }
+
+    /* Busiest day(s) for 7D / 14D, busiest week for 30D, plus a few "at a glance" facts. */
+    function insightsHtml(c) {
+        var unit = c.set.unit, units = unit + 's', n = c.n, N = c.N;
+        var lead = '', rows = '', note = '', heading = '';
+
+        if (n <= 14) {
+            heading = 'Busiest days';
+            var order = [];
+            c.totals.forEach(function (t, i) { if (t > 0) order.push({ i: i, t: t }); });
+            order.sort(function (a, b) { return b.t - a.t || b.i - a.i; });   // ties: most recent first
+            var top = order[0].t;
+            var tied = order.filter(function (x) { return x.t === top; });
+            var dayName = function (i) { return i === n - 1 ? 'Today (' + longDate(c.labels[i]) + ')' : longDate(c.labels[i]); };
+            if (top < 2) {
+                lead = 'Activity was light: no day had more than one ' + unit + '.';
+            } else if (tied.length >= 3) {
+                lead = 'No single busiest day: <b>' + tied.length + ' days</b> tied at ' + plural(top, unit) + ' each.';
+            } else {
+                var picks = [order[0]];
+                // a second day only counts if it is close to the first (at least 60% of it, and 2+)
+                if (order[1] && order[1].t >= Math.max(2, Math.ceil(top * 0.6))) picks.push(order[1]);
+                var pt = picks.reduce(function (a, p) { return a + p.t; }, 0);
+                var chrono = picks.slice().sort(function (a, b) { return a.i - b.i; });
+                lead = chrono.map(function (p) { return '<b>' + esc(dayName(p.i)) + '</b>'; }).join(' and ') +
+                    (picks.length > 1 ? ' were the busiest days: ' + plural(pt, unit) + ' together' : ' was the busiest day: ' + plural(pt, unit)) +
+                    ', ' + share(pt, c.grand) + '% of all ' + units + '.';
+                rows = picks.map(function (p) {
+                    return '<li class="is-top"><span class="dash-rank-name">' + esc(dayName(p.i)) + '</span>' +
+                        '<span class="dash-rank-bar"><i style="width:' + Math.round(p.t / top * 100) + '%"></i></span>' +
+                        '<span class="dash-rank-val"><b>' + p.t + '</b><small>' + share(p.t, c.grand) + '%</small></span></li>';
+                }).join('');
+            }
+        } else {
+            heading = 'Busiest week';
+            var wk = [], wsum = 0, wmax = 0;
+            for (var w = 0; w < 4; w++) {
+                var st = n - 28 + w * 7, en = st + 7, tot = rangeSum(c.totals, st, en);
+                wk.push({ w: w + 1, t: tot, from: c.labels[st], to: c.labels[en - 1] });
+                wsum += tot; if (tot > wmax) wmax = tot;
+            }
+            var best = wk.filter(function (x) { return x.t === wmax; });
+            if (wsum === 0) {
+                lead = 'No ' + units + ' in the last 4 weeks.';
+            } else if (best.length === 1) {
+                lead = '<b>Week ' + best[0].w + '</b> (' + esc(span(best[0].from, best[0].to)) + ') was the busiest: ' +
+                    plural(wmax, unit) + ', ' + share(wmax, wsum) + '% of the last 4 weeks.';
+            } else if (best.length === 2) {
+                lead = '<b>Weeks ' + best[0].w + ' and ' + best[1].w + '</b> tied for busiest at ' + plural(wmax, unit) + ' each.';
+            } else {
+                lead = 'Activity was spread evenly across the weeks.';
+            }
+            var w3 = wk[2].t, w4 = wk[3].t;
+            if (wsum > 0 && (w3 > 0 || w4 > 0)) {
+                if (w3 === 0) lead += ' The latest week is the first with any activity.';
+                else {
+                    var dw = Math.round((w4 - w3) / w3 * 100);
+                    lead += ' The latest week is ' + (dw === 0 ? 'level with' : Math.abs(dw) + '% ' + (dw > 0 ? 'above' : 'below')) + ' the week before.';
+                }
+            }
+            if (wsum > 0) {
+                rows = wk.map(function (x) {
+                    var isTop = x.t === wmax && wmax > 0;
+                    return '<li' + (isTop ? ' class="is-top"' : '') + '><span class="dash-rank-name">Week ' + x.w +
+                        '<small>' + esc(span(x.from, x.to)) + (x.w === 4 ? ' · latest' : '') + '</small></span>' +
+                        '<span class="dash-rank-bar"><i style="width:' + (wmax ? Math.round(x.t / wmax * 100) : 0) + '%"></i></span>' +
+                        '<span class="dash-rank-val"><b>' + x.t + '</b><small>' + share(x.t, wsum) + '%</small></span></li>';
+                }).join('');
+                note = '<p class="dash-ins-note">Weeks are 7-day blocks counting back from today (the most recent 28 days).</p>';
+            }
+        }
+
+        /* at a glance */
+        var sers = c.set.series;
+        function outcome(a, b) {
+            var ap = 0, de = 0;
+            sers.forEach(function (s) {
+                if (s.key === 'approved') ap = rangeSum(s.values, a, b);
+                if (s.key === 'declined') de = rangeSum(s.values, a, b);
+            });
+            return { ap: ap, de: de, rate: (ap + de) > 0 ? Math.round(ap / (ap + de) * 100) : null };
+        }
+        var cur = outcome(N - n, N);
+        var prev = N >= 2 * n ? outcome(N - 2 * n, N - n) : null;
+        var rateDelta = '';
+        if (cur.rate != null && prev && prev.rate != null) {
+            var pts = cur.rate - prev.rate;
+            rateDelta = chipHtml({ dir: pts > 0 ? 'up' : (pts < 0 ? 'down' : 'flat'), text: pts === 0 ? 'no change' : Math.abs(pts) + ' pts' }, 'vs previous ' + n + ' days');
+        }
+        var quiet = c.totals.filter(function (t) { return t === 0; }).length;
+
+        var facts = '';
+        function fact(label, value, small, extra) {
+            facts += '<div class="dash-fact"><dt>' + esc(label) + '</dt><dd>' + value + (small ? ' <small>' + small + '</small>' : '') + (extra || '') + '</dd></div>';
+        }
+        fact('Daily average', '<b>' + (c.grand / n).toFixed(1) + '</b>', 'per day');
+        fact('Approval rate',
+            cur.rate == null ? '<b>—</b>' : '<b>' + cur.rate + '%</b>',
+            cur.rate == null ? 'nothing decided yet' : cur.ap + ' approved · ' + cur.de + ' declined',
+            rateDelta);
+
+        var ex = c.data.extras && c.data.extras[state.set];
+        if (ex) {
+            var bestRow = null, bestSum = 0;
+            (ex.rows || []).forEach(function (r) {
+                var t = rangeSum(r.values, N - n, N);
+                if (t > bestSum) { bestSum = t; bestRow = r; }
+            });
+            if (state.set === 'equipment') {
+                if (cur.de === 0) fact(ex.title, '<b>None</b>', 'nothing was declined');
+                else if (bestRow) fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + cur.de + ' declined');
+            } else if (bestRow) {
+                fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + plural(cur.ap, 'booking') + (bestRow.sub ? ' · ' + esc(bestRow.sub) : ''));
+            }
+        }
+        fact('Days with no activity', '<b>' + quiet + ' <span class="dash-of">of ' + n + '</span></b>');
+
+        return '<section class="dash-ins-col"><h3>' + esc(heading) + '</h3><p class="dash-ins-lead">' + lead + '</p>' +
+            (rows ? '<ul class="dash-rank">' + rows + '</ul>' : '') + note + '</section>' +
+            '<section class="dash-ins-col"><h3>At a glance</h3>' +
+            '<div class="dash-ins-more" aria-expanded="false">' +
+            '<dl class="dash-facts">' + facts + '</dl>' +
+            '</div>' +
+            '<button type="button" class="dash-ins-toggle" aria-expanded="false">' +
+            '<span class="dash-ins-toggle-label">See more</span>' +
+            '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span>' +
+            '</button>' +
+            '</section>';
+    }
+
     /* ── chart ───────────────────────────────────────────────── */
     function drawChart(wrap) {
         var data = wrap._data;
@@ -4269,53 +4473,76 @@ function psSelectFmt(btn) {
 
         var chartEl = wrap.querySelector('[data-dash-chart]');
         var sumEl = wrap.querySelector('[data-dash-summary]');
-        var legEl = wrap.querySelector('[data-dash-legend]');
+        var insEl = wrap.querySelector('[data-dash-insights]');
+        var N = data.labels.length;
 
-        /* summary tiles */
-        var approved = 0, declined = 0;
-        series.forEach(function (s) {
-            if (s.key === 'approved') approved = sum(s.values);
-            if (s.key === 'declined') declined = sum(s.values);
+        /* tallest day: only used to pick a sensible (invisible) scale for the bars */
+        var peak = 0;
+        totals.forEach(function (t) { if (t > peak) peak = t; });
+
+        /* summary: ONE headline number, then how it was decided.
+           (The old approval-rate / daily-average / busiest-day tiles and the
+           separate legend are gone; per-day detail is still on hover.) */
+        var parts = series.map(function (s) {
+            return { key: s.key, label: s.label.toLowerCase(), n: sum(s.values) };
         });
-        var rate = (approved + declined) > 0 ? Math.round(approved / (approved + declined) * 100) + '%' : '—';
-        var peak = 0, peakI = -1;
-        totals.forEach(function (t, i) { if (t > peak) { peak = t; peakI = i; } });
+        var unit = set.unit + (grand === 1 ? '' : 's');
+        var splitHtml = '';
+        if (grand > 0) {
+            var sx = 0;
+            splitHtml = '<div class="dash-split"><svg viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
+            parts.forEach(function (p) {
+                if (!p.n) return;
+                var w = p.n / grand * 100;
+                splitHtml += '<rect class="dash-s-' + esc(p.key) + '" x="' + sx + '" y="0" width="' + w + '" height="1"/>';
+                sx += w;
+            });
+            splitHtml += '</svg></div>';
+        }
+        /* how the headline compares with the period just before it (needs 2n days of history) */
+        var prevTotal = null;
+        if (N >= 2 * n) {
+            prevTotal = 0;
+            set.series.forEach(function (s) { prevTotal += rangeSum(s.values, N - 2 * n, N - n); });
+        }
         sumEl.innerHTML =
-            '<div class="dash-sum"><span>Total ' + esc(set.unit) + 's</span><strong>' + grand + '</strong></div>' +
-            '<div class="dash-sum"><span>Approval rate</span><strong>' + rate + '</strong></div>' +
-            '<div class="dash-sum"><span>Daily average</span><strong>' + (grand / n).toFixed(1) + '</strong></div>' +
-            '<div class="dash-sum"><span>Busiest day</span><strong>' + (peakI >= 0 ? esc(shortDate(labels[peakI])) + ' · ' + peak : '—') + '</strong></div>';
+            '<div class="dash-sum-head"><strong>' + grand + '</strong><span>' + esc(unit) + ' <small>in the last ' + n + ' days</small></span>' +
+            chipHtml(trendChip(grand, prevTotal), 'vs previous ' + n + ' days') + '</div>' +
+            splitHtml +
+            (grand > 0
+                ? '<ul class="dash-sum-legend">' + parts.map(function (p) {
+                    return '<li' + (p.n ? '' : ' class="is-zero"') + '><i class="k-' + esc(p.key) + '"></i><b>' + p.n + '</b> ' + esc(p.label) + '</li>';
+                }).join('') + '</ul>'
+                : '');
 
-        /* legend */
-        legEl.innerHTML = series.map(function (s) {
-            return '<span><i class="k-' + esc(s.key) + '"></i>' + esc(s.label) + ' (' + sum(s.values) + ')</span>';
-        }).join('');
-
-        chartEl.setAttribute('aria-label', set.title + ', last ' + n + ' days: ' + grand + ' total, approval rate ' + rate + '.');
+        chartEl.setAttribute('aria-label', set.title + ', last ' + n + ' days: ' + grand + ' total' +
+            (grand > 0 ? ' (' + parts.map(function (p) { return p.n + ' ' + p.label; }).join(', ') + ')' : '') + '.');
 
         if (grand === 0) {
             chartEl.innerHTML = '<div class="dash-chart-empty">No ' + esc(set.unit) + 's in the last ' + n + ' days.</div>';
+            if (insEl) insEl.innerHTML = '';
             return;
+        }
+
+        if (insEl) {
+            insEl.innerHTML = insightsHtml({ data: data, set: set, n: n, N: N, labels: labels, totals: totals, grand: grand });
         }
 
         /* geometry */
         var W = Math.max(240, chartEl.clientWidth || 600);
         var H = Math.max(200, chartEl.clientHeight || 230);
-        var m = { l: 26, r: 4, t: 8, b: 24 };
+        var m = { l: 4, r: 4, t: 8, b: 24 };
         var pw = W - m.l - m.r, ph = H - m.t - m.b;
         var step = Math.max(1, Math.ceil(peak / 4));
         var top = step * 4;
         var slot = pw / n;
         var bw = Math.max(4, Math.min(30, slot * 0.64));
-        var every = n <= 7 ? 1 : (n <= 14 ? 2 : 5);
+        var every = n <= 7 ? 1 : (n <= 14 ? 7 : 10);   // 7D: every day · 14D / 30D: just a few dates
 
         var out = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">';
 
-        for (var g = 0; g <= 4; g++) {
-            var gy = m.t + ph - (ph * g / 4);
-            out += '<line class="dash-grid-line" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + gy + '" y2="' + gy + '"/>';
-            out += '<text class="dash-axis-text" x="' + (m.l - 6) + '" y="' + (gy + 3.5) + '" text-anchor="end">' + (step * g) + '</text>';
-        }
+        /* just a baseline: bar heights are relative, exact counts show on hover */
+        out += '<line class="dash-baseline" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (m.t + ph) + '" y2="' + (m.t + ph) + '"/>';
 
         labels.forEach(function (lab, i) {
             var gx = m.l + slot * i;
@@ -4332,7 +4559,7 @@ function psSelectFmt(btn) {
             out += '</g>';
             if ((n - 1 - i) % every === 0) {
                 var isToday = i === n - 1;
-                out += '<text class="dash-axis-text' + (isToday ? ' dash-today-text' : '') + '" x="' + (gx + slot / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(isToday ? 'Today' : shortDate(lab)) + '</text>';
+                out += '<text class="dash-axis-text' + (isToday ? ' dash-today-text' : '') + '" x="' + (gx + slot / 2) + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(isToday ? 'Today' : (n <= 7 ? DOW[parseYmd(lab).getDay()] : shortDate(lab))) + '</text>';
             }
         });
         out += '</svg><div class="dash-tip" role="presentation"></div>';
@@ -4385,6 +4612,17 @@ function psSelectFmt(btn) {
         });
     }
 
+    /* toggle "See more" in the insights panel */
+    root.addEventListener('click', function (e) {
+        var btn = e.target.closest('.dash-ins-toggle');
+        if (!btn) return;
+        var expanded = btn.getAttribute('aria-expanded') === 'true';
+        var more = btn.previousElementSibling;
+        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        if (more) more.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        btn.querySelector('.dash-ins-toggle-label').textContent = expanded ? 'See more' : 'See less';
+    });
+
     /* redraw when the card's width changes (sidebar collapse, rotate, resize) */
     if (window.ResizeObserver) {
         var lastW = 0;
@@ -4431,10 +4669,6 @@ function psSelectFmt(btn) {
     });
 
     /* ── live refresh ────────────────────────────────────────── */
-    function stamp() {
-        var el = document.getElementById('dashUpdated');
-        if (el) el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    }
     function dashboardVisible() {
         var panel = document.getElementById('panel-dashboard');
         return !!panel && panel.classList.contains('active') && !document.hidden;
@@ -4454,7 +4688,7 @@ function psSelectFmt(btn) {
         }).then(function (html) {
             if (html == null) return;
             if (html.indexOf('dash-kpis') === -1) { stopped = true; return; }
-            if (html === lastHtml) { stamp(); return; }
+            if (html === lastHtml) return;
             lastHtml = html;
 
             // keep keyboard focus on a chart toggle across the swap
@@ -4466,7 +4700,6 @@ function psSelectFmt(btn) {
             live.innerHTML = html;
             initCharts();
             if (refocus) { var f = live.querySelector(refocus); if (f) f.focus({ preventScroll: true }); }
-            stamp();
         }).catch(function () { /* transient network error: try again next tick */ })
             .then(function () { inflight = false; });
     }

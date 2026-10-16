@@ -87,6 +87,31 @@ if (!function_exists('dash_ago')) {
     }
 }
 
+/** Admin-facing wording for the reason code stored on a declined request. */
+if (!function_exists('dash_decline_label')) {
+    function dash_decline_label(?string $rule): string
+    {
+        $rule = trim((string)$rule);
+        if ($rule === '' || $rule === 'other') return 'Other / unspecified';
+        static $map = [
+            'rule_out_of_stock'          => 'Out of stock',
+            'rule_archived'              => 'Item no longer available',
+            'rule_overdue_block'         => 'Borrower has an overdue item',
+            'rule_overdue_block_enabled' => 'Borrower has an overdue item',
+            'rule_duplicate_block'       => 'Duplicate request',
+            'rule_duplicate_block_enabled' => 'Duplicate request',
+            'rule_missing_doc_hold'      => 'Supporting document missing',
+            'rule_past_datetime'         => 'Date/time already passed',
+            'rule_schedule_conflict'     => 'Schedule conflict',
+            'override'                   => 'Declined manually by an admin',
+        ];
+        if (isset($map[$rule])) return $map[$rule];
+        // rule_1_fifo … rule_5_id_order = the request lost a priority contest
+        if (preg_match('/^rule_[1-5]_/', $rule)) return 'Lost to a higher-priority request';
+        return ucfirst(trim(str_replace('_', ' ', preg_replace('/^rule_(\d+_)?/', '', $rule))));
+    }
+}
+
 /** Collect everything the dashboard shows. */
 function dash_collect(mysqli $conn): array
 {
@@ -135,16 +160,18 @@ function dash_collect(mysqli $conn): array
         [$today, $today, $nowT]
     );
 
-    // ── Activity chart (last 30 days, both datasets; the range toggle is client-side) ──
+    // ── Activity chart: 60 days of history, both datasets. The 7D / 14D / 30D toggle is client-side;
+    //    the extra days let each range be compared with the period right before it. ──
     $labels = [];
-    for ($i = 29; $i >= 0; $i--) {
+    for ($i = 59; $i >= 0; $i--) {
         $labels[] = date('Y-m-d', strtotime("-$i day", strtotime($today)));
     }
     $idx   = array_flip($labels);
-    $zeros = array_fill(0, 30, 0);
+    $zeros = array_fill(0, 60, 0);
     $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros];
     $rm    = ['approved' => $zeros, 'declined' => $zeros, 'cancelled' => $zeros];
     $from  = $labels[0] . ' 00:00:00';
+    $from30 = $labels[30] . ' 00:00:00';   // the 30-day panels below (Most requested) keep a 30-day window
 
     foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_requests WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
         if (!isset($idx[$r['d']])) continue;
@@ -158,6 +185,36 @@ function dash_collect(mysqli $conn): array
         $k = strtolower($r['status']);
         if (isset($rm[$k])) $rm[$k][$idx[$r['d']]] += (int)$r['c'];
     }
+    // Context behind the chart: why requests were declined, and which rooms are booked most.
+    // Each row carries one count per day (same 60-day axis) so the browser can total it for any range.
+    $reasons = [];
+    foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, COALESCE(NULLIF(arbitration_rule,''),'other') AS r, COUNT(*) AS c FROM tbl_requests WHERE status='Declined' AND request_date >= ? GROUP BY DATE(request_date), COALESCE(NULLIF(arbitration_rule,''),'other')", 's', [$from]) as $r) {
+        if (!isset($idx[$r['d']])) continue;
+        $lab = dash_decline_label($r['r']);
+        if (!isset($reasons[$lab])) $reasons[$lab] = ['label' => $lab, 'values' => $zeros];
+        $reasons[$lab]['values'][$idx[$r['d']]] += (int)$r['c'];
+    }
+    $roomsTop = [];
+    foreach (
+        dash_rows($conn, "SELECT DATE(r.request_date) AS d, r.room_id, rm.room_name, b.name AS building, COUNT(*) AS c
+                                 FROM tbl_room_reservations r
+                            LEFT JOIN tbl_rooms rm    ON rm.room_id = r.room_id
+                            LEFT JOIN tbl_buildings b ON b.building_id = rm.building_id
+                                WHERE r.status='Approved' AND r.request_date >= ?
+                             GROUP BY DATE(r.request_date), r.room_id, rm.room_name, b.name", 's', [$from]) as $r
+    ) {
+        if (!isset($idx[$r['d']])) continue;
+        $key = (string)$r['room_id'];
+        if (!isset($roomsTop[$key])) {
+            $roomsTop[$key] = ['label' => $r['room_name'] ?: ('Room #' . $r['room_id']), 'sub' => (string)($r['building'] ?? ''), 'values' => $zeros];
+        }
+        $roomsTop[$key]['values'][$idx[$r['d']]] += (int)$r['c'];
+    }
+    $byTotal = static function (array $rows, int $keep): array {
+        usort($rows, static fn($a, $b) => array_sum($b['values']) <=> array_sum($a['values']));
+        return array_values(array_slice($rows, 0, $keep));
+    };
+
     $d['chart'] = [
         'labels' => $labels,
         'sets'   => [
@@ -172,6 +229,10 @@ function dash_collect(mysqli $conn): array
                 ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $rm['cancelled']],
             ]],
         ],
+        'extras' => [
+            'equipment' => ['title' => 'Top decline reason', 'rows' => $byTotal($reasons, 4)],
+            'rooms'     => ['title' => 'Most booked room',   'rows' => $byTotal($roomsTop, 5)],
+        ],
     ];
 
     // ── Most requested equipment (30 days) ───────────────────────────────
@@ -185,7 +246,7 @@ function dash_collect(mysqli $conn): array
        ORDER BY total DESC, equipment_name ASC
           LIMIT 5",
         's',
-        [$from]
+        [$from30]
     );
 
     // ── Latest requests + decision log ───────────────────────────────────
@@ -387,7 +448,7 @@ function dash_render(array $d): void
             <div class="dash-chart-wrap" data-chart="<?php echo dash_h(json_encode($d['chart'], JSON_UNESCAPED_UNICODE)); ?>">
                 <div class="dash-chart-sum" data-dash-summary></div>
                 <div class="dash-chart" data-dash-chart role="img" aria-label="Bar chart of requests per day"></div>
-                <div class="dash-legend" data-dash-legend></div>
+                <div class="dash-insights" data-dash-insights></div>
             </div>
         </section>
 
@@ -1170,23 +1231,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         $hour = (int)date('H');
                                         echo $hour < 12 ? 'morning' : ($hour < 18 ? 'afternoon' : 'evening');
                                         ?>, <span id="greetName"><?php echo htmlspecialchars(explode(' ', $admin_name)[0]); ?></span>.</h1>
-                            <p>
-                                <?php echo date('l, F j, Y'); ?>
-                                <span class="dash-live" title="This page refreshes itself every few seconds">
-                                    <span class="dash-live-dot" aria-hidden="true"></span>Live &middot; updated <span id="dashUpdated"><?php echo date('g:i A'); ?></span>
-                                </span>
-                            </p>
+                            <p><?php echo date('l, F j, Y'); ?></p>
                         </div>
                         <div class="dash-head-tools">
+                            <!-- One quick action left on purpose: confirming a return by QR code has no other entry point
+                                 on this screen. "Review approvals" and "Add equipment" were removed because the
+                                 Pending approvals card and the Needs attention list already lead to the same places.
+                                 Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
                             <div class="dash-actions">
-                                <button type="button" class="dash-btn dash-btn--primary" data-action="go-lending" data-lending="waiting">
-                                    <span class="material-symbols-outlined" aria-hidden="true">assignment_turned_in</span>Review approvals
-                                </button>
-                                <button type="button" class="dash-btn" data-action="go-lending" data-lending="inventory">
-                                    <span class="material-symbols-outlined" aria-hidden="true">add_box</span>Add equipment
-                                </button>
-                                <!-- Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
-                                <button type="button" class="dash-btn" id="openQrScannerBtn">
+                                <button type="button" class="dash-btn dash-btn--primary" id="openQrScannerBtn">
                                     <span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>Scan return
                                 </button>
                             </div>
@@ -2373,13 +2426,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="pr-card">
                         <div class="pr-card-header">
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
-                        </div>
-                        <div class="rm-fbar">
                             <div class="pr-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="rrSearch" placeholder="Search room or name" autocomplete="off">
+                                <input type="text" id="rrSearch" placeholder="Search room or name" autocomplete="off" aria-label="Search reservations">
                             </div>
-                            <select id="rrStatus" class="pr-filter-select" aria-label="Status">
+                        </div>
+                        <div class="rr-status-bar">
+                            <button type="button" class="rm-chip rr-active-chip" id="rrActiveToday" aria-pressed="false">
+                                <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today
+                            </button>
+                            <select id="rrStatus" class="pr-filter-select" aria-label="Reservation status">
                                 <option value="all">All statuses</option>
                                 <option value="Approved">Approved</option>
                                 <option value="Cancelled">Cancelled</option>
@@ -2414,6 +2470,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             $ar_doc     = ps_doc_info($ar['document_path'] ?? '');
                                             $ar_where   = $ar['floor_label'] . ', ' . $ar['building_name'];
                                             $ar_time    = $ar['start_fmt'] . ' - ' . $ar['end_fmt'];
+                                            // Cancellable: Approved AND the reservation end hasn't passed yet
+                                            $ar_end_ts  = !empty($ar['end_time']) ? strtotime($ar['reservation_date'] . ' ' . $ar['end_time']) : 0;
+                                            $ar_cancellable = $ar['status'] === 'Approved' && $ar_end_ts > time();
                                         ?>
                                             <tr class="ps-rr-row<?php echo $ar_doc ? ' has-doc' : ''; ?>"
                                                 data-rr-id="<?php echo (int)$ar['id']; ?>"
@@ -2433,7 +2492,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-doc-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['url']) : ''; ?>"
                                                 data-doc-open-url="<?php echo $ar_doc ? htmlspecialchars($ar_doc['open_url']) : ''; ?>"
                                                 data-doc-name="<?php echo $ar_doc ? htmlspecialchars($ar_doc['name']) : ''; ?>"
-                                                data-doc-kind="<?php echo $ar_doc ? $ar_doc['kind'] : ''; ?>">
+                                                data-doc-kind="<?php echo $ar_doc ? $ar_doc['kind'] : ''; ?>"
+                                                data-iso-date="<?php echo htmlspecialchars($ar['reservation_date']); ?>"
+                                                data-start-time="<?php echo htmlspecialchars($ar['start_time']); ?>"
+                                                data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
+                                                data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
+                                                data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
+                                                data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
                                                 <td>
                                                     <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
                                                     <div class="rm-subline"><?php echo htmlspecialchars($ar_where); ?></div>
@@ -2457,8 +2522,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <td><span class="ps-badge ps-badge--dot <?php echo $ar_badge; ?>"><?php echo htmlspecialchars($ar['status']); ?></span></td>
                                                 <td>
                                                     <div class="rm-actions">
-                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>View</button>
-                                                        <?php if ($ar['status'] === 'Approved'): ?>
+                                                        <?php if ($ar_cancellable): ?>
                                                             <button type="button" class="pr-tbl-btn cancel-r btn-cancel-rr-admin"
                                                                 data-action="admin-cancel-reservation"
                                                                 data-rr-id="<?php echo (int)$ar['id']; ?>"
@@ -2466,6 +2530,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                 data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
                                                                 title="Cancel this reservation">Cancel</button>
                                                         <?php endif; ?>
+                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>View</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -2484,17 +2549,44 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             var tbl = document.getElementById('rrTable');
                             var q = document.getElementById('rrSearch');
                             var st = document.getElementById('rrStatus');
+                            var activeToday = document.getElementById('rrActiveToday');
+                            var activeOnly = false;
                             var none = document.getElementById('rrNoMatch');
-                            if (!tbl || !q || !st) return;
+                            if (!tbl || !q || !st || !activeToday) return;
 
                             function apply() {
                                 var s = (q.value || '').trim().toLowerCase();
                                 var f = st.value;
                                 var any = false;
+                                var nowISO = (function() {
+                                    try {
+                                        var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+                                        var g = function(t) { return (parts.find(function(p) { return p.type === t; }) || {}).value; };
+                                        return { iso: g('year') + '-' + g('month') + '-' + g('day'), min: (+g('hour')) * 60 + (+g('minute')) };
+                                    } catch(e) { var d = new Date(); return { iso: d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2), min: d.getHours()*60+d.getMinutes() }; }
+                                })();
+                                function parseMin(v) {
+                                    var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                                    if (!m) return null;
+                                    var h = +m[1], mi = +m[2], ap = (m[3] || '').toUpperCase();
+                                    if (ap === 'PM' && h !== 12) h += 12;
+                                    if (ap === 'AM' && h === 12) h = 0;
+                                    return h * 60 + mi;
+                                }
                                 tbl.querySelectorAll('tbody tr.ps-rr-row').forEach(function(r) {
                                     var d = r.dataset;
                                     var hay = ((d.room || '') + ' ' + (d.who || '') + ' ' + (d.whoSub || '') + ' ' + (d.purpose || '')).toLowerCase();
-                                    var show = (!s || hay.indexOf(s) !== -1) && (f === 'all' || d.status === f);
+                                    var show;
+                                    if (activeOnly) {
+                                        var sMin = parseMin(d.startTime);
+                                        var eMin = parseMin(d.endTime);
+                                        show = d.status === 'Approved' && d.isoDate === nowISO.iso
+                                            && sMin !== null && eMin !== null
+                                            && sMin <= nowISO.min && eMin > nowISO.min;
+                                    } else {
+                                        show = (f === 'all' || d.status === f);
+                                    }
+                                    show = show && (!s || hay.indexOf(s) !== -1);
                                     r.style.display = show ? '' : 'none';
                                     if (show) any = true;
                                 });
@@ -2502,7 +2594,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 if (none) none.style.display = (hasRows && !any) ? '' : 'none';
                             }
                             q.addEventListener('input', apply);
-                            st.addEventListener('change', apply);
+                            st.addEventListener('change', function() {
+                                activeOnly = false;
+                                activeToday.setAttribute('aria-pressed', 'false');
+                                apply();
+                            });
+                            activeToday.addEventListener('click', function() {
+                                activeOnly = !activeOnly;
+                                activeToday.setAttribute('aria-pressed', activeOnly ? 'true' : 'false');
+                                if (activeOnly) st.value = 'all';
+                                apply();
+                            });
                         })();
                     </script>
                 </div><!-- /#rooms-reservations-panel -->
@@ -5333,6 +5435,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <div class="ps-kv">
                         <div><span>Name</span><strong id="ps-rr-who">—</strong></div>
                         <div><span>Type</span><strong id="ps-rr-type">—</strong></div>
+                    </div>
+                </section>
+
+                <section class="ps-drawer-sec" id="ps-rr-decision-sec">
+                    <h4>Decision</h4>
+                    <div class="ps-kv">
+                        <div><span>Method</span><strong id="ps-rr-dec-method">—</strong></div>
+                        <div id="ps-rr-dec-rule-row"><span>Rule</span><strong id="ps-rr-dec-rule">—</strong></div>
+                        <div id="ps-rr-dec-reason-row"><span>Reason</span><strong id="ps-rr-dec-reason">—</strong></div>
                     </div>
                 </section>
 
