@@ -4620,12 +4620,95 @@ body {
     opacity: 1;
 }
 
+/* ── FAB popover — speech bubble that auto-appears on Facilities tab ── */
+.act-ai-fab-popover {
+    position: absolute;
+    bottom: calc(100% + 14px);
+    right: 0;
+    width: 230px;
+    background: #fff;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .16);
+    padding: 12px 14px 12px 12px;
+    display: none;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: .8rem;
+    font-family: var(--font-sans);
+    color: var(--color-on-surface);
+    line-height: 1.45;
+    z-index: 301;
+    animation: actPopoverIn .25s cubic-bezier(.16, 1, .3, 1) both;
+    pointer-events: none;
+}
+.act-ai-fab-popover.visible {
+    display: flex;
+    pointer-events: auto;
+}
+/* Speech bubble tail pointing down-right toward the FAB */
+.act-ai-fab-popover::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    right: 16px;
+    width: 14px;
+    height: 8px;
+    background: #fff;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    border-left: 1px solid var(--color-outline-variant);
+    border-right: 1px solid var(--color-outline-variant);
+}
+.act-ai-fab-popover .material-symbols-outlined {
+    color: var(--color-primary);
+    font-variation-settings: 'FILL' 1;
+    margin-top: 1px;
+}
+.act-ai-fab-popover-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--color-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    padding: 0;
+    transition: background var(--transition), color var(--transition);
+    flex-shrink: 0;
+}
+.act-ai-fab-popover-close:hover {
+    background: var(--color-surface-container);
+    color: var(--color-on-surface);
+}
+.act-ai-fab-popover-close .material-symbols-outlined { font-size: 14px; }
+
+@keyframes actPopoverIn {
+    from { opacity: 0; transform: translateY(8px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0)   scale(1);   }
+}
+
+/* Dark mode */
+[data-theme="dark"] .act-ai-fab-popover {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline-variant);
+}
+[data-theme="dark"] .act-ai-fab-popover::after {
+    background: var(--color-surface-container);
+}
+
+
 /* ── AI Chat Window ────────────────────────────────────────────── */
 .act-ai-chat {
     position: fixed;
-    bottom: 92px;
-    right: 32px;
-    width: 320px;
+    bottom: 28px;
+    right: 92px;
+    width: 360px;
     background: var(--color-surface-lowest);
     border: 1px solid var(--color-outline-variant);
     border-radius: var(--radius-xl);
@@ -4763,84 +4846,209 @@ body {
     }
 }
 
+/* ── Header avatar with online dot ──────────────────────────────── */
+.act-ai-chat-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+.act-ai-chat-avatar {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 255, 255, .18);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, .3);
+}
+.act-ai-chat-avatar .material-symbols-outlined {
+    font-size: 17px;
+    font-variation-settings: 'FILL' 1;
+}
+.act-ai-online-dot {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    width: 10px;
+    height: 10px;
+    background: #4caf50;
+    border-radius: 50%;
+    border: 2px solid #800000;
+}
+
+/* ── Message body ────────────────────────────────────────────────── */
 .act-ai-chat-body {
-    height: 260px;
+    height: 320px;
     overflow-y: auto;
-    padding: 14px;
+    padding: 14px 12px;
     background: var(--color-surface-low);
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
+    scroll-behavior: smooth;
+}
+.act-ai-chat-body::-webkit-scrollbar { width: 4px; }
+.act-ai-chat-body::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+    border-radius: 2px;
 }
 
-.act-chat-msg {
+/* Row wrappers — AI on left, user on right */
+.act-chat-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+}
+.act-chat-row-ai  { align-self: flex-start; }
+.act-chat-row-user {
+    flex-direction: row-reverse;
+    align-self: flex-end;
+}
+
+/* Small AI avatar beside each AI bubble */
+.act-chat-ai-avatar {
+    width: 26px;
+    height: 26px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+    margin-bottom: 2px;
+}
+.act-chat-ai-avatar .material-symbols-outlined {
+    font-size: 13px;
+    font-variation-settings: 'FILL' 1;
+}
+
+/* Column for bubble + meta */
+.act-chat-col {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    align-items: flex-start;
+    max-width: 78%;
 }
+.act-chat-col-user { align-items: flex-end; }
 
-.act-chat-msg-user {
-    align-items: flex-end;
-}
-
-.act-chat-msg-time {
-    font-size: .68rem;
-    color: var(--color-secondary);
-    padding: 0 4px;
-}
-
+/* Bubbles */
 .act-chat-bubble {
-    max-width: 85%;
-    padding: 10px 14px;
-    font-size: .82rem;
+    padding: 9px 13px;
+    font-size: .83rem;
     line-height: 1.5;
+    word-break: break-word;
 }
-
 .act-chat-bubble-ai {
     background: var(--color-surface-lowest);
     border: 1px solid var(--color-outline-variant);
-    color: var(--color-on-surface-variant);
+    color: var(--color-on-surface);
     border-radius: 4px 16px 16px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
 }
-
 .act-chat-bubble-user {
     background: var(--color-primary);
     color: #fff;
     border-radius: 16px 4px 16px 16px;
 }
 
+/* Timestamp under each message */
+.act-chat-meta {
+    font-size: .63rem;
+    color: var(--color-secondary);
+    padding: 0 3px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.act-chat-meta-user { justify-content: flex-end; }
+.act-chat-tick {
+    font-size: 11px;
+    color: var(--color-primary);
+}
+
+/* Quick-reply chips */
+.act-chat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.act-chat-chip {
+    background: var(--color-surface-lowest);
+    border: 1.5px solid var(--color-primary);
+    color: var(--color-primary);
+    border-radius: var(--radius-full);
+    padding: 5px 12px;
+    font-size: .74rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+    font-family: var(--font-sans);
+    line-height: 1.3;
+}
+.act-chat-chip:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+/* Typing indicator */
+.act-chat-typing-dots {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 4px 16px 16px 16px;
+    padding: 10px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.act-chat-typing-dots span {
+    width: 6px;
+    height: 6px;
+    background: var(--color-outline);
+    border-radius: 50%;
+    animation: typingBounce 1.2s ease-in-out infinite;
+}
+.act-chat-typing-dots span:nth-child(2) { animation-delay: .2s; }
+.act-chat-typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes typingBounce {
+    0%, 80%, 100% { transform: translateY(0);    opacity: .4; }
+    40%           { transform: translateY(-5px); opacity: 1;  }
+}
+
+/* ── Input bar ───────────────────────────────────────────────────── */
 .act-ai-chat-input {
-    padding: 10px;
+    padding: 10px 12px;
     border-top: 1px solid var(--color-outline-variant);
     display: flex;
     align-items: center;
     gap: 8px;
     background: var(--color-surface-lowest);
+    flex-shrink: 0;
 }
-
 .act-ai-chat-input input {
     flex: 1;
     background: var(--color-surface-container);
-    border: none;
+    border: 1.5px solid transparent;
     border-radius: var(--radius-full);
-    padding: 8px 16px;
-    font-size: .85rem;
+    padding: 9px 16px;
+    font-size: .875rem;
     color: var(--color-on-surface);
     outline: none;
     font-family: var(--font-sans);
-    transition: box-shadow var(--transition);
+    transition: border-color var(--transition), box-shadow var(--transition);
 }
-
 .act-ai-chat-input input:focus {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent);
 }
-
 .act-ai-chat-send {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     background: var(--color-primary);
-    color: var(--color-on-primary);
+    color: #fff;
     border: none;
     border-radius: 50%;
     cursor: pointer;
@@ -4848,24 +5056,23 @@ body {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: opacity var(--transition);
+    transition: opacity var(--transition), transform var(--transition);
 }
-
-.act-ai-chat-send:hover {
-    opacity: .85;
-}
-
+.act-ai-chat-send:hover  { opacity: .88; transform: scale(1.06); }
+.act-ai-chat-send:disabled { opacity: .35; cursor: not-allowed; transform: none; }
 .act-ai-chat-send .material-symbols-outlined {
-    font-size: 14px;
+    font-size: 15px;
+    font-variation-settings: 'FILL' 1;
 }
 
+/* ── Footer ──────────────────────────────────────────────────────── */
 .act-ai-chat-footer {
     padding: 8px 12px;
     text-align: center;
     border-top: 1px solid var(--color-outline-variant);
     background: var(--color-surface-low);
+    flex-shrink: 0;
 }
-
 .act-ai-chat-footer a {
     font-size: .72rem;
     color: var(--color-secondary);
@@ -4875,13 +5082,16 @@ body {
     gap: 5px;
     transition: color var(--transition);
 }
+.act-ai-chat-footer a:hover { color: var(--color-primary); }
+.act-ai-chat-footer .material-symbols-outlined { font-size: 13px; }
 
-.act-ai-chat-footer a:hover {
-    color: var(--color-primary);
+/* ── Dark mode overrides ─────────────────────────────────────────── */
+[data-theme="dark"] .act-chat-bubble-ai,
+[data-theme="dark"] .act-chat-typing-dots {
+    background: var(--color-surface-container);
 }
-
-.act-ai-chat-footer .material-symbols-outlined {
-    font-size: 12px;
+[data-theme="dark"] .act-ai-chat-input input {
+    background: var(--color-surface-container);
 }
 
 /* ── Responsive ────────────────────────────────────────────────── */

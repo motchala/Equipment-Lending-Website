@@ -318,13 +318,15 @@
             window.PUPSyncFacilities.start();
         }
 
-        /* ── AI chatbot: only visible on the Dashboard tab ─────────────── */
+        /* ── AI chatbot: only visible on the Facilities tab ─────────────── */
         const aiFab = document.getElementById('actAiFab');
         const aiChat = document.getElementById('actAiChat');
-        if (tabName === 'home') {
+        if (tabName === 'rooms') {
             if (aiFab) aiFab.style.display = '';
+            _aiTooltipMaybeShow();
         } else {
             if (aiFab) aiFab.style.display = 'none';
+            _aiTooltipHide();
             if (aiChat) {
                 aiChat.classList.remove('open');
                 aiChat.classList.remove('minimized');
@@ -2503,10 +2505,10 @@
                 case 'ai-chat-send':
                     actAiSend();
                     break;
-                case 'ai-chat-report-issue': {
+                case 'ai-chat-report-room-issue': {
                     const inp = document.getElementById('actAiInput');
                     if (inp) {
-                        inp.value = 'I need to report a damaged or lost item.';
+                        inp.value = 'I need to report a room issue.';
                         inp.focus();
                     }
                     break;
@@ -2985,9 +2987,11 @@
         // actually active server-side.
         const aiFabInit = document.getElementById('actAiFab');
         const initialActivePanel = document.querySelector('.tab-panel.active');
-        if (aiFabInit && initialActivePanel && initialActivePanel.id === 'panel-home') {
+        if (aiFabInit && initialActivePanel && initialActivePanel.id === 'panel-rooms') {
             aiFabInit.style.display = '';
+            _aiTooltipMaybeShow();
         }
+
 
         startRequestsPolling();
         initCodePanel();
@@ -4293,52 +4297,54 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
-/* ══════════════════════════════════════════════════════════════════
-   AI CHAT — send function + Enter-key wiring
-   (moved from inline <script> so we no longer need a nonce and CSP
-   inline-script policy stays tight)
-══════════════════════════════════════════════════════════════════ */
+/* ================================================================
+   AI Chatbot — tooltip / popover helpers
+   Shows a speech-bubble popover above the FAB the first time the
+   Facilities tab opens each day (resets at midnight via localStorage
+   timestamp). Dismissed by the × button or by opening the chat.
+================================================================ */
 (function () {
-    function actAiSend() {
-        var input = document.getElementById('actAiInput');
-        var msg = (input ? input.value : '').trim();
-        if (!msg) return;
-        var body = document.getElementById('actAiChatBody');
-        if (!body) return;
+    var STORAGE_KEY  = 'eq_ai_tooltip_seen';
+    var RESET_MS     = 24 * 60 * 60 * 1000; // 24 hours
 
-        /* User bubble */
-        var uDiv = document.createElement('div');
-        uDiv.className = 'act-chat-msg act-chat-msg-user';
-        uDiv.innerHTML = '<span class="act-chat-msg-time">You</span>' +
-            '<div class="act-chat-bubble act-chat-bubble-user">' +
-            msg.replace(/</g, '&lt;') + '</div>';
-        body.appendChild(uDiv);
-        input.value = '';
-        body.scrollTop = body.scrollHeight;
-
-        /* Stub AI reply — wire to real endpoint later */
-        setTimeout(function () {
-            var aDiv = document.createElement('div');
-            aDiv.className = 'act-chat-msg';
-            aDiv.innerHTML = '<span class="act-chat-msg-time">AI Assistant</span>' +
-                '<div class="act-chat-bubble act-chat-bubble-ai">' +
-                'Thanks for your message! AI response support coming soon.' +
-                '</div>';
-            body.appendChild(aDiv);
-            body.scrollTop = body.scrollHeight;
-        }, 600);
+    function _shouldShow() {
+        try {
+            var last = parseInt(localStorage.getItem(STORAGE_KEY) || '0', 10);
+            return (Date.now() - last) > RESET_MS;
+        } catch (e) { return true; }
     }
 
-    /* Expose so any other surface can call it (keeps parity with the
-       old global function that lived in the inline script) */
-    window.actAiSend = actAiSend;
+    function _markSeen() {
+        try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) {}
+    }
 
-    /* Enter key on the chat input */
+    window._aiTooltipMaybeShow = function () {
+        if (!_shouldShow()) return;
+        var popover = document.getElementById('actAiFabPopover');
+        if (!popover) return;
+        setTimeout(function () {
+            popover.classList.add('visible');
+            _markSeen();
+        }, 400);
+    };
+
+    window._aiTooltipHide = function () {
+        var popover = document.getElementById('actAiFabPopover');
+        if (popover) popover.classList.remove('visible');
+    };
+
     function init() {
-        var inp = document.getElementById('actAiInput');
-        if (inp) {
-            inp.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') actAiSend();
+        var closeBtn = document.getElementById('actAiFabPopoverClose');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                window._aiTooltipHide();
+            });
+        }
+        var fab = document.getElementById('actAiFab');
+        if (fab) {
+            fab.addEventListener('click', function () {
+                window._aiTooltipHide();
             });
         }
     }
@@ -4346,6 +4352,151 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   AI CHAT — send function + Enter-key wiring
+   (moved from inline <script> so we no longer need a nonce and CSP
+   inline-script policy stays tight)
+══════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+
+    function escH(s) {
+        return String(s)
+            .replace(/&/g, '&')
+            .replace(/</g, '<')
+            .replace(/>/g, '&gt;');
+    }
+
+    function timeNow() {
+        var d = new Date(), h = d.getHours(), m = d.getMinutes();
+        var ap = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
+    }
+
+    function removeChips() {
+        var c = document.getElementById('actAiChips');
+        if (c) c.remove();
+    }
+
+    function setSending(on) {
+        var btn = document.getElementById('actAiSendBtn');
+        var inp = document.getElementById('actAiInput');
+        if (btn) btn.disabled = on;
+        if (inp) inp.disabled = on;
+    }
+
+    function appendUserBubble(body, text) {
+        var row = document.createElement('div');
+        row.className = 'act-chat-row act-chat-row-user';
+        row.innerHTML =
+            '<div class="act-chat-col act-chat-col-user">' +
+                '<div class="act-chat-bubble act-chat-bubble-user">' + escH(text) + '</div>' +
+                '<div class="act-chat-meta act-chat-meta-user">' +
+                    '<span>' + timeNow() + '</span>' +
+                    '<span class="material-symbols-outlined act-chat-tick">done_all</span>' +
+                '</div>' +
+            '</div>';
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    function appendTyping(body) {
+        var row = document.createElement('div');
+        row.className = 'act-chat-row act-chat-row-ai';
+        row.innerHTML =
+            '<div class="act-chat-ai-avatar">' +
+                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '</div>' +
+            '<div class="act-chat-typing-dots">' +
+                '<span></span><span></span><span></span>' +
+            '</div>';
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+        return row;
+    }
+
+    function appendAiBubble(body, text) {
+        var row = document.createElement('div');
+        row.className = 'act-chat-row act-chat-row-ai';
+        row.innerHTML =
+            '<div class="act-chat-ai-avatar">' +
+                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '</div>' +
+            '<div class="act-chat-col">' +
+                '<div class="act-chat-bubble act-chat-bubble-ai">' + escH(text) + '</div>' +
+                '<div class="act-chat-meta">' +
+                    '<span>' + timeNow() + '</span>' +
+                '</div>' +
+            '</div>';
+        body.appendChild(row);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    /* ── Stub replies for quick-reply chips ──────────────────────
+       Replace this object's values with real API responses later.
+    ────────────────────────────────────────────────────────────── */
+    var STUB_REPLIES = {
+        'how do i reserve a room?':
+            'Go to the Facilities tab, pick a building, then a floor and room. Click "Reserve", choose your date, start and end time, enter your purpose, then submit. The system will auto-approve or waitlist your request.',
+        'what rooms are free today?':
+            'You can check real-time availability by clicking any room card in the Facilities tab — it shows a schedule of free and booked slots for today and the week.',
+        'how far in advance can i book?':
+            'You can reserve a room up to 21 days in advance. Reservations must be within operating hours: 7:00 AM to 8:00 PM.',
+        'cancel my reservation':
+            'Go to My Activity → Room reservations, find your upcoming reservation and click Cancel. Note: cancellations are only allowed more than 1 hour before the start time.',
+        'reservation rules':
+            'Key rules: (1) You can hold up to 2 active room reservations at a time. (2) Reservations must be within 7:00 AM – 8:00 PM. (3) Maximum advance booking is 21 days. (4) Organisation Advisers may attach a supporting document for priority consideration.',
+    };
+
+    function actAiSend(prefill) {
+        var input = document.getElementById('actAiInput');
+        var msg = (prefill || (input ? input.value : '')).trim();
+        if (!msg) return;
+
+        var body = document.getElementById('actAiChatBody');
+        if (!body) return;
+
+        removeChips();
+        appendUserBubble(body, msg);
+        if (input) input.value = '';
+        setSending(true);
+
+        var typing = appendTyping(body);
+        var reply = STUB_REPLIES[msg.toLowerCase()] ||
+            'Thanks for your message! Full AI response support is coming soon. In the meantime, try one of the quick-reply buttons or browse the Facilities tab directly.';
+
+        /* ── STUB DELAY — replace setTimeout with fetch() for Tier 2 ── */
+        setTimeout(function () {
+            typing.remove();
+            appendAiBubble(body, reply);
+            setSending(false);
+        }, 900);
+    }
+
+    window.actAiSend = actAiSend;
+
+    function init() {
+        /* Enter key to send */
+        var inp = document.getElementById('actAiInput');
+        if (inp) {
+            inp.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) actAiSend();
+            });
+        }
+        /* Quick-reply chip clicks */
+        document.addEventListener('click', function (e) {
+            var chip = e.target.closest('.act-chat-chip');
+            if (!chip) return;
+            actAiSend(chip.dataset.chip);
+        });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
+
 
 
 /* ================================================================
