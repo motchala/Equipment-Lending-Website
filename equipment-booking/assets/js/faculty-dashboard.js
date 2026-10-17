@@ -4573,6 +4573,21 @@
             }
             appendAiBubble(body, data.reply);
             if (typeof data.remaining === 'number') updateCounter(data.remaining);
+            // If the AI needs to know the campus, render two quick-reply chips
+            if (data.ask_campus) {
+                var lastRow = body.lastElementChild;
+                if (lastRow) {
+                    var col = lastRow.querySelector('.act-chat-col');
+                    if (col) {
+                        var chips = document.createElement('div');
+                        chips.className = 'act-chat-chips act-campus-chips';
+                        chips.innerHTML =
+                            '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
+                            '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
+                        col.appendChild(chips);
+                    }
+                }
+            }
             setSending(false);
         })
         .catch(function () {

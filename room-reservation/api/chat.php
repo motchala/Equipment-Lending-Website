@@ -189,7 +189,7 @@ $wl_stmt->execute();
 $wl_rows = $wl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $wl_stmt->close();
 
-// ── 14. Format context as plain text ─────────────────────────────────────────
+// ── 14. Format faculty context as plain text ──────────────────────────────────
 $quota_used = count($res_rows);
 $quota_max  = 2;
 
@@ -216,7 +216,249 @@ if (empty($wl_rows)) {
     }, $wl_rows));
 }
 
+// ── 14b. Phase 2 — Availability intent detection + campus disambiguation ──────
+
+/**
+ * Returns true when the message appears to be asking about room availability.
+ */
+function ai_is_availability_query(string $msg): bool
+{
+    $keywords = [
+        // Explicit availability phrases — unambiguous
+        'what rooms', 'which rooms', 'any rooms', 'rooms available',
+        'rooms free', 'rooms open', 'rooms today', 'rooms tomorrow',
+        'rooms on', 'rooms this', 'rooms next',
+        'free rooms', 'available rooms', 'open rooms', 'empty rooms',
+        'free today', 'free tomorrow', 'free on', 'free this', 'free next',
+        'available today', 'available tomorrow', 'available on',
+        'check availability', 'room availability', 'see availability',
+        'is there a room', 'are there rooms', 'find a room',
+        'any free', 'any available', 'any open',
+        'which building', 'what building',
+        // Time-scoped phrases (only when paired with room context)
+        'rooms this week', 'rooms next week',
+        'rooms monday', 'rooms tuesday', 'rooms wednesday',
+        'rooms thursday', 'rooms friday', 'rooms saturday',
+    ];
+    $lower = mb_strtolower($msg);
+    foreach ($keywords as $kw) {
+        if (str_contains($lower, $kw)) return true;
+    }
+    return false;
+}
+
+/**
+ * Detects which campus the faculty is asking about.
+ * Returns 'main', 'cite', or null (unknown — must ask).
+ */
+function ai_detect_campus(string $msg): ?string
+{
+    $lower = mb_strtolower($msg);
+    $main_kw = ['main', 'building a', 'building b', 'zapote', 'pup main'];
+    $cite_kw = ['cite', 'building c', 'canlalay', 'pup cite'];
+    foreach ($cite_kw as $kw) { if (str_contains($lower, $kw)) return 'cite'; }
+    foreach ($main_kw as $kw) { if (str_contains($lower, $kw)) return 'main'; }
+    return null;
+}
+
+/**
+ * Extracts a target date from the message.
+ * Understands: today, tomorrow, day names (Monday–Sunday),
+ * "next Monday", and date strings like "October 25" / "Oct 25" / "25 Oct".
+ * Returns a Y-m-d string in Asia/Manila timezone, defaulting to today.
+ */
+function ai_extract_date(string $msg): string
+{
+    $tz    = new DateTimeZone('Asia/Manila');
+    $now   = new DateTimeImmutable('now', $tz);
+    $lower = mb_strtolower(trim($msg));
+
+    // "today"
+    if (str_contains($lower, 'today'))    return $now->format('Y-m-d');
+    // "tomorrow"
+    if (str_contains($lower, 'tomorrow')) return $now->modify('+1 day')->format('Y-m-d');
+
+    // Day names — "next Monday" or just "Monday"
+    $days = ['monday'=>1,'tuesday'=>2,'wednesday'=>3,'thursday'=>4,
+             'friday'=>5,'saturday'=>6,'sunday'=>0];
+    foreach ($days as $name => $dow) {
+        if (str_contains($lower, $name)) {
+            $prefix = str_contains($lower, 'next ' . $name) ? 'next ' : '';
+            try {
+                $dt = new DateTimeImmutable($prefix . $name, $tz);
+                // If the result is today or in the past (without "next"), advance 7 days
+                if ($prefix === '' && $dt->format('Y-m-d') <= $now->format('Y-m-d')) {
+                    $dt = $dt->modify('+7 days');
+                }
+                if ($dt->format('Y-m-d') >= $now->format('Y-m-d')) {
+                    return $dt->format('Y-m-d');
+                }
+            } catch (\Exception $e) { /* fall through */ }
+        }
+    }
+
+    // Month-name patterns: "October 25", "Oct 25", "25 October", "25 Oct"
+    $month_names = [
+        'january'=>1,'february'=>2,'march'=>3,'april'=>4,'may'=>5,'june'=>6,
+        'july'=>7,'august'=>8,'september'=>9,'october'=>10,'november'=>11,'december'=>12,
+        'jan'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'jun'=>6,'jul'=>7,
+        'aug'=>8,'sep'=>9,'oct'=>10,'nov'=>11,'dec'=>12,
+    ];
+    foreach ($month_names as $mname => $mnum) {
+        if (!str_contains($lower, $mname)) continue;
+        // "October 25" or "Oct 25"
+        if (preg_match('/\b' . preg_quote($mname, '/') . '\s+(\d{1,2})\b/', $lower, $m)) {
+            $day = (int)$m[1];
+        // "25 October" or "25 Oct"
+        } elseif (preg_match('/\b(\d{1,2})\s+' . preg_quote($mname, '/') . '\b/', $lower, $m)) {
+            $day = (int)$m[1];
+        } else {
+            continue;
+        }
+        if ($day < 1 || $day > 31) continue;
+        $year = (int)$now->format('Y');
+        $candidate = sprintf('%04d-%02d-%02d', $year, $mnum, $day);
+        // If the date has already passed this year, try next year
+        if ($candidate < $now->format('Y-m-d')) {
+            $candidate = sprintf('%04d-%02d-%02d', $year + 1, $mnum, $day);
+        }
+        // Validate it's a real date and within 21-day booking window
+        $dt = DateTimeImmutable::createFromFormat('Y-m-d', $candidate, $tz);
+        if ($dt && $dt->format('Y-m-d') === $candidate) {
+            return $candidate;
+        }
+    }
+
+    // Default to today
+    return $now->format('Y-m-d');
+}
+
+/**
+ * Queries room availability for a campus on a given date.
+ * Returns a compact summary string for the system prompt.
+ *
+ * @param mysqli $conn
+ * @param string $campus  'main' or 'cite'
+ * @param string $date    Y-m-d
+ * @return string
+ */
+function ai_availability_summary(mysqli $conn, string $campus, string $date): string
+{
+    // campus_id: 1 = PUP MAIN, 2 = PUP CITE
+    $campus_id = ($campus === 'cite') ? 2 : 1;
+    $campus_label = ($campus === 'cite') ? 'PUP CITE' : 'PUP MAIN';
+
+    // Get all bookable rooms for this campus
+    $stmt = $conn->prepare(
+        "SELECT r.room_id, r.room_name, r.floor_label, r.floor_number,
+                b.name AS building_name
+           FROM tbl_rooms r
+           JOIN tbl_buildings b ON b.building_id = r.building_id
+           JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
+          WHERE c.campus_id  = ?
+            AND r.status     = 'Available'
+            AND r.is_archived = 0
+          ORDER BY b.sort_order ASC, r.floor_number ASC, r.sort_order ASC"
+    );
+    $stmt->bind_param('i', $campus_id);
+    $stmt->execute();
+    $rooms = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (empty($rooms)) {
+        return "No bookable rooms found for {$campus_label} on {$date}.";
+    }
+
+    // Get all Approved reservations for these rooms on this date
+    $room_ids = array_column($rooms, 'room_id');
+    $placeholders = implode(',', array_fill(0, count($room_ids), '?'));
+    $types = str_repeat('i', count($room_ids));
+
+    $res_stmt = $conn->prepare(
+        "SELECT room_id,
+                TIME_FORMAT(start_time, '%H:%i') AS start,
+                TIME_FORMAT(end_time,   '%H:%i') AS end
+           FROM tbl_room_reservations
+          WHERE room_id IN ({$placeholders})
+            AND reservation_date = ?
+            AND status = 'Approved'
+          ORDER BY room_id, start_time"
+    );
+    // bind all room_ids + date
+    $bind_args = array_merge([$types . 's'], $room_ids, [$date]);
+    // bind_param needs references
+    $refs = [];
+    foreach ($bind_args as $k => $v) { $refs[$k] = &$bind_args[$k]; }
+    call_user_func_array([$res_stmt, 'bind_param'], $refs);
+    $res_stmt->execute();
+    $bookings_raw = $res_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $res_stmt->close();
+
+    // Index bookings by room_id
+    $bookings = [];
+    foreach ($bookings_raw as $b) {
+        $bookings[$b['room_id']][] = $b['start'] . '–' . $b['end'];
+    }
+
+    // Group by building for the summary
+    $by_building = [];
+    foreach ($rooms as $r) {
+        $bid  = $r['building_name'];
+        $rid  = $r['room_id'];
+        $free = !isset($bookings[$rid]);
+        $by_building[$bid]['total']  = ($by_building[$bid]['total']  ?? 0) + 1;
+        $by_building[$bid]['free']   = ($by_building[$bid]['free']   ?? 0) + ($free ? 1 : 0);
+        if (!$free) {
+            $by_building[$bid]['booked_slots'][$r['room_name']] = $bookings[$rid];
+        }
+    }
+
+    // Format output
+    $date_label = (new DateTimeImmutable($date, new DateTimeZone('Asia/Manila')))->format('l, F j');
+    $lines = ["## ROOM AVAILABILITY — {$campus_label} — {$date_label}"];
+    foreach ($by_building as $bname => $data) {
+        $free  = $data['free'];
+        $total = $data['total'];
+        $lines[] = "\n### {$bname}";
+        $lines[] = "Free rooms: {$free} of {$total} bookable";
+        if ($free === 0) {
+            $lines[] = "All rooms are booked for this date.";
+        } elseif (isset($data['booked_slots'])) {
+            $lines[] = "Rooms with bookings (avoid these times):";
+            foreach ($data['booked_slots'] as $rname => $slots) {
+                $lines[] = "  - {$rname}: " . implode(', ', $slots);
+            }
+        }
+    }
+    $lines[] = "\nFor exact per-room time slots, tell the faculty to click the room card in the Facilities tab.";
+
+    return implode("\n", $lines);
+}
+
+// ── Run the Phase 2 availability pipeline ────────────────────────────────────
+$ctx_availability   = '';   // empty = not queried (fast path)
+$ask_campus         = false; // true = AI should ask which campus
+
+if (ai_is_availability_query($raw_message)) {
+    $campus = ai_detect_campus($raw_message);
+    if ($campus === null) {
+        // Campus unknown — set flag so AI asks; don't query DB yet
+        $ask_campus = true;
+    } else {
+        $target_date      = ai_extract_date($raw_message);
+        $ctx_availability = ai_availability_summary($conn, $campus, $target_date);
+    }
+}
+
 // ── 15. System prompt ─────────────────────────────────────────────────────────
+$avail_section = $ctx_availability !== ''
+    ? $ctx_availability
+    : 'Not queried — the faculty did not ask about availability, or campus is unknown.';
+
+$campus_instruction = $ask_campus
+    ? "\n## IMPORTANT — CAMPUS UNKNOWN\nThe faculty asked about room availability but did not specify a campus. You MUST ask: \"Which campus are you at?\" and present exactly two options on separate lines:\n→ PUP Main (Buildings A & B)\n→ PUP CITE (Building C)\nDo not answer the availability question until you know the campus. Do not add anything else to this response."
+    : '';
+
 $system_prompt = <<<PROMPT
 You are PUPSync Room Assistant, an AI assistant for the Polytechnic University of the Philippines (PUP) Biñan Campus room reservation system. You help faculty members with room reservations only.
 
@@ -228,22 +470,19 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 - Organisation Advisers may attach a supporting document (PDF, JPG, PNG, max 5 MB) when reserving. This increases their priority in the arbitration system.
 - Student-submitted reservations via faculty code do NOT count toward the faculty's 2-room quota.
 
-## BUILDINGS
-- Building A (Old) — PUP MAIN Campus — 5 floors — lecture halls, org rooms, computer labs, AVR, chemistry lab
-- Building B (New) — PUP MAIN Campus — 4 floors — research rooms, lecture rooms, AVR
-- Building C (CITE) — PUP CITE Campus — 4 floors — computer labs, engineering labs, audiovisual room
+## CAMPUSES & BUILDINGS
+- **PUP MAIN Campus** (Zapote, Biñan, Laguna)
+  - Building A (Old) — 5 floors — lecture halls, org rooms, computer labs, AVR, chemistry lab
+  - Building B (New) — 4 floors — research rooms, lecture rooms, AVR
+- **PUP CITE Campus** (Canlalay, Biñan, Laguna)
+  - Building C — 4 floors — computer labs, engineering labs, audiovisual room
 
 ## HOW TO RESERVE A ROOM
-1. Go to the Facilities tab
-2. Choose a building
-3. Browse by floor and click a room card
-4. Check the room schedule to find a free slot
-5. Click Reserve, fill in the date, time, purpose, and attendees
-6. Submit — the system approves or adds you to the waitlist automatically
+1. Go to the Facilities tab → choose a building → browse by floor → click a room card
+2. Check the room schedule → click Reserve → fill in date, time, purpose, attendees → submit
 
 ## HOW TO CANCEL A RESERVATION
-Go to My Activity → Room reservations → find the reservation → click Cancel.
-Only allowed more than 1 hour before the start time. The cancel button is locked within 1 hour.
+My Activity → Room reservations → find reservation → click Cancel (only if more than 1 hour before start).
 
 ## FACULTY CONTEXT (live data from the database)
 Name: {$faculty_name}
@@ -255,11 +494,16 @@ Active/upcoming reservations:
 Waitlist:
 {$ctx_waitlist}
 
+## LIVE AVAILABILITY DATA
+{$avail_section}
+{$campus_instruction}
+
 ## YOUR BEHAVIOUR
 - Answer only questions about room reservations and the PUPSync system.
-- For real-time availability of specific rooms and slots, tell the user to check the room card in the Facilities tab — you do not have live slot data.
-- Never fabricate room names, dates, or availability data you were not given above.
-- Keep responses under 120 words unless giving step-by-step instructions.
+- When availability data is provided above, use it to give a specific summary by building. Do not list every room — give the count of free rooms per building and mention rooms with bookings.
+- When availability says "Not queried", do not speculate — tell the faculty to check the room card in the Facilities tab.
+- Never fabricate room names, dates, or slot data not provided above.
+- Keep responses under 150 words unless giving step-by-step instructions.
 - Be friendly, concise, and helpful.
 - Never reveal other faculty members' data.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
@@ -363,7 +607,8 @@ $new_remaining = max(0, $RATE_LIMIT - ($rl_count + 1));
 ob_end_clean();
 http_response_code(200);
 echo json_encode([
-    'status'    => 'success',
-    'reply'     => $reply,
-    'remaining' => $new_remaining,
+    'status'     => 'success',
+    'reply'      => $reply,
+    'remaining'  => $new_remaining,
+    'ask_campus' => $ask_campus,
 ]);
