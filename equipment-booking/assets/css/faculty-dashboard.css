@@ -4809,7 +4809,7 @@ body {
 
 /* Minimised state — collapses body, input and footer; only header shows */
 .act-ai-chat.minimized .act-ai-chat-body,
-.act-ai-chat.minimized .act-ai-chat-input,
+.act-ai-chat.minimized .act-ai-chat-input-wrap,
 .act-ai-chat.minimized .act-ai-chat-footer {
     display: none;
 }
@@ -5064,6 +5064,23 @@ body {
     font-size: 15px;
     font-variation-settings: 'FILL' 1;
 }
+
+/* ── Message counter ─────────────────────────────────────────────── */
+.act-ai-chat-input-wrap {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.act-ai-chat-counter {
+    padding: 3px 14px 3px;
+    font-size: .63rem;
+    color: var(--color-secondary);
+    background: var(--color-surface-lowest);
+    border-top: 1px solid var(--color-outline-variant);
+    text-align: right;
+}
+.act-ai-chat-counter.is-low   { color: var(--color-warning); font-weight: 600; }
+.act-ai-chat-counter.is-empty { color: var(--color-error);   font-weight: 700; }
 
 /* ── Footer ──────────────────────────────────────────────────────── */
 .act-ai-chat-footer {
@@ -11797,4 +11814,37 @@ body .side-nav .side-nav-user .side-nav-user-name {
     .bm-room-value span {
         display: none;
     }
+}
+
+/* ── AI bubble markdown rendering ───────────────────────────────────────────
+   Styles for HTML produced by mdToHtml() inside appendAiBubble().
+   Scoped to .act-chat-bubble-ai so they cannot leak to the rest of the page. */
+
+.act-chat-bubble-ai p {
+    margin: 0 0 .45em;
+    line-height: 1.55;
+}
+.act-chat-bubble-ai p:last-child { margin-bottom: 0; }
+
+.act-chat-bubble-ai ol,
+.act-chat-bubble-ai ul {
+    margin: .3em 0 .45em 1.2em;
+    padding: 0;
+    line-height: 1.55;
+}
+.act-chat-bubble-ai li { margin-bottom: .2em; }
+.act-chat-bubble-ai li:last-child { margin-bottom: 0; }
+
+.act-chat-bubble-ai strong { font-weight: 600; }
+.act-chat-bubble-ai em     { font-style: italic; }
+
+.act-chat-bubble-ai code {
+    font-family: ui-monospace, 'Cascadia Code', 'Fira Mono', monospace;
+    font-size: .82em;
+    background: rgba(0,0,0,.06);
+    border-radius: 3px;
+    padding: .1em .3em;
+}
+[data-theme="dark"] .act-chat-bubble-ai code {
+    background: rgba(255,255,255,.1);
 }

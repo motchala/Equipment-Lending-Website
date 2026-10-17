@@ -324,6 +324,24 @@
         if (tabName === 'rooms') {
             if (aiFab) aiFab.style.display = '';
             _aiTooltipMaybeShow();
+            // Refresh the rate-limit counter from the server every time the
+            // Rooms tab becomes active — covers hard resets, tab switches, and
+            // FAB opens, so the displayed count is always accurate.
+            fetch('room-reservation/api/chat-quota.php')
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (typeof d.remaining === 'number') {
+                        var el = document.getElementById('actAiCounter');
+                        var bar = document.getElementById('actAiCounterBar');
+                        if (el) el.textContent = d.remaining;
+                        if (bar) {
+                            bar.classList.remove('is-low', 'is-empty');
+                            if (d.remaining === 0)     bar.classList.add('is-empty');
+                            else if (d.remaining <= 5) bar.classList.add('is-low');
+                        }
+                    }
+                })
+                .catch(function () { /* silently ignore */ });
         } else {
             if (aiFab) aiFab.style.display = 'none';
             _aiTooltipHide();
@@ -4363,9 +4381,71 @@
 
     function escH(s) {
         return String(s)
-            .replace(/&/g, '&')
-            .replace(/</g, '<')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
+    }
+
+    /**
+     * Convert a limited subset of Markdown to safe HTML for AI chat bubbles.
+     * Only handles patterns the Gemini API actually emits:
+     *   **bold**           ->  <strong>
+     *   *italic*           ->  <em>
+     *   `code`             ->  <code>
+     *   Numbered lists     ->  <ol><li>
+     *   Bullet lists       ->  <ul><li>
+     *   Blank-line breaks  ->  paragraph blocks
+     * Raw HTML in the input is escaped first (XSS-safe).
+     */
+    function mdToHtml(s) {
+        // 1. Escape raw HTML first (safety)
+        var t = escH(String(s));
+
+        // 2. Split into blocks on one or more blank lines
+        var blocks = t.split(/\n{2,}/);
+        var html = "";
+
+        blocks.forEach(function (block) {
+            block = block.trim();
+            if (!block) return;
+
+            var bLines = block.split("\n").filter(Boolean);
+
+            // Detect ordered list (lines starting with "1." "2." etc.)
+            var olLines = bLines.filter(function (l) { return /^\d+\.\s/.test(l.trim()); });
+            if (olLines.length > 0 && olLines.length === bLines.length) {
+                html += "<ol>";
+                olLines.forEach(function (line) {
+                    html += "<li>" + inlineMd(line.replace(/^\d+\.\s+/, "")) + "</li>";
+                });
+                html += "</ol>";
+                return;
+            }
+
+            // Detect unordered list (lines starting with "-" or "* ")
+            var ulLines = bLines.filter(function (l) { return /^[-*]\s/.test(l.trim()); });
+            if (ulLines.length > 0 && ulLines.length === bLines.length) {
+                html += "<ul>";
+                ulLines.forEach(function (line) {
+                    html += "<li>" + inlineMd(line.replace(/^[-*]\s+/, "")) + "</li>";
+                });
+                html += "</ul>";
+                return;
+            }
+
+            // Regular paragraph -- convert single newlines to <br>
+            html += "<p>" + inlineMd(block.replace(/\n/g, "<br>")) + "</p>";
+        });
+
+        return html || "<p>" + inlineMd(t) + "</p>";
+    }
+
+    /** Apply inline markdown (**bold**, *italic*, `code`) to an already-escaped string. */
+    function inlineMd(s) {
+        return s
+            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/\*(.+?)\*/g,     "<em>$1</em>")
+            .replace(/`(.+?)`/g,       "<code>$1</code>");
     }
 
     function timeNow() {
@@ -4385,6 +4465,16 @@
         var inp = document.getElementById('actAiInput');
         if (btn) btn.disabled = on;
         if (inp) inp.disabled = on;
+    }
+
+    function updateCounter(remaining) {
+        var el   = document.getElementById('actAiCounter');
+        var bar  = document.getElementById('actAiCounterBar');
+        if (el)  el.textContent = remaining;
+        if (!bar) return;
+        bar.classList.remove('is-low', 'is-empty');
+        if (remaining === 0)      bar.classList.add('is-empty');
+        else if (remaining <= 5)  bar.classList.add('is-low');
     }
 
     function appendUserBubble(body, text) {
@@ -4425,7 +4515,7 @@
                 '<span class="material-symbols-outlined">smart_toy</span>' +
             '</div>' +
             '<div class="act-chat-col">' +
-                '<div class="act-chat-bubble act-chat-bubble-ai">' + escH(text) + '</div>' +
+                '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
                 '<div class="act-chat-meta">' +
                     '<span>' + timeNow() + '</span>' +
                 '</div>' +
@@ -4434,21 +4524,7 @@
         body.scrollTop = body.scrollHeight;
     }
 
-    /* ── Stub replies for quick-reply chips ──────────────────────
-       Replace this object's values with real API responses later.
-    ────────────────────────────────────────────────────────────── */
-    var STUB_REPLIES = {
-        'how do i reserve a room?':
-            'Go to the Facilities tab, pick a building, then a floor and room. Click "Reserve", choose your date, start and end time, enter your purpose, then submit. The system will auto-approve or waitlist your request.',
-        'what rooms are free today?':
-            'You can check real-time availability by clicking any room card in the Facilities tab — it shows a schedule of free and booked slots for today and the week.',
-        'how far in advance can i book?':
-            'You can reserve a room up to 21 days in advance. Reservations must be within operating hours: 7:00 AM to 8:00 PM.',
-        'cancel my reservation':
-            'Go to My Activity → Room reservations, find your upcoming reservation and click Cancel. Note: cancellations are only allowed more than 1 hour before the start time.',
-        'reservation rules':
-            'Key rules: (1) You can hold up to 2 active room reservations at a time. (2) Reservations must be within 7:00 AM – 8:00 PM. (3) Maximum advance booking is 21 days. (4) Organisation Advisers may attach a supporting document for priority consideration.',
-    };
+
 
     function actAiSend(prefill) {
         var input = document.getElementById('actAiInput');
@@ -4458,21 +4534,52 @@
         var body = document.getElementById('actAiChatBody');
         if (!body) return;
 
+        // Guard: do not fire if already waiting for a response
+        if (document.getElementById('actAiSendBtn') && document.getElementById('actAiSendBtn').disabled) return;
+
         removeChips();
         appendUserBubble(body, msg);
         if (input) input.value = '';
         setSending(true);
 
         var typing = appendTyping(body);
-        var reply = STUB_REPLIES[msg.toLowerCase()] ||
-            'Thanks for your message! Full AI response support is coming soon. In the meantime, try one of the quick-reply buttons or browse the Facilities tab directly.';
 
-        /* ── STUB DELAY — replace setTimeout with fetch() for Tier 2 ── */
-        setTimeout(function () {
+        /* ── REAL API CALL — Gemini via room-reservation/api/chat.php ── */
+        var _csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var _csrfToken = _csrfMeta ? _csrfMeta.getAttribute('content') : '';
+        fetch('room-reservation/api/chat.php', {
+            method:  'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body:    JSON.stringify({
+                message:    msg,
+                csrf_token: _csrfToken,
+            }),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
             typing.remove();
-            appendAiBubble(body, reply);
+            if (data.status === 'rate_limited') {
+                appendAiBubble(body, data.message);
+                updateCounter(0);
+                setSending(false);
+                return;
+            }
+            if (data.status !== 'success') {
+                appendAiBubble(body, data.message || 'Something went wrong. Please try again.');
+                setSending(false);
+                return;
+            }
+            appendAiBubble(body, data.reply);
+            if (typeof data.remaining === 'number') updateCounter(data.remaining);
             setSending(false);
-        }, 900);
+        })
+        .catch(function () {
+            typing.remove();
+            appendAiBubble(body, 'Network error. Please check your connection and try again.');
+            setSending(false);
+        });
     }
 
     window.actAiSend = actAiSend;

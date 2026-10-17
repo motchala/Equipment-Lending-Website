@@ -3960,11 +3960,16 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 </div>
 
                 <!-- Input bar -->
-                <div class="act-ai-chat-input">
-                    <input type="text" id="actAiInput" placeholder="Aa" autocomplete="off">
-                    <button class="act-ai-chat-send" id="actAiSendBtn" data-action="ai-chat-send" title="Send">
-                        <span class="material-symbols-outlined">send</span>
-                    </button>
+                <div class="act-ai-chat-input-wrap">
+                    <div class="act-ai-chat-counter" id="actAiCounterBar">
+                        <span id="actAiCounter">20</span> messages remaining this hour
+                    </div>
+                    <div class="act-ai-chat-input">
+                        <input type="text" id="actAiInput" placeholder="Aa" autocomplete="off" maxlength="500">
+                        <button class="act-ai-chat-send" id="actAiSendBtn" data-action="ai-chat-send" title="Send">
+                            <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Footer -->

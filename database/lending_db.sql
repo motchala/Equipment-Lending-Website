@@ -1116,6 +1116,19 @@ COMMIT;
 -- Check: this should now return 0 rows.
 SELECT room_id, room_name FROM tbl_rooms WHERE is_archived = 1;
 
+
+-- AI Chat rate-limiting log
+-- Tracks how many messages each faculty member has sent
+-- within the current 1-hour rolling window.
+CREATE TABLE IF NOT EXISTS `tbl_ai_chat_log` (
+  `id`           int(11)      NOT NULL AUTO_INCREMENT,
+  `faculty_id`   varchar(50)  NOT NULL,
+  `sent_at`      datetime     NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_faculty_sent` (`faculty_id`, `sent_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
