@@ -2531,6 +2531,12 @@
                     }
                     break;
                 }
+                case 'ai-confirm-reservation':
+                    if (typeof window.actAiConfirm === 'function') window.actAiConfirm();
+                    break;
+                case 'ai-cancel-reservation':
+                    if (typeof window.actAiCancel === 'function') window.actAiCancel();
+                    break;
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
@@ -4372,111 +4378,60 @@
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   AI CHAT — send function + Enter-key wiring
-   (moved from inline <script> so we no longer need a nonce and CSP
-   inline-script policy stays tight)
+   AI CHAT — send function, history, pending state, confirmation
 ══════════════════════════════════════════════════════════════════ */
 (function () {
     'use strict';
 
+    /* ── State ───────────────────────────────────────────────────── */
+    var _chatHistory        = [];   // [{role:'user'|'model', text:'...'}]
+    var _pendingReservation = null; // structured object waiting for Confirm
+    var _inReservationFlow  = false;// true while collecting reservation details
+
+    /* ── Helpers ─────────────────────────────────────────────────── */
     function escH(s) {
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
     }
-
-    /**
-     * Convert a limited subset of Markdown to safe HTML for AI chat bubbles.
-     * Only handles patterns the Gemini API actually emits:
-     *   **bold**           ->  <strong>
-     *   *italic*           ->  <em>
-     *   `code`             ->  <code>
-     *   Numbered lists     ->  <ol><li>
-     *   Bullet lists       ->  <ul><li>
-     *   Blank-line breaks  ->  paragraph blocks
-     * Raw HTML in the input is escaped first (XSS-safe).
-     */
-    function mdToHtml(s) {
-        // 1. Escape raw HTML first (safety)
-        var t = escH(String(s));
-
-        // 2. Split into blocks on one or more blank lines
-        var blocks = t.split(/\n{2,}/);
-        var html = "";
-
-        blocks.forEach(function (block) {
-            block = block.trim();
-            if (!block) return;
-
-            var bLines = block.split("\n").filter(Boolean);
-
-            // Detect ordered list (lines starting with "1." "2." etc.)
-            var olLines = bLines.filter(function (l) { return /^\d+\.\s/.test(l.trim()); });
-            if (olLines.length > 0 && olLines.length === bLines.length) {
-                html += "<ol>";
-                olLines.forEach(function (line) {
-                    html += "<li>" + inlineMd(line.replace(/^\d+\.\s+/, "")) + "</li>";
-                });
-                html += "</ol>";
-                return;
-            }
-
-            // Detect unordered list (lines starting with "-" or "* ")
-            var ulLines = bLines.filter(function (l) { return /^[-*]\s/.test(l.trim()); });
-            if (ulLines.length > 0 && ulLines.length === bLines.length) {
-                html += "<ul>";
-                ulLines.forEach(function (line) {
-                    html += "<li>" + inlineMd(line.replace(/^[-*]\s+/, "")) + "</li>";
-                });
-                html += "</ul>";
-                return;
-            }
-
-            // Regular paragraph -- convert single newlines to <br>
-            html += "<p>" + inlineMd(block.replace(/\n/g, "<br>")) + "</p>";
-        });
-
-        return html || "<p>" + inlineMd(t) + "</p>";
-    }
-
-    /** Apply inline markdown (**bold**, *italic*, `code`) to an already-escaped string. */
-    function inlineMd(s) {
-        return s
-            .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-            .replace(/\*(.+?)\*/g,     "<em>$1</em>")
-            .replace(/`(.+?)`/g,       "<code>$1</code>");
-    }
-
     function timeNow() {
         var d = new Date(), h = d.getHours(), m = d.getMinutes();
         var ap = h >= 12 ? 'PM' : 'AM';
         h = h % 12 || 12;
         return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap;
     }
-
+    function mdToHtml(s) {
+        var t = escH(String(s));
+        t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        t = t.replace(/\*(.*?)\*/g,     '<em>$1</em>');
+        t = t.replace(/^[-•]\s+(.+)$/gm,'<li>$1</li>');
+        t = t.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        t = t.replace(/\n/g, '<br>');
+        return t;
+    }
+    function addToHistory(role, text) {
+        _chatHistory.push({ role: role, text: text });
+        if (_chatHistory.length > 10) _chatHistory = _chatHistory.slice(-10);
+    }
     function removeChips() {
         var c = document.getElementById('actAiChips');
         if (c) c.remove();
+        // Also remove any confirmation or campus chips
+        document.querySelectorAll('.act-campus-chips, .act-confirm-chips').forEach(function(el) { el.remove(); });
     }
-
     function setSending(on) {
         var btn = document.getElementById('actAiSendBtn');
         var inp = document.getElementById('actAiInput');
         if (btn) btn.disabled = on;
         if (inp) inp.disabled = on;
     }
-
     function updateCounter(remaining) {
-        var el   = document.getElementById('actAiCounter');
-        var bar  = document.getElementById('actAiCounterBar');
-        if (el)  el.textContent = remaining;
+        var el  = document.getElementById('actAiCounter');
+        var bar = document.getElementById('actAiCounterBar');
+        if (el) el.textContent = remaining;
         if (!bar) return;
         bar.classList.remove('is-low', 'is-empty');
         if (remaining === 0)      bar.classList.add('is-empty');
         else if (remaining <= 5)  bar.classList.add('is-low');
     }
-
     function appendUserBubble(body, text) {
         var row = document.createElement('div');
         row.className = 'act-chat-row act-chat-row-user';
@@ -4491,7 +4446,6 @@
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
     }
-
     function appendTyping(body) {
         var row = document.createElement('div');
         row.className = 'act-chat-row act-chat-row-ai';
@@ -4506,7 +4460,6 @@
         body.scrollTop = body.scrollHeight;
         return row;
     }
-
     function appendAiBubble(body, text) {
         var row = document.createElement('div');
         row.className = 'act-chat-row act-chat-row-ai';
@@ -4522,46 +4475,135 @@
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
+        return row;
     }
 
+    /* ── Pending state (confirmation flow) ───────────────────────── */
+    function enterPendingState(reservation, lastRow) {
+        _pendingReservation = reservation;
+        // Disable input so faculty can only click Confirm or Cancel
+        var inp = document.getElementById('actAiInput');
+        var btn = document.getElementById('actAiSendBtn');
+        if (inp) inp.disabled = true;
+        if (btn) btn.disabled = true;
 
+        // Render Confirm/Cancel chips on the last AI bubble
+        if (lastRow) {
+            var col = lastRow.querySelector('.act-chat-col');
+            if (col) {
+                var chips = document.createElement('div');
+                chips.className = 'act-chat-chips act-confirm-chips';
+                chips.innerHTML =
+                    '<button class="act-chat-chip act-chip-confirm" data-action="ai-confirm-reservation">✅ Confirm</button>' +
+                    '<button class="act-chat-chip act-chip-cancel"  data-action="ai-cancel-reservation">❌ Cancel</button>';
+                col.appendChild(chips);
+            }
+        }
+    }
 
+    function exitPendingState() {
+        _pendingReservation  = null;
+        _inReservationFlow   = false;
+        _chatHistory         = []; // clear history after flow completes
+        document.querySelectorAll('.act-confirm-chips').forEach(function(el) { el.remove(); });
+        var inp = document.getElementById('actAiInput');
+        var btn = document.getElementById('actAiSendBtn');
+        if (inp) { inp.disabled = false; inp.focus(); }
+        if (btn) btn.disabled = false;
+    }
+
+    /* ── Handle Confirm click ────────────────────────────────────── */
+    function handleConfirmReservation() {
+        if (!_pendingReservation) return;
+        var body = document.getElementById('actAiChatBody');
+        if (!body) return;
+
+        // Remove chips, show typing
+        document.querySelectorAll('.act-confirm-chips').forEach(function(el) { el.remove(); });
+        var typing = appendTyping(body);
+
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+        fetch('room-reservation/api/chat-reserve.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(Object.assign({}, _pendingReservation, { csrf_token: csrfToken })),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            typing.remove();
+            exitPendingState();
+            if (data.status === 'success') {
+                var dateStr  = data.res_date   || '';
+                var startStr = data.start_time || '';
+                var endStr   = data.end_time   || '';
+                appendAiBubble(body,
+                    '✅ Done! **' + escH(data.room_name) + '** has been reserved.\n' +
+                    '📅 ' + escH(dateStr) + ' · ' + escH(startStr) + ' – ' + escH(endStr) + '\n' +
+                    '🔖 Reservation ID: #' + data.reservation_id + '\n\n' +
+                    'You can view it in My Activity → Room reservations.'
+                );
+            } else {
+                appendAiBubble(body, '❌ ' + (data.message || 'Reservation failed. Please try again.'));
+            }
+        })
+        .catch(function() {
+            typing.remove();
+            exitPendingState();
+            appendAiBubble(body, 'Network error while submitting. Please try again.');
+        });
+    }
+
+    /* ── Handle Cancel click ─────────────────────────────────────── */
+    function handleCancelReservation() {
+        var body = document.getElementById('actAiChatBody');
+        exitPendingState();
+        if (body) {
+            appendAiBubble(body, 'No problem — reservation cancelled. Is there anything else I can help you with?');
+        }
+    }
+
+    /* ── Main send function ──────────────────────────────────────── */
     function actAiSend(prefill) {
         var input = document.getElementById('actAiInput');
-        var msg = (prefill || (input ? input.value : '')).trim();
+        var msg   = (prefill || (input ? input.value : '')).trim();
         if (!msg) return;
 
         var body = document.getElementById('actAiChatBody');
         if (!body) return;
 
-        // Guard: do not fire if already waiting for a response
-        if (document.getElementById('actAiSendBtn') && document.getElementById('actAiSendBtn').disabled) return;
+        // Block if already waiting for a response
+        if (document.getElementById('actAiSendBtn') &&
+            document.getElementById('actAiSendBtn').disabled) return;
 
         removeChips();
         appendUserBubble(body, msg);
         if (input) input.value = '';
         setSending(true);
+        addToHistory('user', msg);
 
-        var typing = appendTyping(body);
+        var typing    = appendTyping(body);
+        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
-        /* ── REAL API CALL — Gemini via room-reservation/api/chat.php ── */
-        var _csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        var _csrfToken = _csrfMeta ? _csrfMeta.getAttribute('content') : '';
         fetch('room-reservation/api/chat.php', {
             method:  'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({
-                message:    msg,
-                csrf_token: _csrfToken,
+                message:              msg,
+                csrf_token:           csrfToken,
+                history:              _chatHistory.slice(0, -1), // exclude the message we just added
+                is_reservation_flow:  _inReservationFlow,
             }),
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
             typing.remove();
+
             if (data.status === 'rate_limited') {
                 appendAiBubble(body, data.message);
+                addToHistory('model', data.message);
                 updateCounter(0);
                 setSending(false);
                 return;
@@ -4571,26 +4613,37 @@
                 setSending(false);
                 return;
             }
-            appendAiBubble(body, data.reply);
+
+            var lastRow = appendAiBubble(body, data.reply);
+            addToHistory('model', data.reply);
             if (typeof data.remaining === 'number') updateCounter(data.remaining);
-            // If the AI needs to know the campus, render two quick-reply chips
+
+            // Campus chips
             if (data.ask_campus) {
-                var lastRow = body.lastElementChild;
-                if (lastRow) {
-                    var col = lastRow.querySelector('.act-chat-col');
-                    if (col) {
-                        var chips = document.createElement('div');
-                        chips.className = 'act-chat-chips act-campus-chips';
-                        chips.innerHTML =
-                            '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
-                            '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
-                        col.appendChild(chips);
-                    }
+                var col = lastRow && lastRow.querySelector('.act-chat-col');
+                if (col) {
+                    var chips = document.createElement('div');
+                    chips.className = 'act-chat-chips act-campus-chips';
+                    chips.innerHTML =
+                        '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
+                        '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
+                    col.appendChild(chips);
                 }
+                _inReservationFlow = true; // campus clarification is part of the flow
             }
+
+            // Pending reservation — enter confirmation state
+            // Do NOT call setSending(false) here — enterPendingState manages
+            // the input/button disabled state itself.
+            if (data.pending_reservation) {
+                _inReservationFlow = true;
+                enterPendingState(data.pending_reservation, lastRow);
+                return;
+            }
+
             setSending(false);
         })
-        .catch(function () {
+        .catch(function() {
             typing.remove();
             appendAiBubble(body, 'Network error. Please check your connection and try again.');
             setSending(false);
@@ -4598,19 +4651,24 @@
     }
 
     window.actAiSend = actAiSend;
+    window.actAiConfirm = handleConfirmReservation;
+    window.actAiCancel  = handleCancelReservation;
 
+
+    /* ── Init ────────────────────────────────────────────────────── */
     function init() {
-        /* Enter key to send */
         var inp = document.getElementById('actAiInput');
         if (inp) {
-            inp.addEventListener('keydown', function (e) {
+            inp.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) actAiSend();
             });
         }
-        /* Quick-reply chip clicks */
-        document.addEventListener('click', function (e) {
+        // Chip clicks — welcome chips, campus chips
+        document.addEventListener('click', function(e) {
             var chip = e.target.closest('.act-chat-chip');
             if (!chip) return;
+            // Confirm/Cancel are handled by data-action, not data-chip
+            if (chip.dataset.action) return;
             actAiSend(chip.dataset.chip);
         });
     }
@@ -4618,6 +4676,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
+
 
 
 

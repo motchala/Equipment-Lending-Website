@@ -4988,8 +4988,22 @@ body {
     font-family: var(--font-sans);
     line-height: 1.3;
 }
-.act-chat-chip:hover {
-    background: var(--color-primary);
+/* Confirm chip — green tint */
+.act-chip-confirm {
+    border-color: var(--color-success);
+    color: var(--color-success);
+}
+.act-chip-confirm:hover {
+    background: var(--color-success);
+    color: #fff;
+}
+/* Cancel chip — red tint */
+.act-chip-cancel {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+.act-chip-cancel:hover {
+    background: var(--color-error);
     color: #fff;
 }
 

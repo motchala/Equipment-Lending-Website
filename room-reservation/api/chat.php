@@ -59,12 +59,25 @@ if ($api_key === '') {
 }
 
 // ── 8. Validate and sanitise user message ─────────────────────────────────────
-$raw_message = trim((string)($body['message'] ?? ''));
+$raw_message        = trim((string)($body['message']          ?? ''));
+$is_reservation_flow = (bool)($body['is_reservation_flow']    ?? false);
+$history_raw         = is_array($body['history'] ?? null) ? $body['history'] : [];
+
 if (mb_strlen($raw_message) < 3) {
     chat_respond(422, 'error', 'Please type a complete question (at least 3 characters).');
 }
 if (mb_strlen($raw_message) > 500) {
     chat_respond(422, 'error', 'Message is too long. Please keep it under 500 characters.');
+}
+
+// Sanitise history — max 10 entries, role must be 'user' or 'model', text must be string
+$history = [];
+foreach (array_slice($history_raw, -10) as $entry) {
+    $role = (string)($entry['role'] ?? '');
+    $text = trim((string)($entry['text'] ?? ''));
+    if (in_array($role, ['user', 'model'], true) && $text !== '') {
+        $history[] = ['role' => $role, 'text' => $text];
+    }
 }
 
 // ── 9. Database connection ────────────────────────────────────────────────────
@@ -85,58 +98,59 @@ $conn->query("
 ");
 
 // ── 11. Rate limit check (20 messages per rolling hour) ───────────────────────
+// Reservation flow clarification messages are exempt — the entire flow costs
+// exactly 1 message (logged only when the AI presents the final confirmation).
 $RATE_LIMIT = 20;
+$rl_count   = 0;
 
-$rl_stmt = $conn->prepare(
-    "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log
-      WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
-);
-$rl_stmt->bind_param('s', $faculty_id);
-$rl_stmt->execute();
-$rl_count = (int)($rl_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
-$rl_stmt->close();
-
-if ($rl_count >= $RATE_LIMIT) {
-    // Tell the faculty exactly when their limit resets
-    $oldest_stmt = $conn->prepare(
-        "SELECT MIN(sent_at) AS oldest FROM tbl_ai_chat_log
+if (!$is_reservation_flow) {
+    // Check quota
+    $rl_stmt = $conn->prepare(
+        "SELECT COUNT(*) AS cnt FROM tbl_ai_chat_log
           WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
     );
-    $oldest_stmt->bind_param('s', $faculty_id);
-    $oldest_stmt->execute();
-    $oldest = $oldest_stmt->get_result()->fetch_assoc()['oldest'] ?? null;
-    $oldest_stmt->close();
+    $rl_stmt->bind_param('s', $faculty_id);
+    $rl_stmt->execute();
+    $rl_count = (int)($rl_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
+    $rl_stmt->close();
 
-    $reset_time = '';
-    if ($oldest) {
-        $reset_dt = new DateTime($oldest, new DateTimeZone('Asia/Manila'));
-        $reset_dt->modify('+1 hour');
-        $reset_time = $reset_dt->format('g:i A');
+    if ($rl_count >= $RATE_LIMIT) {
+        $oldest_stmt = $conn->prepare(
+            "SELECT MIN(sent_at) AS oldest FROM tbl_ai_chat_log
+              WHERE faculty_id = ? AND sent_at >= (NOW() - INTERVAL 1 HOUR)"
+        );
+        $oldest_stmt->bind_param('s', $faculty_id);
+        $oldest_stmt->execute();
+        $oldest = $oldest_stmt->get_result()->fetch_assoc()['oldest'] ?? null;
+        $oldest_stmt->close();
+
+        $reset_time = '';
+        if ($oldest) {
+            $reset_dt = new DateTime($oldest, new DateTimeZone('Asia/Manila'));
+            $reset_dt->modify('+1 hour');
+            $reset_time = $reset_dt->format('g:i A');
+        }
+
+        chat_respond(429, 'rate_limited',
+            'You have reached the 20 message limit for this hour.' .
+            ($reset_time ? " Your limit resets at {$reset_time}." : ''),
+            ['reset_time' => $reset_time, 'remaining' => 0]
+        );
     }
 
-    chat_respond(429, 'rate_limited',
-        'You have reached the 20 message limit for this hour.' .
-        ($reset_time ? " Your limit resets at {$reset_time}." : ''),
-        ['reset_time' => $reset_time, 'remaining' => 0]
+    // Log before API call so aborted calls still count
+    $log_stmt = $conn->prepare(
+        "INSERT INTO tbl_ai_chat_log (faculty_id, sent_at) VALUES (?, NOW())"
     );
-}
+    $log_stmt->bind_param('s', $faculty_id);
+    $log_stmt->execute();
+    $log_insert_id = (int)$conn->insert_id;
+    $log_stmt->close();
 
-// ── 12. Log this message BEFORE calling Gemini ────────────────────────────────
-// Logged before the API call so aborted/timed-out calls still count.
-// We store the inserted row ID so we can delete it if Gemini fails with a
-// server-side error (503/curl error) — those are not the user's fault.
-$log_stmt = $conn->prepare(
-    "INSERT INTO tbl_ai_chat_log (faculty_id, sent_at) VALUES (?, NOW())"
-);
-$log_stmt->bind_param('s', $faculty_id);
-$log_stmt->execute();
-$log_insert_id = (int)$conn->insert_id;
-$log_stmt->close();
-
-// Cleanup old rows ~5% of requests to keep the table small
-if (mt_rand(1, 20) === 1) {
-    $conn->query("DELETE FROM tbl_ai_chat_log WHERE sent_at < (NOW() - INTERVAL 24 HOUR)");
-}
+    if (mt_rand(1, 20) === 1) {
+        $conn->query("DELETE FROM tbl_ai_chat_log WHERE sent_at < (NOW() - INTERVAL 24 HOUR)");
+    }
+} // ── end non-reservation-flow block ──────────────────────────────────────────
 
 // ── 13. Build faculty context from DB ────────────────────────────────────────
 // 13a. Faculty role and department
@@ -436,8 +450,53 @@ function ai_availability_summary(mysqli $conn, string $campus, string $date): st
 }
 
 // ── Run the Phase 2 availability pipeline ────────────────────────────────────
-$ctx_availability   = '';   // empty = not queried (fast path)
-$ask_campus         = false; // true = AI should ask which campus
+$ctx_availability   = '';
+$ask_campus         = false;
+
+// ── Phase 3 helper functions ──────────────────────────────────────────────────
+
+function ai_is_reservation_intent(string $msg): bool
+{
+    $lower = mb_strtolower($msg);
+    $phrases = [
+        'reserve me', 'book me', 'reserve a room for me', 'book a room for me',
+        'i want to reserve', 'i want to book', 'can you reserve', 'please reserve',
+        'reserve for me', 'book for me', 'make a reservation for me',
+        'create a reservation', 'set up a reservation', 'i need a room',
+        'get me a room', 'reserve room', 'book room',
+    ];
+    foreach ($phrases as $p) {
+        if (str_contains($lower, $p)) return true;
+    }
+    return false;
+}
+
+function ai_room_list(mysqli $conn, string $campus): string
+{
+    $campus_id = ($campus === 'cite') ? 2 : 1;
+    $stmt = $conn->prepare(
+        "SELECT r.room_id, r.room_name, r.floor_label, b.name AS building_name
+           FROM tbl_rooms r
+           JOIN tbl_buildings b ON b.building_id = r.building_id
+          WHERE b.campus_id = ? AND r.status = 'Available' AND r.is_archived = 0
+          ORDER BY b.sort_order, r.floor_number, r.sort_order"
+    );
+    if (!$stmt) return 'Room list unavailable.';
+    $stmt->bind_param('i', $campus_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if (empty($rows)) return 'No bookable rooms available.';
+
+    $lines = [];
+    foreach ($rows as $r) {
+        $floor = $r['floor_label'] ?? '';
+        $lines[] = "ID:{$r['room_id']} — {$r['room_name']} ({$r['building_name']}, {$floor})";
+    }
+    return implode("\n", $lines);
+}
+
 
 if (ai_is_availability_query($raw_message)) {
     $campus = ai_detect_campus($raw_message);
@@ -450,21 +509,101 @@ if (ai_is_availability_query($raw_message)) {
     }
 }
 
+// ── Phase 3 — Reservation intent pipeline ────────────────────────────────────
+// Check current message AND recent history for reservation intent
+$full_context_for_intent = $raw_message;
+foreach (array_slice($history, -4) as $h) {
+    $full_context_for_intent .= ' ' . $h['text'];
+}
+
+$reservation_intent = ai_is_reservation_intent($full_context_for_intent);
+$ctx_room_list      = '';
+$reservation_campus = ai_detect_campus($full_context_for_intent);
+
+if ($reservation_intent) {
+    if ($reservation_campus === null && !$ask_campus) {
+        $ask_campus = true; // reuse campus disambiguation from Phase 2
+    } elseif ($reservation_campus !== null) {
+        $ctx_room_list = ai_room_list($conn, $reservation_campus);
+    }
+} else {
+    $reservation_intent = false;
+}
+
+
+
 // ── 15. System prompt ─────────────────────────────────────────────────────────
+
+// Inject current Manila date/time so Gemini knows what day it is
+$now_manila     = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
+$today_label    = $now_manila->format('l, F j, Y'); // e.g. "Sunday, October 18, 2026"
+$today_date     = $now_manila->format('Y-m-d');
+$today_day_name = $now_manila->format('l');         // e.g. "Sunday"
+$is_sunday      = $now_manila->format('N') === '7'; // true if today is Sunday
+
 $avail_section = $ctx_availability !== ''
     ? $ctx_availability
     : 'Not queried — the faculty did not ask about availability, or campus is unknown.';
 
 $campus_instruction = $ask_campus
-    ? "\n## IMPORTANT — CAMPUS UNKNOWN\nThe faculty asked about room availability but did not specify a campus. You MUST ask: \"Which campus are you at?\" and present exactly two options on separate lines:\n→ PUP Main (Buildings A & B)\n→ PUP CITE (Building C)\nDo not answer the availability question until you know the campus. Do not add anything else to this response."
+    ? "\n## IMPORTANT — CAMPUS UNKNOWN\nThe faculty asked about availability or wants to reserve a room but did not specify a campus. You MUST ask: \"Which campus are you at?\" and present exactly two options on separate lines:\n→ PUP Main (Buildings A & B)\n→ PUP CITE (Building C)\nDo not answer until you know the campus. Do not add anything else to this response."
     : '';
+
+$reservation_instruction = '';
+if ($reservation_intent && $reservation_campus !== null && $ctx_room_list !== '') {
+    $reservation_instruction = <<<RESINSTR
+
+## RESERVATION MODE — ACTIVE
+The faculty wants to make a room reservation. Your job is to collect all required details and present a confirmation.
+
+### AVAILABLE ROOMS FOR THIS CAMPUS
+{$ctx_room_list}
+
+### REQUIRED DETAILS TO COLLECT (ask for missing ones — max 1 question at a time)
+1. room_id — which room (match to the list above by name; store the numeric ID)
+2. reservation_date — Y-m-d format (parse from what they say)
+3. start_time — HH:MM (24-hour)
+4. end_time — HH:MM (24-hour)
+5. purpose — what the room is for
+6. attendees — how many people will use the room (including the faculty themselves) — always ask this, do not assume a default
+
+### WHEN ALL DETAILS ARE COLLECTED
+Respond with a confirmation summary in this EXACT format (no deviations):
+
+CONFIRMATION:
+Room: [room name]
+Date: [day, Month D]
+Time: [H:MM AM] to [H:MM PM]
+Purpose: [purpose]
+Attendees: [number]
+
+Then add one line: "Reply **Confirm** to reserve or **Cancel** to start over."
+
+When you have ALL details collected, present the confirmation summary and end your response with EXACTLY this line (no variation):
+##READY_TO_CONFIRM##
+
+Do not write anything after ##READY_TO_CONFIRM##. This signals the system to show the Confirm/Cancel buttons to the faculty.
+
+### IMPORTANT RULES
+- Never invent a room_id not in the list above.
+- Never confirm a reservation outside 07:00–20:00.
+- Never confirm a reservation on a Sunday.
+- If the faculty mentions a room not in the list, tell them it is not available and suggest they browse the Facilities tab.
+- Do not ask for all missing details at once — ask one question at a time.
+RESINSTR;
+}
 
 $system_prompt = <<<PROMPT
 You are PUPSync Room Assistant, an AI assistant for the Polytechnic University of the Philippines (PUP) Biñan Campus room reservation system. You help faculty members with room reservations only.
 
+## TODAY (injected by the server — always accurate)
+- Current date: {$today_label}
+- Today is a {$today_day_name}
+- Reservations on Sundays are NOT allowed — if the faculty asks to reserve today or mentions Sunday, tell them reservations are not available on Sundays and suggest the next available day (Monday)
+
 ## SYSTEM RULES (always accurate — never contradict these)
 - Operating hours: 7:00 AM to 8:00 PM. Reservations must start and end within these hours.
-- Maximum advance booking: 21 days from today.
+- Maximum advance booking: 21 days from today ({$today_date}).
 - Maximum active reservations per faculty: 2 at the same time. "Active" means Approved and not yet ended.
 - Cancellation policy: A reservation can only be cancelled more than 1 hour before the start time.
 - Organisation Advisers may attach a supporting document (PDF, JPG, PNG, max 5 MB) when reserving. This increases their priority in the arbitration system.
@@ -478,8 +617,7 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
   - Building C — 4 floors — computer labs, engineering labs, audiovisual room
 
 ## HOW TO RESERVE A ROOM
-1. Go to the Facilities tab → choose a building → browse by floor → click a room card
-2. Check the room schedule → click Reserve → fill in date, time, purpose, attendees → submit
+You can either guide the faculty to reserve manually through the Facilities tab, OR if the faculty asks you to reserve for them directly, enter Reservation Mode and collect the required details (see RESERVATION MODE section below if active).
 
 ## HOW TO CANCEL A RESERVATION
 My Activity → Room reservations → find reservation → click Cancel (only if more than 1 hour before start).
@@ -501,73 +639,115 @@ Waitlist:
 ## YOUR BEHAVIOUR
 - Answer only questions about room reservations and the PUPSync system.
 - When availability data is provided above, use it to give a specific summary by building. Do not list every room — give the count of free rooms per building and mention rooms with bookings.
-- When availability says "Not queried", do not speculate — tell the faculty to check the room card in the Facilities tab.
+- When availability says "Not queried", do not speculate — tell the faculty to check the room card in the Facilities tab for specific slot details.
+- When the faculty asks YOU to reserve a room for them directly, do NOT redirect them to the Facilities tab — enter Reservation Mode instead by collecting the required details.
 - Never fabricate room names, dates, or slot data not provided above.
-- Keep responses under 150 words unless giving step-by-step instructions.
+- Keep responses under 150 words unless in Reservation Mode or giving step-by-step instructions.
 - Be friendly, concise, and helpful.
 - Never reveal other faculty members' data.
 - If asked something unrelated to rooms or PUPSync, politely redirect.
+{$reservation_instruction}
 PROMPT;
 
-// ── 16. Call Gemini API ───────────────────────────────────────────────────────
-// Using gemini-3.8-flash via the legacy generateContent endpoint (still fully
-// supported). Auth is sent as x-goog-api-key header instead of a query param
-// per Google's current guidance for Gemini 3.x models.
+// ── 16. Call Gemini API with multi-key rotation ───────────────────────────────
+// Three API keys from three Google accounts are tried in order.
+// Key rotation triggers on 429 (daily quota exhausted) — not on 503
+// (server overload) which is retried with the same key first.
+// Each key gets up to 2 retries on 503 before rotating to the next.
 $gemini_url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+
+// Build contents array: history + current message
+$contents = [];
+foreach ($history as $h) {
+    $contents[] = ['role' => $h['role'], 'parts' => [['text' => $h['text']]]];
+}
+$contents[] = ['role' => 'user', 'parts' => [['text' => $raw_message]]];
 
 $request_body = json_encode([
     'system_instruction' => [
         'parts' => [['text' => $system_prompt]],
     ],
-    'contents' => [
-        ['role' => 'user', 'parts' => [['text' => $raw_message]]],
-    ],
+    'contents' => $contents,
     'generationConfig' => [
-        // Note: Google recommends keeping temperature at its default (1.0) for
-        // Gemini 3.x models. Lower values can cause looping. maxOutputTokens
-        // is kept intentionally small to control cost and response length.
         'maxOutputTokens' => 300,
         'thinkingConfig'  => ['thinkingLevel' => 'low'],
     ],
 ]);
 
-// Retry up to 2 extra times on 503 (Gemini overload) with short back-off.
+// Load all three keys — skip any that are empty
+$api_keys = array_values(array_filter([
+    trim((string)($_ENV['AI_API_KEY']  ?? '')),
+    trim((string)($_ENV['AI_API_KEY2'] ?? '')),
+    trim((string)($_ENV['AI_API_KEY3'] ?? '')),
+], fn($k) => $k !== ''));
+
+if (empty($api_keys)) {
+    error_log('[PUPSync AI] No API keys configured in .env');
+    chat_respond(503, 'error', 'The AI assistant is temporarily unavailable. Please try again later.');
+}
+
 $response    = false;
 $curl_error  = '';
 $http_status = 0;
-$max_attempts = 3;
+$used_key    = '';
 
-for ($attempt = 1; $attempt <= $max_attempts; $attempt++) {
-    $ch = curl_init($gemini_url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $request_body,
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: application/json',
-            'x-goog-api-key: ' . $api_key,
-        ],
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_CONNECTTIMEOUT => 8,
-    ]);
-    $response    = curl_exec($ch);
-    $curl_error  = curl_error($ch);
-    $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+foreach ($api_keys as $current_key) {
+    // Each key gets up to 2 retries on 503 (server overload)
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $ch = curl_init($gemini_url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $request_body,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'x-goog-api-key: ' . $current_key,
+            ],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+        ]);
+        $response    = curl_exec($ch);
+        $curl_error  = curl_error($ch);
+        $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-    // Only retry on 503 (server overload) — not on auth/quota errors
-    if ($http_status !== 503 || $attempt === $max_attempts) break;
-    usleep(600000 * $attempt); // 0.6 s, then 1.2 s
+        if ($curl_error || $response === false) {
+            // Network error — no point retrying same key
+            break;
+        }
+
+        if ($http_status === 200) {
+            // Success — stop everything
+            $used_key = $current_key;
+            break 2;
+        }
+
+        if ($http_status === 429) {
+            // Daily quota exhausted for this key — rotate to next key immediately
+            error_log('[PUPSync AI] Key quota exhausted (429), rotating to next key.');
+            break; // break inner loop, continue outer foreach
+        }
+
+        if ($http_status === 503 && $attempt < 2) {
+            // Server overload — retry same key once with backoff
+            usleep(700000); // 0.7 s
+            continue;
+        }
+
+        // Any other error — rotate to next key
+        break;
+    }
 }
 
 // ── 17. Handle errors ─────────────────────────────────────────────────────────
-// Helper: remove the log row so a server-side failure doesn't cost the user a message.
 $refund_log = function () use ($conn, $log_insert_id): void {
     if ($log_insert_id > 0) {
         $d = $conn->prepare("DELETE FROM tbl_ai_chat_log WHERE id = ?");
-        $d->bind_param('i', $log_insert_id);
-        $d->execute();
-        $d->close();
+        if ($d) {
+            $d->bind_param('i', $log_insert_id);
+            $d->execute();
+            $d->close();
+        }
     }
 };
 
@@ -581,18 +761,19 @@ $decoded = json_decode((string)$response, true);
 
 if ($http_status !== 200 || isset($decoded['error'])) {
     $gemini_err = $decoded['error']['message'] ?? 'Unknown error';
-    error_log('[PUPSync AI] Gemini error ' . $http_status . ': ' . $gemini_err);
+    error_log('[PUPSync AI] All keys failed. Last status ' . $http_status . ': ' . $gemini_err);
 
-    // Refund the log entry for server-side failures (503 overload, network issues).
-    // Do NOT refund 400/401/429 — those are caused by the request itself.
     if (in_array($http_status, [500, 503, 504], true) || $http_status === 0) {
         $refund_log();
-    }
-
-    if ($http_status === 503) {
         chat_respond(503, 'error', 'The AI assistant is busy right now. Please wait a moment and try again.');
     }
-    chat_respond(503, 'error', 'AI service error (' . $http_status . '). Please try again.');
+
+    if ($http_status === 429) {
+        $refund_log();
+        chat_respond(429, 'error', 'The AI assistant has reached its daily limit. Please try again tomorrow.');
+    }
+
+    chat_respond(503, 'error', 'The AI assistant encountered an error. Please try again.');
 }
 
 $reply = trim((string)($decoded['candidates'][0]['content']['parts'][0]['text'] ?? ''));
@@ -601,14 +782,166 @@ if ($reply === '') {
     chat_respond(503, 'error', 'The AI assistant did not return a response. Please try again.');
 }
 
-// ── 18. Return success ────────────────────────────────────────────────────────
-$new_remaining = max(0, $RATE_LIMIT - ($rl_count + 1));
+// ── 18. Detect confirmation state and extract reservation details ──────────────
+// Instead of asking Gemini to output machine-readable JSON (unreliable),
+// we detect the ##READY_TO_CONFIRM## signal, strip it from the reply,
+// then extract reservation details from the conversation context in PHP.
+$pending_reservation = null;
+
+if (str_contains($reply, '##READY_TO_CONFIRM##')) {
+    // Strip the signal from the visible reply
+    $reply = trim(str_replace('##READY_TO_CONFIRM##', '', $reply));
+
+    // Extract reservation details from Gemini's confirmation reply ONLY.
+    // Using the full conversation history causes date extraction to pick up
+    // earlier messages (e.g. "today is Sunday") instead of the confirmed date.
+    $full_text  = $reply;
+    $full_lower = mb_strtolower($full_text);
+    // Use full history only for room name matching (room names don't change)
+    $history_text = '';
+    foreach ($history as $h) {
+        $history_text .= ' ' . $h['text'];
+    }
+
+    // Extract room_id — look for "ID:NNN" pattern from the room list we sent
+    $room_id_found = 0;
+    $room_name_found = '';
+    if (preg_match('/\bID:(\d+)\b/i', $full_text, $m)) {
+        $room_id_found = (int)$m[1];
+    } else {
+        // Fallback: try to match room name against DB
+        if ($reservation_campus !== null) {
+            $campus_id_lookup = ($reservation_campus === 'cite') ? 2 : 1;
+            $rl = $conn->prepare(
+                "SELECT r.room_id, r.room_name FROM tbl_rooms r
+                   JOIN tbl_buildings b ON b.building_id = r.building_id
+                  WHERE b.campus_id = ? AND r.status = 'Available' AND r.is_archived = 0"
+            );
+            $rl->bind_param('i', $campus_id_lookup);
+            $rl->execute();
+            $all_rooms = $rl->get_result()->fetch_all(MYSQLI_ASSOC);
+            $rl->close();
+            $combined_for_room = mb_strtolower($full_text . ' ' . $history_text);
+            foreach ($all_rooms as $ar) {
+                if (str_contains($combined_for_room, mb_strtolower($ar['room_name']))) {
+                    $room_id_found   = (int)$ar['room_id'];
+                    $room_name_found = $ar['room_name'];
+                    break;
+                }
+            }
+        }
+    }
+
+    // Extract date — look for explicit date in Gemini's confirmation first
+    // e.g. "Monday, October 19" or "Tuesday, October 20, 2026"
+    $res_date_found = '';
+    $month_names_map = [
+        'january'=>1,'february'=>2,'march'=>3,'april'=>4,'may'=>5,'june'=>6,
+        'july'=>7,'august'=>8,'september'=>9,'october'=>10,'november'=>11,'december'=>12,
+        'jan'=>1,'feb'=>2,'mar'=>3,'apr'=>4,'jun'=>6,'jul'=>7,
+        'aug'=>8,'sep'=>9,'oct'=>10,'nov'=>11,'dec'=>12,
+    ];
+    // Pattern: "October 19" or "Oct 19" or "19 October" with optional day name
+    foreach ($month_names_map as $mname => $mnum) {
+        if (!str_contains($full_lower, $mname)) continue;
+        if (preg_match('/\b' . preg_quote($mname, '/') . '\s+(\d{1,2})(?:,?\s*(\d{4}))?\b/', $full_lower, $dm)) {
+            $day  = (int)$dm[1];
+            $year = isset($dm[2]) && $dm[2] ? (int)$dm[2] : (int)date('Y');
+            if ($day >= 1 && $day <= 31) {
+                $candidate = sprintf('%04d-%02d-%02d', $year, $mnum, $day);
+                $dt_check  = DateTimeImmutable::createFromFormat('Y-m-d', $candidate, new DateTimeZone('Asia/Manila'));
+                if ($dt_check && $dt_check->format('Y-m-d') === $candidate) {
+                    $res_date_found = $candidate;
+                    break;
+                }
+            }
+        }
+    }
+    // Fallback to keyword extraction if no explicit date found in reply
+    if ($res_date_found === '') {
+        $res_date_found = ai_extract_date($full_text . ' ' . $history_text);
+    }
+
+    // Extract start/end times — collect ALL time mentions then take first two
+    $start_found = '';
+    $end_found   = '';
+    $all_times   = [];
+
+    // Find all 12-hour AM/PM times first (most common in natural language)
+    if (preg_match_all('/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i', $full_text, $tm_all, PREG_SET_ORDER)) {
+        foreach ($tm_all as $tm_match) {
+            $h  = (int)$tm_match[1];
+            $mn = isset($tm_match[2]) && $tm_match[2] !== '' ? (int)$tm_match[2] : 0;
+            $ap = strtolower($tm_match[3]);
+            if ($ap === 'pm' && $h < 12) $h += 12;
+            if ($ap === 'am' && $h === 12) $h = 0;
+            $all_times[] = sprintf('%02d:%02d', $h, $mn);
+        }
+    }
+
+    // If no 12-hour found, try 24-hour HH:MM
+    if (empty($all_times)) {
+        if (preg_match_all('/\b([01]?\d|2[0-3]):([0-5]\d)\b/', $full_text, $tm_24, PREG_SET_ORDER)) {
+            foreach ($tm_24 as $tm_match) {
+                $all_times[] = $tm_match[1] . ':' . $tm_match[2];
+            }
+        }
+    }
+
+    // Also try Filipino time patterns: "3pm hanggang 5pm", "3 hanggang 5"
+    if (count($all_times) < 2) {
+        if (preg_match('/\b(\d{1,2})\s*(?:pm|PM)\s*(?:hanggang|to|–|-|until)\s*(\d{1,2})\s*(?:pm|PM)\b/', $full_text, $t_fil)) {
+            $h1 = (int)$t_fil[1]; if ($h1 < 12) $h1 += 12;
+            $h2 = (int)$t_fil[2]; if ($h2 < 12) $h2 += 12;
+            $all_times = [sprintf('%02d:00', $h1), sprintf('%02d:00', $h2)];
+        }
+    }
+
+    // Deduplicate and take first two distinct times
+    $all_times = array_values(array_unique($all_times));
+    if (isset($all_times[0])) $start_found = $all_times[0];
+    if (isset($all_times[1])) $end_found   = $all_times[1];
+
+    // Extract purpose — look for common purpose keywords
+    $purpose_found = 'Meeting';
+    $purpose_map = [
+        'lecture' => 'Lecture', 'klase' => 'Lecture', 'class' => 'Lecture',
+        'meeting' => 'Meeting', 'pulong' => 'Meeting',
+        'lab' => 'Laboratory Session', 'laboratory' => 'Laboratory Session',
+        'seminar' => 'Seminar', 'training' => 'Training',
+        'review' => 'Review Session', 'exam' => 'Examination',
+    ];
+    foreach ($purpose_map as $kw => $label) {
+        if (str_contains($full_lower, $kw)) { $purpose_found = $label; break; }
+    }
+
+    // Only set pending if we have the minimum required fields
+    if ($room_id_found > 0 && $res_date_found && $start_found && $end_found) {
+        $pending_reservation = [
+            'room_id'          => $room_id_found,
+            'reservation_date' => $res_date_found,
+            'start_time'       => $start_found,
+            'end_time'         => $end_found,
+            'purpose'          => $purpose_found,
+            'attendees'        => 1,
+        ];
+    } else {
+        // Could not extract enough details — log and continue without pending state
+        error_log('[PUPSync AI] READY_TO_CONFIRM detected but could not extract details from: ' . mb_substr($full_text, -300));
+    }
+}
+
+// ── 19. Return success ────────────────────────────────────────────────────────
+$new_remaining = $is_reservation_flow
+    ? max(0, $RATE_LIMIT - $rl_count)   // flow not counted — remaining unchanged
+    : max(0, $RATE_LIMIT - ($rl_count + 1));
 
 ob_end_clean();
 http_response_code(200);
 echo json_encode([
-    'status'     => 'success',
-    'reply'      => $reply,
-    'remaining'  => $new_remaining,
-    'ask_campus' => $ask_campus,
+    'status'              => 'success',
+    'reply'               => $reply,
+    'remaining'           => $new_remaining,
+    'ask_campus'          => $ask_campus,
+    'pending_reservation' => $pending_reservation,
 ]);
