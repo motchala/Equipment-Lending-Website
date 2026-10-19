@@ -193,7 +193,8 @@ $final_reason = (string)($final['reason'] ?? '');
 
 // If declined, remove the row (same as submit-student-reserve.php behaviour)
 if ($final_status === 'Declined') {
-    $conn->prepare("DELETE FROM tbl_room_reservations WHERE id = ?")->execute();
+    $del = $conn->prepare("DELETE FROM tbl_room_reservations WHERE id = ?");
+    if ($del) { $del->bind_param('i', $reservation_id); $del->execute(); $del->close(); }
     reserve_respond(409, 'error',
         'The reservation could not be approved: ' . ($final_reason ?: 'time slot conflict.')
         . ' Please choose a different room or time.'

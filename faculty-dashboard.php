@@ -3962,7 +3962,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 <!-- Input bar -->
                 <div class="act-ai-chat-input-wrap">
                     <div class="act-ai-chat-counter" id="actAiCounterBar">
-                        <span id="actAiCounter">20</span> messages remaining this hour
+                        <span id="actAiCounter">—</span> messages remaining this hour
                     </div>
                     <div class="act-ai-chat-input">
                         <input type="text" id="actAiInput" placeholder="Aa" autocomplete="off" maxlength="500">

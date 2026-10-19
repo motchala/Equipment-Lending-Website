@@ -5116,6 +5116,150 @@ body {
 .act-ai-chat-footer a:hover { color: var(--color-primary); }
 .act-ai-chat-footer .material-symbols-outlined { font-size: 13px; }
 
+/* ── AI reservation mini-form ────────────────────────────────────── */
+.act-mini-form {
+    margin-top: 10px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: .82rem;
+    box-shadow: var(--shadow-sm);
+}
+.act-mini-form-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-size: .85rem;
+}
+.act-mini-form-title .material-symbols-outlined {
+    font-size: 17px;
+    font-variation-settings: 'FILL' 1;
+}
+.act-mini-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+}
+.act-mini-field label {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--color-on-surface-variant);
+}
+.act-mini-req { color: var(--color-error); }
+.act-mini-field input,
+.act-mini-field select {
+    background: var(--color-surface-container);
+    border: 1.5px solid var(--color-outline-variant);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: .81rem;
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color var(--transition);
+    width: 100%;
+    box-sizing: border-box;
+}
+.act-mini-field input:focus,
+.act-mini-field select:focus {
+    border-color: var(--color-primary);
+}
+.act-mini-field input:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+.act-mini-row {
+    display: flex;
+    gap: 8px;
+}
+.act-mini-row .act-mini-field { flex: 1; }
+
+/* Combobox wrapper */
+.act-mini-combobox { position: relative; }
+.act-mini-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    max-height: 160px;
+    overflow-y: auto;
+    background: var(--color-surface-lowest);
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    z-index: 400;
+    box-shadow: var(--shadow-md);
+}
+.act-mini-dd-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    border-bottom: 1px solid var(--color-outline-variant);
+    transition: background var(--transition);
+}
+.act-mini-dd-item:last-child { border-bottom: none; }
+.act-mini-dd-item:hover { background: var(--color-surface-container); }
+.act-mini-dd-item strong { font-size: .82rem; color: var(--color-on-surface); }
+.act-mini-dd-meta {
+    font-size: .72rem;
+    color: var(--color-secondary);
+}
+.act-mini-dd-empty {
+    padding: 10px;
+    font-size: .78rem;
+    color: var(--color-secondary);
+    text-align: center;
+}
+
+.act-mini-error {
+    font-size: .74rem;
+    color: var(--color-error);
+    background: var(--color-error-container);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+}
+.act-mini-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.act-mini-btn {
+    padding: 7px 14px;
+    border-radius: var(--radius-full);
+    font-size: .78rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border: none;
+    transition: opacity var(--transition);
+}
+.act-mini-cancel {
+    background: var(--color-surface-high);
+    color: var(--color-on-surface-variant);
+}
+.act-mini-submit {
+    background: var(--color-primary);
+    color: #fff;
+}
+.act-mini-btn:hover    { opacity: .85; }
+.act-mini-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Dark mode */
+[data-theme="dark"] .act-mini-form { background: var(--color-surface-container); }
+[data-theme="dark"] .act-mini-field input,
+[data-theme="dark"] .act-mini-field select { background: var(--color-surface-high); }
+[data-theme="dark"] .act-mini-dropdown { background: var(--color-surface-container); }
+
+
+
 /* ── Dark mode overrides ─────────────────────────────────────────── */
 [data-theme="dark"] .act-chat-bubble-ai,
 [data-theme="dark"] .act-chat-typing-dots {

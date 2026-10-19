@@ -316,6 +316,30 @@
 
         if (tabName === 'rooms' && window.PUPSyncFacilities) {
             window.PUPSyncFacilities.start();
+
+            // Deep-link: read params stored by the AI mini-form in sessionStorage
+            (function () {
+                var raw = null;
+                try { raw = sessionStorage.getItem('ai_room_deeplink'); } catch (e) {}
+                if (!raw) return;
+
+                var params = null;
+                try { params = JSON.parse(raw); } catch (e) {}
+                // Consume immediately — one-shot, never re-opens on back/forward
+                try { sessionStorage.removeItem('ai_room_deeplink'); } catch (e) {}
+                if (!params || !params.room) return;
+
+                var roomId = params.room;
+                var date   = params.date  || null;
+                var start  = params.start || null;
+                var end    = params.end   || null;
+
+                // Hard-reload path: sessionStorage was set, page reloaded,
+                // now we land on Facilities and open the room
+                if (window.PUPSyncFacilities && window.PUPSyncFacilities.openRoom) {
+                    window.PUPSyncFacilities.openRoom(roomId, date, start, end);
+                }
+            })();
         }
 
         /* ── AI chatbot: only visible on the Facilities tab ─────────────── */
@@ -4378,19 +4402,14 @@
 })();
 
 /* ══════════════════════════════════════════════════════════════════
-   AI CHAT — send function, history, pending state, confirmation
+   AI CHAT — send function, campus chips, reservation mini-form
 ══════════════════════════════════════════════════════════════════ */
 (function () {
     'use strict';
 
-    /* ── State ───────────────────────────────────────────────────── */
-    var _chatHistory        = [];   // [{role:'user'|'model', text:'...'}]
-    var _pendingReservation = null; // structured object waiting for Confirm
-    var _inReservationFlow  = false;// true while collecting reservation details
-
     /* ── Helpers ─────────────────────────────────────────────────── */
     function escH(s) {
-        return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '<').replace(/>/g, '>');
     }
     function timeNow() {
         var d = new Date(), h = d.getHours(), m = d.getMinutes();
@@ -4407,15 +4426,10 @@
         t = t.replace(/\n/g, '<br>');
         return t;
     }
-    function addToHistory(role, text) {
-        _chatHistory.push({ role: role, text: text });
-        if (_chatHistory.length > 10) _chatHistory = _chatHistory.slice(-10);
-    }
     function removeChips() {
         var c = document.getElementById('actAiChips');
         if (c) c.remove();
-        // Also remove any confirmation or campus chips
-        document.querySelectorAll('.act-campus-chips, .act-confirm-chips').forEach(function(el) { el.remove(); });
+        document.querySelectorAll('.act-campus-chips').forEach(function(el) { el.remove(); });
     }
     function setSending(on) {
         var btn = document.getElementById('actAiSendBtn');
@@ -4429,8 +4443,8 @@
         if (el) el.textContent = remaining;
         if (!bar) return;
         bar.classList.remove('is-low', 'is-empty');
-        if (remaining === 0)      bar.classList.add('is-empty');
-        else if (remaining <= 5)  bar.classList.add('is-low');
+        if (remaining === 0)     bar.classList.add('is-empty');
+        else if (remaining <= 5) bar.classList.add('is-low');
     }
     function appendUserBubble(body, text) {
         var row = document.createElement('div');
@@ -4469,103 +4483,305 @@
             '</div>' +
             '<div class="act-chat-col">' +
                 '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
-                '<div class="act-chat-meta">' +
-                    '<span>' + timeNow() + '</span>' +
-                '</div>' +
+                '<div class="act-chat-meta"><span>' + timeNow() + '</span></div>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
         return row;
     }
 
-    /* ── Pending state (confirmation flow) ───────────────────────── */
-    function enterPendingState(reservation, lastRow) {
-        _pendingReservation = reservation;
-        // Disable input so faculty can only click Confirm or Cancel
-        var inp = document.getElementById('actAiInput');
-        var btn = document.getElementById('actAiSendBtn');
-        if (inp) inp.disabled = true;
-        if (btn) btn.disabled = true;
+    /* ── AI reservation mini-form ───────────────────────────────── */
+    //
+    // Shown when the AI detects reservation intent (intent_reserve: true).
+    // Collects 4 inputs: campus, date, start time, end time.
+    // On slot selection, fetches available rooms from Component C.
+    // Room field is a searchable combobox, not a flat select.
+    // "Find & Reserve" navigates to the Facilities tab and opens
+    // the Reserve modal for the selected room pre-filled.
+    //
+    // This form does NOT submit any reservation itself.
+    // It only collects context and hands off to the existing Facilities UI.
 
-        // Render Confirm/Cancel chips on the last AI bubble
-        if (lastRow) {
-            var col = lastRow.querySelector('.act-chat-col');
-            if (col) {
-                var chips = document.createElement('div');
-                chips.className = 'act-chat-chips act-confirm-chips';
-                chips.innerHTML =
-                    '<button class="act-chat-chip act-chip-confirm" data-action="ai-confirm-reservation">✅ Confirm</button>' +
-                    '<button class="act-chat-chip act-chip-cancel"  data-action="ai-cancel-reservation">❌ Cancel</button>';
-                col.appendChild(chips);
-            }
+    function showMiniForm(lastRow) {
+        var col = lastRow && lastRow.querySelector('.act-chat-col');
+        if (!col) return;
+
+        var now    = new Date();
+        var today  = now.getFullYear() + '-' +
+                     String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                     String(now.getDate()).padStart(2, '0');
+        var maxDt  = new Date(now.getTime() + 21 * 86400000);
+        var maxDay = maxDt.getFullYear() + '-' +
+                     String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
+                     String(maxDt.getDate()).padStart(2, '0');
+
+        var form = document.createElement('div');
+        form.className = 'act-mini-form';
+        form.id = 'actMiniForm';
+        form.innerHTML =
+            '<div class="act-mini-form-title">' +
+                '<span class="material-symbols-outlined">calendar_month</span>' +
+                'Find an Available Room' +
+            '</div>' +
+            '<div class="act-mini-field">' +
+                '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
+                '<select id="actMfCampus">' +
+                    '<option value="" disabled selected>Select campus…</option>' +
+                    '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
+                    '<option value="cite">PUP CITE (Building C)</option>' +
+                '</select>' +
+            '</div>' +
+            '<div class="act-mini-field">' +
+                '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
+                '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
+            '</div>' +
+            '<div class="act-mini-row">' +
+                '<div class="act-mini-field">' +
+                    '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
+                    '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
+                '</div>' +
+                '<div class="act-mini-field">' +
+                    '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
+                    '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
+                '</div>' +
+            '</div>' +
+            '<div class="act-mini-field">' +
+                '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
+                '<div class="act-mini-combobox" id="actMfComboWrap">' +
+                    '<input type="text" id="actMfRoomSearch" ' +
+                           'placeholder="Fill campus, date & time first\u2026" ' +
+                           'autocomplete="off" disabled>' +
+                    '<input type="hidden" id="actMfRoomId">' +
+                    '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
+                '</div>' +
+            '</div>' +
+            '<div id="actMfError" class="act-mini-error" style="display:none;"></div>' +
+            '<div class="act-mini-actions">' +
+                '<button type="button" class="act-mini-btn act-mini-cancel" ' +
+                        'id="actMfCancelBtn">Cancel</button>' +
+                '<button type="button" class="act-mini-btn act-mini-submit" ' +
+                        'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
+            '</div>';
+
+        col.appendChild(form);
+        _wireMiniForm();
+    }
+
+    var _miniFormRooms        = [];
+    var _miniFormRoomSelected = false;
+
+    function _wireMiniForm() {
+        var campusSel  = document.getElementById('actMfCampus');
+        var dateInp    = document.getElementById('actMfDate');
+        var startInp   = document.getElementById('actMfStart');
+        var endInp     = document.getElementById('actMfEnd');
+        var roomSearch = document.getElementById('actMfRoomSearch');
+        var roomIdInp  = document.getElementById('actMfRoomId');
+        var dropdown   = document.getElementById('actMfDropdown');
+        var submitBtn  = document.getElementById('actMfSubmitBtn');
+        var errEl      = document.getElementById('actMfError');
+        var cancelBtn  = document.getElementById('actMfCancelBtn');
+
+        if (!campusSel || !dateInp || !startInp || !endInp ||
+            !roomSearch || !roomIdInp || !dropdown || !submitBtn) return;
+
+        function showErr(msg) {
+            if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; }
         }
-    }
+        function clearErr() {
+            if (errEl) errEl.style.display = 'none';
+        }
 
-    function exitPendingState() {
-        _pendingReservation  = null;
-        _inReservationFlow   = false;
-        _chatHistory         = []; // clear history after flow completes
-        document.querySelectorAll('.act-confirm-chips').forEach(function(el) { el.remove(); });
-        var inp = document.getElementById('actAiInput');
-        var btn = document.getElementById('actAiSendBtn');
-        if (inp) { inp.disabled = false; inp.focus(); }
-        if (btn) btn.disabled = false;
-    }
+        function onSlotChange() {
+            var campus = campusSel.value;
+            var date   = dateInp.value;
+            var start  = startInp.value;
+            var end    = endInp.value;
 
-    /* ── Handle Confirm click ────────────────────────────────────── */
-    function handleConfirmReservation() {
-        if (!_pendingReservation) return;
-        var body = document.getElementById('actAiChatBody');
-        if (!body) return;
+            _miniFormRooms         = [];
+            _miniFormRoomSelected  = false;
+            roomSearch.value       = '';
+            roomIdInp.value        = '';
+            dropdown.style.display = 'none';
+            submitBtn.disabled     = true;
+            clearErr();
 
-        // Remove chips, show typing
-        document.querySelectorAll('.act-confirm-chips').forEach(function(el) { el.remove(); });
-        var typing = appendTyping(body);
+            if (!campus || !date || !start || !end) {
+                roomSearch.disabled    = true;
+                roomSearch.placeholder = 'Fill campus, date & time first\u2026';
+                return;
+            }
+            if (end <= start) {
+                showErr('End time must be after start time.');
+                roomSearch.disabled    = true;
+                roomSearch.placeholder = 'Fix the time range first\u2026';
+                return;
+            }
 
-        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
-        var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            roomSearch.disabled    = true;
+            roomSearch.placeholder = 'Loading rooms\u2026';
 
-        fetch('room-reservation/api/chat-reserve.php', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(Object.assign({}, _pendingReservation, { csrf_token: csrfToken })),
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            typing.remove();
-            exitPendingState();
-            if (data.status === 'success') {
-                var dateStr  = data.res_date   || '';
-                var startStr = data.start_time || '';
-                var endStr   = data.end_time   || '';
-                appendAiBubble(body,
-                    '✅ Done! **' + escH(data.room_name) + '** has been reserved.\n' +
-                    '📅 ' + escH(dateStr) + ' · ' + escH(startStr) + ' – ' + escH(endStr) + '\n' +
-                    '🔖 Reservation ID: #' + data.reservation_id + '\n\n' +
-                    'You can view it in My Activity → Room reservations.'
-                );
+            var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+            fetch('room-reservation/api/check-slot-availability.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    csrf_token: csrfToken,
+                    campus:     campus,
+                    date:       date,
+                    start_time: start,
+                    end_time:   end,
+                }),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.error) {
+                    showErr(data.error);
+                    roomSearch.placeholder = 'No rooms available.';
+                    return;
+                }
+                _miniFormRooms = data.rooms || [];
+                if (_miniFormRooms.length === 0) {
+                    roomSearch.disabled    = true;
+                    roomSearch.placeholder = 'No rooms available for this slot.';
+                    showErr('No rooms are free for this campus, date and time. Try a different slot.');
+                    return;
+                }
+                roomSearch.disabled    = false;
+                roomSearch.placeholder = 'Type to search ' + _miniFormRooms.length +
+                    ' available room' + (_miniFormRooms.length === 1 ? '' : 's') + '\u2026';
+            })
+            .catch(function() {
+                showErr('Could not load rooms. Please try again.');
+                roomSearch.placeholder = 'Error loading rooms.';
+            });
+        }
+
+        campusSel.addEventListener('change', onSlotChange);
+        dateInp.addEventListener('change',   onSlotChange);
+        startInp.addEventListener('change',  onSlotChange);
+        endInp.addEventListener('change',    onSlotChange);
+
+        function renderDropdown(query) {
+            var q = query.trim().toLowerCase();
+            var filtered = q === ''
+                ? _miniFormRooms
+                : _miniFormRooms.filter(function(r) {
+                    return r.room_name.toLowerCase().includes(q) ||
+                           r.building_name.toLowerCase().includes(q) ||
+                           r.floor_label.toLowerCase().includes(q);
+                  });
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML =
+                    '<div class="act-mini-dd-empty">No rooms match "' + escH(query) + '"</div>';
             } else {
-                appendAiBubble(body, '❌ ' + (data.message || 'Reservation failed. Please try again.'));
+                dropdown.innerHTML = filtered.map(function(r) {
+                    return '<div class="act-mini-dd-item" ' +
+                           'data-id="' + r.room_id + '" ' +
+                           'data-label="' + escH(r.room_name + ' \u00b7 ' +
+                               r.building_name + ' \u00b7 ' + r.floor_label) + '">' +
+                               '<strong>' + escH(r.room_name) + '</strong>' +
+                               '<span class="act-mini-dd-meta">' +
+                               escH(r.building_name) + ' \u00b7 ' + escH(r.floor_label) +
+                               '</span>' +
+                           '</div>';
+                }).join('');
             }
-        })
-        .catch(function() {
-            typing.remove();
-            exitPendingState();
-            appendAiBubble(body, 'Network error while submitting. Please try again.');
-        });
-    }
-
-    /* ── Handle Cancel click ─────────────────────────────────────── */
-    function handleCancelReservation() {
-        var body = document.getElementById('actAiChatBody');
-        exitPendingState();
-        if (body) {
-            appendAiBubble(body, 'No problem — reservation cancelled. Is there anything else I can help you with?');
+            dropdown.style.display = 'block';
         }
+
+        roomSearch.addEventListener('input', function() {
+            roomIdInp.value       = '';
+            _miniFormRoomSelected = false;
+            submitBtn.disabled    = true;
+            if (_miniFormRooms.length > 0) renderDropdown(this.value);
+        });
+
+        roomSearch.addEventListener('focus', function() {
+            if (_miniFormRooms.length > 0) renderDropdown(this.value);
+        });
+
+        dropdown.addEventListener('mousedown', function(e) {
+            var item = e.target.closest('.act-mini-dd-item');
+            if (!item) return;
+            e.preventDefault();
+            roomIdInp.value       = item.dataset.id;
+            roomSearch.value      = item.dataset.label;
+            _miniFormRoomSelected = true;
+            dropdown.style.display = 'none';
+            submitBtn.disabled    = false;
+            clearErr();
+        });
+
+        document.addEventListener('click', function hideDd(e) {
+            var f = document.getElementById('actMiniForm');
+            if (!f) { document.removeEventListener('click', hideDd, true); return; }
+            if (!f.contains(e.target)) {
+                dropdown.style.display = 'none';
+                if (!_miniFormRoomSelected) {
+                    roomSearch.value = '';
+                    roomIdInp.value  = '';
+                }
+            }
+        }, true);
+
+        cancelBtn.addEventListener('click', function() {
+            var f = document.getElementById('actMiniForm');
+            if (f) f.remove();
+            setSending(false);
+            var chatBody = document.getElementById('actAiChatBody');
+            if (chatBody) appendAiBubble(chatBody,
+                'No problem! You can ask me anything else, or head to the ' +
+                'Facilities tab to browse and reserve directly.');
+        });
+
+        submitBtn.addEventListener('click', function() {
+            var roomId = roomIdInp.value;
+            var date   = dateInp.value;
+            var start  = startInp.value;
+            var end    = endInp.value;
+
+            if (!roomId) { showErr('Please select a room from the list.'); return; }
+            if (!date)   { showErr('Please select a date.'); return; }
+            if (!start)  { showErr('Please enter a start time.'); return; }
+            if (!end)    { showErr('Please enter an end time.'); return; }
+            clearErr();
+
+            // Close chat
+            var chatEl = document.getElementById('actAiChat');
+            if (chatEl) { chatEl.classList.remove('open'); chatEl.classList.remove('minimized'); }
+
+            // Remove mini-form
+            var f = document.getElementById('actMiniForm');
+            if (f) f.remove();
+            setSending(false);
+
+            // Store params for hard-reload fallback only
+            try {
+                sessionStorage.setItem('ai_room_deeplink', JSON.stringify({
+                    room: roomId, date: date, start: start, end: end
+                }));
+            } catch(e) {}
+
+            // Switch to Facilities tab by clicking the sidebar nav item —
+            // this uses the existing public delegation system and is accessible
+            // from any IIFE scope, unlike _switchTabDOM which is private
+            var facilitiesNavBtn = document.querySelector('.side-nav-item[data-tab="rooms"]');
+            if (facilitiesNavBtn) facilitiesNavBtn.click();
+
+            // openRoom handles its own loading wait via setInterval
+            if (window.PUPSyncFacilities && window.PUPSyncFacilities.openRoom) {
+                window.PUPSyncFacilities.openRoom(roomId, date, start, end);
+            }
+        });
     }
 
     /* ── Main send function ──────────────────────────────────────── */
     function actAiSend(prefill) {
+
         var input = document.getElementById('actAiInput');
         var msg   = (prefill || (input ? input.value : '')).trim();
         if (!msg) return;
@@ -4573,7 +4789,6 @@
         var body = document.getElementById('actAiChatBody');
         if (!body) return;
 
-        // Block if already waiting for a response
         if (document.getElementById('actAiSendBtn') &&
             document.getElementById('actAiSendBtn').disabled) return;
 
@@ -4581,7 +4796,6 @@
         appendUserBubble(body, msg);
         if (input) input.value = '';
         setSending(true);
-        addToHistory('user', msg);
 
         var typing    = appendTyping(body);
         var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
@@ -4590,12 +4804,7 @@
         fetch('room-reservation/api/chat.php', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({
-                message:              msg,
-                csrf_token:           csrfToken,
-                history:              _chatHistory.slice(0, -1), // exclude the message we just added
-                is_reservation_flow:  _inReservationFlow,
-            }),
+            body:    JSON.stringify({ message: msg, csrf_token: csrfToken }),
         })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -4603,7 +4812,6 @@
 
             if (data.status === 'rate_limited') {
                 appendAiBubble(body, data.message);
-                addToHistory('model', data.message);
                 updateCounter(0);
                 setSending(false);
                 return;
@@ -4615,10 +4823,9 @@
             }
 
             var lastRow = appendAiBubble(body, data.reply);
-            addToHistory('model', data.reply);
             if (typeof data.remaining === 'number') updateCounter(data.remaining);
 
-            // Campus chips
+            // Campus disambiguation chips (availability queries)
             if (data.ask_campus) {
                 var col = lastRow && lastRow.querySelector('.act-chat-col');
                 if (col) {
@@ -4629,15 +4836,12 @@
                         '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
                     col.appendChild(chips);
                 }
-                _inReservationFlow = true; // campus clarification is part of the flow
             }
 
-            // Pending reservation — enter confirmation state
-            // Do NOT call setSending(false) here — enterPendingState manages
-            // the input/button disabled state itself.
-            if (data.pending_reservation) {
-                _inReservationFlow = true;
-                enterPendingState(data.pending_reservation, lastRow);
+            // Reservation intent — show 4-field mini-form
+            if (data.intent_reserve) {
+                showMiniForm(lastRow);
+                // Keep send disabled until form is cancelled or submitted
                 return;
             }
 
@@ -4651,9 +4855,6 @@
     }
 
     window.actAiSend = actAiSend;
-    window.actAiConfirm = handleConfirmReservation;
-    window.actAiCancel  = handleCancelReservation;
-
 
     /* ── Init ────────────────────────────────────────────────────── */
     function init() {
@@ -4663,12 +4864,9 @@
                 if (e.key === 'Enter' && !e.shiftKey) actAiSend();
             });
         }
-        // Chip clicks — welcome chips, campus chips
         document.addEventListener('click', function(e) {
             var chip = e.target.closest('.act-chat-chip');
             if (!chip) return;
-            // Confirm/Cancel are handled by data-action, not data-chip
-            if (chip.dataset.action) return;
             actAiSend(chip.dataset.chip);
         });
     }
@@ -4676,6 +4874,7 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
 })();
+
 
 
 
