@@ -4618,6 +4618,36 @@
                 return;
             }
 
+            // Past time check — only applies when the selected date is today
+            var todayStr = (function() {
+                var n = new Date();
+                return n.getFullYear() + '-' +
+                    String(n.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(n.getDate()).padStart(2, '0');
+            })();
+            if (date === todayStr) {
+                var nowH   = new Date().getHours();
+                var nowM   = new Date().getMinutes();
+                var startH = parseInt(start.split(':')[0], 10);
+                var startM = parseInt(start.split(':')[1], 10);
+                if (startH < nowH || (startH === nowH && startM <= nowM)) {
+                    showErr('Start time cannot be in the past. Please choose a future time.');
+                    roomSearch.disabled    = true;
+                    roomSearch.placeholder = 'Fix the start time first\u2026';
+                    return;
+                }
+            }
+
+            // Maximum booking duration: 5 hours (300 minutes)
+            var startMin = parseInt(start.split(':')[0], 10) * 60 + parseInt(start.split(':')[1], 10);
+            var endMin   = parseInt(end.split(':')[0], 10)   * 60 + parseInt(end.split(':')[1], 10);
+            if (endMin - startMin > 300) {
+                showErr('Maximum booking duration is 5 hours.');
+                roomSearch.disabled    = true;
+                roomSearch.placeholder = 'Fix the duration first\u2026';
+                return;
+            }
+
             roomSearch.disabled    = true;
             roomSearch.placeholder = 'Loading rooms\u2026';
 

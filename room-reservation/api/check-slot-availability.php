@@ -115,7 +115,7 @@ if (!preg_match('/^\d{2}:\d{2}$/', $start_time)) {
     slot_respond(400, ['error' => 'start_time must be in HH:MM format.']);
 }
 if ($start_time < '07:00' || $start_time >= '20:00') {
-    slot_respond(400, ['error' => 'start_time must be between 07:00 and 20:00.']);
+    slot_respond(400, ['error' => 'Start time must be between 7:00 AM and 8:00 PM.']);
 }
 
 // ── Validate end_time ─────────────────────────────────────────────────────────
@@ -124,10 +124,10 @@ if (!preg_match('/^\d{2}:\d{2}$/', $end_time)) {
     slot_respond(400, ['error' => 'end_time must be in HH:MM format.']);
 }
 if ($end_time <= $start_time) {
-    slot_respond(400, ['error' => 'end_time must be after start_time.']);
+    slot_respond(400, ['error' => 'End time must be after start time.']);
 }
 if ($end_time > '20:00') {
-    slot_respond(400, ['error' => 'end_time cannot be after 20:00.']);
+    slot_respond(400, ['error' => 'End time cannot be after 8:00 PM.']);
 }
 
 // ── Database connection ───────────────────────────────────────────────────────

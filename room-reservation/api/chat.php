@@ -468,8 +468,8 @@ Waitlist:
 PROMPT;
 
 // ── 15. Call Gemini with multi-key rotation ───────────────────────────────────
-$gemini_url   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
-$request_body = json_encode([
+$gemini_url          = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+$gemini_request_body = json_encode([
     'system_instruction' => ['parts' => [['text' => $system_prompt]]],
     'contents'           => [['role' => 'user', 'parts' => [['text' => $raw_message]]]],
     'generationConfig'   => ['maxOutputTokens' => 300, 'thinkingConfig' => ['thinkingLevel' => 'low']],
@@ -478,6 +478,7 @@ $request_body = json_encode([
 $response    = false;
 $curl_error  = '';
 $http_status = 0;
+$provider    = 'gemini'; // tracks which provider ultimately answered
 
 foreach ($api_keys as $current_key) {
     for ($attempt = 1; $attempt <= 2; $attempt++) {
@@ -485,7 +486,7 @@ foreach ($api_keys as $current_key) {
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $request_body,
+            CURLOPT_POSTFIELDS     => $gemini_request_body,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'x-goog-api-key: ' . $current_key],
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 8,
@@ -495,11 +496,77 @@ foreach ($api_keys as $current_key) {
         $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($curl_error || $response === false) break;
-        if ($http_status === 200) break 2;
-        if ($http_status === 429) { error_log('[PUPSync AI] Key quota exhausted, rotating.'); break; }
-        if ($http_status === 503 && $attempt < 2) { usleep(700000); continue; }
-        break;
+        if ($curl_error || $response === false) {
+            error_log('[PUPSync AI] Gemini key curl error: ' . $curl_error);
+            break; // try next key
+        }
+        if ($http_status === 200) {
+            // Verify reply is not empty before accepting
+            $decoded_check = json_decode((string)$response, true);
+            $reply_check   = trim((string)($decoded_check['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+            if ($reply_check !== '') break 2; // success — exit both loops
+            error_log('[PUPSync AI] Gemini key returned 200 but empty reply, rotating.');
+            $response = false;
+            break;
+        }
+        if ($http_status === 429) {
+            error_log('[PUPSync AI] Gemini key quota exhausted (429), rotating.');
+            break; // try next key
+        }
+        if ($http_status === 503 && $attempt < 2) {
+            usleep(700000);
+            continue; // retry same key once
+        }
+        error_log('[PUPSync AI] Gemini key failed with status ' . $http_status . ', rotating.');
+        break; // try next key
+    }
+}
+
+// ── 15b. Groq fallback — fires if ALL Gemini keys failed for any reason ───────
+if ($response === false || $http_status !== 200) {
+    error_log('[PUPSync AI] All Gemini keys failed. Switching to Groq fallback for faculty ' . $faculty_id);
+
+    load_env(); // already called above, safe to call again (no-op if already loaded)
+    $groq_key = trim((string)($_ENV['GROQ_API_KEY'] ?? ''));
+
+    if ($groq_key === '') {
+        error_log('[PUPSync AI] Groq fallback triggered but GROQ_API_KEY is not set in .env');
+        // Fall through — sections 16 error handling will respond 503
+    } else {
+        $groq_url          = 'https://api.groq.com/openai/v1/chat/completions';
+        $groq_request_body = json_encode([
+            'model'       => 'openai/gpt-oss-120b',
+            'messages'    => [
+                ['role' => 'system', 'content' => $system_prompt],
+                ['role' => 'user',   'content' => $raw_message],
+            ],
+            'max_tokens'  => 300,
+            'temperature' => 0.7,
+        ]);
+
+        $ch = curl_init($groq_url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $groq_request_body,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $groq_key,
+            ],
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+        ]);
+        $response    = curl_exec($ch);
+        $curl_error  = curl_error($ch);
+        $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_status === 200) {
+            $provider = 'groq';
+            error_log('[PUPSync AI] Groq fallback succeeded for faculty ' . $faculty_id);
+        } else {
+            error_log('[PUPSync AI] Groq fallback also failed. Status: ' . $http_status);
+        }
     }
 }
 
@@ -518,8 +585,8 @@ if ($curl_error || $response === false) {
 
 $decoded = json_decode((string)$response, true);
 if ($http_status !== 200 || isset($decoded['error'])) {
-    $gemini_err = $decoded['error']['message'] ?? 'Unknown error';
-    error_log('[PUPSync AI] All keys failed. Last status ' . $http_status . ': ' . $gemini_err);
+    $api_err = $decoded['error']['message'] ?? 'Unknown error';
+    error_log('[PUPSync AI] Final failure (' . $provider . '). Status ' . $http_status . ': ' . $api_err);
     if (in_array($http_status, [500, 503, 504], true) || $http_status === 0) $refund_log();
     if ($http_status === 429) {
         $refund_log();
@@ -528,9 +595,15 @@ if ($http_status !== 200 || isset($decoded['error'])) {
     chat_respond(503, 'error', 'The AI assistant encountered an error. Please try again.');
 }
 
-$reply = trim((string)($decoded['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+// Parse reply — path differs by provider
+if ($provider === 'groq') {
+    $reply = trim((string)($decoded['choices'][0]['message']['content'] ?? ''));
+} else {
+    $reply = trim((string)($decoded['candidates'][0]['content']['parts'][0]['text'] ?? ''));
+}
+
 if ($reply === '') {
-    error_log('[PUPSync AI] Empty reply.');
+    error_log('[PUPSync AI] Empty reply from ' . $provider . '.');
     chat_respond(503, 'error', 'The AI assistant did not return a response. Please try again.');
 }
 
