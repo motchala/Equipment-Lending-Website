@@ -4081,9 +4081,9 @@ function psSelectFmt(btn) {
     // Capture phase: runs before the generic data-action handler, so the ID
     // inside the Waiting table opens this drawer instead of the old detail modal.
     document.addEventListener('click', function (e) {
-        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"]');
+        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"], #eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
         if (!t) return;
-        var row = t.closest('tr.ps-req-row');
+        var row = t.closest('tr.ps-req-row, tr.eq-loan-row');
         if (!row) return;
         e.preventDefault();
         e.stopPropagation();
@@ -4094,7 +4094,7 @@ function psSelectFmt(btn) {
     drawer.addEventListener('click', function (e) {
         var b = e.target.closest('[data-appr-decide]');
         if (!b || !currentId) return;
-        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"]');
+        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"], #eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + currentId + '"]');
         if (!row) return;
         var sel = b.getAttribute('data-appr-decide') === 'approve'
             ? '[data-modal="ps-approve-modal"]'
@@ -4178,29 +4178,29 @@ function psSelectFmt(btn) {
 
         // Decision context. The room arbitration log records the rule used for
         // automatic decisions; an override/manual value denotes an admin decision.
-        var arbRule   = d.arbRule   || '';
+        var arbRule = d.arbRule || '';
         var arbReason = d.arbReason || d.reason || '';
-        var hasDoc    = !!d.docUrl;
-        var decSec    = el('ps-rr-decision-sec');
+        var hasDoc = !!d.docUrl;
+        var decSec = el('ps-rr-decision-sec');
         if (decSec) {
             var ruleMap = {
-                'rule_1_fifo':           'FIFO (first submitted)',
-                'rule_2_signatory':      'Request-letter/signatory priority',
-                'rule_3_role':           'Submitter role priority',
+                'rule_1_fifo': 'FIFO (first submitted)',
+                'rule_2_signatory': 'Request-letter/signatory priority',
+                'rule_3_role': 'Submitter role priority',
                 'rule_4_return_history': 'Return-history priority',
-                'rule_5_id_order':       'ID order tie-breaker',
-                'rule_past_datetime':    'Past date or time',
-                'rule_archived':          'Room availability policy',
-                'rule_missing_doc_hold':  'Supporting-document policy',
+                'rule_5_id_order': 'ID order tie-breaker',
+                'rule_past_datetime': 'Past date or time',
+                'rule_archived': 'Room availability policy',
+                'rule_missing_doc_hold': 'Supporting-document policy',
                 'rule_schedule_conflict': 'Schedule conflict',
-                'override':              'Admin override',
-                'manual':                'Manual admin decision'
+                'override': 'Admin override',
+                'manual': 'Manual admin decision'
             };
             var ruleLabel = ruleMap[arbRule] || (arbRule
                 ? arbRule.replace(/^rule_\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })
                 : 'Not recorded');
             var isManual = arbRule === 'override' || arbRule === 'manual';
-            var isAuto   = arbRule !== '' && !isManual;
+            var isAuto = arbRule !== '' && !isManual;
             var methodLabel;
             if (isManual) {
                 methodLabel = 'Manual (admin decision)';
@@ -4213,7 +4213,7 @@ function psSelectFmt(btn) {
             if (methodEl) methodEl.textContent = methodLabel;
 
             var ruleRow = el('ps-rr-dec-rule-row');
-            var ruleEl  = el('ps-rr-dec-rule');
+            var ruleEl = el('ps-rr-dec-rule');
             if (ruleRow && ruleEl) {
                 ruleRow.hidden = false;
                 ruleEl.textContent = ruleLabel;
@@ -4221,7 +4221,7 @@ function psSelectFmt(btn) {
 
             // Reason row
             var reasonRow = el('ps-rr-dec-reason-row');
-            var reasonEl  = el('ps-rr-dec-reason');
+            var reasonEl = el('ps-rr-dec-reason');
             if (reasonRow && reasonEl) {
                 reasonRow.hidden = false;
                 reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
@@ -4838,6 +4838,169 @@ function psSelectFmt(btn) {
         sync();
     }
 
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+    else install();
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   EQUIPMENT › sub-tabs (Catalog | On Loan) + On Loan filter/search
+   Additive block. Scoped to #eqTabs / #eq-onloan; nothing else is touched.
+   window.psOpenEquipmentTab('eq-onloan') can be called from deep links.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    function install() {
+        var tabs = document.getElementById('eqTabs');
+        if (!tabs) return;
+
+        function openPanel(panelId) {
+            var chip = null;
+            tabs.querySelectorAll('.rq-filter-chip').forEach(function (c) {
+                var on = c.getAttribute('data-eq-panel') === panelId;
+                c.classList.toggle('active', on);
+                if (on) chip = c;
+            });
+            if (!chip) return;
+            document.querySelectorAll('#panel-inventory .eq-sub-panel').forEach(function (p) {
+                p.classList.toggle('active', p.id === panelId);
+            });
+        }
+        window.psOpenEquipmentTab = openPanel;
+
+        tabs.addEventListener('click', function (e) {
+            var chip = e.target.closest('.rq-filter-chip[data-eq-panel]');
+            if (chip) openPanel(chip.getAttribute('data-eq-panel'));
+        });
+
+        /* On Loan: status tabs + live search + pagination (20 per page) */
+        var table = document.getElementById('eq-loan-table');
+        var search = document.getElementById('eq-loan-search');
+        var tabBar = document.getElementById('eqLoanFilter');
+        var titleEl = document.getElementById('eqLoanTitle');
+        var pager = document.getElementById('eq-loan-pager');
+        var pgInfo = document.getElementById('eq-loan-pager-info');
+        var pgCtl = document.getElementById('eq-loan-pager-ctl');
+        var pgNums = document.getElementById('eq-loan-pg-nums');
+        var pgPrev = document.getElementById('eq-loan-pg-prev');
+        var pgNext = document.getElementById('eq-loan-pg-next');
+        if (!table) return;
+
+        var PAGE_SIZE = 20;
+        var TITLES = {
+            all: 'All Loans',
+            waiting: 'Pending Review',
+            active: 'Active Borrowings',
+            overdue: 'Overdue Items',
+            returned: 'Returned Equipment'
+        };
+        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
+        var noMatch = table.querySelector('tr.eq-loan-nomatch');
+        var mode = 'all';
+        var query = '';
+        var page = 1;
+
+        function matchesMode(state) {
+            if (mode === 'all') return true;
+            if (mode === 'active') return state === 'ok' || state === 'due';
+            return state === mode; /* waiting | overdue | returned */
+        }
+
+        function matchesQuery(row) {
+            if (!query) return true;
+            var d = row.dataset;
+            var hay = [d.borrower, d.equipment, d.idNumber, '#' + String(d.id || '').padStart(4, '0')].join(' ').toLowerCase();
+            return hay.indexOf(query) !== -1;
+        }
+
+        /* 1 … 4 5 6 … 12 — always first, last and the current page ±1 (same as the Equipment list) */
+        function pageList(total, current) {
+            var keep = [1, total, current - 1, current, current + 1];
+            var list = [], last = 0;
+            keep.filter(function (n, i) { return n >= 1 && n <= total && keep.indexOf(n) === i; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function render() {
+            var hits = rows.filter(function (r) { return matchesMode(r.dataset.loanState) && matchesQuery(r); });
+            var total = hits.length;
+            var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            page = Math.min(Math.max(page, 1), pages);
+            var start = (page - 1) * PAGE_SIZE;
+            var end = Math.min(start + PAGE_SIZE, total);
+            var visible = hits.slice(start, end);
+
+            rows.forEach(function (r) { r.style.display = visible.indexOf(r) !== -1 ? '' : 'none'; });
+            if (noMatch) noMatch.hidden = !(rows.length > 0 && total === 0);
+
+            if (!pager) return;
+            pager.hidden = rows.length === 0;
+            if (pgInfo) pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
+            if (pgCtl) pgCtl.hidden = pages <= 1;
+            if (pgPrev) pgPrev.disabled = page <= 1;
+            if (pgNext) pgNext.disabled = page >= pages;
+            if (pgNums) {
+                pgNums.textContent = '';
+                pageList(pages, page).forEach(function (n) {
+                    if (n === 'gap') {
+                        var gap = document.createElement('span');
+                        gap.className = 'inv-pager-gap';
+                        gap.textContent = '\u2026';
+                        pgNums.appendChild(gap);
+                        return;
+                    }
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.dataset.page = String(n);
+                    btn.textContent = String(n);
+                    btn.setAttribute('aria-label', 'Page ' + n);
+                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    pgNums.appendChild(btn);
+                });
+            }
+        }
+
+        if (tabBar) {
+            tabBar.addEventListener('click', function (e) {
+                var b = e.target.closest('.eq-loan-tab');
+                if (!b) return;
+                mode = b.getAttribute('data-loan-filter') || 'all';
+                tabBar.querySelectorAll('.eq-loan-tab').forEach(function (t) {
+                    var on = t === b;
+                    t.classList.toggle('active', on);
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                if (titleEl) titleEl.textContent = TITLES[mode] || TITLES.all;
+                page = 1;
+                render();
+            });
+        }
+        if (search) {
+            search.addEventListener('input', function () {
+                query = this.value.trim().toLowerCase();
+                page = 1;
+                render();
+            });
+        }
+        if (pgPrev) pgPrev.addEventListener('click', function () { page--; render(); });
+        if (pgNext) pgNext.addEventListener('click', function () { page++; render(); });
+        if (pgNums) {
+            pgNums.addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-page]');
+                if (!btn) return;
+                page = parseInt(btn.dataset.page, 10) || 1;
+                render();
+            });
+        }
+
+        render();
+    }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
     else install();
 })();
