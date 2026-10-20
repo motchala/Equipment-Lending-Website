@@ -178,7 +178,11 @@
             c.buildings.forEach(function (b) {
                 var rooms = 0;
                 b.floor_data.forEach(function (f) {
-                    f.rooms.forEach(function (r) { ROOM_INDEX[r.room_id] = r; rooms++; });
+                    f.rooms.forEach(function (r) {
+                        r._building_id = b.id; // attach building key so openRoom can navigate
+                        ROOM_INDEX[r.room_id] = r;
+                        rooms++;
+                    });
                 });
 
                 var name = BUILDING_LABELS[b.id] || b.name;
@@ -1321,7 +1325,103 @@
         document.body.appendChild(formOverlay);
 
         /* Public hook used by faculty-dashboard.js on first visit to the tab */
-        window.PUPSyncFacilities = { start: start };
+        window.PUPSyncFacilities = {
+            start: start,
+
+            /**
+             * Deep-link entry point: navigate to a specific room and optionally
+             * open the reservation form pre-filled with date/start/end.
+             * Called by faculty-dashboard.js after reading URL hash params set
+             * by the AI chatbot mini-form.
+             *
+             * @param {number|string} roomId
+             * @param {string|null}   date   YYYY-MM-DD or null
+             * @param {string|null}   startT HH:MM or null
+             * @param {string|null}   endT   HH:MM or null
+             */
+            openRoom: function (roomId, date, startT, endT) {
+                var rid = String(roomId);
+
+                function doOpen() {
+                    var room = ROOM_INDEX[rid];
+                    if (!room) {
+                        // Room not in the loaded index — just show the buildings view
+                        showBuildingsView();
+                        return;
+                    }
+
+                    // Navigate to the building that contains this room
+                    showRoomsView(room._building_id);
+
+                    // Find the correct floor and render it so the room card exists in the DOM
+                    var b = BUILDINGS[activeBuildingId];
+                    if (b) {
+                        for (var fi = 0; fi < b.floors.length; fi++) {
+                            var floorRooms = b.floors[fi].rooms || [];
+                            for (var ri = 0; ri < floorRooms.length; ri++) {
+                                if (String(floorRooms[ri].room_id) === rid) {
+                                    renderFloor(fi);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Open the room detail modal
+                    var locationLabel = '';
+                    if (b) {
+                        var activeFloor = b.floors[activeFloorIdx];
+                        locationLabel = b.name + (activeFloor ? ' \u00b7 ' + activeFloor.label : '');
+                    }
+                    openRoomModal(room, locationLabel);
+
+                    // If date/time provided, open the reservation form pre-filled
+                    if (date && startT && endT) {
+                        // Wait for the room modal to finish rendering before opening the form
+                        setTimeout(function () {
+                            openReservationForm(room);
+
+                            // Pre-fill the form fields after they're created
+                            setTimeout(function () {
+                                var elDate  = document.getElementById('fcty-res-date');
+                                var elStart = document.getElementById('fcty-res-start');
+                                var elEnd   = document.getElementById('fcty-res-end');
+
+                                if (elDate) {
+                                    elDate.value = date;
+                                    elDate.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                                if (elStart) {
+                                    elStart.value = startT;
+                                    elStart.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                                if (elEnd) {
+                                    elEnd.value = endT;
+                                    elEnd.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }, 80);
+                        }, 50);
+                    }
+                }
+
+                if (loaded) {
+                    doOpen();
+                } else {
+                    // Facilities not loaded yet — start loading then open
+                    start();
+                    var waitMs = 0;
+                    var waitInterval = setInterval(function () {
+                        waitMs += 100;
+                        if (loaded) {
+                            clearInterval(waitInterval);
+                            doOpen();
+                        } else if (waitMs > 8000) {
+                            clearInterval(waitInterval); // give up after 8 seconds
+                        }
+                    }, 100);
+                }
+            }
+        };
 
         /* Buildings → rooms */
         panelsEl.addEventListener('click', function (e) {

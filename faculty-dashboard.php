@@ -3912,16 +3912,20 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             </div><!-- /panel-activity -->
 
             <!-- ── AI Support Hub ──────────────────────────────────────────── -->
-            <!-- Chat window -->
             <div class="act-ai-chat" id="actAiChat">
+
+                <!-- Header -->
                 <div class="act-ai-chat-head">
                     <div class="act-ai-chat-head-info">
-                        <div class="act-ai-chat-avatar">
-                            <span class="material-symbols-outlined">smart_toy</span>
+                        <div class="act-ai-chat-avatar-wrap">
+                            <div class="act-ai-chat-avatar">
+                                <span class="material-symbols-outlined">smart_toy</span>
+                            </div>
+                            <span class="act-ai-online-dot"></span>
                         </div>
                         <div>
-                            <div class="act-ai-chat-name">PUPSync AI Support</div>
-                            <div class="act-ai-chat-status">Online</div>
+                            <div class="act-ai-chat-name">PUPSync Room Assistant</div>
+                            <div class="act-ai-chat-status">Active now</div>
                         </div>
                     </div>
                     <div class="act-ai-chat-head-btns">
@@ -3933,35 +3937,65 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         </button>
                     </div>
                 </div>
+
+                <!-- Message body -->
                 <div class="act-ai-chat-body" id="actAiChatBody">
-                    <div class="act-chat-msg">
-                        <span class="act-chat-msg-time">AI Assistant</span>
-                        <div class="act-chat-bubble act-chat-bubble-ai">
-                            Hello <?php echo htmlspecialchars($fullname); ?>! I'm your PUPSync AI Assistant.
-                            How can I help with your activity tracking today?
+                    <div class="act-chat-row act-chat-row-ai">
+                        <div class="act-chat-ai-avatar">
+                            <span class="material-symbols-outlined">smart_toy</span>
+                        </div>
+                        <div class="act-chat-col">
+                            <div class="act-chat-bubble act-chat-bubble-ai">
+                                Hi <?php echo htmlspecialchars($fullname); ?>! 👋 I'm your PUPSync Room Assistant. Ask me about room availability, how to reserve, or anything about the facilities.
+                            </div>
+                            <div class="act-chat-chips" id="actAiChips">
+                                <button class="act-chat-chip" data-chip="How do I reserve a room?">How do I reserve a room?</button>
+                                <button class="act-chat-chip" data-chip="What rooms are free today?">What rooms are free today?</button>
+                                <button class="act-chat-chip" data-chip="How far in advance can I book?">How far in advance can I book?</button>
+                                <button class="act-chat-chip" data-chip="Cancel my reservation">Cancel my reservation</button>
+                                <button class="act-chat-chip" data-chip="Reservation rules">Reservation rules</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="act-ai-chat-input">
-                    <input type="text" id="actAiInput" placeholder="Type a message…">
-                    <button class="act-ai-chat-send" data-action="ai-chat-send">
-                        <span class="material-symbols-outlined">send</span>
-                    </button>
+
+                <!-- Input bar -->
+                <div class="act-ai-chat-input-wrap">
+                    <div class="act-ai-chat-counter" id="actAiCounterBar">
+                        <span id="actAiCounter">—</span> messages remaining this hour
+                    </div>
+                    <div class="act-ai-chat-input">
+                        <input type="text" id="actAiInput" placeholder="Aa" autocomplete="off" maxlength="500">
+                        <button class="act-ai-chat-send" id="actAiSendBtn" data-action="ai-chat-send" title="Send">
+                            <span class="material-symbols-outlined">send</span>
+                        </button>
+                    </div>
                 </div>
+
+                <!-- Footer -->
                 <div class="act-ai-chat-footer">
-                    <a href="#" data-action="ai-chat-report-issue">
-                        <span class="material-symbols-outlined">error_outline</span>
-                        Manual Form: Report Damaged / Lost Item
+                    <a href="#" data-action="ai-chat-report-room-issue">
+                        <span class="material-symbols-outlined">flag</span>
+                        Report a Room Issue
                     </a>
                 </div>
+
             </div>
 
-            <!-- FAB — hidden by default; JS shows it only on the Dashboard tab -->
+            <!-- FAB — hidden by default; JS shows it only on the Facilities tab -->
             <button class="act-ai-fab" id="actAiFab" style="display:none;"
-                data-action="ai-fab-toggle" title="Chat with AI Support">
+                data-action="ai-fab-toggle" title="Ask about rooms">
                 <span class="material-symbols-outlined">smart_toy</span>
-                <span class="act-ai-fab-tooltip">Chat with AI Support</span>
+                <span class="act-ai-fab-tooltip">Ask about rooms</span>
+                <div class="act-ai-fab-popover" id="actAiFabPopover">
+                    <span class="material-symbols-outlined" style="font-size:16px;flex-shrink:0;">smart_toy</span>
+                    <span>Need help finding or booking a room? Ask the AI assistant!</span>
+                    <button class="act-ai-fab-popover-close" id="actAiFabPopoverClose" title="Dismiss">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
             </button>
+
         </main><!-- /app-main -->
     </div><!-- /main-wrapper -->
 
