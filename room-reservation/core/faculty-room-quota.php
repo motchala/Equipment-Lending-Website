@@ -129,9 +129,12 @@ function fcty_quota_message(): string
  *
  * What counts as what (all times Asia/Manila):
  *   live       Approved, already started, not finished yet   -> "In progress"
- *   upcoming   Approved, starts in the future
+ *   upcoming   Approved, starts in the future                -> "Upcoming"
  *   history    Approved + finished (shown as "Completed"), Declined, Cancelled
  *   waitlist   slots the faculty member asked to be told about (future only)
+ *
+ * The equipment half lives in equipment-booking/core/faculty-activity.php and
+ * uses the same helpers, status words and colours defined below.
  * Reservations a faculty member's students made through their room code
  * (submitted_as = student) are not the faculty member's own activity and are
  * left out here, exactly like the room limit above leaves them out.
@@ -322,12 +325,111 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
     return $out;
 }
 
-/** Small pill: tone is one of live | today | soon | ok | wait | bad | muted. */
+/* ----------------------------------------------------------------------------
+ * Shared look-and-wording helpers (used by the room AND the equipment half)
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Small status pill. Four tones only, the same colours the Home tab, the admin
+ * portal and the Help Center use for the same words:
+ *   ok    green   Approved
+ *   wait  amber   Pending, Waitlisted
+ *   bad   red     Overdue, Declined
+ *   muted grey    Returned, Completed, Cancelled
+ * ($icon is kept so older callers still work; a status is words + colour only.)
+ */
 function fact_chip(string $text, string $tone, string $icon = ''): string
 {
-    return '<span class="fact-chip is-' . fact_h($tone) . '">'
-        . ($icon !== '' ? fact_icon($icon) : '') . fact_h($text) . '</span>';
+    return '<span class="fact-chip is-' . fact_h($tone) . '">' . fact_h($text) . '</span>';
 }
+
+/** One place decides how a status is worded and coloured on the My Activity screen. */
+function fact_status_chip(string $status): string
+{
+    static $map = [
+        'Waiting'    => ['Pending',    'wait'],
+        'Waitlisted' => ['Waitlisted', 'wait'],
+        'Approved'   => ['Approved',   'ok'],
+        'Overdue'    => ['Overdue',    'bad'],
+        'Declined'   => ['Declined',   'bad'],
+        'Returned'   => ['Returned',   'muted'],
+        'Completed'  => ['Completed',  'muted'],
+        'Cancelled'  => ['Cancelled',  'muted'],
+    ];
+    [$label, $tone] = $map[$status] ?? [$status !== '' ? $status : 'Unknown', 'muted'];
+    return fact_chip($label, $tone);
+}
+
+/** "Today", "Tomorrow", "Oct 20" (year added only when it is not the current year). */
+function fact_day_label(DateTimeImmutable $now, DateTimeImmutable $date, bool $relative = true): string
+{
+    if ($relative) {
+        $days = fact_days_away($now, $date);
+        if ($days === 0) {
+            return 'Today';
+        }
+        if ($days === 1) {
+            return 'Tomorrow';
+        }
+    }
+    return $date->format($date->format('Y') === $now->format('Y') ? 'M j' : 'M j, Y');
+}
+
+/**
+ * "Today, 1:00 PM – 3:00 PM"  /  "Oct 20, 8:00 AM – Oct 22, 5:00 PM"  /  "Oct 20 – Oct 22".
+ * Times are optional (older requests have none).
+ */
+function fact_range_label(
+    DateTimeImmutable $now,
+    DateTimeImmutable $from,
+    ?string $fromTime,
+    DateTimeImmutable $to,
+    ?string $toTime,
+    bool $relative = true
+): string {
+    $t1 = ($fromTime ?? '') !== '' ? fact_time((string)$fromTime) : '';
+    $t2 = ($toTime ?? '') !== '' ? fact_time((string)$toTime) : '';
+    $d1 = fact_day_label($now, $from, $relative);
+    $d2 = fact_day_label($now, $to, $relative);
+
+    if ($from->format('Y-m-d') === $to->format('Y-m-d')) {
+        if ($t1 !== '' && $t2 !== '') {
+            return $d1 . ', ' . $t1 . ' – ' . $t2;
+        }
+        return $t1 !== '' ? $d1 . ', ' . $t1 : $d1;
+    }
+    return $d1 . ($t1 !== '' ? ', ' . $t1 : '') . ' – ' . $d2 . ($t2 !== '' ? ', ' . $t2 : '');
+}
+
+/** A labelled group of rows; more than three collapse behind "Show all". */
+function fact_render_group(string $label, array $itemsHtml): string
+{
+    if (!$itemsHtml) {
+        return '';
+    }
+    $total     = count($itemsHtml);
+    $collapsed = $total > 3;
+    $html  = '<div class="fact-group"><h3 class="fact-group-label">' . fact_h($label) . '</h3>';
+    $html .= '<div class="fact-list' . ($collapsed ? ' is-collapsed' : '') . '">' . implode('', $itemsHtml) . '</div>';
+    if ($collapsed) {
+        $html .= '<button type="button" class="fact-more" data-fact-more aria-expanded="false">Show all ' . $total
+            . ' <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button>';
+    }
+    return $html . '</div>';
+}
+
+/** Empty state: one icon, one title, one short line. */
+function fact_render_empty(string $icon, string $title, string $sub): string
+{
+    return '<div class="fact-empty">' . fact_icon($icon)
+        . '<p class="fact-empty-title">' . fact_h($title) . '</p>'
+        . '<p class="fact-empty-sub">' . fact_h($sub) . '</p></div>';
+}
+
+/*
+ * No longer used by My Activity (rooms now show their date in the text line, and
+ * status is a plain pill). Kept so nothing else that may call them breaks.
+ */
 
 /** "In progress", "Today", "Tomorrow", "In 3 days" */
 function fact_when_chip(string $state, int $days): string
@@ -355,52 +457,59 @@ function fact_date_tile(string $date): string
         . '</span><span class="fact-date-mon">' . $dt->format('M') . '</span></div>';
 }
 
+/* ----------------------------------------------------------------------------
+ * Rooms: rows, card body, history rows, summary numbers
+ * -------------------------------------------------------------------------- */
+
 /**
  * One reservation row for the "Room reservations" card.
+ * Same anatomy as an equipment row: title + status pill, when, where, actions.
  *
  * @param array<string, mixed> $it
  */
 function fact_render_room_item(array $it, string $kind): string
 {
-    $state   = fact_s($it, 'state');
-    $room    = fact_s($it, 'room');
-    $times   = fact_time(fact_s($it, 'start')) . ' – ' . fact_time(fact_s($it, 'end'));
-    $meta    = $times . ' · ' . fact_s($it, 'where');
-    $classes = 'fact-item fact-room' . ($kind === 'live' ? ' is-live' : '') . ($kind === 'waitlist' ? ' is-waitlist' : '');
+    $tz    = new DateTimeZone('Asia/Manila');
+    $now   = new DateTimeImmutable('now', $tz);
+    $date  = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($it, 'date'), $tz);
+    $when  = $date !== false
+        ? fact_range_label($now, $date, fact_s($it, 'start'), $date, fact_s($it, 'end'))
+        : fact_time(fact_s($it, 'start')) . ' – ' . fact_time(fact_s($it, 'end'));
+    $room  = fact_s($it, 'room');
 
-    $html  = '<article class="' . $classes . '" data-rr-id="' . fact_i($it, 'id') . '">';
-    $html .= fact_date_tile(fact_s($it, 'date'));
-    $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_h($room) . '</h4>';
-    $html .= $kind === 'waitlist'
-        ? fact_chip('Waitlisted', 'wait', 'notifications')
-        : fact_when_chip($state, fact_i($it, 'days'));
-    $html .= '</div><p class="fact-item-meta">' . fact_h($meta) . '</p>';
-
-    if ($kind !== 'waitlist') {
-        $sub = '<span>' . fact_h(fact_s($it, 'purpose')) . '</span>';
-        if (!empty($it['letter'])) {
-            $sub .= '<span class="fact-tag" title="A supporting letter is attached">' . fact_icon('attach_file') . 'Letter</span>';
-        }
-        $html .= '<p class="fact-item-sub">' . $sub . '</p>';
+    $sub = [fact_h(fact_s($it, 'where'))];
+    if ($kind === 'waitlist') {
+        $sub[] = 'We\'ll notify you if this slot opens up';
     } else {
-        $html .= '<p class="fact-item-sub"><span>We\'ll notify you if this slot opens up.</span></p>';
+        if (fact_s($it, 'purpose') !== '') {
+            $sub[] = fact_h(fact_s($it, 'purpose'));
+        }
+        if (!empty($it['letter'])) {
+            $sub[] = '<span class="fact-attach" title="A supporting letter is attached">' . fact_icon('attach_file') . 'Letter</span>';
+        }
     }
-    $html .= '</div>';
 
-    // Actions: only upcoming reservations can be cancelled, and not within 1 hour of the start
+    $html  = '<article class="fact-item fact-room" data-rr-id="' . fact_i($it, 'id') . '">';
+    $html .= '<span class="fact-tile">' . fact_icon('meeting_room') . '</span>';
+    $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_h($room) . '</h4>';
+    $html .= fact_status_chip($kind === 'waitlist' ? 'Waitlisted' : 'Approved') . '</div>';
+    $html .= '<p class="fact-item-meta">' . fact_h($when) . '</p>';
+    $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
+
+    // Only upcoming reservations can be cancelled, and not within 1 hour of the start
     if ($kind === 'upcoming') {
         $html .= '<div class="fact-item-actions">';
         if (!empty($it['can_cancel'])) {
             $html .= '<button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-reservation"'
                 . ' data-rr-id="' . fact_i($it, 'id') . '" data-room-name="' . fact_h($room) . '"'
-                . ' title="Cancel this reservation">' . fact_icon('cancel') . 'Cancel</button>';
+                . ' title="Cancel this reservation">Cancel</button>';
         } else {
-            $html .= '<span class="fact-lock" title="Reservations can\'t be cancelled within 1 hour of the start time">'
-                . fact_icon('lock') . '</span>';
+            $html .= '<span class="fact-note" title="Reservations can\'t be cancelled within 1 hour of the start time">'
+                . fact_icon('lock') . 'Can\'t be cancelled within 1 hour of the start</span>';
         }
         $html .= '</div>';
     }
-    return $html . '</article>';
+    return $html . '</div></article>';
 }
 
 /**
@@ -415,51 +524,37 @@ function fact_render_rooms_body(array $d): string
     $waitlist = is_array($d['waitlist'] ?? null) ? $d['waitlist'] : [];
     $active   = fact_i($d, 'active');
     $max      = max(1, fact_i($d, 'max'));
-    $left     = max(0, $max - $active);
+    $full     = $active >= $max;
 
-    // Limit meter: one pip per allowed room
-    $pips = '';
-    for ($i = 0; $i < $max; $i++) {
-        $pips .= '<i class="fact-pip' . ($i < $active ? ' is-on' : '') . '"></i>';
-    }
-    $html  = '<div class="fact-quota' . ($left === 0 ? ' is-full' : '') . '">';
-    $html .= '<div class="fact-quota-text"><p class="fact-quota-main"><strong>' . $active . ' of ' . $max . '</strong> rooms reserved</p>'
-        . '<span>' . ($left === 0
-            ? 'Limit reached — cancel one or wait until it ends to reserve another.'
-            : $left . ' more ' . ($left === 1 ? 'room' : 'rooms') . ' available to reserve.') . '</span></div>';
-    $html .= '<div class="fact-pips" aria-hidden="true">' . $pips . '</div></div>';
+    // The room limit is a real rule (see the top of this file): say it once, in one quiet line.
+    $html = '<p class="fact-limit' . ($full ? ' is-full' : '') . '"><strong>' . $active . ' of ' . $max . '</strong> active reservations'
+        . ($full ? ' &middot; Limit reached. Cancel one or wait until it ends to reserve another.' : '') . '</p>';
 
     if (!$live && !$upcoming && !$waitlist) {
-        return $html . '<div class="fact-empty">' . fact_icon('event_available')
-            . '<p class="fact-empty-title">No room reservations right now</p>'
-            . '<p class="fact-empty-sub">Reserve a room for your class, lab session or meeting.</p>'
-            . '<button type="button" class="fact-btn fact-btn-primary" data-action="go-tab" data-tab="rooms">'
-            . fact_icon('meeting_room') . 'Reserve a room</button></div>';
+        return $html . fact_render_empty('event_available', 'No room reservations', 'Reserve a room for your class, lab session or meeting.');
     }
 
     $groups = [
-        ['Happening now', 'live', $live],
+        ['In progress', 'live', $live],
         ['Upcoming', 'upcoming', $upcoming],
-        ['On the waitlist', 'waitlist', $waitlist],
+        ['Waitlist', 'waitlist', $waitlist],
     ];
     foreach ($groups as [$label, $kind, $items]) {
-        if (!$items) {
-            continue;
-        }
-        $html .= '<div class="fact-group"><h3 class="fact-group-label">' . fact_h($label) . '</h3><div class="fact-list">';
+        $rows = [];
         foreach ($items as $it) {
             if (is_array($it)) {
                 /** @var array<string, mixed> $it */
-                $html .= fact_render_room_item($it, $kind);
+                $rows[] = fact_render_room_item($it, $kind);
             }
         }
-        $html .= '</div></div>';
+        $html .= fact_render_group($label, $rows);
     }
     return $html;
 }
 
 /**
- * History rows (<tr>) for rooms. Merged into the shared history table.
+ * History rows (<tr>) for rooms. Merged into the shared history table
+ * (Activity | When | Status).
  *
  * @param array<string, mixed> $d result of fact_load_rooms()
  */
@@ -467,6 +562,7 @@ function fact_render_room_history_rows(array $d): string
 {
     $items = is_array($d['history'] ?? null) ? $d['history'] : [];
     $html  = '';
+    $now   = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
 
     // Slots the faculty member is already waiting on (so we don't offer to join twice)
     $waiting = [];
@@ -483,47 +579,45 @@ function fact_render_room_history_rows(array $d): string
             continue;
         }
         /** @var array<string, mixed> $it */
-        $state = fact_s($it, 'state');
-        $map = [
-            'completed' => ['Completed', 'muted', 'task_alt'],
-            'declined'  => ['Declined', 'bad', 'cancel'],
-            'cancelled' => ['Cancelled', 'muted', 'event_busy'],
-        ];
-        [$label, $tone, $glyph] = $map[$state] ?? $map['completed'];
+        $state  = fact_s($it, 'state');
+        $status = ['completed' => 'Completed', 'declined' => 'Declined', 'cancelled' => 'Cancelled'][$state] ?? 'Completed';
 
         $dt    = DateTimeImmutable::createFromFormat('Y-m-d', fact_s($it, 'date'));
-        $day   = $dt !== false ? $dt->format('M j, Y') : fact_s($it, 'date');
+        $day   = $dt !== false ? fact_day_label($now, $dt, false) : fact_s($it, 'date');
         $times = fact_time(fact_s($it, 'start')) . ' – ' . fact_time(fact_s($it, 'end'));
 
-        $sub = fact_h(fact_s($it, 'purpose'));
+        // Second line: why it ended this way (or what it was for)
+        $note = fact_h(fact_s($it, 'purpose'));
         if (fact_s($it, 'reason') !== '' && $state !== 'completed') {
-            $sub .= ' · ' . fact_h(fact_s($it, 'reason'));
+            $note = fact_h(fact_s($it, 'reason'));
         }
         $slot_key = fact_i($it, 'room_id') . '|' . fact_s($it, 'date') . '|' . fact_s($it, 'start') . '|' . fact_s($it, 'end');
         if ($state === 'declined' && !empty($it['future']) && isset($waiting[$slot_key])) {
-            $sub .= ' <span class="fact-linkbtn is-done">' . fact_icon('notifications_active') . 'On waitlist</span>';
+            $note .= ' <span class="fact-linkbtn is-done">On the waitlist</span>';
         } elseif ($state === 'declined' && !empty($it['future'])) {
-            $sub .= ' <button type="button" class="fact-linkbtn" data-action="join-waitlist"'
+            $note .= ' <button type="button" class="fact-linkbtn" data-action="join-waitlist"'
                 . ' data-room-id="' . fact_i($it, 'room_id') . '" data-room-name="' . fact_h(fact_s($it, 'room')) . '"'
                 . ' data-res-date="' . fact_h(fact_s($it, 'date')) . '"'
                 . ' data-start-time="' . fact_h(fact_s($it, 'start')) . '" data-end-time="' . fact_h(fact_s($it, 'end')) . '">'
-                . fact_icon('notifications') . 'Join waitlist</button>';
+                . 'Join waitlist</button>';
         }
 
         $html .= '<tr class="fact-row" data-kind="room" data-status="' . fact_h($state) . '" data-ts="' . fact_i($it, 'start_ts') . '">'
             . '<td data-label="Activity"><div class="fact-cell"><span class="fact-tile">' . fact_icon('meeting_room') . '</span>'
-            . '<div class="fact-cell-text"><span class="fact-kind">Room</span><p class="fact-row-title">' . fact_h(fact_s($it, 'room')) . '</p>'
-            . '<p class="fact-row-sub">' . $sub . '</p></div></div></td>'
-            . '<td data-label="Location">' . fact_h(fact_s($it, 'where')) . '</td>'
+            . '<div class="fact-cell-text"><p class="fact-row-title">' . fact_h(fact_s($it, 'room')) . '</p>'
+            . '<p class="fact-row-sub">Room · ' . fact_h(fact_s($it, 'where')) . '</p>'
+            . ($note !== '' ? '<p class="fact-row-sub">' . $note . '</p>' : '')
+            . '</div></div></td>'
             . '<td data-label="When"><span class="fact-when">' . fact_h($day) . '</span><span class="fact-row-sub">' . fact_h($times) . '</span></td>'
-            . '<td data-label="Status" class="fact-col-status">' . fact_chip($label, $tone, $glyph) . '</td>'
+            . '<td data-label="Status" class="fact-col-status">' . fact_status_chip($status) . '</td>'
             . '</tr>';
     }
     return $html;
 }
 
 /**
- * Values for the two room tiles in the stat strip.
+ * Values for the room tile in the summary strip (plus the older "next booking" pair,
+ * which the live-refresh endpoint still returns).
  *
  * @param array<string, mixed> $d result of fact_load_rooms()
  * @return array{reserved: string, reserved_sub: string, next: string, next_sub: string, active: int}

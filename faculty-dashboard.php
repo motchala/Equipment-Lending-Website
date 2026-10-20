@@ -77,6 +77,7 @@ function actEquipIcon(string $name): string
 
 require_once __DIR__ . '/equipment-booking/core/arbitration-engine.php';
 require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+require_once __DIR__ . '/equipment-booking/core/faculty-activity.php';   // My Activity (equipment) + shared housekeeping
 BookingSchedule::ensureSchema($conn);
 
 function maskEmail($email)
@@ -96,13 +97,12 @@ function bm_fail(string $msg): void
 }
 
 // ── Auto-decline expired & mark overdue ───────────────────────────────────
+// One shared routine (equipment-booking/core/faculty-activity.php) so this page and the
+// My Activity live refresh apply exactly the same rules:
+//   - a Waiting request whose borrow date has passed is declined ("Request expired")
+//   - overdue marking is time-aware (hourly bookings) and Later bookings take their stock when they start
 $today = date('Y-m-d');
-$reason_expired = "Request expired – borrow date has already passed";
-$stmt_expired = $conn->prepare("UPDATE tbl_requests SET status='Declined', reason=? WHERE status='Waiting' AND borrow_date < ?");
-$stmt_expired->bind_param("ss", $reason_expired, $today);
-$stmt_expired->execute();
-// Overdue marking is time-aware now (hourly bookings) and Later bookings take their stock when they start
-BookingSchedule::tick($conn);
+fact_eq_housekeeping($conn);
 
 // ── Handle Borrow Request ──────────────────────────────────────────────────
 if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($_POST['submitted_as'])) {
@@ -3507,109 +3507,30 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             <div class="tab-panel" id="panel-activity">
 
                 <?php
-                /* ── My Activity: data & helpers ─────────────────────────────
-                   The screen has three layers, top to bottom:
+                /* ── My Activity ─────────────────────────────────────────────
+                   Three layers, top to bottom:
 
-                     1. Summary strip   four numbers, two for equipment, two for rooms
+                     1. Summary strip   Active loans · Overdue · Pending · Room reservations
+                                        (same words and numbers as the Home tab's key figures)
                      2. Right now       Equipment card | Room reservations card
+                                        each one: In progress / Upcoming (rooms also: Waitlist)
                      3. History         one table for both, filtered All / Equipment / Rooms
 
-                   Equipment status lifecycle: Waiting -> Approved -> Overdue -> Returned
-                                                          \-> Declined
-                   Every equipment request lands in exactly ONE place:
-                     • Currently borrowing : Overdue, or Approved that already started
-                     • Upcoming            : Waiting, or Approved that hasn't started yet
-                     • History             : Returned or Declined
+                   Both halves are drawn by shared renderers, so the first paint and the live
+                   refresh are always identical:
+                     equipment  equipment-booking/core/faculty-activity.php   fact_eq_*
+                                refreshed by api/poll-requests.php?view=activity
+                     rooms      room-reservation/core/faculty-room-quota.php  fact_*
+                                refreshed by api/poll-reservations.php?view=activity
 
-                   Rooms are loaded by the fact_* functions in room-reservation/core/faculty-room-quota.php,
-                   the same code the live-refresh feed (api/poll-reservations.php?view=activity) uses.
+                   Status words and colours come from one place, fact_status_chip():
+                     Pending = amber · Approved = green · Overdue / Declined = red
+                     Returned / Completed / Cancelled = grey
                 ─────────────────────────────────────────────────────────────── */
-                require_once __DIR__ . '/room-reservation/core/faculty-room-quota.php';
-
-                $act_current = mysqli_query(
-                    $conn,
-                    "SELECT * FROM tbl_requests
-                     WHERE faculty_id='$uid_safe'
-                     AND (status='Overdue' OR (status='Approved' AND borrow_date <= '$today'))
-                     ORDER BY (status='Overdue') DESC, return_date ASC"
-                );
-
-                $act_upcoming = mysqli_query(
-                    $conn,
-                    "SELECT * FROM tbl_requests
-                     WHERE faculty_id='$uid_safe'
-                     AND (status='Waiting' OR (status='Approved' AND borrow_date > '$today'))
-                     ORDER BY borrow_date ASC"
-                );
-
-                $act_history = mysqli_query(
-                    $conn,
-                    "SELECT * FROM tbl_requests
-                     WHERE faculty_id='$uid_safe'
-                     AND status IN ('Returned','Declined')
-                     ORDER BY request_date DESC
-                     LIMIT 200"   /* client-side pagination shows 10 at a time; 200 is a safe ceiling */
-                );
-
-                /* ── Stat counters ─────────────────────────────────────────── */
-                $act_stat_current = $act_current ? (int) mysqli_num_rows($act_current) : 0;
-                $act_stat_upcoming = $act_upcoming ? (int) mysqli_num_rows($act_upcoming) : 0;
-
-
-                $act_stat_overdue = mysqli_fetch_assoc(mysqli_query(
-                    $conn,
-                    "SELECT COUNT(*) as c FROM tbl_requests
-                     WHERE faculty_id='$uid_safe' AND status='Overdue'"
-                ))['c'] ?? 0;
-
-                /* ── Room reservations (shared with the live-refresh endpoint) ── */
+                $act_eq         = fact_eq_load($conn, (string) $_SESSION['faculty_id']);
+                $act_eq_stats   = fact_eq_stats($act_eq);
                 $act_rooms      = fact_load_rooms($conn, (string) $_SESSION['faculty_id']);
                 $act_room_stats = fact_room_stats($act_rooms);
-
-                /* ── Loan progress — linear (matches "Active Now" on the Home tab) ── */
-                function actLoanProgress(string $borrowDate, string $returnDate, string $today, bool $isOverdue): array
-                {
-                    $bd      = strtotime($borrowDate);
-                    $rd      = strtotime($returnDate);
-                    $td      = strtotime($today);
-                    $total   = max(1, $rd - $bd);
-                    $elapsed = max(0, min($td - $bd, $total));
-                    $pct     = (int) round(($elapsed / $total) * 100);
-                    $diffDays = (int) round(($rd - $td) / 86400);
-
-                    if ($isOverdue) {
-                        $late  = abs($diffDays);
-                        $label = $late <= 0 ? 'Overdue' : ($late === 1 ? 'Overdue by 1 day' : "Overdue by {$late} days");
-                    } elseif ($diffDays <= 0) {
-                        $label = 'Due today';
-                    } elseif ($diffDays === 1) {
-                        $label = 'Due tomorrow';
-                    } else {
-                        $label = "Due in {$diffDays} days";
-                    }
-                    return ['pct' => max(4, min(100, $pct)), 'label' => $label];
-                }
-
-                /* ── Equipment status pill (uses the same chip as the room side) ── */
-                function actStatusPill(string $status): string
-                {
-                    $map = [
-                        'Waiting'  => ['Pending',  'wait',  'schedule'],
-                        'Approved' => ['Approved', 'ok',    'check_circle'],
-                        'Declined' => ['Declined', 'bad',   'cancel'],
-                        'Overdue'  => ['Overdue',  'warn',  'warning'],
-                        'Returned' => ['Returned', 'muted', 'task_alt'],
-                    ];
-                    $d = $map[$status] ?? $map['Waiting'];
-                    return fact_chip($d[0], $d[1], $d[2]);
-                }
-
-                /* "Room 201" for a bare room number, otherwise as typed */
-                function actRoomLabel(string $room): string
-                {
-                    $room = trim($room);
-                    return stripos($room, 'room') === 0 ? $room : 'Room ' . $room;
-                }
                 ?>
 
                 <!-- ── Header ───────────────────────────────────────────── -->
@@ -3618,212 +3539,57 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <h2 class="myact-title">My Activity</h2>
                         <p class="fact-sub">Your equipment loans and room reservations, all in one place.</p>
                     </div>
-                    <button type="button" class="myact-download-btn" data-fact-print>
-                        <span class="material-symbols-outlined">download</span>
-                        <span class="myact-download-label">Download Report</span>
+                    <button type="button" class="fact-btn fact-btn-ghost" data-fact-print>
+                        <span class="material-symbols-outlined" aria-hidden="true">download</span>Download Report
                     </button>
                 </header>
 
-                <!-- ── Summary strip: 2 equipment numbers + 2 room numbers ── -->
+                <!-- ── Summary strip ────────────────────────────────────── -->
                 <div class="fact-stats" role="group" aria-label="Activity summary">
                     <div class="fact-stat">
-                        <span class="fact-stat-value"><?php echo $act_stat_current; ?></span>
-                        <span class="fact-stat-label">Borrowing now</span>
-                        <?php if ($act_stat_overdue > 0): ?>
-                            <span class="fact-stat-sub is-bad"><?php echo (int) $act_stat_overdue; ?> overdue</span>
-                        <?php else: ?>
-                            <span class="fact-stat-sub"><?php echo $act_stat_current > 0 ? 'All on time' : 'Nothing out'; ?></span>
-                        <?php endif; ?>
+                        <span class="fact-stat-value" data-fact-stat="loans"><?php echo (int) $act_eq_stats['loans']; ?></span>
+                        <span class="fact-stat-label">Active loans</span>
+                    </div>
+                    <div class="fact-stat<?php echo $act_eq_stats['overdue'] > 0 ? ' is-alert' : ''; ?>">
+                        <span class="fact-stat-value" data-fact-stat="overdue"><?php echo (int) $act_eq_stats['overdue']; ?></span>
+                        <span class="fact-stat-label">Overdue</span>
                     </div>
                     <div class="fact-stat">
-                        <span class="fact-stat-value"><?php echo $act_stat_upcoming; ?></span>
-                        <span class="fact-stat-label">Upcoming equipment</span>
-                        <span class="fact-stat-sub"><?php echo $act_stat_upcoming > 0 ? 'Not started yet' : 'None scheduled'; ?></span>
+                        <span class="fact-stat-value" data-fact-stat="pending"><?php echo (int) $act_eq_stats['pending']; ?></span>
+                        <span class="fact-stat-label">Pending</span>
                     </div>
                     <div class="fact-stat">
                         <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
-                        <span class="fact-stat-label">Rooms reserved</span>
-                        <span class="fact-stat-sub" data-fact-stat="reserved_sub"><?php echo fact_h($act_room_stats['reserved_sub']); ?></span>
-                    </div>
-                    <div class="fact-stat">
-                        <span class="fact-stat-value" data-fact-stat="next"><?php echo fact_h($act_room_stats['next']); ?></span>
-                        <span class="fact-stat-label">Next room booking</span>
-                        <span class="fact-stat-sub" data-fact-stat="next_sub"><?php echo fact_h($act_room_stats['next_sub']); ?></span>
+                        <span class="fact-stat-label">Room reservations</span>
                     </div>
                 </div>
 
                 <!-- ── Right now: Equipment | Room reservations ─────────── -->
                 <div class="fact-grid">
 
-                    <!-- ═══════════ Equipment ═══════════ -->
                     <section class="fact-card" id="factEquipment" aria-labelledby="factEquipTitle">
                         <header class="fact-card-head">
-                            <div class="fact-card-title">
-                                <span class="fact-card-icon"><span class="material-symbols-outlined">inventory_2</span></span>
-                                <h3 class="myact-section-title" id="factEquipTitle">Equipment</h3>
-                            </div>
-                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">
-                                <span class="material-symbols-outlined">add_shopping_cart</span>Borrow
-                            </button>
-                        </header>
-
-                        <div class="fact-card-body">
-
-                            <?php if ($act_stat_overdue > 0): ?>
-                                <!-- Gentle notice, not a screaming red box -->
-                                <div class="fact-notice" role="status">
-                                    <span class="material-symbols-outlined">info</span>
-                                    <div>
-                                        <strong>Lending clearance notice</strong>
-                                        <span><?php echo (int) $act_stat_overdue; ?> item<?php echo $act_stat_overdue > 1 ? 's' : ''; ?> pending surrender. New equipment requests are on hold until it is returned.</span>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
-
-                            <!-- Currently borrowing -->
-                            <div class="fact-group">
-                                <h3 class="fact-group-label">Currently borrowing</h3>
-                                <?php if ($act_current && mysqli_num_rows($act_current) > 0):
-                                    $act_current_total = mysqli_num_rows($act_current);
-                                ?>
-                                    <div class="fact-list<?php echo $act_current_total > 3 ? ' is-collapsed' : ''; ?>">
-                                        <?php while ($r = mysqli_fetch_assoc($act_current)):
-                                            $isOverdue = $r['status'] === 'Overdue';
-                                            $icon  = actEquipIcon($r['equipment_name']);
-                                            $image = actEquipImage($r['equipment_name']);
-                                            $prog  = actLoanProgress($r['borrow_date'], $r['return_date'], $today, $isOverdue);
-                                            $dueTone = $isOverdue ? 'bad' : (in_array($prog['label'], ['Due today', 'Due tomorrow'], true) ? 'today' : 'soon');
-                                        ?>
-                                            <article class="fact-item fact-loan<?php echo $isOverdue ? ' is-overdue' : ''; ?>">
-                                                <span class="fact-tile fact-tile-lg">
-                                                    <?php if ($image): ?>
-                                                        <img src="<?php echo $image; ?>" alt="">
-                                                    <?php else: ?>
-                                                        <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                    <?php endif; ?>
-                                                </span>
-                                                <div class="fact-item-main">
-                                                    <div class="fact-item-top">
-                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
-                                                        <?php echo fact_chip($prog['label'], $dueTone); ?>
-                                                    </div>
-                                                    <p class="fact-item-meta">
-                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
-                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
-                                                    </p>
-                                                    <div class="fact-bar" aria-hidden="true"><i class="<?php echo $isOverdue ? 'is-overdue' : ''; ?>" style="width:<?php echo (int) $prog['pct']; ?>%"></i></div>
-                                                </div>
-                                                <div class="fact-item-actions">
-                                                    <?php if (!empty($r['return_token'])): ?>
-                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"
-                                                            data-token="<?php echo htmlspecialchars($r['return_token'], ENT_QUOTES); ?>"
-                                                            data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
-                                                            <span class="material-symbols-outlined">qr_code_2</span>Return QR
-                                                        </button>
-                                                    <?php endif; ?>
-                                                    <?php if (!$isOverdue): ?>
-                                                        <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">Extend</button>
-                                                    <?php endif; ?>
-                                                    <button type="button" class="fact-btn fact-btn-ghost is-danger"
-                                                        data-action="myact-report-issue"
-                                                        data-request-id="<?php echo (int) $r['id']; ?>"
-                                                        data-equipment="<?php echo htmlspecialchars($r['equipment_name'], ENT_QUOTES); ?>">
-                                                        <span class="material-symbols-outlined">report</span>Report
-                                                    </button>
-                                                </div>
-                                            </article>
-                                        <?php endwhile; ?>
-                                    </div>
-                                    <?php if ($act_current_total > 3): ?>
-                                        <button type="button" class="fact-more" data-fact-more>
-                                            Show all <?php echo $act_current_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                        </button>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <div class="fact-empty is-compact">
-                                        <span class="material-symbols-outlined">check_circle</span>
-                                        <p class="fact-empty-title">Nothing currently borrowed</p>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <!-- Upcoming -->
-                            <div class="fact-group">
-                                <h3 class="fact-group-label">Upcoming</h3>
-                                <?php if ($act_upcoming && mysqli_num_rows($act_upcoming) > 0):
-                                    $act_upcoming_total = mysqli_num_rows($act_upcoming);
-                                ?>
-                                    <div class="fact-list<?php echo $act_upcoming_total > 3 ? ' is-collapsed' : ''; ?>">
-                                        <?php while ($r = mysqli_fetch_assoc($act_upcoming)):
-                                            $bd = strtotime($r['borrow_date']);
-                                            $td = strtotime($today);
-                                            $daysAway = (int) round(($bd - $td) / 86400);
-                                            $awayStr = $daysAway <= 0 ? 'Starts today' : ($daysAway === 1 ? 'Starts tomorrow' : "Starts in {$daysAway} days");
-                                            $icon  = actEquipIcon($r['equipment_name']);
-                                            $image = actEquipImage($r['equipment_name']);
-                                        ?>
-                                            <article class="fact-item">
-                                                <span class="fact-tile fact-tile-lg">
-                                                    <?php if ($image): ?>
-                                                        <img src="<?php echo $image; ?>" alt="">
-                                                    <?php else: ?>
-                                                        <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                    <?php endif; ?>
-                                                </span>
-                                                <div class="fact-item-main">
-                                                    <div class="fact-item-top">
-                                                        <h4 class="fact-item-title"><?php echo htmlspecialchars($r['equipment_name']); ?></h4>
-                                                        <?php echo actStatusPill($r['status']); ?>
-                                                    </div>
-                                                    <p class="fact-item-meta">
-                                                        <?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?> ·
-                                                        <?php echo date('M j', strtotime($r['borrow_date'])); ?><?php echo !empty($r['borrow_time']) ? ' ' . BookingSchedule::fmtTime($r['borrow_time']) : ''; ?> – <?php echo date('M j, Y', strtotime($r['return_date'])); ?><?php echo !empty($r['return_time']) ? ' ' . BookingSchedule::fmtTime($r['return_time']) : ''; ?>
-                                                    </p>
-                                                    <p class="fact-item-sub"><span><?php echo $awayStr; ?></span></p>
-                                                </div>
-                                            </article>
-                                        <?php endwhile; ?>
-                                    </div>
-                                    <?php if ($act_upcoming_total > 3): ?>
-                                        <button type="button" class="fact-more" data-fact-more>
-                                            Show all <?php echo $act_upcoming_total; ?> <span class="material-symbols-outlined">expand_more</span>
-                                        </button>
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <div class="fact-empty is-compact">
-                                        <span class="material-symbols-outlined">event_upcoming</span>
-                                        <p class="fact-empty-title">No upcoming requests</p>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-
-                        </div>
-                    </section><!-- /factEquipment -->
-
-                    <!-- ═══════════ Room reservations ═══════════ -->
-                    <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
-                        <header class="fact-card-head">
-                            <div class="fact-card-title">
-                                <span class="fact-card-icon"><span class="material-symbols-outlined">meeting_room</span></span>
-                                <h3 class="myact-section-title" id="factRoomsTitle">Room reservations</h3>
-                            </div>
-                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="rooms">
-                                <span class="material-symbols-outlined">add</span>Reserve
-                            </button>
+                            <h3 class="fact-card-title" id="factEquipTitle">Equipment</h3>
+                            <span id="factEquipAction"><?php echo fact_eq_render_action($act_eq); ?></span>
                         </header>
                         <!-- Filled here on first paint; swapped live by the My Activity block at the end of faculty-dashboard.js -->
+                        <div class="fact-card-body" id="factEquipBody"><?php echo fact_eq_render_body($act_eq, $root_url); ?></div>
+                    </section>
+
+                    <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
+                        <header class="fact-card-head">
+                            <h3 class="fact-card-title" id="factRoomsTitle">Room reservations</h3>
+                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="rooms">Reserve Room</button>
+                        </header>
                         <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
-                    </section><!-- /factRooms -->
+                    </section>
 
                 </div><!-- /fact-grid -->
 
-                <!-- ═══════════ History (equipment + rooms) ═══════════ -->
+                <!-- ── History (equipment + rooms) ──────────────────────── -->
                 <section class="fact-card fact-history" id="factHistory" aria-labelledby="factHistTitle">
                     <header class="fact-card-head">
-                        <div class="fact-card-title">
-                            <span class="fact-card-icon"><span class="material-symbols-outlined">history</span></span>
-                            <h3 class="myact-section-title" id="factHistTitle">History</h3>
-                        </div>
+                        <h3 class="fact-card-title" id="factHistTitle">History</h3>
                         <div class="fact-tools">
                             <div class="fact-seg" id="factKindTabs" role="group" aria-label="Show">
                                 <button type="button" class="fact-seg-btn is-active" data-fact-kind="all" aria-pressed="true">All</button>
@@ -3831,7 +3597,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 <button type="button" class="fact-seg-btn" data-fact-kind="room" aria-pressed="false">Rooms</button>
                             </div>
                             <label class="fact-search">
-                                <span class="material-symbols-outlined">search</span>
+                                <span class="material-symbols-outlined" aria-hidden="true">search</span>
                                 <input type="text" id="factSearch" placeholder="Search history…" autocomplete="off" aria-label="Search history">
                             </label>
                         </div>
@@ -3842,59 +3608,20 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <thead>
                                 <tr>
                                     <th scope="col">Activity</th>
-                                    <th scope="col">Location</th>
                                     <th scope="col">When</th>
                                     <th scope="col" class="fact-col-status">Status</th>
                                 </tr>
                             </thead>
-                            <tbody id="factHistBody">
-                                <?php
-                                if ($act_history) {
-                                    while ($r = mysqli_fetch_assoc($act_history)):
-                                        $isDeclined = $r['status'] === 'Declined';
-                                        $icon  = actEquipIcon($r['equipment_name']);
-                                        $image = actEquipImage($r['equipment_name']);
-                                        $endRaw = $r['returned_at'] ?: $r['return_date'];
-                                        $dateLine = $isDeclined
-                                            ? 'Requested ' . date('M j, Y', strtotime($r['request_date']))
-                                            : (date('M j', strtotime($r['borrow_date'])) . ' – ' . date('M j, Y', strtotime($endRaw)));
-                                        $rowTs = (int) strtotime($isDeclined ? $r['request_date'] : $endRaw);
-                                ?>
-                                        <tr class="fact-row" data-kind="equipment" data-status="<?php echo strtolower($r['status']); ?>" data-ts="<?php echo $rowTs; ?>">
-                                            <td data-label="Activity">
-                                                <div class="fact-cell">
-                                                    <span class="fact-tile">
-                                                        <?php if ($image): ?>
-                                                            <img src="<?php echo $image; ?>" alt="">
-                                                        <?php else: ?>
-                                                            <span class="material-symbols-outlined"><?php echo $icon; ?></span>
-                                                        <?php endif; ?>
-                                                    </span>
-                                                    <div class="fact-cell-text">
-                                                        <span class="fact-kind">Equipment</span>
-                                                        <p class="fact-row-title"><?php echo htmlspecialchars($r['equipment_name']); ?></p>
-                                                        <?php if ($isDeclined && !empty($r['reason'])): ?>
-                                                            <p class="fact-row-sub"><?php echo htmlspecialchars($r['reason']); ?></p>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td data-label="Location"><?php echo htmlspecialchars(actRoomLabel((string) $r['room'])); ?></td>
-                                            <td data-label="When"><span class="fact-when"><?php echo $dateLine; ?></span></td>
-                                            <td data-label="Status" class="fact-col-status"><?php echo actStatusPill($r['status']); ?></td>
-                                        </tr>
-                                <?php
-                                    endwhile;
-                                }
-                                echo fact_render_room_history_rows($act_rooms);
-                                ?>
-                            </tbody>
+                            <tbody id="factHistBody"><?php
+                                                        echo fact_eq_render_history_rows($act_eq, $root_url);
+                                                        echo fact_render_room_history_rows($act_rooms);
+                                                        ?></tbody>
                         </table>
                     </div>
 
                     <p class="fact-noresults" id="factNoResults" hidden>No records match your search.</p>
                     <div class="fact-empty" id="factHistEmpty" hidden>
-                        <span class="material-symbols-outlined">history</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">history</span>
                         <p class="fact-empty-title">No history yet</p>
                         <p class="fact-empty-sub">Returned equipment and past room reservations will show up here.</p>
                     </div>

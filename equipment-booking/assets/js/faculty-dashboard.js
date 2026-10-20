@@ -320,19 +320,19 @@
             // Deep-link: read params stored by the AI mini-form in sessionStorage
             (function () {
                 var raw = null;
-                try { raw = sessionStorage.getItem('ai_room_deeplink'); } catch (e) {}
+                try { raw = sessionStorage.getItem('ai_room_deeplink'); } catch (e) { }
                 if (!raw) return;
 
                 var params = null;
-                try { params = JSON.parse(raw); } catch (e) {}
+                try { params = JSON.parse(raw); } catch (e) { }
                 // Consume immediately — one-shot, never re-opens on back/forward
-                try { sessionStorage.removeItem('ai_room_deeplink'); } catch (e) {}
+                try { sessionStorage.removeItem('ai_room_deeplink'); } catch (e) { }
                 if (!params || !params.room) return;
 
                 var roomId = params.room;
-                var date   = params.date  || null;
-                var start  = params.start || null;
-                var end    = params.end   || null;
+                var date = params.date || null;
+                var start = params.start || null;
+                var end = params.end || null;
 
                 // Hard-reload path: sessionStorage was set, page reloaded,
                 // now we land on Facilities and open the room
@@ -360,7 +360,7 @@
                         if (el) el.textContent = d.remaining;
                         if (bar) {
                             bar.classList.remove('is-low', 'is-empty');
-                            if (d.remaining === 0)     bar.classList.add('is-empty');
+                            if (d.remaining === 0) bar.classList.add('is-empty');
                             else if (d.remaining <= 5) bar.classList.add('is-low');
                         }
                     }
@@ -3915,6 +3915,8 @@
                         window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
                         checkOverdueState();
                         _updateFacultyStatCards(fresh);
+                        // My Activity (equipment) re-draws itself when this fires
+                        document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
                     }
                 })
                 .catch(() => { }); // silently ignore network errors
@@ -3923,7 +3925,7 @@
 
     /* -- Room Reservation Notices ---------------------------------------- */
     /* Reservations are accepted on the spot, and My Activity refreshes its own
-       room list (faculty-activity.js), so there is no table to keep in sync
+       room list (the My Activity block at the end of this file), so there is no table to keep in sync
        here any more. This only watches for one thing: an admin cancelling a
        reservation, which is reported with a toast. */
     function startReservationsPolling() {
@@ -4352,8 +4354,8 @@
    timestamp). Dismissed by the × button or by opening the chat.
 ================================================================ */
 (function () {
-    var STORAGE_KEY  = 'eq_ai_tooltip_seen';
-    var RESET_MS     = 24 * 60 * 60 * 1000; // 24 hours
+    var STORAGE_KEY = 'eq_ai_tooltip_seen';
+    var RESET_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     function _shouldShow() {
         try {
@@ -4363,7 +4365,7 @@
     }
 
     function _markSeen() {
-        try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) { }
     }
 
     window._aiTooltipMaybeShow = function () {
@@ -4420,8 +4422,8 @@
     function mdToHtml(s) {
         var t = escH(String(s));
         t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        t = t.replace(/\*(.*?)\*/g,     '<em>$1</em>');
-        t = t.replace(/^[-•]\s+(.+)$/gm,'<li>$1</li>');
+        t = t.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        t = t.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
         t = t.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
         t = t.replace(/\n/g, '<br>');
         return t;
@@ -4429,7 +4431,7 @@
     function removeChips() {
         var c = document.getElementById('actAiChips');
         if (c) c.remove();
-        document.querySelectorAll('.act-campus-chips').forEach(function(el) { el.remove(); });
+        document.querySelectorAll('.act-campus-chips').forEach(function (el) { el.remove(); });
     }
     function setSending(on) {
         var btn = document.getElementById('actAiSendBtn');
@@ -4438,12 +4440,12 @@
         if (inp) inp.disabled = on;
     }
     function updateCounter(remaining) {
-        var el  = document.getElementById('actAiCounter');
+        var el = document.getElementById('actAiCounter');
         var bar = document.getElementById('actAiCounterBar');
         if (el) el.textContent = remaining;
         if (!bar) return;
         bar.classList.remove('is-low', 'is-empty');
-        if (remaining === 0)     bar.classList.add('is-empty');
+        if (remaining === 0) bar.classList.add('is-empty');
         else if (remaining <= 5) bar.classList.add('is-low');
     }
     function appendUserBubble(body, text) {
@@ -4451,11 +4453,11 @@
         row.className = 'act-chat-row act-chat-row-user';
         row.innerHTML =
             '<div class="act-chat-col act-chat-col-user">' +
-                '<div class="act-chat-bubble act-chat-bubble-user">' + escH(text) + '</div>' +
-                '<div class="act-chat-meta act-chat-meta-user">' +
-                    '<span>' + timeNow() + '</span>' +
-                    '<span class="material-symbols-outlined act-chat-tick">done_all</span>' +
-                '</div>' +
+            '<div class="act-chat-bubble act-chat-bubble-user">' + escH(text) + '</div>' +
+            '<div class="act-chat-meta act-chat-meta-user">' +
+            '<span>' + timeNow() + '</span>' +
+            '<span class="material-symbols-outlined act-chat-tick">done_all</span>' +
+            '</div>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4465,10 +4467,10 @@
         row.className = 'act-chat-row act-chat-row-ai';
         row.innerHTML =
             '<div class="act-chat-ai-avatar">' +
-                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '<span class="material-symbols-outlined">smart_toy</span>' +
             '</div>' +
             '<div class="act-chat-typing-dots">' +
-                '<span></span><span></span><span></span>' +
+            '<span></span><span></span><span></span>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4479,11 +4481,11 @@
         row.className = 'act-chat-row act-chat-row-ai';
         row.innerHTML =
             '<div class="act-chat-ai-avatar">' +
-                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '<span class="material-symbols-outlined">smart_toy</span>' +
             '</div>' +
             '<div class="act-chat-col">' +
-                '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
-                '<div class="act-chat-meta"><span>' + timeNow() + '</span></div>' +
+            '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
+            '<div class="act-chat-meta"><span>' + timeNow() + '</span></div>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4506,81 +4508,81 @@
         var col = lastRow && lastRow.querySelector('.act-chat-col');
         if (!col) return;
 
-        var now    = new Date();
-        var today  = now.getFullYear() + '-' +
-                     String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                     String(now.getDate()).padStart(2, '0');
-        var maxDt  = new Date(now.getTime() + 21 * 86400000);
+        var now = new Date();
+        var today = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+        var maxDt = new Date(now.getTime() + 21 * 86400000);
         var maxDay = maxDt.getFullYear() + '-' +
-                     String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
-                     String(maxDt.getDate()).padStart(2, '0');
+            String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
+            String(maxDt.getDate()).padStart(2, '0');
 
         var form = document.createElement('div');
         form.className = 'act-mini-form';
         form.id = 'actMiniForm';
         form.innerHTML =
             '<div class="act-mini-form-title">' +
-                '<span class="material-symbols-outlined">calendar_month</span>' +
-                'Find an Available Room' +
+            '<span class="material-symbols-outlined">calendar_month</span>' +
+            'Find an Available Room' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
-                '<select id="actMfCampus">' +
-                    '<option value="" disabled selected>Select campus…</option>' +
-                    '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
-                    '<option value="cite">PUP CITE (Building C)</option>' +
-                '</select>' +
+            '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
+            '<select id="actMfCampus">' +
+            '<option value="" disabled selected>Select campus…</option>' +
+            '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
+            '<option value="cite">PUP CITE (Building C)</option>' +
+            '</select>' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
-                '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
+            '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
+            '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
             '</div>' +
             '<div class="act-mini-row">' +
-                '<div class="act-mini-field">' +
-                    '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
-                    '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
-                '</div>' +
-                '<div class="act-mini-field">' +
-                    '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
-                    '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
-                '</div>' +
+            '<div class="act-mini-field">' +
+            '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
+            '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
-                '<div class="act-mini-combobox" id="actMfComboWrap">' +
-                    '<input type="text" id="actMfRoomSearch" ' +
-                           'placeholder="Fill campus, date & time first\u2026" ' +
-                           'autocomplete="off" disabled>' +
-                    '<input type="hidden" id="actMfRoomId">' +
-                    '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
-                '</div>' +
+            '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
+            '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
+            '</div>' +
+            '</div>' +
+            '<div class="act-mini-field">' +
+            '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
+            '<div class="act-mini-combobox" id="actMfComboWrap">' +
+            '<input type="text" id="actMfRoomSearch" ' +
+            'placeholder="Fill campus, date & time first\u2026" ' +
+            'autocomplete="off" disabled>' +
+            '<input type="hidden" id="actMfRoomId">' +
+            '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
+            '</div>' +
             '</div>' +
             '<div id="actMfError" class="act-mini-error" style="display:none;"></div>' +
             '<div class="act-mini-actions">' +
-                '<button type="button" class="act-mini-btn act-mini-cancel" ' +
-                        'id="actMfCancelBtn">Cancel</button>' +
-                '<button type="button" class="act-mini-btn act-mini-submit" ' +
-                        'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
+            '<button type="button" class="act-mini-btn act-mini-cancel" ' +
+            'id="actMfCancelBtn">Cancel</button>' +
+            '<button type="button" class="act-mini-btn act-mini-submit" ' +
+            'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
             '</div>';
 
         col.appendChild(form);
         _wireMiniForm();
     }
 
-    var _miniFormRooms        = [];
+    var _miniFormRooms = [];
     var _miniFormRoomSelected = false;
 
     function _wireMiniForm() {
-        var campusSel  = document.getElementById('actMfCampus');
-        var dateInp    = document.getElementById('actMfDate');
-        var startInp   = document.getElementById('actMfStart');
-        var endInp     = document.getElementById('actMfEnd');
+        var campusSel = document.getElementById('actMfCampus');
+        var dateInp = document.getElementById('actMfDate');
+        var startInp = document.getElementById('actMfStart');
+        var endInp = document.getElementById('actMfEnd');
         var roomSearch = document.getElementById('actMfRoomSearch');
-        var roomIdInp  = document.getElementById('actMfRoomId');
-        var dropdown   = document.getElementById('actMfDropdown');
-        var submitBtn  = document.getElementById('actMfSubmitBtn');
-        var errEl      = document.getElementById('actMfError');
-        var cancelBtn  = document.getElementById('actMfCancelBtn');
+        var roomIdInp = document.getElementById('actMfRoomId');
+        var dropdown = document.getElementById('actMfDropdown');
+        var submitBtn = document.getElementById('actMfSubmitBtn');
+        var errEl = document.getElementById('actMfError');
+        var cancelBtn = document.getElementById('actMfCancelBtn');
 
         if (!campusSel || !dateInp || !startInp || !endInp ||
             !roomSearch || !roomIdInp || !dropdown || !submitBtn) return;
@@ -4594,45 +4596,45 @@
 
         function onSlotChange() {
             var campus = campusSel.value;
-            var date   = dateInp.value;
-            var start  = startInp.value;
-            var end    = endInp.value;
+            var date = dateInp.value;
+            var start = startInp.value;
+            var end = endInp.value;
 
-            _miniFormRooms         = [];
-            _miniFormRoomSelected  = false;
-            roomSearch.value       = '';
-            roomIdInp.value        = '';
+            _miniFormRooms = [];
+            _miniFormRoomSelected = false;
+            roomSearch.value = '';
+            roomIdInp.value = '';
             dropdown.style.display = 'none';
-            submitBtn.disabled     = true;
+            submitBtn.disabled = true;
             clearErr();
 
             if (!campus || !date || !start || !end) {
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fill campus, date & time first\u2026';
                 return;
             }
             if (end <= start) {
                 showErr('End time must be after start time.');
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fix the time range first\u2026';
                 return;
             }
 
             // Past time check — only applies when the selected date is today
-            var todayStr = (function() {
+            var todayStr = (function () {
                 var n = new Date();
                 return n.getFullYear() + '-' +
                     String(n.getMonth() + 1).padStart(2, '0') + '-' +
                     String(n.getDate()).padStart(2, '0');
             })();
             if (date === todayStr) {
-                var nowH   = new Date().getHours();
-                var nowM   = new Date().getMinutes();
+                var nowH = new Date().getHours();
+                var nowM = new Date().getMinutes();
                 var startH = parseInt(start.split(':')[0], 10);
                 var startM = parseInt(start.split(':')[1], 10);
                 if (startH < nowH || (startH === nowH && startM <= nowM)) {
                     showErr('Start time cannot be in the past. Please choose a future time.');
-                    roomSearch.disabled    = true;
+                    roomSearch.disabled = true;
                     roomSearch.placeholder = 'Fix the start time first\u2026';
                     return;
                 }
@@ -4640,109 +4642,109 @@
 
             // Maximum booking duration: 5 hours (300 minutes)
             var startMin = parseInt(start.split(':')[0], 10) * 60 + parseInt(start.split(':')[1], 10);
-            var endMin   = parseInt(end.split(':')[0], 10)   * 60 + parseInt(end.split(':')[1], 10);
+            var endMin = parseInt(end.split(':')[0], 10) * 60 + parseInt(end.split(':')[1], 10);
             if (endMin - startMin > 300) {
                 showErr('Maximum booking duration is 5 hours.');
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fix the duration first\u2026';
                 return;
             }
 
-            roomSearch.disabled    = true;
+            roomSearch.disabled = true;
             roomSearch.placeholder = 'Loading rooms\u2026';
 
-            var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
             var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
             fetch('room-reservation/api/check-slot-availability.php', {
-                method:  'POST',
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
+                body: JSON.stringify({
                     csrf_token: csrfToken,
-                    campus:     campus,
-                    date:       date,
+                    campus: campus,
+                    date: date,
                     start_time: start,
-                    end_time:   end,
+                    end_time: end,
                 }),
             })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    showErr(data.error);
-                    roomSearch.placeholder = 'No rooms available.';
-                    return;
-                }
-                _miniFormRooms = data.rooms || [];
-                if (_miniFormRooms.length === 0) {
-                    roomSearch.disabled    = true;
-                    roomSearch.placeholder = 'No rooms available for this slot.';
-                    showErr('No rooms are free for this campus, date and time. Try a different slot.');
-                    return;
-                }
-                roomSearch.disabled    = false;
-                roomSearch.placeholder = 'Type to search ' + _miniFormRooms.length +
-                    ' available room' + (_miniFormRooms.length === 1 ? '' : 's') + '\u2026';
-            })
-            .catch(function() {
-                showErr('Could not load rooms. Please try again.');
-                roomSearch.placeholder = 'Error loading rooms.';
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) {
+                        showErr(data.error);
+                        roomSearch.placeholder = 'No rooms available.';
+                        return;
+                    }
+                    _miniFormRooms = data.rooms || [];
+                    if (_miniFormRooms.length === 0) {
+                        roomSearch.disabled = true;
+                        roomSearch.placeholder = 'No rooms available for this slot.';
+                        showErr('No rooms are free for this campus, date and time. Try a different slot.');
+                        return;
+                    }
+                    roomSearch.disabled = false;
+                    roomSearch.placeholder = 'Type to search ' + _miniFormRooms.length +
+                        ' available room' + (_miniFormRooms.length === 1 ? '' : 's') + '\u2026';
+                })
+                .catch(function () {
+                    showErr('Could not load rooms. Please try again.');
+                    roomSearch.placeholder = 'Error loading rooms.';
+                });
         }
 
         campusSel.addEventListener('change', onSlotChange);
-        dateInp.addEventListener('change',   onSlotChange);
-        startInp.addEventListener('change',  onSlotChange);
-        endInp.addEventListener('change',    onSlotChange);
+        dateInp.addEventListener('change', onSlotChange);
+        startInp.addEventListener('change', onSlotChange);
+        endInp.addEventListener('change', onSlotChange);
 
         function renderDropdown(query) {
             var q = query.trim().toLowerCase();
             var filtered = q === ''
                 ? _miniFormRooms
-                : _miniFormRooms.filter(function(r) {
+                : _miniFormRooms.filter(function (r) {
                     return r.room_name.toLowerCase().includes(q) ||
-                           r.building_name.toLowerCase().includes(q) ||
-                           r.floor_label.toLowerCase().includes(q);
-                  });
+                        r.building_name.toLowerCase().includes(q) ||
+                        r.floor_label.toLowerCase().includes(q);
+                });
 
             if (filtered.length === 0) {
                 dropdown.innerHTML =
                     '<div class="act-mini-dd-empty">No rooms match "' + escH(query) + '"</div>';
             } else {
-                dropdown.innerHTML = filtered.map(function(r) {
+                dropdown.innerHTML = filtered.map(function (r) {
                     return '<div class="act-mini-dd-item" ' +
-                           'data-id="' + r.room_id + '" ' +
-                           'data-label="' + escH(r.room_name + ' \u00b7 ' +
-                               r.building_name + ' \u00b7 ' + r.floor_label) + '">' +
-                               '<strong>' + escH(r.room_name) + '</strong>' +
-                               '<span class="act-mini-dd-meta">' +
-                               escH(r.building_name) + ' \u00b7 ' + escH(r.floor_label) +
-                               '</span>' +
-                           '</div>';
+                        'data-id="' + r.room_id + '" ' +
+                        'data-label="' + escH(r.room_name + ' \u00b7 ' +
+                            r.building_name + ' \u00b7 ' + r.floor_label) + '">' +
+                        '<strong>' + escH(r.room_name) + '</strong>' +
+                        '<span class="act-mini-dd-meta">' +
+                        escH(r.building_name) + ' \u00b7 ' + escH(r.floor_label) +
+                        '</span>' +
+                        '</div>';
                 }).join('');
             }
             dropdown.style.display = 'block';
         }
 
-        roomSearch.addEventListener('input', function() {
-            roomIdInp.value       = '';
+        roomSearch.addEventListener('input', function () {
+            roomIdInp.value = '';
             _miniFormRoomSelected = false;
-            submitBtn.disabled    = true;
+            submitBtn.disabled = true;
             if (_miniFormRooms.length > 0) renderDropdown(this.value);
         });
 
-        roomSearch.addEventListener('focus', function() {
+        roomSearch.addEventListener('focus', function () {
             if (_miniFormRooms.length > 0) renderDropdown(this.value);
         });
 
-        dropdown.addEventListener('mousedown', function(e) {
+        dropdown.addEventListener('mousedown', function (e) {
             var item = e.target.closest('.act-mini-dd-item');
             if (!item) return;
             e.preventDefault();
-            roomIdInp.value       = item.dataset.id;
-            roomSearch.value      = item.dataset.label;
+            roomIdInp.value = item.dataset.id;
+            roomSearch.value = item.dataset.label;
             _miniFormRoomSelected = true;
             dropdown.style.display = 'none';
-            submitBtn.disabled    = false;
+            submitBtn.disabled = false;
             clearErr();
         });
 
@@ -4753,12 +4755,12 @@
                 dropdown.style.display = 'none';
                 if (!_miniFormRoomSelected) {
                     roomSearch.value = '';
-                    roomIdInp.value  = '';
+                    roomIdInp.value = '';
                 }
             }
         }, true);
 
-        cancelBtn.addEventListener('click', function() {
+        cancelBtn.addEventListener('click', function () {
             var f = document.getElementById('actMiniForm');
             if (f) f.remove();
             setSending(false);
@@ -4768,16 +4770,16 @@
                 'Facilities tab to browse and reserve directly.');
         });
 
-        submitBtn.addEventListener('click', function() {
+        submitBtn.addEventListener('click', function () {
             var roomId = roomIdInp.value;
-            var date   = dateInp.value;
-            var start  = startInp.value;
-            var end    = endInp.value;
+            var date = dateInp.value;
+            var start = startInp.value;
+            var end = endInp.value;
 
             if (!roomId) { showErr('Please select a room from the list.'); return; }
-            if (!date)   { showErr('Please select a date.'); return; }
-            if (!start)  { showErr('Please enter a start time.'); return; }
-            if (!end)    { showErr('Please enter an end time.'); return; }
+            if (!date) { showErr('Please select a date.'); return; }
+            if (!start) { showErr('Please enter a start time.'); return; }
+            if (!end) { showErr('Please enter an end time.'); return; }
             clearErr();
 
             // Close chat
@@ -4794,7 +4796,7 @@
                 sessionStorage.setItem('ai_room_deeplink', JSON.stringify({
                     room: roomId, date: date, start: start, end: end
                 }));
-            } catch(e) {}
+            } catch (e) { }
 
             // Switch to Facilities tab by clicking the sidebar nav item —
             // this uses the existing public delegation system and is accessible
@@ -4813,7 +4815,7 @@
     function actAiSend(prefill) {
 
         var input = document.getElementById('actAiInput');
-        var msg   = (prefill || (input ? input.value : '')).trim();
+        var msg = (prefill || (input ? input.value : '')).trim();
         if (!msg) return;
 
         var body = document.getElementById('actAiChatBody');
@@ -4827,61 +4829,61 @@
         if (input) input.value = '';
         setSending(true);
 
-        var typing    = appendTyping(body);
-        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var typing = appendTyping(body);
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
         fetch('room-reservation/api/chat.php', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ message: msg, csrf_token: csrfToken }),
+            body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
         })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            typing.remove();
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                typing.remove();
 
-            if (data.status === 'rate_limited') {
-                appendAiBubble(body, data.message);
-                updateCounter(0);
-                setSending(false);
-                return;
-            }
-            if (data.status !== 'success') {
-                appendAiBubble(body, data.message || 'Something went wrong. Please try again.');
-                setSending(false);
-                return;
-            }
-
-            var lastRow = appendAiBubble(body, data.reply);
-            if (typeof data.remaining === 'number') updateCounter(data.remaining);
-
-            // Campus disambiguation chips (availability queries)
-            if (data.ask_campus) {
-                var col = lastRow && lastRow.querySelector('.act-chat-col');
-                if (col) {
-                    var chips = document.createElement('div');
-                    chips.className = 'act-chat-chips act-campus-chips';
-                    chips.innerHTML =
-                        '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
-                        '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
-                    col.appendChild(chips);
+                if (data.status === 'rate_limited') {
+                    appendAiBubble(body, data.message);
+                    updateCounter(0);
+                    setSending(false);
+                    return;
                 }
-            }
+                if (data.status !== 'success') {
+                    appendAiBubble(body, data.message || 'Something went wrong. Please try again.');
+                    setSending(false);
+                    return;
+                }
 
-            // Reservation intent — show 4-field mini-form
-            if (data.intent_reserve) {
-                showMiniForm(lastRow);
-                // Keep send disabled until form is cancelled or submitted
-                return;
-            }
+                var lastRow = appendAiBubble(body, data.reply);
+                if (typeof data.remaining === 'number') updateCounter(data.remaining);
 
-            setSending(false);
-        })
-        .catch(function() {
-            typing.remove();
-            appendAiBubble(body, 'Network error. Please check your connection and try again.');
-            setSending(false);
-        });
+                // Campus disambiguation chips (availability queries)
+                if (data.ask_campus) {
+                    var col = lastRow && lastRow.querySelector('.act-chat-col');
+                    if (col) {
+                        var chips = document.createElement('div');
+                        chips.className = 'act-chat-chips act-campus-chips';
+                        chips.innerHTML =
+                            '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
+                            '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
+                        col.appendChild(chips);
+                    }
+                }
+
+                // Reservation intent — show 4-field mini-form
+                if (data.intent_reserve) {
+                    showMiniForm(lastRow);
+                    // Keep send disabled until form is cancelled or submitted
+                    return;
+                }
+
+                setSending(false);
+            })
+            .catch(function () {
+                typing.remove();
+                appendAiBubble(body, 'Network error. Please check your connection and try again.');
+                setSending(false);
+            });
     }
 
     window.actAiSend = actAiSend;
@@ -4890,11 +4892,11 @@
     function init() {
         var inp = document.getElementById('actAiInput');
         if (inp) {
-            inp.addEventListener('keydown', function(e) {
+            inp.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey) actAiSend();
             });
         }
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             var chip = e.target.closest('.act-chat-chip');
             if (!chip) return;
             actAiSend(chip.dataset.chip);
@@ -4915,11 +4917,13 @@
    1. History table   filter All / Equipment / Rooms, search, paging
    2. Show all        expands the Currently borrowing / Upcoming lists
    3. Download Report prints the whole record (CSS un-pages it)
-   4. Rooms, live     re-fetches room-reservation/api/poll-reservations.php?view=activity
-                      and swaps the Room reservations card, the room rows of
-                      the history table and the two room numbers in the summary
-                      strip. Runs after a booking / cancellation, when the tab
-                      is opened, and every 30 s while visible.
+   4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
+                      Equipment: equipment-booking/api/poll-requests.php?view=activity
+                      Each swaps its card, its rows in the history table and its numbers
+                      in the summary strip (same renderers as the first page load).
+                      Runs when the tab is opened, after a booking / cancellation,
+                      the moment the 5 s requests poll sees a status change (e.g. admin
+                      confirms a return), and every 30 s while the tab is visible.
 
    Cancel / Join waitlist / Report issue / go-tab buttons are handled by the
    delegated handlers above (data-action="..."). No inline event handlers are
@@ -4934,6 +4938,7 @@
         var PER_PAGE = 10;
         var REFRESH_MS = 30000;
         var API_ROOMS = 'room-reservation/api/poll-reservations.php?view=activity';
+        var API_EQUIP = 'equipment-booking/api/poll-requests.php?view=activity';
 
         var panel = document.getElementById('panel-activity');
         var body = document.getElementById('factHistBody');
@@ -5098,49 +5103,99 @@
             if (e.target.closest('[data-fact-print]')) window.print();
         });
 
-        /* ── 4. Rooms: live refresh ──────────────────────────────── */
-        var inFlight = false;
+        /* ── 4. Live refresh (equipment + rooms) ─────────────────── */
+        var inFlight = { rooms: false, equipment: false };
 
         function setStat(name, value) {
             var el = panel.querySelector('[data-fact-stat="' + name + '"]');
-            if (el) el.textContent = value;
+            if (!el) return;
+            el.textContent = value;
+            if (name === 'overdue') {
+                var box = el.closest('.fact-stat');
+                if (box) box.classList.toggle('is-alert', Number(value) > 0);
+            }
+        }
+
+        /* Swap a card's contents but keep any "Show all" the person already opened */
+        function swapBody(container, html) {
+            var opened = {};
+            container.querySelectorAll('.fact-group').forEach(function (g) {
+                var label = g.querySelector('.fact-group-label');
+                var list = g.querySelector('.fact-list');
+                if (label && list && g.querySelector('[data-fact-more]') && !list.classList.contains('is-collapsed')) {
+                    opened[label.textContent] = true;
+                }
+            });
+            container.innerHTML = html;
+            container.querySelectorAll('.fact-group').forEach(function (g) {
+                var label = g.querySelector('.fact-group-label');
+                var list = g.querySelector('.fact-list');
+                var more = g.querySelector('[data-fact-more]');
+                if (label && list && more && opened[label.textContent]) {
+                    list.classList.remove('is-collapsed');
+                    more.classList.add('is-open');
+                    more.setAttribute('aria-expanded', 'true');
+                    more.firstChild.nodeValue = 'Show less ';
+                }
+            });
+        }
+
+        /* Replace one kind of history row ("room" / "equipment") with fresh ones */
+        function swapHistory(kind, html) {
+            body.querySelectorAll('tr.fact-row[data-kind="' + kind + '"]').forEach(function (tr) { tr.remove(); });
+            body.insertAdjacentHTML('beforeend', html);
+            sortRows();
+            apply();
+        }
+
+        function load(url, key, done) {
+            if (inFlight[key]) return;
+            inFlight[key] = true;
+            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data || data.error || Array.isArray(data)) return;
+                    done(data);
+                })
+                .catch(function () { /* a failed refresh must never disturb the screen */ })
+                .then(function () { inFlight[key] = false; });
         }
 
         function refreshRooms() {
-            if (inFlight) return;
-            inFlight = true;
-            fetch(API_ROOMS, { credentials: 'same-origin', cache: 'no-store' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (data) {
-                    if (!data || data.error) return;
-
-                    var card = $('factRoomsBody');
-                    if (card && typeof data.body === 'string') card.innerHTML = data.body;
-
-                    if (typeof data.rows === 'string') {
-                        body.querySelectorAll('tr.fact-row[data-kind="room"]').forEach(function (tr) { tr.remove(); });
-                        body.insertAdjacentHTML('beforeend', data.rows);
-                        sortRows();
-                        apply();
-                    }
-
-                    if (data.stats) {
-                        setStat('reserved', data.stats.reserved);
-                        setStat('reserved_sub', data.stats.reserved_sub);
-                        setStat('next', data.stats.next);
-                        setStat('next_sub', data.stats.next_sub);
-                    }
-                })
-                .catch(function () { /* a failed refresh must never disturb the screen */ })
-                .then(function () { inFlight = false; });
+            load(API_ROOMS, 'rooms', function (data) {
+                var card = $('factRoomsBody');
+                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                if (typeof data.rows === 'string') swapHistory('room', data.rows);
+                if (data.stats) setStat('reserved', data.stats.reserved);
+            });
         }
+
+        function refreshEquipment() {
+            load(API_EQUIP, 'equipment', function (data) {
+                var card = $('factEquipBody');
+                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                var action = $('factEquipAction');
+                if (action && typeof data.action === 'string') action.innerHTML = data.action;
+                if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
+                if (data.stats) {
+                    setStat('loans', data.stats.loans);
+                    setStat('overdue', data.stats.overdue);
+                    setStat('pending', data.stats.pending);
+                }
+            });
+        }
+
+        function refreshAll() { refreshEquipment(); refreshRooms(); }
 
         function panelIsOpen() {
             return panel.classList.contains('active') && !document.hidden;
         }
 
-        /* After booking or cancelling */
+        /* After booking or cancelling a room */
         document.addEventListener('pupsync:reservation-submitted', refreshRooms);
+
+        /* The 5 s requests poll saw a status change (approved, returned, overdue ...) */
+        document.addEventListener('pupsync:requests-changed', function () { if (panelIsOpen()) refreshEquipment(); });
 
         /* Joining a waitlist does not fire that event — look again shortly after */
         document.addEventListener('click', function (e) {
@@ -5150,12 +5205,14 @@
             }
         });
 
-        /* When the tab is opened, make sure it is current */
-        var navActivity = $('nav-activity');
-        if (navActivity) navActivity.addEventListener('click', function () { setTimeout(refreshRooms, 150); });
+        /* Whenever the tab is opened (sidebar, Home key figures, "View all"), make sure it is current */
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(function () { if (panel.classList.contains('active')) refreshAll(); })
+                .observe(panel, { attributes: true, attributeFilter: ['class'] });
+        }
 
-        setInterval(function () { if (panelIsOpen()) refreshRooms(); }, REFRESH_MS);
-        document.addEventListener('visibilitychange', function () { if (panelIsOpen()) refreshRooms(); });
+        setInterval(function () { if (panelIsOpen()) refreshAll(); }, REFRESH_MS);
+        document.addEventListener('visibilitychange', function () { if (panelIsOpen()) refreshAll(); });
 
         /* ── Start ───────────────────────────────────────────────── */
         sortRows();
