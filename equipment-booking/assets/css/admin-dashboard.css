@@ -11769,12 +11769,143 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     min-width: 155px;
 }
 
+/* Sort: dropdown (what to sort by) + arrow button (direction), pushed to the right */
+#panel-rooms .rr-sort {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+#panel-rooms .rr-status-bar .rr-sort .pr-filter-select {
+    margin-left: 0;
+}
+
+#panel-rooms .rr-sort-dir {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 9px;
+    background: var(--card-bg);
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+#panel-rooms .rr-sort-dir:hover {
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .rr-sort-dir:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+#panel-rooms .rr-sort-dir .material-symbols-outlined {
+    font-size: 18px;
+}
+
 #panel-rooms .rr-active-chip {
     gap: 5px;
 }
 
 #panel-rooms .rr-active-chip .material-symbols-outlined {
     font-size: 15px;
+}
+
+/* Reservations status tabs (All / Active today / Waiting / Approved / Cancelled / Declined) + sort dropdown */
+#panel-rooms .rr-status-bar {
+    flex-wrap: wrap;
+}
+
+#panel-rooms .rr-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+#panel-rooms .rr-tab {
+    gap: 6px;
+}
+
+#panel-rooms .rr-tab-count {
+    min-width: 19px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.07);
+    color: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1.5;
+    text-align: center;
+}
+
+#panel-rooms .rr-tab-count:empty {
+    display: none;
+}
+
+/* Waiting is the review queue: its count turns red while something needs a decision */
+#panel-rooms .rr-tab-count.has {
+    background: var(--danger);
+    color: #fff;
+}
+
+@media (max-width: 700px) {
+    #panel-rooms .rr-sort {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+
+    #panel-rooms .rr-status-bar .rr-sort .pr-filter-select {
+        flex: 1 1 auto;
+        width: auto;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    #panel-rooms .rr-sort-dir {
+        width: 44px;
+        height: 44px;
+    }
+}
+
+/* Reservation drawer: Super Admin decision box for Waiting requests */
+.ps-rr-reason {
+    display: block;
+    width: 100%;
+    min-height: 84px;
+    margin-top: 8px;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    background: var(--primary-white);
+    color: var(--text-dark);
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.ps-rr-reason:focus {
+    outline: none;
+    border-color: var(--accent-maroon);
+}
+
+.ps-rr-review-err {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--danger);
+}
+
+.ps-rr-review-err[hidden] {
+    display: none;
 }
 
 #panel-rooms .rm-table thead th:last-child,
@@ -11832,10 +11963,43 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     gap: 6px;
 }
 
-#panel-rooms .rm-table td.rm-empty-cell {
+/* The :last-child makes this outrank the right-aligned last column rule above,
+   otherwise the full-width "No ... match" cell (it is the last cell) is pushed right. */
+#panel-rooms .rm-table tbody td.rm-empty-cell,
+#panel-rooms .rm-table tbody td.rm-empty-cell:last-child {
     padding: 2.5rem 1rem;
     text-align: center;
     color: var(--text-light);
+}
+
+/* Reservations table: fixed column widths so the headers stay put when the status
+   tabs / search change which rows are visible (auto layout re-sized columns to fit them).
+   Desktop/tablet only; phones use the stacked-card layout. */
+@media (min-width: 769px) {
+    #panel-rooms #rrTable {
+        table-layout: fixed;
+        min-width: 720px;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(1) {
+        width: 22%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(2) {
+        width: 18%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(3) {
+        width: 26%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(4) {
+        width: 15%;
+    }
+
+    #panel-rooms #rrTable thead th:nth-child(5) {
+        width: 19%;
+    }
 }
 
 #panel-rooms .rm-sr {
@@ -12185,4 +12349,124 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 .eq-loan-row.is-scheduled td:first-child {
     box-shadow: inset 3px 0 0 #3b82c4;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FACILITIES › TABS  (additive — Rooms / Reservations / Issues / Archived)
+   Same look as the Equipment tabs (.rq-filter-chip): every tab is its own
+   pill-shaped, individually-bordered button instead of sharing one container.
+   Sized up a little from the Equipment chips. Markup classes and the
+   data-rooms-tab hooks are unchanged, so tab switching still works as before.
+═══════════════════════════════════════════════════════════════ */
+#panel-rooms .pr-sub-tabs {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 0;
+    gap: 10px;
+    flex-wrap: wrap;
+    overflow: visible;
+}
+
+#panel-rooms .pr-sub-tab {
+    gap: 7px;
+    padding: 0.55rem 1.2rem;
+    border-radius: 50px;
+    border: 1.5px solid var(--khaki-border);
+    background: var(--primary-white);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-light);
+    white-space: nowrap;
+}
+
+#panel-rooms .pr-sub-tab:hover {
+    background: var(--primary-white);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+}
+
+#panel-rooms .pr-sub-tab.active {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+    font-weight: 600;
+}
+
+#panel-rooms .rm-tab-ico {
+    font-size: 18px;
+    line-height: 1;
+}
+
+#panel-rooms .pr-tab-badge {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    min-width: 19px;
+}
+
+@media (max-width: 700px) {
+    #panel-rooms .rm-tabbar {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    #panel-rooms .rm-tabbar .pr-sub-tabs:first-child {
+        flex: 1 1 100%;
+    }
+
+    #panel-rooms .pr-sub-tabs {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    #panel-rooms .pr-sub-tabs .pr-sub-tab {
+        flex: 0 1 auto;
+        gap: 6px;
+        padding: 0.5rem 0.95rem;
+        font-size: 12.5px;
+    }
+
+    #panel-rooms .rm-tab-ico {
+        font-size: 17px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EQUIPMENT › TABS SIZE  (additive — Catalog / On Loan)
+   Same size as the Facilities tabs above. Scoped to #eqTabs so the other
+   .rq-filter-chip uses (notification filters etc.) keep their size.
+═══════════════════════════════════════════════════════════════ */
+#eqTabs {
+    gap: 10px;
+}
+
+#eqTabs .rq-filter-chip {
+    gap: 7px;
+    padding: 0.55rem 1.2rem;
+    font-size: 13.5px;
+}
+
+#eqTabs .eq-tab-ico {
+    font-size: 18px;
+}
+
+#eqTabs .rq-chip-count {
+    font-size: 10.5px;
+    min-width: 19px;
+}
+
+@media (max-width: 700px) {
+    #eqTabs {
+        gap: 8px;
+    }
+
+    #eqTabs .rq-filter-chip {
+        gap: 6px;
+        padding: 0.5rem 0.95rem;
+        font-size: 12.5px;
+    }
+
+    #eqTabs .eq-tab-ico {
+        font-size: 17px;
+    }
 }

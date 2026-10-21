@@ -1160,7 +1160,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </a>
                     <a class="nav-item" data-tab="rooms" href="#">
                         <span class="material-symbols-outlined">meeting_room</span>
-                        <span class="nav-label">Rooms</span>
+                        <span class="nav-label">Facilities</span>
                     </a>
                 </div>
                 <?php if ($is_super_admin): ?>
@@ -1282,7 +1282,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- ── Page header + Add Room button ──────────────────── -->
                 <div class="pr-page-header-row">
                     <div>
-                        <h1 class="pr-page-title">Room Management</h1>
+                        <h1 class="pr-page-title">Facilities Management</h1>
                         <p class="pr-page-subtitle">Browse rooms, reservations and reported issues.</p>
                     </div>
                     <?php if ($is_super_admin): ?>
@@ -1461,9 +1461,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Tabs: main tabs on the left, Archived in its own container on the far right -->
                 <div class="rm-tabbar">
                     <div class="pr-sub-tabs" id="rooms-toggle-wrap">
-                        <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
+                        <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">meeting_room</span> Rooms
+                        </button>
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-reservations">
-                            Reservations
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">event_available</span> Reservations
                             <?php
                             $rm_resv_approved = count(array_filter($admin_room_reservations ?? [], function ($r) {
                                 return ($r['status'] ?? '') === 'Approved';
@@ -1473,7 +1475,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <?php endif; ?>
                         </button>
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-issues">
-                            Issues
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">report_problem</span> Issues
                             <?php if (!empty($admin_room_issues_open)): ?>
                                 <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
                             <?php endif; ?>
@@ -1481,7 +1483,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="pr-sub-tabs rm-tabs-solo" id="rooms-archived-tab-wrap">
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived">
-                            Archived
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">inventory_2</span> Archived
                             <span class="pr-tab-badge" id="roomsArchivedBadge" style="background:var(--text-light);<?php echo empty($rooms_archived) ? 'display:none;' : ''; ?>"><?php echo count($rooms_archived); ?></span>
                         </button>
                     </div>
@@ -2017,6 +2019,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- RESERVATIONS -->
                 <div class="rooms-sub-panel" id="rooms-reservations-panel">
+                    <?php
+                    // Table rows start in "most recent request first" order (the sort dropdown re-orders them live).
+                    $rr_rows = $admin_room_reservations ?? [];
+                    usort($rr_rows, function ($a, $b) {
+                        $ta = !empty($a['request_date']) ? (int)strtotime($a['request_date']) : 0;
+                        $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
+                        return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
+                    });
+                    // Waiting (adviser requests with an attached letter) is a Super Admin-only queue.
+                    $rr_is_super = !empty($ps_rooms_can_view_sensitive_adviser_requests);
+                    ?>
                     <div class="pr-card">
                         <div class="pr-card-header">
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
@@ -2026,15 +2039,39 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                         </div>
                         <div class="rr-status-bar">
-                            <button type="button" class="rm-chip rr-active-chip" id="rrActiveToday" aria-pressed="false">
-                                <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today
-                            </button>
-                            <select id="rrStatus" class="pr-filter-select" aria-label="Reservation status">
-                                <option value="all">All statuses</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Cancelled">Cancelled</option>
-                                <option value="Declined">Declined</option>
-                            </select>
+                            <div class="rr-tabs" id="rrTabs" role="group" aria-label="Filter reservations by status">
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="all" aria-pressed="true">
+                                    All <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
+                                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today <span class="rr-tab-count"></span>
+                                </button>
+                                <?php if ($rr_is_super): ?>
+                                    <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
+                                        Waiting <span class="rr-tab-count"></span>
+                                    </button>
+                                <?php endif; ?>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Approved" aria-pressed="false">
+                                    Approved <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Cancelled" aria-pressed="false">
+                                    Cancelled <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Declined" aria-pressed="false">
+                                    Declined <span class="rr-tab-count"></span>
+                                </button>
+                            </div>
+                            <div class="rr-sort">
+                                <select id="rrSort" class="pr-filter-select" aria-label="Sort reservations by">
+                                    <option value="recent" selected>Recent requests</option>
+                                    <option value="date">Reservation date</option>
+                                </select>
+                                <button type="button" class="rr-sort-dir" id="rrSortDir" data-dir="desc"
+                                    title="Newest requests first (click to reverse)"
+                                    aria-label="Sort direction: newest requests first. Click to reverse.">
+                                    <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="pr-tbl-wrap">
                             <table class="pr-table rm-table" id="rrTable">
@@ -2044,18 +2081,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>When</th>
                                         <th>Requested by</th>
                                         <th>Status</th>
-                                        <th><span class="rm-sr">Actions</span></th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (empty($admin_room_reservations)): ?>
+                                    <?php if (empty($rr_rows)): ?>
                                         <tr>
                                             <td colspan="5" class="rm-empty-cell">No reservations yet.</td>
                                         </tr>
-                                        <?php else: foreach ($admin_room_reservations as $ar):
+                                        <?php else: foreach ($rr_rows as $ar):
                                             $ar_badge = 'ps-badge--active';
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
                                             if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
+                                            if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
+                                            // Only a Super Admin can decide a Waiting request (the API enforces this too).
+                                            $ar_reviewable = $ar['status'] === 'Waiting' && $rr_is_super;
 
                                             $ar_type    = ps_submitted_as_label($ar['submitted_as']);
                                             $ar_is_stud = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name']);
@@ -2092,6 +2132,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
                                                 data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
                                                 data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
+                                                data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
+                                                data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
                                                 <td>
                                                     <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
@@ -2124,7 +2166,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                 data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
                                                                 title="Cancel this reservation">Cancel</button>
                                                         <?php endif; ?>
-                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>View</button>
+                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail><?php echo $ar_reviewable ? 'Review' : 'View'; ?></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -2136,93 +2178,301 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </tbody>
                             </table>
                         </div>
+                        <div class="inv-pager" id="rrPager" hidden>
+                            <span class="inv-pager-info" id="rrPagerInfo"></span>
+                            <div class="inv-pager-ctl" id="rrPagerCtl">
+                                <button type="button" class="inv-pager-btn" id="rrPgPrev" aria-label="Previous page">
+                                    <span class="material-symbols-outlined">chevron_left</span>
+                                </button>
+                                <div class="inv-pager-nums" id="rrPgNums"></div>
+                                <button type="button" class="inv-pager-btn" id="rrPgNext" aria-label="Next page">
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <script nonce="<?php echo $csp_nonce; ?>">
                         (function() {
                             'use strict';
                             var tbl = document.getElementById('rrTable');
                             var q = document.getElementById('rrSearch');
-                            var st = document.getElementById('rrStatus');
-                            var activeToday = document.getElementById('rrActiveToday');
-                            var activeOnly = false;
+                            var sortSel = document.getElementById('rrSort');
+                            var dirBtn = document.getElementById('rrSortDir');
+                            var tabsWrap = document.getElementById('rrTabs');
                             var none = document.getElementById('rrNoMatch');
-                            if (!tbl || !q || !st || !activeToday) return;
+                            var pager = document.getElementById('rrPager');
+                            var pgInfo = document.getElementById('rrPagerInfo');
+                            var pgCtl = document.getElementById('rrPagerCtl');
+                            var pgPrev = document.getElementById('rrPgPrev');
+                            var pgNext = document.getElementById('rrPgNext');
+                            var pgNums = document.getElementById('rrPgNums');
+                            if (!tbl || !q || !sortSel || !dirBtn || !tabsWrap || !pager) return;
+                            var PAGE_SIZE = 15;
+                            var tbody = tbl.tBodies[0];
+                            var tab = 'all'; // all | active | Waiting | Approved | Cancelled | Declined
+                            var dir = 'desc'; // desc = newest / latest first, asc = oldest / earliest first
+                            var page = 1;
 
-                            function apply() {
-                                var s = (q.value || '').trim().toLowerCase();
-                                var f = st.value;
-                                var any = false;
-                                var nowISO = (function() {
-                                    try {
-                                        var parts = new Intl.DateTimeFormat('en-CA', {
-                                            timeZone: 'Asia/Manila',
-                                            year: 'numeric',
-                                            month: '2-digit',
-                                            day: '2-digit',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            hourCycle: 'h23'
-                                        }).formatToParts(new Date());
-                                        var g = function(t) {
-                                            return (parts.find(function(p) {
-                                                return p.type === t;
-                                            }) || {}).value;
-                                        };
-                                        return {
-                                            iso: g('year') + '-' + g('month') + '-' + g('day'),
-                                            min: (+g('hour')) * 60 + (+g('minute'))
-                                        };
-                                    } catch (e) {
-                                        var d = new Date();
-                                        return {
-                                            iso: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
-                                            min: d.getHours() * 60 + d.getMinutes()
-                                        };
-                                    }
-                                })();
-
-                                function parseMin(v) {
-                                    var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
-                                    if (!m) return null;
-                                    var h = +m[1],
-                                        mi = +m[2],
-                                        ap = (m[3] || '').toUpperCase();
-                                    if (ap === 'PM' && h !== 12) h += 12;
-                                    if (ap === 'AM' && h === 12) h = 0;
-                                    return h * 60 + mi;
+                            function manilaNow() {
+                                try {
+                                    var parts = new Intl.DateTimeFormat('en-CA', {
+                                        timeZone: 'Asia/Manila',
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hourCycle: 'h23'
+                                    }).formatToParts(new Date());
+                                    var g = function(t) {
+                                        return (parts.find(function(p) {
+                                            return p.type === t;
+                                        }) || {}).value;
+                                    };
+                                    return {
+                                        iso: g('year') + '-' + g('month') + '-' + g('day'),
+                                        min: (+g('hour')) * 60 + (+g('minute'))
+                                    };
+                                } catch (e) {
+                                    var d = new Date();
+                                    return {
+                                        iso: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+                                        min: d.getHours() * 60 + d.getMinutes()
+                                    };
                                 }
-                                tbl.querySelectorAll('tbody tr.ps-rr-row').forEach(function(r) {
+                            }
+
+                            function parseMin(v) {
+                                var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                                if (!m) return null;
+                                var h = +m[1],
+                                    mi = +m[2],
+                                    ap = (m[3] || '').toUpperCase();
+                                if (ap === 'PM' && h !== 12) h += 12;
+                                if (ap === 'AM' && h === 12) h = 0;
+                                return h * 60 + mi;
+                            }
+
+                            function rows() {
+                                return Array.prototype.slice.call(tbody.querySelectorAll('tr.ps-rr-row'));
+                            }
+
+                            function isActiveNow(d, now) {
+                                var sMin = parseMin(d.startTime);
+                                var eMin = parseMin(d.endTime);
+                                return d.status === 'Approved' && d.isoDate === now.iso &&
+                                    sMin !== null && eMin !== null &&
+                                    sMin <= now.min && eMin > now.min;
+                            }
+
+                            /* ── Sorting ─────────────────────────────────────────
+                               Dropdown picks WHAT to sort by, the arrow button picks the direction:
+                               recent : submission time of the request
+                               date   : reservation date + start time */
+                            function startKey(d) {
+                                return (d.isoDate || '') + ' ' + (d.startTime || '');
+                            }
+
+                            function comparator() {
+                                var sign = dir === 'asc' ? 1 : -1;
+                                var byDate = sortSel.value === 'date';
+                                return function(a, b) {
+                                    var x = a.dataset,
+                                        y = b.dataset,
+                                        r;
+                                    if (byDate) {
+                                        var kx = startKey(x),
+                                            ky = startKey(y);
+                                        r = kx < ky ? -1 : (kx > ky ? 1 : 0);
+                                    } else {
+                                        r = (+x.submittedTs || 0) - (+y.submittedTs || 0);
+                                    }
+                                    if (!r) r = (+x.rrId || 0) - (+y.rrId || 0);
+                                    return r * sign;
+                                };
+                            }
+
+                            function sortRows() {
+                                var list = rows().sort(comparator());
+                                var frag = document.createDocumentFragment();
+                                list.forEach(function(r) {
+                                    frag.appendChild(r);
+                                });
+                                tbody.insertBefore(frag, none || null);
+                            }
+
+                            function syncDirBtn() {
+                                var asc = dir === 'asc';
+                                var label = sortSel.value === 'date' ?
+                                    (asc ? 'Earliest first' : 'Latest first') :
+                                    (asc ? 'Oldest requests first' : 'Newest requests first');
+                                dirBtn.setAttribute('data-dir', dir);
+                                dirBtn.title = label + ' (click to reverse)';
+                                dirBtn.setAttribute('aria-label', 'Sort direction: ' + label.toLowerCase() + '. Click to reverse.');
+                                var ico = dirBtn.querySelector('.material-symbols-outlined');
+                                if (ico) ico.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+                            }
+
+                            /* ── Tab counts (independent of the search box) ─────── */
+                            function updateCounts() {
+                                var now = manilaNow();
+                                var c = {
+                                    all: 0,
+                                    active: 0,
+                                    Waiting: 0,
+                                    Approved: 0,
+                                    Cancelled: 0,
+                                    Declined: 0
+                                };
+                                rows().forEach(function(r) {
+                                    var d = r.dataset;
+                                    c.all++;
+                                    if (typeof c[d.status] === 'number') c[d.status]++;
+                                    if (isActiveNow(d, now)) c.active++;
+                                });
+                                tabsWrap.querySelectorAll('[data-rr-tab]').forEach(function(b) {
+                                    var key = b.getAttribute('data-rr-tab');
+                                    var span = b.querySelector('.rr-tab-count');
+                                    if (!span) return;
+                                    span.textContent = c[key];
+                                    // Waiting is the to-do queue: highlight it while something needs a decision
+                                    span.classList.toggle('has', key === 'Waiting' && c[key] > 0);
+                                });
+                            }
+
+                            /* ── 1 … 4 5 6 … 12 : first, last and the current page ±1 ── */
+                            function pageList(total, current) {
+                                var keep = [1, total, current - 1, current, current + 1];
+                                var list = [],
+                                    last = 0;
+                                keep.filter(function(n, i) {
+                                        return n >= 1 && n <= total && keep.indexOf(n) === i;
+                                    })
+                                    .sort(function(x, y) {
+                                        return x - y;
+                                    })
+                                    .forEach(function(n) {
+                                        if (n - last > 1) list.push('gap');
+                                        list.push(n);
+                                        last = n;
+                                    });
+                                return list;
+                            }
+
+                            function renderPager(total, pages, start, end) {
+                                pager.hidden = total === 0;
+                                pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
+                                pgCtl.hidden = pages <= 1;
+                                pgPrev.disabled = page <= 1;
+                                pgNext.disabled = page >= pages;
+                                pgNums.textContent = '';
+                                pageList(pages, page).forEach(function(n) {
+                                    if (n === 'gap') {
+                                        var gap = document.createElement('span');
+                                        gap.className = 'inv-pager-gap';
+                                        gap.textContent = '\u2026';
+                                        pgNums.appendChild(gap);
+                                        return;
+                                    }
+                                    var btn = document.createElement('button');
+                                    btn.type = 'button';
+                                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                                    btn.dataset.page = String(n);
+                                    btn.textContent = String(n);
+                                    btn.setAttribute('aria-label', 'Page ' + n);
+                                    if (n === page) btn.setAttribute('aria-current', 'page');
+                                    pgNums.appendChild(btn);
+                                });
+                            }
+
+                            /* ── Filtering (active tab + search), then 15 rows per page ── */
+                            function applyFilter() {
+                                var s = (q.value || '').trim().toLowerCase();
+                                var now = manilaNow();
+                                var all = rows();
+                                var hits = all.filter(function(r) {
                                     var d = r.dataset;
                                     var hay = ((d.room || '') + ' ' + (d.who || '') + ' ' + (d.whoSub || '') + ' ' + (d.purpose || '')).toLowerCase();
-                                    var show;
-                                    if (activeOnly) {
-                                        var sMin = parseMin(d.startTime);
-                                        var eMin = parseMin(d.endTime);
-                                        show = d.status === 'Approved' && d.isoDate === nowISO.iso &&
-                                            sMin !== null && eMin !== null &&
-                                            sMin <= nowISO.min && eMin > nowISO.min;
-                                    } else {
-                                        show = (f === 'all' || d.status === f);
-                                    }
-                                    show = show && (!s || hay.indexOf(s) !== -1);
-                                    r.style.display = show ? '' : 'none';
-                                    if (show) any = true;
+                                    var show = tab === 'all' ? true : (tab === 'active' ? isActiveNow(d, now) : d.status === tab);
+                                    return show && (!s || hay.indexOf(s) !== -1);
                                 });
-                                var hasRows = tbl.querySelector('tbody tr.ps-rr-row');
-                                if (none) none.style.display = (hasRows && !any) ? '' : 'none';
+                                var total = hits.length;
+                                var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                                page = Math.min(Math.max(page, 1), pages);
+                                var start = (page - 1) * PAGE_SIZE;
+                                var end = Math.min(start + PAGE_SIZE, total);
+                                var visible = hits.slice(start, end);
+                                all.forEach(function(r) {
+                                    r.style.display = visible.indexOf(r) !== -1 ? '' : 'none';
+                                });
+                                var hasRows = all.length > 0;
+                                if (none) {
+                                    none.style.display = (hasRows && total === 0) ? '' : 'none';
+                                    var cell = none.firstElementChild;
+                                    if (cell) cell.textContent = (tab === 'Waiting' && !s) ? 'No reservations are waiting for review.' : 'No reservations match.';
+                                }
+                                renderPager(total, pages, start, end);
                             }
-                            q.addEventListener('input', apply);
-                            st.addEventListener('change', function() {
-                                activeOnly = false;
-                                activeToday.setAttribute('aria-pressed', 'false');
-                                apply();
+
+                            function goToPage(n) {
+                                page = n;
+                                applyFilter();
+                                // keep the top of the table in view after jumping pages
+                                var card = tbl.closest('.pr-card');
+                                if (card && card.scrollIntoView && card.getBoundingClientRect().top < 0) card.scrollIntoView({
+                                    block: 'start',
+                                    behavior: 'smooth'
+                                });
+                            }
+
+                            tabsWrap.addEventListener('click', function(e) {
+                                var b = e.target.closest('[data-rr-tab]');
+                                if (!b) return;
+                                tab = b.getAttribute('data-rr-tab');
+                                tabsWrap.querySelectorAll('[data-rr-tab]').forEach(function(x) {
+                                    x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+                                });
+                                page = 1;
+                                applyFilter();
                             });
-                            activeToday.addEventListener('click', function() {
-                                activeOnly = !activeOnly;
-                                activeToday.setAttribute('aria-pressed', activeOnly ? 'true' : 'false');
-                                if (activeOnly) st.value = 'all';
-                                apply();
+                            q.addEventListener('input', function() {
+                                page = 1;
+                                applyFilter();
                             });
+                            sortSel.addEventListener('change', function() {
+                                page = 1;
+                                syncDirBtn();
+                                sortRows();
+                                applyFilter();
+                            });
+                            dirBtn.addEventListener('click', function() {
+                                dir = dir === 'asc' ? 'desc' : 'asc';
+                                page = 1;
+                                syncDirBtn();
+                                sortRows();
+                                applyFilter();
+                            });
+                            pgPrev.addEventListener('click', function() {
+                                goToPage(page - 1);
+                            });
+                            pgNext.addEventListener('click', function() {
+                                goToPage(page + 1);
+                            });
+                            pgNums.addEventListener('click', function(e) {
+                                var b = e.target.closest('[data-page]');
+                                if (b) goToPage(parseInt(b.getAttribute('data-page'), 10));
+                            });
+                            // Fired after a Waiting request is approved/declined from the drawer
+                            document.addEventListener('rr:rows-changed', function() {
+                                sortRows();
+                                updateCounts();
+                                applyFilter();
+                            });
+
+                            syncDirBtn();
+                            sortRows(); // also honours a sort value the browser restored on refresh
+                            updateCounts();
+                            applyFilter();
                         })();
                     </script>
                 </div><!-- /#rooms-reservations-panel -->
@@ -5110,30 +5360,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <form id="manual-return-form" method="post" action="equipment-booking/api/manual-return.php">
                     <?= csrf_field() ?>
                     <input type="hidden" id="manual-return-request-id" name="request_id">
-                <div class="ps-req-summary">
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
-                </div>
-                <div class="ps-form-group">
-                    <label class="ps-form-label">Return Condition</label>
-                    <input type="hidden" id="manual-return-condition-value" name="return_condition" value="Good">
-                    <select class="ps-form-control" id="manual-return-condition">
-                        <option>Good — No visible damage</option>
-                        <option>Fair — Minor wear</option>
-                        <option>Damaged — Needs repair</option>
-                        <option>Missing — Item not returned</option>
-                    </select>
-                </div>
-                <div class="ps-form-group">
-                    <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                    <textarea class="ps-form-control" id="manual-return-notes" name="admin_notes" rows="2" maxlength="2000" placeholder="Any notes about the return..."></textarea>
-                </div>
-                <div class="ps-alert ps-alert--info" style="margin:0">
-                    <span class="material-symbols-outlined">info</span>
-                    Recording this manual return updates the stock count and closes this request. No faculty QR code is required.
-                </div>
+                    <div class="ps-req-summary">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Return Condition</label>
+                        <input type="hidden" id="manual-return-condition-value" name="return_condition" value="Good">
+                        <select class="ps-form-control" id="manual-return-condition">
+                            <option>Good — No visible damage</option>
+                            <option>Fair — Minor wear</option>
+                            <option>Damaged — Needs repair</option>
+                            <option>Missing — Item not returned</option>
+                        </select>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                        <textarea class="ps-form-control" id="manual-return-notes" name="admin_notes" rows="2" maxlength="2000" placeholder="Any notes about the return..."></textarea>
+                    </div>
+                    <div class="ps-alert ps-alert--info" style="margin:0">
+                        <span class="material-symbols-outlined">info</span>
+                        Recording this manual return updates the stock count and closes this request. No faculty QR code is required.
+                    </div>
                 </form>
             </div>
             <div class="ps-modal-foot">
@@ -5433,12 +5683,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <h4>Notes</h4>
                     <div class="ps-drawer-note" id="ps-rr-notes">—</div>
                 </section>
+
+                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
+                    <!-- Super Admin only: shown for Waiting requests. Open the attached letter above, then decide. -->
+                    <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
+                        <h4>Your decision</h4>
+                        <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
+                        <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
+                        <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
+                    </section>
+                <?php endif; ?>
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
                 <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
                     <span class="material-symbols-outlined">cancel</span> Cancel reservation
                 </button>
+                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
+                    <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
+                        <span class="material-symbols-outlined">close</span> Decline
+                    </button>
+                    <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
+                        <span class="material-symbols-outlined">check</span> Approve
+                    </button>
+                <?php endif; ?>
             </div>
         </aside>
     </div>

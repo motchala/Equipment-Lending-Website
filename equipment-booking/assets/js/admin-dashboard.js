@@ -4017,6 +4017,9 @@ function psSelectFmt(btn) {
    ROOMS — reservation details drawer (Rooms > Reservations table)
    Additive block. "Cancel reservation" in the drawer clicks the row's
    own Cancel button, so the existing cancel modal + API are reused.
+   Waiting requests (Org Adviser + attached letter) show a reason box and
+   Approve / Decline buttons for the Super Admin; the decision goes to
+   room-reservation/api/review-adviser-reservation.php (Super Admin only).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -4027,6 +4030,24 @@ function psSelectFmt(btn) {
     function txt(id, v) {
         var n = el(id);
         if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    var reviewSec = el('ps-rr-review-sec');
+    var reasonBox = el('ps-rr-review-reason');
+    var reviewErr = el('ps-rr-review-err');
+    var decideBtns = Array.prototype.slice.call(drawer.querySelectorAll('[data-rr-decide]'));
+
+    function showReviewError(msg) {
+        if (!reviewErr) return;
+        reviewErr.textContent = msg;
+        reviewErr.hidden = false;
+    }
+
+    function setReviewUI(on) {
+        if (reviewSec) reviewSec.hidden = !on;
+        decideBtns.forEach(function (b) { b.hidden = !on; b.disabled = false; });
+        if (reasonBox) reasonBox.value = '';
+        if (reviewErr) { reviewErr.hidden = true; reviewErr.textContent = ''; }
     }
 
     function openFor(row) {
@@ -4044,7 +4065,7 @@ function psSelectFmt(btn) {
         txt('ps-rr-type', d.type);
 
         var badge = el('ps-rr-status');
-        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned' };
+        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned', Waiting: 'ps-badge--waiting' };
         badge.className = 'ps-badge ps-badge--dot ' + (cls[d.status] || 'ps-badge--returned');
         badge.textContent = d.status;
 
@@ -4075,6 +4096,9 @@ function psSelectFmt(btn) {
 
         // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
         el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
+
+        // Review controls: Waiting requests, Super Admin only (the table only flags those rows).
+        setReviewUI(d.status === 'Waiting' && d.canReview === '1');
 
         // Decision context. The room arbitration log records the rule used for
         // automatic decisions; an override/manual value denotes an admin decision.
@@ -4126,10 +4150,99 @@ function psSelectFmt(btn) {
                 reasonRow.hidden = false;
                 reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
             }
+            // Waiting: nothing has been decided yet
+            if (d.status === 'Waiting') {
+                if (methodEl) methodEl.textContent = 'Awaiting Super Admin review';
+                if (ruleRow) ruleRow.hidden = true;
+                if (reasonRow) reasonRow.hidden = true;
+            }
             decSec.hidden = false;
         }
 
         if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
+    }
+
+    /* Reflect an approved/declined decision in the table row without a reload */
+    function applyDecision(row, decision, reason) {
+        var d = row.dataset;
+        d.status = decision;
+        d.reason = reason;
+        d.arbRule = 'override';
+        d.arbReason = reason;
+        d.canReview = '0';
+
+        var badge = row.querySelector('.ps-badge');
+        if (badge) {
+            badge.className = 'ps-badge ps-badge--dot ' + (decision === 'Approved' ? 'ps-badge--active' : 'ps-badge--overdue');
+            badge.textContent = decision;
+        }
+        var viewBtn = row.querySelector('[data-rr-detail]');
+        if (viewBtn) viewBtn.textContent = 'View';
+
+        // An approved reservation that has not ended yet can be cancelled, like any other
+        var endMs = Date.parse((d.isoDate || '') + 'T' + (d.endTime || '') + '+08:00'); // Asia/Manila
+        var cancellable = decision === 'Approved' && endMs > Date.now();
+        d.cancellable = cancellable ? '1' : '0';
+        if (cancellable && viewBtn && !row.querySelector('.btn-cancel-rr-admin')) {
+            var cb = document.createElement('button');
+            cb.type = 'button';
+            cb.className = 'pr-tbl-btn cancel-r btn-cancel-rr-admin';
+            cb.setAttribute('data-action', 'admin-cancel-reservation');
+            cb.setAttribute('data-rr-id', d.rrId);
+            cb.setAttribute('data-room-name', d.room || '');
+            cb.setAttribute('data-faculty-name', d.who || '');
+            cb.title = 'Cancel this reservation';
+            cb.textContent = 'Cancel';
+            viewBtn.parentNode.insertBefore(cb, viewBtn);
+        }
+        // Lets the table script re-sort, refresh the tab counts and re-apply the filter
+        document.dispatchEvent(new CustomEvent('rr:rows-changed'));
+    }
+
+    function submitDecision(decision, btn) {
+        if (!currentRow) return;
+        var row = currentRow;
+        var reason = reasonBox ? reasonBox.value.trim() : '';
+        if (reason.length < 5) {
+            showReviewError('Please enter a reason of at least 5 characters.');
+            if (reasonBox) reasonBox.focus();
+            return;
+        }
+        var tokenEl = document.querySelector('input[name="csrf_token"]');
+        var idleHtml = btn.innerHTML;
+        if (reviewErr) reviewErr.hidden = true;
+        decideBtns.forEach(function (b) { b.disabled = true; });
+        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
+
+        fetch('room-reservation/api/review-adviser-reservation.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                reservation_id: parseInt(row.dataset.rrId, 10),
+                decision: decision,
+                reason: reason,
+                csrf_token: tokenEl ? tokenEl.value : ''
+            })
+        })
+            .then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+            })
+            .then(function (res) {
+                if (!res.ok || res.j.status !== 'success') {
+                    var err = new Error(res.j.message || 'Could not save the decision.');
+                    err.fromServer = true;
+                    throw err;
+                }
+                applyDecision(row, decision, reason);
+                if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
+                if (typeof window.showToast === 'function') window.showToast(res.j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
+            })
+            .catch(function (err) {
+                showReviewError(err && err.fromServer ? err.message : 'Network error. Please try again.');
+                decideBtns.forEach(function (b) { b.disabled = false; });
+                btn.innerHTML = idleHtml;
+            });
     }
 
     document.addEventListener('click', function (e) {
@@ -4142,6 +4255,11 @@ function psSelectFmt(btn) {
     });
 
     drawer.addEventListener('click', function (e) {
+        var decideBtn = e.target.closest('[data-rr-decide]');
+        if (decideBtn) {
+            submitDecision(decideBtn.getAttribute('data-rr-decide'), decideBtn);
+            return;
+        }
         if (!e.target.closest('[data-rr-cancel]') || !currentRow) return;
         var btn = currentRow.querySelector('.btn-cancel-rr-admin');
         if (!btn) return;
