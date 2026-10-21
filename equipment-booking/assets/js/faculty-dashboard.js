@@ -540,12 +540,19 @@
 
     /* ── Borrow Form ───────────────────────────────────────────────────── */
     /* ================================================================
-       ROOM PICKER  (Borrow Request modal)
+       ROOM PICKER  (Borrow Request modal -> "Choose a room" modal)
        ----------------------------------------------------------------
-       Your reservations (suggested) · Outside · Building tabs > floors > rooms.
-       Rooms come from window.BOOKING_META.rooms (the same tables as Facilities).
-       Rooms that another faculty has reserved for the chosen time are greyed out
-       and cannot be picked (the server checks this again).
+       The Room field in the Borrow Request modal is a button. It opens a
+       separate modal (#roomPickModal) that lists ONLY rooms the admin left
+       Available (window.BOOKING_META.rooms is already filtered; Maintenance
+       and Not Bookable rooms never appear), grouped building > floor.
+
+       A room that another faculty has reserved for the chosen date and time
+       is still listed, but it is marked Reserved and cannot be picked: it is
+       focusable and hoverable (hover / focus shows when it is taken) but a
+       click does nothing. Reserved rooms are re-checked every time the modal
+       opens and every few seconds while it stays open. The server checks
+       again on submit.
     ================================================================ */
     const RoomPicker = (function () {
         const meta = () => window.BOOKING_META || {};
@@ -561,136 +568,83 @@
             const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 86400000);
             return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
-        let index = null;   // room_id -> { id, name, building, floor, status }
+        const whenLabel = (s, e) => { const a = parseTs(s), b = parseTs(e); return (a && b) ? dayLabel(a) + ' · ' + rangeLabel(a, b) : ''; };
+        const pageLoadedAt = Date.now();
+        /* "now" on the server's clock: the page's own date + minutes since midnight, kept ticking */
+        function nowDate() {
+            const t = parseTs((meta().today || '') + ' 00:00');
+            if (!t) return new Date();
+            return new Date(t.getTime() + ((meta().nowMin || 0) + (Date.now() - pageLoadedAt) / 60000) * 60000);
+        }
+        const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+        /* ---- room index (only rooms that can take equipment) -------- */
+        let index = null;   // room_id -> { id, name, building, floor }
         function buildIndex() {
             index = {};
-            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => { index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label, status: r.status }; })));
+            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => {
+                if (r.status && r.status !== 'Available') return;
+                index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label };
+            })));
         }
 
+        /* ---- shared modal --------------------------------------------- */
+        const M = {};          // element refs, filled by modalRefs()
+        let active = null;     // the picker (Room field) currently using the modal
+        let lastFocus = null, pollTimer = null, tab = 0;
+
+        function modalRefs() {
+            if (M.root) return M.root;
+            M.root = document.getElementById('roomPickModal'); if (!M.root) return null;
+            M.sub = document.getElementById('roomPickSub'); M.search = document.getElementById('roomPickSearch');
+            M.tabs = document.getElementById('roomPickTabs'); M.body = document.getElementById('roomPickBody');
+            M.count = document.getElementById('roomPickCount');
+            M.root.addEventListener('click', e => {
+                if (e.target === M.root || e.target.closest('[data-rp-close]')) { close(true); return; }
+                const t = e.target.closest('[data-rp-tab]'); if (t) { tab = +t.dataset.rpTab; filter(); return; }
+                if (e.target.closest('[data-rp-retry]')) { load(active, true); return; }
+                const r = e.target.closest('[data-room]'); if (!r || !active) return;
+                if (r.getAttribute('aria-disabled') === 'true') return;       // reserved: hoverable, never clickable
+                pick(active, r.dataset.room, false);
+            });
+            M.search.addEventListener('input', filter);
+            M.root.addEventListener('keydown', onKey);
+            return M.root;
+        }
+
+        function focusables() { return Array.from(M.root.querySelectorAll('button, input')).filter(x => !x.disabled && !x.closest('[hidden]') && x.offsetParent !== null); }
+        function onKey(e) {
+            if (e.key === 'Tab') {
+                const f = focusables(); if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                return;
+            }
+            const t = e.target.closest && e.target.closest('.rp-room, .rp-quick');
+            if (!t || ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) < 0) return;
+            const tiles = Array.from(M.body.querySelectorAll('.rp-room, .rp-quick')).filter(x => !x.closest('[hidden]') && x.offsetParent !== null);
+            const i = tiles.indexOf(t); if (i < 0) return;
+            const cols = Math.max(1, getComputedStyle(t.parentElement).gridTemplateColumns.split(' ').length);
+            const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'ArrowDown' ? i + cols : i - cols;
+            if (n >= 0 && n < tiles.length) { e.preventDefault(); tiles[n].focus(); }
+        }
+        // Escape closes only this modal, never the Borrow Request modal underneath
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape' || !M.root || M.root.style.display !== 'flex') return;
+            e.stopImmediatePropagation(); e.preventDefault(); close(true);
+        }, true);
+
+        /* ---- per-field state ------------------------------------------ */
         function setup(root) {
             const st = {
                 root: root, form: root.closest('form'), input: root.querySelector('[data-bm-room-input]'),
                 trigger: root.querySelector('[data-bm-room-trigger]'), valueEl: root.querySelector('[data-bm-room-value]'),
-                hint: root.querySelector('[data-bm-room-hint]'), panel: root.querySelector('[data-bm-room-panel]'),
-                search: root.querySelector('[data-bm-room-search]'), list: root.querySelector('[data-bm-room-list]'),
-                reserved: new Set(), suggested: new Set(), tab: 0, tok: 0, open: false
+                hint: root.querySelector('[data-bm-room-hint]'),
+                query: null, label: '', reserved: new Set(), suggested: new Set(), info: {}, tok: 0, loaded: false
             };
             root._rp = st;
-            build(st);
-            st.trigger.addEventListener('click', () => toggle(st, !st.open));
-            st.search.addEventListener('input', () => filter(st));
-            st.list.addEventListener('click', e => {
-                const tab = e.target.closest('[data-tab]'); if (tab) { st.tab = +tab.dataset.tab; filter(st); return; }
-                const b = e.target.closest('[data-room]'); if (!b || b.disabled) return;
-                pick(st, b.dataset.room, false);
-            });
-            root.addEventListener('keydown', e => {
-                if (e.key === 'Escape' && st.open) { e.stopPropagation(); toggle(st, false); st.trigger.focus(); return; }
-                if (!st.open || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End')) return;
-                const items = focusables(st); if (!items.length) return;
-                const cur = items.indexOf(document.activeElement); let n;
-                if (e.key === 'Home') n = 0; else if (e.key === 'End') n = items.length - 1;
-                else if (e.key === 'ArrowDown') n = cur < 0 ? 0 : Math.min(items.length - 1, cur + 1);
-                else n = cur <= 0 ? -1 : cur - 1;
-                e.preventDefault(); if (n < 0) st.search.focus(); else items[n].focus();
-            });
-            document.addEventListener('click', e => { if (st.open && !root.contains(e.target)) toggle(st, false); });
-        }
-        function focusables(st) { return Array.from(st.list.querySelectorAll('button')).filter(b => !b.disabled && !b.closest('[hidden]')); }
-
-        function build(st) {
-            const m = meta(), list = st.list; list.innerHTML = '';
-            const top = el('div', 'bm-rp-top'); list.appendChild(top);
-            (m.mine || []).forEach(r => {
-                const a = parseTs(r.start), b = parseTs(r.end); if (!a || !b) return;
-                const btn = el('button', 'bm-rp-res'); btn.type = 'button'; btn.dataset.room = r.room_id; btn.dataset.mine = '1';
-                btn.setAttribute('role', 'option');
-                btn.appendChild(icon('event_available'));
-                const t = el('span', 'bm-rp-txt'); t.appendChild(el('strong', '', r.name)); t.appendChild(el('small', '', dayLabel(a) + ' · ' + rangeLabel(a, b) + ' · ' + r.building)); btn.appendChild(t);
-                const star = el('span', 'bm-rp-sug', 'Suggested'); star.hidden = true; btn.appendChild(star);
-                top.appendChild(btn);
-            });
-            if (top.children.length) { const h = el('div', 'bm-rp-head', 'Your reservations'); top.insertBefore(h, top.firstChild); }
-            const out = el('button', 'bm-rp-res bm-rp-outside'); out.type = 'button'; out.dataset.room = 'outside'; out.setAttribute('role', 'option');
-            out.appendChild(icon('park')); const ot = el('span', 'bm-rp-txt'); ot.appendChild(el('strong', '', 'Outside')); ot.appendChild(el('small', '', 'Off-campus / outdoors')); out.appendChild(ot);
-            top.appendChild(out);
-
-            const rooms = m.rooms || [];
-            if (rooms.length > 1) {
-                const tabs = el('div', 'bm-rp-tabs'); tabs.setAttribute('role', 'tablist');
-                rooms.forEach((b, i) => { const t = el('button', 'bm-rp-tab', b.name); t.type = 'button'; t.dataset.tab = i; t.setAttribute('role', 'tab'); tabs.appendChild(t); });
-                list.appendChild(tabs);
-            }
-            rooms.forEach((b, i) => {
-                const wrap = el('div', 'bm-rp-bldg'); wrap.dataset.b = i;
-                wrap.appendChild(el('div', 'bm-rp-bhead', b.name));
-                (b.floors || []).forEach(f => {
-                    const fl = el('div', 'bm-rp-floor'); fl.appendChild(el('div', 'bm-rp-fhead', f.label));
-                    const grid = el('div', 'bm-rp-grid');
-                    (f.rooms || []).forEach(r => {
-                        const o = el('button', 'bm-rp-opt'); o.type = 'button'; o.dataset.room = r.room_id; o.setAttribute('role', 'option');
-                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
-                        o.appendChild(el('span', 'bm-rp-dot')); o.appendChild(el('span', 'bm-rp-name', r.name)); o.appendChild(el('span', 'bm-rp-tag'));
-                        o.title = r.name; grid.appendChild(o);
-                    });
-                    fl.appendChild(grid); wrap.appendChild(fl);
-                });
-                list.appendChild(wrap);
-            });
-            list.appendChild(Object.assign(el('div', 'bm-rp-empty', 'No rooms match'), { hidden: true }));
-            applyStates(st); filter(st);
-        }
-
-        function stateOf(st, id) {
-            const r = index[id]; if (!r) return 'ok';
-            if (r.status === 'Maintenance') return 'maint';
-            if (st.reserved.has(+id)) return 'reserved';
-            return r.status === 'Not Bookable' ? 'office' : 'ok';
-        }
-        function applyStates(st) {
-            st.list.querySelectorAll('.bm-rp-opt').forEach(o => {
-                const s = stateOf(st, o.dataset.room); o.dataset.state = s; o.disabled = (s === 'maint' || s === 'reserved');
-                o.querySelector('.bm-rp-tag').textContent = s === 'maint' ? 'Maintenance' : s === 'reserved' ? 'Reserved' : '';
-                o.setAttribute('aria-selected', st.input.value === o.dataset.room ? 'true' : 'false');
-                o.classList.toggle('is-selected', st.input.value === o.dataset.room);
-            });
-            st.list.querySelectorAll('.bm-rp-res').forEach(b => {
-                const id = b.dataset.room, blocked = id !== 'outside' && stateOf(st, id) !== 'ok' && stateOf(st, id) !== 'office';
-                b.disabled = blocked;
-                const star = b.querySelector('.bm-rp-sug'); if (star) star.hidden = !(st.suggested.has(+id) && !blocked);
-                b.setAttribute('aria-selected', st.input.value === id ? 'true' : 'false'); b.classList.toggle('is-selected', st.input.value === id);
-            });
-        }
-
-        function filter(st) {
-            const term = st.search.value.trim().toLowerCase(), list = st.list;
-            const tabs = list.querySelector('.bm-rp-tabs'), top = list.querySelector('.bm-rp-top');
-            if (tabs) { tabs.hidden = !!term; tabs.querySelectorAll('.bm-rp-tab').forEach(t => { const on = +t.dataset.tab === st.tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); }); }
-            let any = false;
-            top.querySelectorAll('.bm-rp-res').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) any = true; });
-            const head = top.querySelector('.bm-rp-head'); if (head) head.hidden = !!term;
-            list.querySelectorAll('.bm-rp-bldg').forEach(w => {
-                let wAny = false;
-                w.querySelectorAll('.bm-rp-floor').forEach(fl => {
-                    let fAny = false;
-                    fl.querySelectorAll('.bm-rp-opt').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) { fAny = true; } });
-                    fl.hidden = !fAny; if (fAny) wAny = true;
-                });
-                const show = term ? wAny : (+w.dataset.b === st.tab);
-                w.hidden = !show; w.classList.toggle('is-searching', !!term); if (term && wAny) any = true;
-            });
-            if (!term) any = true;
-            list.querySelector('.bm-rp-empty').hidden = any;
-        }
-
-        function toggle(st, open) {
-            st.open = open; st.panel.hidden = !open; st.trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); st.root.classList.toggle('is-open', open);
-            if (open) {
-                const cur = index[st.input.value]; if (cur) { const bi = (meta().rooms || []).findIndex(b => b.name === cur.building); if (bi > -1) st.tab = bi; }
-                st.search.value = ''; filter(st);
-                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) st.search.focus({ preventScroll: true });
-                const sel = st.list.querySelector('.is-selected'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
-            }
+            st.trigger.addEventListener('click', () => open(st));
         }
 
         function show(st, value) {
@@ -701,40 +655,243 @@
             st.valueEl.appendChild(el('strong', '', r.name)); st.valueEl.appendChild(el('span', '', r.building + ' · ' + r.floor));
         }
         function setHint(st, msg, cls) { st.hint.hidden = !msg; st.hint.textContent = msg || ''; st.hint.className = 'bm-hint' + (cls ? ' ' + cls : ''); }
-
         function pick(st, value, auto) {
-            st.input.value = value; show(st, value); applyStates(st); toggle(st, false);
+            st.input.value = value; show(st, value);
             setHint(st, auto ? 'Suggested from your reservation.' : '', auto ? 'ok' : '');
             st.input.dispatchEvent(new Event('change', { bubbles: true }));
-            if (!auto) st.trigger.focus({ preventScroll: true });
+            if (!auto) close(true);
         }
-        function clear(st) { st.input.value = ''; show(st, ''); applyStates(st); }
+        function clear(st) { st.input.value = ''; show(st, ''); }
 
-        function setWindow(form, query) {
-            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+        /* ---- availability for the chosen window ----------------------- */
+        function fetchRooms(st) {
+            return fetch('equipment-booking/api/check-booking-availability.php?' + st.query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
+                .then(r => r.json()).then(j => (j && j.ok === true && j.rooms) ? j.rooms : null);
+        }
+        function apply(st, rooms) {
+            st.reserved = new Set((rooms.reserved || []).map(Number));
+            st.suggested = new Set((rooms.mine || []).map(Number));
+            st.info = rooms.info || {};
+            st.loaded = true;
+        }
+        function load(st, showSpinner) {
+            if (!st || !st.query) return;
             const token = ++st.tok;
-            if (!query) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
-            fetch('equipment-booking/api/check-booking-availability.php?' + query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
-                .then(r => r.json()).then(j => {
-                    if (token !== st.tok) return;
-                    if (!j || j.ok !== true || !j.rooms) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
-                    st.reserved = new Set((j.rooms.reserved || []).map(Number)); st.suggested = new Set((j.rooms.mine || []).map(Number));
-                    applyStates(st);
-                    const cur = st.input.value;
-                    if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'Reserved for that time. Pick another room.', 'bad'); }
-                    else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
-                    else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
-                }).catch(() => { });
+            if (showSpinner && active === st) paintMessage('Checking which rooms are free…', 'progress_activity', true);
+            fetchRooms(st).then(rooms => {
+                if (token !== st.tok) return;
+                if (!rooms) throw new Error('bad');
+                apply(st, rooms);
+                if (active === st) { if (M.body.querySelector('[data-rp-msg]')) build(); applyStates(); }
+            }).catch(() => {
+                if (token !== st.tok || active !== st) return;
+                if (!st.loaded) paintMessage('Could not check room availability.', 'wifi_off', false, true);
+            });
+        }
+
+        /* Called by BorrowSchedule whenever date / time / length change. */
+        function setWindow(form, query, label) {
+            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+            st.label = label || '';
+            if (!query) { st.query = null; st.tok++; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {}; if (active === st) close(false); return; }
+            if (query === st.query && st.loaded) return;
+            st.query = query; st.loaded = false;
+            const token = ++st.tok;
+            fetchRooms(st).then(rooms => {
+                if (token !== st.tok || !rooms) return;
+                apply(st, rooms);
+                const cur = st.input.value;
+                if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'That room is reserved for the new time. Pick another room.', 'bad'); }
+                else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
+                else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
+                if (active === st) applyStates();
+            }).catch(() => { });
         }
         function reset(form) {
             const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
-            st.tok++; st.reserved = new Set(); st.suggested = new Set(); st.tab = 0;
-            st.search.value = ''; clear(st); setHint(st, ''); toggle(st, false); filter(st);
+            st.tok++; st.query = null; st.label = ''; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {};
+            clear(st); setHint(st, ''); if (active === st) close(false);
+        }
+
+        /* ---- open / close --------------------------------------------- */
+        function open(st) {
+            if (!modalRefs()) return;
+            if (!st.query) { setHint(st, 'Choose your date, start time and how long you need it first, so we can show which rooms are free.', 'bad'); return; }
+            setHint(st, st.hint.className.indexOf('ok') > -1 ? st.hint.textContent : '');
+            active = st; lastFocus = document.activeElement; tab = 0;
+            M.sub.textContent = st.label ? st.label : 'Where will the equipment be used?';
+            M.search.value = '';
+            M.root.style.display = 'flex';
+            M.body.scrollTop = 0;
+            if (st.loaded) { build(); applyStates(); } else { paintMessage('Checking which rooms are free…', 'progress_activity', true); }
+            load(st, false);
+            clearInterval(pollTimer); pollTimer = setInterval(() => { if (active) load(active, false); }, 10000);
+            if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) M.search.focus({ preventScroll: true });
+            else { const f = focusables(); if (f.length) f[0].focus({ preventScroll: true }); }
+        }
+        function close(restoreFocus) {
+            if (!M.root || M.root.style.display !== 'flex') { active = null; return; }
+            M.root.style.display = 'none'; clearInterval(pollTimer); pollTimer = null;
+            const st = active; active = null;
+            if (restoreFocus && st && st.trigger && st.trigger.offsetParent !== null) st.trigger.focus({ preventScroll: true });
+            else if (restoreFocus && lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+        }
+
+        /* ---- rendering -------------------------------------------------- */
+        function paintMessage(text, ic, spin, retry) {
+            M.tabs.hidden = true; M.tabs.innerHTML = ''; M.count.textContent = '';
+            M.body.innerHTML = '';
+            const box = el('div', 'rp-empty'); box.setAttribute('data-rp-msg', '1');
+            const i = icon(ic); if (spin) i.classList.add('rp-spin'); box.appendChild(i);
+            box.appendChild(el('p', '', text));
+            if (retry) { const b = el('button', 'btn-cancel-acc', 'Try again'); b.type = 'button'; b.setAttribute('data-rp-retry', '1'); box.appendChild(b); }
+            M.body.appendChild(box);
+        }
+
+        function quick(roomId, iconName, title, sub, grp) {
+            const b = el('button', 'rp-quick'); b.type = 'button'; b.dataset.room = roomId; if (grp) b.dataset.grp = grp;
+            b.appendChild(icon(iconName));
+            const t = el('span', 'rp-quick-txt'); t.appendChild(el('strong', '', title)); t.appendChild(el('small', '', sub)); b.appendChild(t);
+            b.appendChild(el('span', 'rp-quick-tag'));
+            return b;
+        }
+
+        function build() {
+            const m = meta(); M.body.innerHTML = '';
+            const buildings = (m.rooms || []).map(b => ({
+                name: b.name,
+                floors: (b.floors || []).map(f => ({ label: f.label, rooms: (f.rooms || []).filter(r => !r.status || r.status === 'Available') })).filter(f => f.rooms.length)
+            })).filter(b => b.floors.length);
+
+            // Outside + the faculty's own reservations
+            const top = el('section', 'rp-sec rp-top'); top.dataset.rpTop = '1';
+            // Recommended first: rooms you are using right now, rooms you will use later today,
+            // then rooms you reserved for another day (each group in time order).
+            const nowD = nowDate();
+            const mine = (m.mine || []).filter(r => index[r.room_id] && parseTs(r.start) && parseTs(r.end))
+                .map(r => { const a = parseTs(r.start), z = parseTs(r.end); return { r: r, a: a, z: z, grp: (a <= nowD && nowD < z) ? 'now' : (sameDay(a, nowD) ? 'today' : 'later') }; })
+                .sort((x, y) => x.a - y.a);
+            const groups = [
+                { key: 'now', label: 'Using now', icon: 'door_open', sub: x => 'Until ' + hm(x.z) + ' ' + meridiem(x.z) },
+                { key: 'today', label: 'Later today', icon: 'event_available', sub: x => rangeLabel(x.a, x.z) },
+                { key: 'later', label: 'Reserved for another day', icon: 'calendar_month', sub: x => dayLabel(x.a) + ' · ' + rangeLabel(x.a, x.z) }
+            ];
+            if (mine.length) {
+                top.appendChild(el('h4', 'rp-sec-title', 'Recommended for you'));
+                groups.forEach(g => {
+                    const list = mine.filter(x => x.grp === g.key); if (!list.length) return;
+                    top.appendChild(el('div', 'rp-grp-label', g.label));
+                    const grid = el('div', 'rp-quick-grid');
+                    list.forEach(x => grid.appendChild(quick(x.r.room_id, g.icon, x.r.name, g.sub(x) + ' · ' + x.r.building, g.key)));
+                    top.appendChild(grid);
+                });
+            }
+            const og = el('div', 'rp-quick-grid rp-quick-grid--one');
+            og.appendChild(quick('outside', 'park', 'Outside', 'Off-campus / outdoors'));
+            top.appendChild(og);
+            M.body.appendChild(top);
+
+            if (!buildings.length) {
+                const none = el('div', 'rp-empty rp-empty--inline'); none.appendChild(icon('meeting_room'));
+                none.appendChild(el('p', '', 'No rooms are open for equipment right now. You can still choose Outside.'));
+                M.body.appendChild(none);
+            }
+
+            if (tab >= buildings.length) tab = 0;
+            M.tabs.innerHTML = '';
+            buildings.forEach((b, i) => {
+                const t = el('button', 'rp-tab'); t.type = 'button'; t.dataset.rpTab = i; t.setAttribute('role', 'tab');
+                t.appendChild(el('span', 'rp-tab-name', b.name)); t.appendChild(el('span', 'rp-tab-n'));
+                M.tabs.appendChild(t);
+            });
+            M.tabs.hidden = buildings.length < 2;
+
+            buildings.forEach((b, i) => {
+                const wrap = el('section', 'rp-sec rp-bldg'); wrap.dataset.b = i;
+                wrap.appendChild(el('h4', 'rp-bhead', b.name));
+                b.floors.forEach(f => {
+                    const fl = el('div', 'rp-floor'); fl.appendChild(el('h5', 'rp-fhead', f.label));
+                    const grid = el('div', 'rp-grid');
+                    f.rooms.forEach(r => {
+                        const o = el('button', 'rp-room'); o.type = 'button'; o.dataset.room = r.room_id; o.dataset.b = i;
+                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
+                        const head = el('span', 'rp-room-top'); head.appendChild(el('span', 'rp-room-name', r.name)); head.appendChild(icon('check_circle')); o.appendChild(head);
+                        const sub = el('span', 'rp-room-meta'); sub.appendChild(el('span', 'rp-room-status')); sub.appendChild(el('span', 'rp-room-when')); o.appendChild(sub);
+                        grid.appendChild(o);
+                    });
+                    fl.appendChild(grid); wrap.appendChild(fl);
+                });
+                M.body.appendChild(wrap);
+            });
+            M.body.appendChild(Object.assign(el('div', 'rp-empty rp-empty--search', 'No rooms match your search.'), { hidden: true }));
+            applyStates(); filter();
+        }
+
+        function whenTaken(st, id) {
+            const list = (st.info && st.info[id]) || [];
+            return list.slice(0, 2).map(x => whenLabel(x.start, x.end)).filter(Boolean).join(', ') + (list.length > 2 ? ' +' + (list.length - 2) : '');
+        }
+
+        /* free / reserved / selected state of every tile (cheap; runs on each refresh) */
+        function applyStates() {
+            const st = active; if (!st || !M.body) return;
+            let free = 0, taken = 0;
+            M.body.querySelectorAll('.rp-room').forEach(o => {
+                const id = +o.dataset.room, isTaken = st.reserved.has(id), isMine = st.suggested.has(id), sel = st.input.value === o.dataset.room;
+                const name = o.querySelector('.rp-room-name').textContent, when = isTaken ? whenTaken(st, id) : '';
+                o.classList.toggle('is-taken', isTaken); o.classList.toggle('is-mine', isMine && !isTaken); o.classList.toggle('is-selected', sel && !isTaken);
+                if (isTaken) { o.setAttribute('aria-disabled', 'true'); taken++; } else { o.removeAttribute('aria-disabled'); free++; }
+                o.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
+                o.querySelector('.rp-room-status').textContent = isTaken ? 'Reserved' : (isMine ? 'Your reservation' : 'Free');
+                o.querySelector('.rp-room-when').textContent = when;
+                if (when) o.setAttribute('data-when', '1'); else o.removeAttribute('data-when');
+                o.querySelector('.material-symbols-outlined').textContent = isTaken ? 'lock' : 'check_circle';
+                o.setAttribute('aria-label', isTaken ? name + ', already reserved' + (when ? ' ' + when : '') + ', not available' : name + ', ' + (isMine ? 'your reservation, ' : '') + 'free');
+            });
+            M.body.querySelectorAll('.rp-quick').forEach(b => {
+                const id = b.dataset.room, isOut = id === 'outside', isTaken = !isOut && st.reserved.has(+id), isMine = !isOut && st.suggested.has(+id), sel = st.input.value === id;
+                b.classList.toggle('is-taken', isTaken); b.classList.toggle('is-selected', sel && !isTaken);
+                if (isTaken) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+                b.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
+                const tag = b.querySelector('.rp-quick-tag'); tag.textContent = isTaken ? 'Reserved' : (isMine ? 'Fits your time' : (b.dataset.grp === 'now' ? 'In use now' : ''));
+                tag.classList.toggle('is-taken', isTaken);
+            });
+            M.tabs.querySelectorAll('.rp-tab').forEach(t => {
+                const n = M.body.querySelectorAll('.rp-room[data-b="' + t.dataset.rpTab + '"]:not(.is-taken)').length;
+                t.querySelector('.rp-tab-n').textContent = n;
+            });
+            M.count.textContent = free + ' free' + (taken ? ' · ' + taken + ' reserved' : '');
+        }
+
+        function filter() {
+            if (!M.body || !M.body.querySelector('.rp-bldg, .rp-top')) return;
+            const term = M.search.value.trim().toLowerCase();
+            M.tabs.querySelectorAll('.rp-tab').forEach(t => { const on = +t.dataset.rpTab === tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+            const multi = !M.tabs.hidden;
+            M.tabs.classList.toggle('is-off', !!term);
+            const top = M.body.querySelector('.rp-top'); let any = false;
+            if (top) {
+                let topAny = false;
+                top.querySelectorAll('.rp-quick').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) topAny = true; });
+                top.querySelectorAll('.rp-sec-title, .rp-grp-label').forEach(h => { h.hidden = !!term; });
+                top.hidden = !topAny; if (topAny) any = true;
+            }
+            M.body.querySelectorAll('.rp-bldg').forEach(w => {
+                let wAny = false;
+                w.querySelectorAll('.rp-floor').forEach(fl => {
+                    let fAny = false;
+                    fl.querySelectorAll('.rp-room').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) fAny = true; });
+                    fl.hidden = !fAny; if (fAny) wAny = true;
+                });
+                const showIt = term ? wAny : (!multi || +w.dataset.b === tab);
+                w.hidden = !showIt; w.classList.toggle('is-searching', !!term || !multi); if (term && wAny) any = true; if (!term && showIt) any = true;
+            });
+            const empty = M.body.querySelector('.rp-empty--search'); if (empty) empty.hidden = any;
         }
 
         return {
-            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); },
-            setWindow: setWindow, reset: reset,
+            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); modalRefs(); },
+            setWindow: setWindow, reset: reset, close: function () { close(false); },
             value: function (form) { const i = form && form.querySelector('[data-bm-room-input]'); return i ? i.value : ''; }
         };
     })();
@@ -955,7 +1112,8 @@
             const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
             st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin)) + '</strong></span>';
             st.els.summary.classList.add('has');
-            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st)); check(st, w); }, 350);
+            const winText = (st.mode === 'today' ? 'Today' : fmtDay(w.start)) + ' · ' + fmtClock(w.startMin) + ' → ' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin));
+            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st), winText); check(st, w); }, 350);
         }
         /* window as query-string, shared by the availability and room checks */
         function windowQuery(st) {
@@ -1058,6 +1216,7 @@
     function closeBorrowModal() {
         const modal = document.getElementById('borrowModal');
         if (modal) modal.style.display = 'none';
+        if (window.RoomPicker) window.RoomPicker.close();
     }
 
     /* Borrow modal: show the chosen file's name inside the styled drop area */
@@ -2564,6 +2723,11 @@
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
+                case 'equip-search-clear': {
+                    var eqIn = document.getElementById('equipmentSearch');
+                    if (eqIn) { eqIn.value = ''; eqIn.dispatchEvent(new Event('input', { bubbles: true })); eqIn.focus(); }
+                    break;
+                }
                 case 'close-borrow-modal':
                     closeBorrowModal();
                     break;
@@ -2900,6 +3064,10 @@
     const eqSearch = document.getElementById('equipmentSearch');
     const eqCat = document.getElementById('categoryFilter');
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
+    if (eqSearch) eqSearch.addEventListener('input', function () {
+        const clr = document.getElementById('equipmentSearchClear');
+        if (clr) clr.hidden = !eqSearch.value;
+    });
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
     /* ── Global dashboard search ─────────────────────────────────────── */
@@ -3860,7 +4028,8 @@
                             const canBookAhead = qty <= 0 && (isNaN(total) ? false : total > 0);
                             btn.disabled = qty <= 0 && !canBookAhead;
                             btn.classList.toggle('btn-borrow-ahead', canBookAhead);
-                            btn.textContent = qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable');
+                            btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">' + (qty > 0 ? 'add_shopping_cart' : (canBookAhead ? 'event' : 'block')) + '</span>' +
+                                '<span class="btn-borrow-label">' + (qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable')) + '</span>';
                         }
                     });
                 })

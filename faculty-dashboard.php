@@ -599,7 +599,7 @@ if ($is_dual_mode) {
 }
 
 // ── Borrow Request modal data ─────────────────────────────────────────────
-$bk_rooms  = BookingSchedule::roomsTree($conn);
+$bk_rooms  = BookingSchedule::roomsTree($conn, true);   // Available rooms only (no Maintenance / Not Bookable)
 $bk_totals = BookingSchedule::totalStockMap($conn);
 $bk_items  = [];
 $bk_res    = $conn->query("SELECT item_name, quantity FROM tbl_inventory WHERE is_archived = 0");
@@ -1985,7 +1985,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .featured-label .material-symbols-outlined {
             font-size: 18px;
-            color: #f59e0b;
+            color: var(--accent-gold-deep);
             font-variation-settings: 'FILL' 1;
         }
 
@@ -2001,8 +2001,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             grid-column: span 2;
             background: #ffffff;
             border: 1px solid #f0e0e0;
-            border-left: 4px solid #570000;
             border-radius: 14px;
+            position: relative;
             display: flex;
             flex-direction: row;
             overflow: hidden;
@@ -2096,6 +2096,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             background: #ffffff;
             border: 1px solid #f0e0e0;
             border-radius: 14px;
+            position: relative;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -2199,45 +2200,52 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             box-shadow: 0 4px 24px rgba(87, 0, 0, .05) !important;
         }
 
-        /* Filter bar */
+        /* Filter bar: search + category, one height, one radius, same focus ring as the modal fields */
         #panel-lending .catalog-filters {
             display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: 12px;
+            margin-bottom: 22px;
             flex-wrap: wrap;
         }
 
         #panel-lending .catalog-search-wrap {
             flex: 1;
-            min-width: 200px;
+            min-width: 220px;
+            min-height: 46px;
             display: flex;
             align-items: center;
             gap: 10px;
-            background: #f9fafb !important;
-            border: 1.5px solid #e5e7eb !important;
-            border-radius: 10px !important;
-            padding: 10px 16px !important;
+            background: var(--color-surface-lowest) !important;
+            border: 1.5px solid var(--color-outline-variant) !important;
+            border-radius: 12px !important;
+            padding: 0 8px 0 16px !important;
             transition: border-color .18s, box-shadow .18s;
         }
 
+        #panel-lending .catalog-search-wrap:hover {
+            border-color: var(--color-outline) !important;
+        }
+
         #panel-lending .catalog-search-wrap:focus-within {
-            border-color: #570000 !important;
-            box-shadow: 0 0 0 3px rgba(87, 0, 0, .08) !important;
-            background: #fff !important;
+            border-color: var(--color-primary-container) !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-container) 16%, transparent) !important;
         }
 
         #panel-lending .catalog-search-wrap .material-symbols-outlined {
-            font-size: 18px;
+            font-size: 20px;
             color: var(--color-secondary);
             flex-shrink: 0;
         }
 
         #panel-lending .catalog-search-wrap input {
+            flex: 1;
+            min-width: 0;
+            align-self: stretch;
             border: none;
             background: transparent;
             outline: none;
             font-family: var(--font-sans);
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             color: var(--color-on-surface);
             width: 100%;
         }
@@ -2246,24 +2254,66 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: var(--color-secondary);
         }
 
+        #panel-lending .catalog-search-clear {
+            flex-shrink: 0;
+            display: inline-grid;
+            place-items: center;
+            width: 30px;
+            height: 30px;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: var(--color-secondary);
+            cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+
+        #panel-lending .catalog-search-clear[hidden] {
+            display: none;
+        }
+
+        #panel-lending .catalog-search-clear .material-symbols-outlined {
+            font-size: 18px;
+        }
+
+        #panel-lending .catalog-search-clear:hover {
+            background: var(--color-surface-container);
+            color: var(--color-on-surface);
+        }
+
+        #panel-lending .catalog-search-clear:focus-visible {
+            outline: 2px solid var(--accent-gold-deep);
+            outline-offset: 1px;
+        }
+
         #panel-lending .catalog-filter-select {
-            padding: 10px 14px !important;
-            border: 1.5px solid #e5e7eb !important;
-            border-radius: 10px !important;
-            background: #f9fafb !important;
-            color: var(--color-on-surface-variant) !important;
+            min-height: 46px;
+            min-width: 190px;
+            padding: 0 40px 0 16px !important;
+            border: 1.5px solid var(--color-outline-variant) !important;
+            border-radius: 12px !important;
+            background-color: var(--color-surface-lowest) !important;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23777' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            appearance: none;
+            -webkit-appearance: none;
+            color: var(--color-on-surface) !important;
             font-family: var(--font-sans);
-            font-size: 0.875rem !important;
+            font-size: 0.9rem !important;
             font-weight: 500;
             outline: none;
             cursor: pointer;
-            min-width: 175px;
-            transition: border-color .18s;
+            transition: border-color .18s, box-shadow .18s;
+        }
+
+        #panel-lending .catalog-filter-select:hover {
+            border-color: var(--color-outline) !important;
         }
 
         #panel-lending .catalog-filter-select:focus {
-            border-color: #570000 !important;
-            box-shadow: 0 0 0 3px rgba(87, 0, 0, .08) !important;
+            border-color: var(--color-primary-container) !important;
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-container) 16%, transparent) !important;
         }
 
         /* ── Equipment grid ───────────────────────────────────────── */
@@ -2288,8 +2338,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-lending .eq-item-card::after,
-        #panel-lending .item-node::after {
-            /* hover accent: same curved gold band as the cards */
+        #panel-lending .item-node::after,
+        #panel-lending .feat-hero::after,
+        #panel-lending .feat-secondary::after {
+            /* accent: the same curved gold band as every other card and table, always shown */
             content: '';
             position: absolute;
             top: 0;
@@ -2308,8 +2360,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             -webkit-mask-composite: xor;
             mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
             mask-composite: exclude;
-            opacity: 0;
-            transition: opacity .25s;
             pointer-events: none;
             z-index: 2;
         }
@@ -2317,13 +2367,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .eq-item-card:hover,
         #panel-lending .item-node:hover {
             transform: translateY(-4px) !important;
-            border-color: rgba(87, 0, 0, .22) !important;
+            border-color: rgba(184, 145, 58, .55) !important;
             box-shadow: 0 12px 28px -5px rgba(87, 0, 0, .13), 0 4px 10px -4px rgba(87, 0, 0, .07) !important;
-        }
-
-        #panel-lending .eq-item-card:hover::after,
-        #panel-lending .item-node:hover::after {
-            opacity: 1;
         }
 
         /* Image zone */
@@ -2449,22 +2494,32 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: #dc2626 !important;
         }
 
-        /* Borrow button */
+        /* Borrow button: icon + label, one height with the featured button, gold keyboard focus */
         #panel-lending .btn-borrow {
             width: 100% !important;
-            padding: 10px !important;
+            min-height: 42px;
+            padding: 0 14px !important;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
             background: #570000 !important;
             color: #fff !important;
-            border: none !important;
-            border-radius: 9px !important;
+            border: 1.5px solid #570000 !important;
+            border-radius: 10px !important;
             cursor: pointer;
             font-weight: 600 !important;
-            font-size: 0.855rem !important;
+            font-size: 0.86rem !important;
             font-family: var(--font-sans);
             margin-top: auto;
             box-shadow: 0 2px 8px rgba(87, 0, 0, .22) !important;
             transition: background .2s, transform .2s, box-shadow .2s !important;
             letter-spacing: 0.01em;
+        }
+
+        #panel-lending .btn-borrow .material-symbols-outlined {
+            font-size: 18px;
+            line-height: 1;
         }
 
         #panel-lending .btn-borrow:hover:not(:disabled) {
@@ -2473,19 +2528,30 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             box-shadow: 0 6px 16px rgba(87, 0, 0, .32) !important;
         }
 
+        #panel-lending .btn-borrow:active:not(:disabled) {
+            transform: translateY(0) !important;
+            box-shadow: 0 1px 4px rgba(87, 0, 0, .25) !important;
+        }
+
+        #panel-lending .btn-borrow:focus-visible,
+        #panel-lending .btn-borrow-primary:focus-visible {
+            outline: 2px solid var(--accent-gold-deep);
+            outline-offset: 2px;
+        }
+
         #panel-lending .btn-borrow:disabled,
         #panel-lending .btn-borrow[disabled] {
-            background: #f3f4f6 !important;
+            background: var(--color-surface-container) !important;
             color: var(--color-secondary) !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
-            border: 1px solid #e5e7eb !important;
+            border: 1.5px solid var(--color-outline-variant) !important;
         }
 
         #panel-lending .btn-borrow-blocked {
             background: transparent !important;
             color: var(--color-secondary) !important;
-            border: 1px solid #e5e7eb !important;
+            border: 1.5px solid var(--color-outline-variant) !important;
             cursor: not-allowed !important;
             box-shadow: none !important;
         }
@@ -2521,12 +2587,14 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         #panel-lending .btn-borrow-primary {
             display: inline-flex;
             align-items: center;
-            gap: 7px;
-            padding: 10px 22px;
+            gap: 8px;
+            min-height: 44px;
+            padding: 0 22px;
+            justify-content: center;
             background: #570000;
             color: #fff;
             border: none;
-            border-radius: 9px;
+            border-radius: 10px;
             font-size: 0.875rem;
             font-weight: 600;
             font-family: var(--font-sans);
@@ -2542,14 +2610,14 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
         }
 
         #panel-lending .btn-borrow-primary:disabled {
-            background: #f3f4f6;
+            background: var(--color-surface-container);
             color: var(--color-secondary);
             box-shadow: none;
             cursor: not-allowed;
         }
 
         #panel-lending .btn-borrow-primary .material-symbols-outlined {
-            font-size: 16px;
+            font-size: 18px;
         }
 
         /* Empty state */
@@ -2602,7 +2670,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         [data-theme="dark"] #panel-lending .catalog-search-wrap,
         [data-theme="dark"] #panel-lending .catalog-filter-select {
-            background: var(--color-surface-container) !important;
+            background-color: var(--color-surface-container) !important;
             border-color: var(--color-outline-variant) !important;
             color: var(--color-on-surface) !important;
         }
@@ -3344,12 +3412,14 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                             </div>
                                             <div style="margin-top:auto;">
                                                 <?php if ($has_overdue_block): ?>
-                                                    <button class="btn-borrow-primary" style="width:100%;" disabled>Overdue Block</button>
+                                                    <button class="btn-borrow-primary" style="width:100%;" disabled>
+                                                        <span class="material-symbols-outlined" aria-hidden="true">block</span> Overdue Block
+                                                    </button>
                                                 <?php else: ?>
                                                     <button class="btn-borrow-primary" style="width:100%;justify-content:center;"
                                                         data-action="open-borrow-form"
                                                         data-item="<?php echo htmlspecialchars($featured_sec['item_name'], ENT_QUOTES); ?>">
-                                                        Borrow
+                                                        <span class="material-symbols-outlined" aria-hidden="true">add_shopping_cart</span> Borrow
                                                     </button>
                                                 <?php endif; ?>
                                             </div>
@@ -3371,9 +3441,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <div class="catalog-filters">
                             <div class="catalog-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name…">
+                                <input type="text" id="equipmentSearch" placeholder="Search by equipment name…" autocomplete="off" aria-label="Search equipment by name">
+                                <button type="button" class="catalog-search-clear" id="equipmentSearchClear" data-action="equip-search-clear" aria-label="Clear search" hidden>
+                                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                                </button>
                             </div>
-                            <select id="categoryFilter" class="catalog-filter-select">
+                            <select id="categoryFilter" class="catalog-filter-select" aria-label="Filter by category">
                                 <option value="">All Categories</option>
                                 <?php
                                 mysqli_data_seek($category_result, 0);
@@ -3431,7 +3504,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                             <?php if ($has_overdue_block): ?>
                                                 <button class="btn-borrow btn-borrow-blocked" disabled
                                                     title="You have an overdue item. Return it before borrowing again.">
-                                                    Overdue Block
+                                                    <span class="material-symbols-outlined" aria-hidden="true">block</span>
+                                                    <span class="btn-borrow-label">Overdue Block</span>
                                                 </button>
                                             <?php else: ?>
                                                 <?php
@@ -3443,7 +3517,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                     <?php if ($eq_shelf <= 0 && !$eq_ahead) echo 'disabled'; ?>
                                                     data-action="open-borrow-form"
                                                     data-item="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>">
-                                                    <?php echo ($eq_shelf > 0) ? 'Borrow' : ($eq_ahead ? 'Book ahead' : 'Unavailable'); ?>
+                                                    <span class="material-symbols-outlined" aria-hidden="true"><?php echo ($eq_shelf > 0) ? 'add_shopping_cart' : ($eq_ahead ? 'event' : 'block'); ?></span>
+                                                    <span class="btn-borrow-label"><?php echo ($eq_shelf > 0) ? 'Borrow' : ($eq_ahead ? 'Book ahead' : 'Unavailable'); ?></span>
                                                 </button>
                                             <?php endif; ?>
                                         </div>
@@ -4867,6 +4942,42 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             }());
         </script>
     <?php endif; ?><!-- /dual-mode borrowModal -->
+
+    <!-- ── Choose a Room Modal ─────────────────────────────────────────────
+         Opened from the Room field of the Borrow Request modal. Shows only rooms the
+         admin left Available; rooms another faculty has reserved for the chosen date and
+         time stay visible but cannot be picked. The content is built by RoomPicker in
+         faculty-dashboard.js. -->
+    <div class="modal-backdrop rp-backdrop" id="roomPickModal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="roomPickTitle">
+        <div class="modal-box rp-box">
+            <div class="modal-header bm-head">
+                <span class="bm-tile" aria-hidden="true"><span class="material-symbols-outlined">meeting_room</span></span>
+                <div class="bm-heading">
+                    <h3 id="roomPickTitle">Choose a room</h3>
+                    <p class="bm-sub" id="roomPickSub">Where will the equipment be used?</p>
+                </div>
+                <button type="button" class="modal-close-btn" data-rp-close aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="rp-tools">
+                <label class="rp-search">
+                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
+                    <input type="search" id="roomPickSearch" placeholder="Search rooms" autocomplete="off" aria-label="Search rooms">
+                </label>
+                <div class="rp-tabs" id="roomPickTabs" role="tablist" aria-label="Buildings" hidden></div>
+            </div>
+            <div class="rp-scroll" id="roomPickBody" aria-live="polite"></div>
+            <div class="rp-foot">
+                <div class="rp-legend" aria-hidden="true">
+                    <span class="rp-key"><i class="rp-dot rp-dot--free"></i>Free</span>
+                    <span class="rp-key"><i class="rp-dot rp-dot--taken"></i>Reserved</span>
+                </div>
+                <span class="rp-count" id="roomPickCount"></span>
+                <button type="button" class="btn-cancel-acc" data-rp-close>Cancel</button>
+            </div>
+        </div>
+    </div><!-- /roomPickModal -->
 
     <!-- Confirmation Modal -->
     <div class="modal-backdrop" id="confirmationModal" style="display:none;" role="dialog" aria-modal="true">
