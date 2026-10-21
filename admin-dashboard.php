@@ -286,18 +286,20 @@ function dash_attention(array $d): array
             'icon' => 'schedule',
             'title' => dash_pl($d['overdue'], 'overdue return'),
             'sub'   => $d['overdue_days'] > 0 ? 'Oldest is ' . dash_pl($d['overdue_days'], 'day') . ' past due' : 'Past its return date',
-            'go' => 'requests',
-            'chip' => 'rq-overdue'
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'overdue'
         ];
     }
     if ($d['waiting'] > 0) {
         $a[] = [
             'tone' => 'warn',
             'icon' => 'assignment',
-            'title' => dash_pl($d['waiting'], 'request') . ' awaiting approval',
-            'sub'   => 'Review and approve or decline',
-            'go' => 'requests',
-            'chip' => 'rq-waiting'
+            'title' => dash_pl($d['waiting'], 'pending request'),
+            'sub'   => 'Awaiting a decision',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting'
         ];
     }
     if ($d['due_today'] > 0) {
@@ -306,8 +308,9 @@ function dash_attention(array $d): array
             'icon' => 'event_available',
             'title' => dash_pl($d['due_today'], 'item') . ' due back today',
             'sub'   => 'Expect returns by end of day',
-            'go' => 'requests',
-            'chip' => 'rq-active'
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'active'
         ];
     }
     if ($d['rooms_issues'] > 0) {
@@ -358,11 +361,12 @@ function dash_render(array $d): void
         [
             'tone' => $d['waiting'] > 0 ? 'warn' : 'ok',
             'icon' => 'assignment',
-            'label' => 'Pending approvals',
+            'label' => 'Pending requests',
             'val' => $d['waiting'],
-            'sub' => $d['waiting'] > 0 ? 'Needs your review' : 'Queue is clear',
-            'go' => 'requests',
-            'chip' => 'rq-waiting',
+            'sub' => $d['waiting'] > 0 ? 'Awaiting a decision' : 'Queue is clear',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting',
         ],
         [
             'tone' => 'ok',
@@ -370,8 +374,9 @@ function dash_render(array $d): void
             'label' => 'Active loans',
             'val' => $d['active'],
             'sub' => $d['due_today'] > 0 ? dash_pl($d['due_today'], 'item') . ' due back today' : 'None due today',
-            'go' => 'requests',
-            'chip' => 'rq-active',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'active',
         ],
         [
             'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
@@ -381,8 +386,9 @@ function dash_render(array $d): void
             'sub' => $d['overdue'] > 0
                 ? ($d['overdue_days'] > 0 ? 'Oldest ' . dash_pl($d['overdue_days'], 'day') . ' late' : 'Needs follow-up')
                 : 'Nothing overdue',
-            'go' => 'requests',
-            'chip' => 'rq-overdue',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'overdue',
         ],
         [
             'tone' => 'info',
@@ -412,7 +418,8 @@ function dash_render(array $d): void
     <section class="dash-kpis" aria-label="Key figures">
         <?php foreach ($kpis as $k): ?>
             <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
-                data-dash-go="<?php echo dash_h($k['go']); ?>" data-dash-chip="<?php echo dash_h($k['chip']); ?>">
+                data-dash-go="<?php echo dash_h($k['go']); ?>"
+                data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
                 <span class="dash-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($k['icon']); ?></span></span>
                 <span class="dash-kpi-body">
                     <span class="dash-kpi-label"><?php echo dash_h($k['label']); ?></span>
@@ -466,7 +473,8 @@ function dash_render(array $d): void
                     <?php foreach ($attn as $a): ?>
                         <li>
                             <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
-                                data-dash-go="<?php echo dash_h($a['go']); ?>" data-dash-chip="<?php echo dash_h($a['chip']); ?>">
+                                data-dash-go="<?php echo dash_h($a['go']); ?>"
+                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>">
                                 <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
                                 <span class="dash-attn-text">
                                     <strong><?php echo dash_h($a['title']); ?></strong>
@@ -481,7 +489,7 @@ function dash_render(array $d): void
                 <div class="dash-empty dash-empty--ok">
                     <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
                     <strong>You're all caught up</strong>
-                    <small>No approvals, overdue returns, room issues or stock problems.</small>
+                    <small>No pending requests, overdue returns, room issues or stock problems.</small>
                 </div>
             <?php endif; ?>
         </section>
@@ -606,7 +614,7 @@ function dash_render(array $d): void
                     <h2 id="dashLatestTitle">Latest requests</h2>
                     <p>Most recent equipment requests</p>
                 </div>
-                <button type="button" class="dash-link" data-dash-go="requests" data-dash-chip="rq-waiting">View all</button>
+                <button type="button" class="dash-link" data-dash-go="inventory" data-dash-loan-filter="all">View all</button>
             </header>
             <div class="ps-table-wrap">
                 <table class="ps-table dash-table">
@@ -1058,7 +1066,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 }
             }
 
-            if (['requests', 'rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
+            if (['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
             try {
                 if (sessionStorage.getItem('adminHardRefresh') === '1') return;
             } catch (_) {}
@@ -1146,13 +1154,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="nav-group" role="group" aria-labelledby="navg-operations">
                     <span class="nav-group-title" id="navg-operations">Operations</span>
-                    <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
-                        <span class="material-symbols-outlined">assignment</span>
-                        <span class="nav-label">Approvals</span>
-                        <?php if ($stat_waiting > 0): ?>
-                            <span class="nav-badge"><?php echo $stat_waiting; ?></span>
-                        <?php endif; ?>
-                    </a>
                     <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
                         <span class="material-symbols-outlined">inventory_2</span>
                         <span class="nav-label">Equipment</span>
@@ -1235,8 +1236,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="dash-head-tools">
                             <!-- One quick action left on purpose: confirming a return by QR code has no other entry point
-                                 on this screen. "Review approvals" and "Add equipment" were removed because the
-                                 Pending approvals card and the Needs attention list already lead to the same places.
+                                 on this screen. "Review requests" and "Add equipment" were removed because the
+                                 Pending requests card and the Needs attention list already lead to the same places.
                                  Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
                             <div class="dash-actions">
                                 <button type="button" class="dash-btn dash-btn--primary" id="openQrScannerBtn">
@@ -1267,413 +1268,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div><!-- /panel-dashboard -->
 
 
-            <!-- ============================================================
-         TAB: REQUESTS  (Phase 3 redesign)
-    ============================================================ -->
-            <div class="tab-panel" id="panel-requests">
-
-                <!-- Page header -->
-                <div class="ps-page-header-row">
-                    <div class="ps-page-header">
-                        <h1>Approvals</h1>
-                        <p>Review special requests that need a policy override, mainly Organization Adviser submissions with supporting documents. Standard requests are processed automatically.</p>
-                    </div>
-                    <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
-                        <span class="material-symbols-outlined">download</span> Export
-                    </button>
-                </div>
-
-                <!-- Sub-tabs -->
-                <div class="rq-filter-chips" id="rqTabs">
-                    <button class="rq-filter-chip active" data-rq-panel="rq-waiting">
-                        Waiting
-                        <?php if ($stat_waiting > 0): ?>
-                            <span class="rq-chip-count"><?php echo $stat_waiting; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-active">
-                        Active
-                        <?php if ($stat_approved > 0): ?>
-                            <span class="rq-chip-count rq-chip-count--ok"><?php echo $stat_approved; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-overdue">
-                        Overdue
-                        <?php if ($stat_overdue > 0): ?>
-                            <span class="rq-chip-count"><?php echo $stat_overdue; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-all">Returned</button>
-                </div>
-
-                <!-- ── WAITING ───────────────────────────────────────────── -->
-                <div class="rq-sub-panel active" id="rq-waiting">
-                    <div class="ps-help-note">
-                        <span class="material-symbols-outlined">info</span>
-                        Standard requests are approved automatically. Only requests that need a policy override appear here, usually from Organization Advisers with a supporting document. Open the document, then approve or decline.
-                    </div>
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">pending</span> Pending Review</h3>
-                            <div style="display:flex;gap:6px">
-                                <input class="ps-form-control" style="width:200px" placeholder="Search requester..." id="rq-waiting-search">
-                            </div>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table ps-appr-table" id="rq-waiting-table">
-                                <thead>
-                                    <tr>
-                                        <th>Request</th>
-                                        <th>Item</th>
-                                        <th>Document</th>
-                                        <th>Status</th>
-                                        <th class="ps-appr-th-act">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    // Collect rows, count batch sizes, and list rows WITH a document first
-                                    // (attachment-first workflow). Order within each group stays newest-first.
-                                    mysqli_data_seek($waiting_result, 0);
-                                    $ps_w_with = [];
-                                    $ps_w_without = [];
-                                    $ps_w_batch = [];
-                                    while ($rw = mysqli_fetch_assoc($waiting_result)) {
-                                        if (!empty($rw['batch_id'])) {
-                                            $ps_w_batch[$rw['batch_id']] = ($ps_w_batch[$rw['batch_id']] ?? 0) + 1;
-                                        }
-                                        if (ps_doc_info($rw['document_path'] ?? '')) $ps_w_with[] = $rw;
-                                        else $ps_w_without[] = $rw;
-                                    }
-                                    $ps_w_rows = array_merge($ps_w_with, $ps_w_without);
-                                    if (count($ps_w_rows) > 0):
-                                        foreach ($ps_w_rows as $r):
-                                            $doc      = ps_doc_info($r['document_path'] ?? '');
-                                            $qty      = max(1, (int)($r['borrow_qty'] ?? 1));
-                                            $who_type = ps_submitted_as_label($r['submitted_as'] ?? '');
-                                            $batch_n  = !empty($r['batch_id']) ? (int)($ps_w_batch[$r['batch_id']] ?? 1) : 1;
-                                    ?>
-                                            <tr class="ps-req-row ps-appr-row<?php echo $doc ? ' has-doc' : ''; ?>"
-                                                data-id="<?php echo (int)$r['id']; ?>"
-                                                data-status="Waiting"
-                                                data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="<?php echo htmlspecialchars($who_type); ?>"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-qty="<?php echo $qty; ?>"
-                                                data-batch-n="<?php echo $batch_n; ?>"
-                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
-                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
-                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
-                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
-                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
-                                                data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
-                                                data-doc-url="<?php echo $doc ? htmlspecialchars($doc['url']) : ''; ?>"
-                                                data-doc-open-url="<?php echo $doc ? htmlspecialchars($doc['open_url']) : ''; ?>"
-                                                data-doc-name="<?php echo $doc ? htmlspecialchars($doc['name']) : ''; ?>"
-                                                data-doc-kind="<?php echo $doc ? $doc['kind'] : ''; ?>">
-                                                <td>
-                                                    <button type="button" class="ps-appr-id"
-                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal"
-                                                        title="Open review panel">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
-                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($who_type); ?> &middot; <?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></div>
-                                                </td>
-                                                <td>
-                                                    <div class="ps-appr-item">
-                                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
-                                                        <?php if ($qty > 1): ?><span class="ps-appr-qty">&times;<?php echo $qty; ?></span><?php endif; ?>
-                                                    </div>
-                                                    <div class="ps-appr-sub">
-                                                        Needed <?php echo date('M d', strtotime($r['borrow_date'])); ?>
-                                                        <?php if ($batch_n > 1): ?><span class="ps-appr-batch" title="Part of one submission with <?php echo $batch_n; ?> items">Batch of <?php echo $batch_n; ?></span><?php endif; ?>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <?php if ($doc): ?>
-                                                        <a class="ps-doc-chip ps-doc-chip--<?php echo $doc['kind']; ?>"
-                                                            href="<?php echo htmlspecialchars($doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
-                                                            title="Open <?php echo htmlspecialchars($doc['name']); ?> in a new tab">
-                                                            <span class="material-symbols-outlined"><?php echo ps_doc_icon($doc['kind']); ?></span>
-                                                            <span class="ps-doc-chip__name"><?php echo htmlspecialchars($doc['name']); ?></span>
-                                                            <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
-                                                        </a>
-                                                    <?php else: ?>
-                                                        <span class="ps-doc-chip ps-doc-chip--none">
-                                                            <span class="material-symbols-outlined">block</span> No document
-                                                        </span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td><span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span></td>
-                                                <td>
-                                                    <div class="ps-appr-actions">
-                                                        <button class="ps-btn ps-btn--success ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-approve-modal">
-                                                            <span class="material-symbols-outlined">check</span> Approve
-                                                        </button>
-                                                        <button class="ps-btn ps-btn--danger ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-decline-modal">
-                                                            <span class="material-symbols-outlined">close</span> Decline
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="5">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">assignment_turned_in</span>
-                                                    <p>Nothing needs your review. Standard requests are processed automatically.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-waiting -->
-
-                <!-- ── ACTIVE BORROWINGS ─────────────────────────────────── -->
-                <div class="rq-sub-panel" id="rq-active">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">check_circle</span>
-                                Active Borrowings (<?php echo $stat_approved; ?>)</h3>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Issued</th>
-                                        <th>Due</th>
-                                        <th>Approved by</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    // Who approved each request (an admin, or the rules engine) — shared with every admin.
-                                    $_act_ids = [];
-                                    mysqli_data_seek($approved_result, 0);
-                                    while ($_r = mysqli_fetch_assoc($approved_result)) {
-                                        $_act_ids[] = (int)$_r['id'];
-                                    }
-                                    $_act_dec = admin_request_decisions($conn, $_act_ids);
-                                    mysqli_data_seek($approved_result, 0);
-                                    if (mysqli_num_rows($approved_result) > 0):
-                                        while ($r = mysqli_fetch_assoc($approved_result)):
-                                            $isOD = strtotime($r['return_date']) < strtotime($today);
-                                    ?>
-                                            <tr>
-                                                <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d', strtotime($r['borrow_date'])); ?></td>
-                                                <td style="<?php echo $isOD ? 'color:var(--danger);font-weight:600' : ''; ?>">
-                                                    <?php echo date('M d', strtotime($r['return_date'])); ?>
-                                                </td>
-                                                <td><?php echo admin_decider_html($_act_dec[(int)$r['id']]['approved'] ?? null); ?></td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">inventory_2</span>
-                                                    <p>No active borrowings at the moment.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-active -->
-
-                <!-- ── OVERDUE ────────────────────────────────────────────── -->
-                <div class="rq-sub-panel" id="rq-overdue">
-                    <?php if ($stat_overdue > 0): ?>
-                        <div class="ps-alert ps-alert--danger" id="rq-overdue-alert">
-                            <span class="material-symbols-outlined">warning</span>
-                            <?php echo $stat_overdue; ?> item(s) are overdue. Contact the borrowers immediately.
-                            <button class="ps-alert__close" data-action="dismiss-alert" data-target="rq-overdue-alert"><span class="material-symbols-outlined">close</span></button>
-                        </div>
-                    <?php endif; ?>
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">schedule</span>
-                                Overdue Items (<?php echo $stat_overdue; ?>)</h3>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Due Date</th>
-                                        <th>Days Overdue</th>
-                                        <th>Approved by</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $overdue_q = mysqli_query($conn, "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
-                                        FROM tbl_requests
-                                        LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
-                                        WHERE tbl_requests.status='Overdue' OR (tbl_requests.status='Approved' AND tbl_requests.return_date < CURDATE())
-                                        ORDER BY tbl_requests.return_date ASC");
-                                    $_od_ids = [];
-                                    if ($overdue_q) {
-                                        while ($_r = mysqli_fetch_assoc($overdue_q)) {
-                                            $_od_ids[] = (int)$_r['id'];
-                                        }
-                                        mysqli_data_seek($overdue_q, 0);
-                                    }
-                                    $_od_dec = admin_request_decisions($conn, $_od_ids);
-                                    if ($overdue_q && mysqli_num_rows($overdue_q) > 0):
-                                        while ($r = mysqli_fetch_assoc($overdue_q)):
-                                            $days_od = max(0, (int)floor((strtotime($today) - strtotime($r['return_date'])) / 86400));
-                                    ?>
-                                            <tr data-id="<?php echo (int)$r['id']; ?>">
-                                                <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td style="color:var(--danger);font-weight:600"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
-                                                <td><span class="ps-badge ps-badge--overdue"><?php echo $days_od; ?> days</span></td>
-                                                <td><?php echo admin_decider_html($_od_dec[(int)$r['id']]['approved'] ?? null); ?></td>
-                                                <td>
-                                                    <div style="display:flex;gap:6px">
-                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
-                                                        <button class="ps-btn ps-btn--outline ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">check_circle</span>
-                                                    <p>No overdue items. Great job!</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-overdue -->
-
-                <!-- ── RETURNED (merged: was "History" + "All Requests") ──── -->
-                <div class="rq-sub-panel" id="rq-all">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Returned Requests</h3>
-                            <div style="display:flex;gap:6px">
-                                <input class="ps-form-control" style="width:220px" placeholder="Search..." id="rq-all-search">
-                                <select class="ps-form-control" style="width:140px" id="rq-all-range">
-                                    <option value="today">Today</option>
-                                    <option value="week">This Week</option>
-                                    <option value="month" selected>This Month</option>
-                                    <option value="year">This Year</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table" id="rq-all-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Returned</th>
-                                        <th>Returned by</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $all_q = mysqli_query($conn, "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
-                                        FROM tbl_requests
-                                        LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
-                                        WHERE tbl_requests.status='Returned'
-                                        ORDER BY tbl_requests.return_date DESC LIMIT 100");
-                                    $_ret_ids = [];
-                                    if ($all_q) {
-                                        while ($_r = mysqli_fetch_assoc($all_q)) {
-                                            $_ret_ids[] = (int)$_r['id'];
-                                        }
-                                        mysqli_data_seek($all_q, 0);
-                                    }
-                                    $_ret_dec = admin_request_decisions($conn, $_ret_ids);
-                                    if ($all_q && mysqli_num_rows($all_q) > 0):
-                                        while ($r = mysqli_fetch_assoc($all_q)):
-                                    ?>
-                                            <tr class="ps-req-row"
-                                                data-id="<?php echo (int)$r['id']; ?>"
-                                                data-status="<?php echo htmlspecialchars($r['status']); ?>"
-                                                data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="Faculty"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
-                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
-                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
-                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
-                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
-                                                <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
-                                                    #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                                <td><?php echo admin_decider_html($_ret_dec[(int)$r['id']]['returned'] ?? null); ?></td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">list_alt</span>
-                                                    <p>No requests found.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-all -->
-
-            </div><!-- /panel-requests -->
 
 
 
@@ -3988,7 +3582,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         }
                     }
                     $eq_ret_total  = count($eq_ret_rows);
-                    // Waiting (Pending Review) rows — same rule as Approvals: supporting-letter requests from
+                    // Waiting (Pending Review) rows — supporting-letter requests from
                     // Organization Advisers are visible to a Super Admin only. Rows with a document come first.
                     $eq_wait_sql = "SELECT tbl_requests.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
@@ -5023,7 +4617,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Approvals</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                                                Go to <strong>Equipment → On Loan</strong> and select <strong>Waiting</strong>. Review the request, then approve or decline it. The faculty member will see the updated status on their portal.
                                             </div>
                                         </details>
 
@@ -5672,7 +5266,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
-    <!-- DRAWER: APPROVALS REVIEW (Waiting table). Reuses the ps-modal-backdrop open/close
+    <!-- DRAWER: REQUEST REVIEW (Equipment > On Loan). Reuses the ps-modal-backdrop open/close
          mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
          Approve / Decline here hand off to the existing approve/decline modals. -->
     <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
@@ -6121,7 +5715,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         }
         $toast_queue[] = $lt_msg;
 
-        $ov_n = (int)$stat_overdue;
+        $ov_n = (int)($dash_data['overdue'] ?? 0);
         if ($ov_n > 0) {
             $toast_queue[] = 'Overdue alert: ' . $ov_n . ($ov_n === 1 ? ' item is' : ' items are')
                 . ' currently overdue and need immediate attention.';
@@ -6395,7 +5989,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div id="admin-poll-toast">
     </div>
 
-    <!-- Modal + sub-tab functions (inline for guaranteed global scope) -->
+    <!-- Modal helpers (inline for guaranteed global scope) -->
     <script nonce="<?php echo $csp_nonce; ?>">
         /* ── Modal open / close ─────────────────────────────────────── */
         function psOpenModal(id) {
@@ -6416,77 +6010,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Requests filter-chip switching */
-            var rqTabs = document.getElementById('rqTabs');
-            if (rqTabs) {
-                rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(tab) {
-                    tab.addEventListener('click', function() {
-                        rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(t) {
-                            t.classList.remove('active');
-                        });
-                        document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function(p) {
-                            p.classList.remove('active');
-                        });
-                        tab.classList.add('active');
-                        var panel = document.getElementById(tab.dataset.rqPanel);
-                        if (panel) panel.classList.add('active');
-                    });
-                });
-            }
-
-            /* Live search — Waiting table */
-            var waitSearch = document.getElementById('rq-waiting-search');
-            var waitTable = document.getElementById('rq-waiting-table');
-            if (waitSearch && waitTable) {
-                waitSearch.addEventListener('input', function() {
-                    var q = waitSearch.value.toLowerCase();
-                    waitTable.querySelectorAll('tbody tr').forEach(function(row) {
-                        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-                    });
-                });
-            }
-
-            /* Live search + return-date range filter — Returned Requests */
-            var allSearch = document.getElementById('rq-all-search');
-            var allRange = document.getElementById('rq-all-range');
-            var allTable = document.getElementById('rq-all-table');
-
-            function inReturnRange(dateStr, range) {
-                if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
-                var d = new Date(dateStr + 'T00:00:00');
-                if (isNaN(d.getTime())) return true;
-                var now = new Date();
-                var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                if (range === 'today') {
-                    return d.getTime() === todayStart.getTime();
-                }
-                if (range === 'week') {
-                    var weekStart = new Date(todayStart);
-                    weekStart.setDate(todayStart.getDate() - todayStart.getDay());
-                    return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
-                }
-                if (range === 'month') {
-                    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-                }
-                if (range === 'year') {
-                    return d.getFullYear() === now.getFullYear();
-                }
-                return true;
-            }
-
-            function filterAll() {
-                var q = allSearch ? allSearch.value.toLowerCase() : '';
-                var range = allRange ? allRange.value : 'month';
-                if (!allTable) return;
-                allTable.querySelectorAll('tbody tr').forEach(function(row) {
-                    var matchQ = !q || row.textContent.toLowerCase().includes(q);
-                    var matchRange = inReturnRange(row.dataset.returnDate, range);
-                    row.style.display = (matchQ && matchRange) ? '' : 'none';
-                });
-            }
-            if (allSearch) allSearch.addEventListener('input', filterAll);
-            if (allRange) allRange.addEventListener('change', filterAll);
-            filterAll(); // apply the default "This Month" range immediately
         });
     </script>
 

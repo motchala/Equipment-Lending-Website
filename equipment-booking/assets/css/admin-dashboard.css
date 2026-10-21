@@ -2377,7 +2377,7 @@ select.ps-form-control {
     overflow-x: auto;
 }
 
-/* ── Sub-tabs (Requests panel) ────────────────────────────────── */
+/* ── Sub-tabs (Settings panel) ────────────────────────────────── */
 .rq-sub-tabs {
     display: flex;
     gap: 4px;
@@ -2426,11 +2426,9 @@ select.ps-form-control {
     display: block;
 }
 
-/* ── Filter chips (Requests tab) ──────────────────────────────────
-   Pill-shaped, individually-bordered buttons — visually distinct from
-   the rectangular .rq-sub-tab used for Rooms/Settings sub-navigation,
-   so the "filter a single list" pattern reads differently from the
-   "switch between screens" pattern. ── */
+/* ── Filter chips ────────────────────────────────────────────────
+   Pill-shaped, individually-bordered buttons used to filter or switch
+   compact lists such as Equipment loans and notifications. ── */
 .rq-filter-chips {
     display: flex;
     align-items: center;
@@ -4842,7 +4840,7 @@ input[type="range"] {
 }
 
 /* Brief highlight flash for a row/card the user was just deep-linked to
-   from a notification (Requests table row, Inventory item, etc.) */
+   from a notification (Equipment loan, Inventory item, etc.) */
 .notif-target-flash {
     animation: notifTargetFlash 1.8s ease;
 }
@@ -9409,12 +9407,10 @@ a.ps-doc-chip:hover {
 /* Phone layout: cooperates with admin-dashboard-responsive.css (table -> cards) */
 @media (max-width: 768px) {
 
-    #panel-requests .ps-appr-table td,
     #panel-rooms .ps-appr-table td {
         min-width: 0;
     }
 
-    #panel-requests .ps-appr-table td.rc-title,
     #panel-rooms .ps-appr-table td.rc-title {
         flex-direction: column;
         align-items: flex-start;
@@ -9422,7 +9418,6 @@ a.ps-doc-chip:hover {
         text-align: left;
     }
 
-    #panel-requests .ps-appr-table td.rc-title .ps-appr-who,
     #panel-rooms .ps-appr-table td.rc-title .ps-appr-who {
         font-size: 15px;
     }
@@ -9688,7 +9683,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
    PUPSYNC ADMIN — Dashboard tab
    ----------------------------------------------------------------
    Everything is namespaced `dash-*` and scoped under `.dash`, so no
-   other panel (Approvals, Equipment, Rooms, Faculty, Settings) is
+   other panel (Equipment, Rooms, Faculty, Settings) is
    touched. Colours come from the existing theme variables in
    admin-dashboard.css, so Light / Dark / High-contrast all work.
 

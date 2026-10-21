@@ -179,6 +179,7 @@
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
+        if (!panel) return;
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -449,8 +450,8 @@
 
     /* ── Navigate to the screen a notification is about ─────────
        Different categories go different places on purpose:
-         overdue  → Requests tab, Overdue filter, flash the row
-         request  → Requests tab, Waiting filter, opens the exact
+         overdue  → Equipment > On Loan, Overdue filter, flash the row
+         request  → Equipment > On Loan, Waiting filter, opens the exact
                      request's detail modal (same one the table uses)
          room     → Rooms tab, Issues sub-tab, opens the exact
                      issue's review modal
@@ -461,25 +462,7 @@
         _markCardRead(card);
         psCloseModal('notifOverlay');
 
-        if (tab === 'requests') {
-            _switchTabDOM('requests');
-            const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + card.dataset.linkChip + '"]');
-            if (chip) chip.click();
-
-            const reqId = card.dataset.linkRequestId;
-            if (!reqId) return;
-            setTimeout(() => {
-                const row = document.querySelector('.ps-req-row[data-id="' + reqId + '"]');
-                if (!row) return;
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.classList.add('notif-target-flash');
-                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
-                // Waiting-table rows can open the real detail modal directly —
-                // reuse the exact trigger the table itself uses.
-                const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
-                if (trigger) setTimeout(() => trigger.click(), 280);
-            }, 120);
-        } else if (tab === 'rooms') {
+        if (tab === 'rooms') {
             _switchTabDOM('rooms');
             if (card.dataset.linkSub) switchRoomsTab(card.dataset.linkSub);
 
@@ -499,6 +482,25 @@
             }, 120);
         } else if (tab === 'inventory') {
             _switchTabDOM('inventory');
+            if (card.dataset.linkSub === 'eq-onloan') {
+                setTimeout(() => {
+                    const loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                    if (loanPanel) loanPanel.click();
+                    const filter = document.querySelector('#eqLoanFilter [data-loan-filter="' + card.dataset.linkChip + '"]');
+                    if (filter) filter.click();
+
+                    const requestId = card.dataset.linkRequestId;
+                    if (!requestId) return;
+                    const row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + requestId + '"]');
+                    if (!row) return;
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    row.classList.add('notif-target-flash');
+                    setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                    const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
+                    if (card.dataset.linkChip === 'waiting' && trigger) setTimeout(() => trigger.click(), 280);
+                }, 120);
+                return;
+            }
             const itemId = card.dataset.linkItemId;
             if (!itemId) return;
             setTimeout(() => {
@@ -1457,8 +1459,8 @@
                 case 'go-lending': {
                     // NOTE: this used to jump to a standalone "Lending" panel
                     // (Borrow Requests / Equipment Registry / Raw Data /
-                    // Arbitration Log) that's since been removed — Requests
-                    // and Inventory are now their own real top-level tabs.
+                    // Arbitration Log) that's since been removed. Request
+                    // handling now lives under Equipment > On Loan.
                     const dest = el.dataset.lending || 'waiting';
                     if (dest === 'inventory') {
                         _switchTabDOM('inventory');
@@ -1478,12 +1480,13 @@
                         }
                         if (fw) fw.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                        // "waiting" (Review Requests / View All) — go to the
-                        // Requests tab and make sure the waiting-for-approval
-                        // filter is the one showing.
-                        _switchTabDOM('requests');
-                        const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="rq-waiting"]');
-                        if (chip) chip.click();
+                        // "waiting" (Review Requests / View All) — show pending
+                        // requests in Equipment > On Loan.
+                        _switchTabDOM('inventory');
+                        const eqTab = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                        if (eqTab) eqTab.click();
+                        const filter = document.querySelector('#eqLoanFilter [data-loan-filter="waiting"]');
+                        if (filter) filter.click();
                     }
                     break;
                 }
@@ -3900,110 +3903,6 @@
 })();
 
 /* ════════════════════════════════════════════════════════════════
-   PHASE 3 — REQUESTS PANEL JS
-   Modal system + sub-tab switcher
-════════════════════════════════════════════════════════════════ */
-
-/* ── ps-modal open / close ────────────────────────────────────── */
-function psOpenModal(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.add('ps-modal-open');
-}
-function psCloseModal(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.remove('ps-modal-open');
-}
-
-/* Close modal when clicking the backdrop */
-document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
-    bd.addEventListener('click', function (e) {
-        if (e.target === bd) bd.classList.remove('ps-modal-open');
-    });
-});
-
-/* ── Requests filter-chip switcher ────────────────────────────── */
-(function () {
-    var tabGroup = document.getElementById('rqTabs');
-    if (!tabGroup) return;
-
-    tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            /* Deactivate all chips and panels */
-            tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (t) {
-                t.classList.remove('active');
-            });
-            document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
-                p.classList.remove('active');
-            });
-
-            /* Activate clicked chip and its panel */
-            tab.classList.add('active');
-            var panelId = tab.dataset.rqPanel;
-            var panel = document.getElementById(panelId);
-            if (panel) panel.classList.add('active');
-        });
-    });
-})();
-
-/* ── Live search — Waiting table ─────────────────────────────── */
-(function () {
-    var input = document.getElementById('rq-waiting-search');
-    var table = document.getElementById('rq-waiting-table');
-    if (!input || !table) return;
-    input.addEventListener('input', function () {
-        var q = input.value.toLowerCase();
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-            var text = row.textContent.toLowerCase();
-            row.style.display = text.includes(q) ? '' : 'none';
-        });
-    });
-})();
-
-/* ── Live search + return-date range filter — Returned Requests table ── */
-(function () {
-    var searchInput = document.getElementById('rq-all-search');
-    var rangeSel = document.getElementById('rq-all-range');
-    var table = document.getElementById('rq-all-table');
-    if (!table) return;
-
-    function inReturnRange(dateStr, range) {
-        if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
-        var d = new Date(dateStr + 'T00:00:00');
-        if (isNaN(d.getTime())) return true;
-        var now = new Date();
-        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (range === 'today') {
-            return d.getTime() === todayStart.getTime();
-        }
-        if (range === 'week') {
-            var weekStart = new Date(todayStart);
-            weekStart.setDate(todayStart.getDate() - todayStart.getDay());
-            return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
-        }
-        if (range === 'month') {
-            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-        }
-        if (range === 'year') {
-            return d.getFullYear() === now.getFullYear();
-        }
-        return true;
-    }
-
-    function filterAll() {
-        var q = searchInput ? searchInput.value.toLowerCase() : '';
-        var range = rangeSel ? rangeSel.value : 'month';
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-            var text = row.textContent.toLowerCase();
-            var matchQ = !q || text.includes(q);
-            var matchRange = inReturnRange(row.dataset.returnDate, range);
-            row.style.display = (matchQ && matchRange) ? '' : 'none';
-        });
-    }
-    if (searchInput) searchInput.addEventListener('input', filterAll);
-    if (rangeSel) rangeSel.addEventListener('change', filterAll);
-    filterAll(); // apply the default "This Month" range immediately
-})();
-/* ════════════════════════════════════════════════════════════════
    PHASE 3 — ARBITRATION + EXPORT HELPERS
 ════════════════════════════════════════════════════════════════ */
 
@@ -4017,7 +3916,7 @@ function psSelectFmt(btn) {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   APPROVALS — review drawer for the Waiting table
+   APPROVALS — review drawer for the Equipment > On Loan table
    Additive block. Opens from the request ID in each row (and from the
    notification deep link, which clicks the same ID element). Approve /
    Decline in the drawer hand off to the EXISTING approve / decline
@@ -4080,11 +3979,11 @@ function psSelectFmt(btn) {
     }
 
     // Capture phase: runs before the generic data-action handler, so the ID
-    // inside the Waiting table opens this drawer instead of the old detail modal.
+    // in the waiting list opens this drawer instead of the old detail modal.
     document.addEventListener('click', function (e) {
-        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"], #eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
+        var t = e.target.closest('#eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
         if (!t) return;
-        var row = t.closest('tr.ps-req-row, tr.eq-loan-row');
+        var row = t.closest('tr.eq-loan-row');
         if (!row) return;
         e.preventDefault();
         e.stopPropagation();
@@ -4095,7 +3994,7 @@ function psSelectFmt(btn) {
     drawer.addEventListener('click', function (e) {
         var b = e.target.closest('[data-appr-decide]');
         if (!b || !currentId) return;
-        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"], #eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + currentId + '"]');
+        var row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + currentId + '"]');
         if (!row) return;
         var sel = b.getAttribute('data-appr-decide') === 'approve'
             ? '[data-modal="ps-approve-modal"]'
@@ -4646,10 +4545,12 @@ function psSelectFmt(btn) {
             var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
             if (nav) {
                 nav.click();
-                var chipKey = go.getAttribute('data-dash-chip');
-                if (chipKey) {
-                    var chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + chipKey + '"]');
-                    if (chip) chip.click();
+                var loanFilter = go.getAttribute('data-dash-loan-filter');
+                if (loanFilter) {
+                    var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                    if (loanPanel) loanPanel.click();
+                    var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
+                    if (loanTab) loanTab.click();
                 }
             }
             return;
