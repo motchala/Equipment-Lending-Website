@@ -63,6 +63,31 @@ if (!function_exists('fnotif_ensure_table')) {
     }
 }
 
+if (!function_exists('fnotif_ensure_admin_notice_table')) {
+    /** One-off notices sent by an administrator to a specific faculty member. */
+    function fnotif_ensure_admin_notice_table(mysqli $conn): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        $conn->query(
+            "CREATE TABLE IF NOT EXISTS `tbl_faculty_admin_notice` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `faculty_id` varchar(50) NOT NULL,
+                `request_id` int(11) DEFAULT NULL,
+                `admin_id` int(11) DEFAULT NULL,
+                `admin_name` varchar(255) NOT NULL,
+                `title` varchar(255) NOT NULL,
+                `message` text NOT NULL,
+                `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+                PRIMARY KEY (`id`),
+                KEY `idx_faculty_time` (`faculty_id`, `created_at`),
+                KEY `idx_request` (`request_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+        );
+    }
+}
+
 if (!function_exists('fnotif_table_exists')) {
     function fnotif_table_exists(mysqli $conn, string $table): bool
     {
@@ -889,7 +914,47 @@ if (!function_exists('fnotif_build_list')) {
             error_log('[PUPSync] fnotif account source failed: ' . $ex->getMessage());
         }
 
-        /* ── 6. Static System notices (everyone, new and old accounts) ── */
+        /* ── 6. Administrator-authored notices ───────────────────────── */
+        try {
+            fnotif_ensure_admin_notice_table($conn);
+            $stmt = $conn->prepare(
+                'SELECT id, request_id, admin_name, title, message, created_at
+                   FROM tbl_faculty_admin_notice
+                  WHERE faculty_id = ?
+                  ORDER BY created_at DESC
+                  LIMIT 100'
+            );
+            if ($stmt) {
+                $stmt->bind_param('s', $facultyId);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                while ($notice = $res->fetch_assoc()) {
+                    $sentTs = strtotime((string)$notice['created_at']) ?: $now;
+                    $add([
+                        'key'        => 'adminnotice-' . (int)$notice['id'],
+                        'cat'        => 'overdue',
+                        'icon'       => 'priority_high',
+                        'icon_class' => 'ni-overdue',
+                        'urgent'     => true,
+                        'title'      => (string)$notice['title'],
+                        'body'       => $e((string)$notice['message']),
+                        'ts'         => $sentTs,
+                        'time_label' => 'Admin notice',
+                        'detail'     => [
+                            $d('Sent By', (string)$notice['admin_name']),
+                            $d('Sent On', date('M j, Y g:i A', $sentTs)),
+                            $d('Message', (string)$notice['message'], true),
+                        ],
+                        'link'       => $lendingLink,
+                    ]);
+                }
+                $stmt->close();
+            }
+        } catch (Throwable $ex) {
+            error_log('[PUPSync] fnotif admin notices failed: ' . $ex->getMessage());
+        }
+
+        /* ── 7. Static System notices (everyone, new and old accounts) ── */
         try {
             foreach (fnotif_static_notices() as $sn) {
                 $add([

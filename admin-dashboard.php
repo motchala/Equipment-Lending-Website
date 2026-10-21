@@ -4130,7 +4130,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                     data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
                                                             <?php else: ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
+                                                                    data-action="ps-open-modal" data-modal="ps-return-modal">Manual Return</button>
                                                                 <?php if ($lst === 'overdue'): ?>
                                                                     <button type="button" class="ps-btn ps-btn--outline ps-btn--sm"
                                                                         data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
@@ -5094,19 +5094,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     <?php endif; ?>
 
-    <!-- MODAL: CONFIRM RETURN -->
+    <!-- MODAL: MANUAL RETURN (does not require the borrower's QR code) -->
     <div class="ps-modal-backdrop" id="ps-return-modal">
         <div class="ps-modal ps-modal--sm">
             <div class="ps-modal-head">
                 <div class="ps-modal-head-icon ps-mhi--maroon">
                     <span class="material-symbols-outlined">assignment_return</span>
                 </div>
-                <h3>Confirm Return</h3>
+                <h3>Manual Return</h3>
                 <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
             <div class="ps-modal-body">
+                <form id="manual-return-form" method="post" action="equipment-booking/api/manual-return.php">
+                    <?= csrf_field() ?>
+                    <input type="hidden" id="manual-return-request-id" name="request_id">
                 <div class="ps-req-summary">
                     <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
@@ -5115,7 +5118,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Return Condition</label>
-                    <select class="ps-form-control">
+                    <input type="hidden" id="manual-return-condition-value" name="return_condition" value="Good">
+                    <select class="ps-form-control" id="manual-return-condition">
                         <option>Good — No visible damage</option>
                         <option>Fair — Minor wear</option>
                         <option>Damaged — Needs repair</option>
@@ -5124,17 +5128,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                    <textarea class="ps-form-control" rows="2" placeholder="Any notes about the return..."></textarea>
+                    <textarea class="ps-form-control" id="manual-return-notes" name="admin_notes" rows="2" maxlength="2000" placeholder="Any notes about the return..."></textarea>
                 </div>
                 <div class="ps-alert ps-alert--info" style="margin:0">
                     <span class="material-symbols-outlined">info</span>
-                    Confirming will update the stock count and close this request.
+                    Recording this manual return updates the stock count and closes this request. No faculty QR code is required.
                 </div>
+                </form>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
-                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
-                    <span class="material-symbols-outlined">check</span> Confirm Return
+                <button type="submit" form="manual-return-form" class="ps-btn ps-btn--primary" id="manual-return-confirm-btn">
+                    <span class="material-symbols-outlined">check</span> Record Manual Return
                 </button>
             </div>
         </div>
@@ -5153,6 +5158,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
+                <form id="overdue-notice-form" method="post" action="equipment-booking/api/send-overdue-notice.php">
+                    <?= csrf_field() ?>
+                    <input type="hidden" id="overdue-notice-request-id" name="request_id">
+                </form>
                 <div class="ps-req-summary" style="margin-bottom:1rem">
                     <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
@@ -5161,7 +5170,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Message Preview</label>
-                    <div class="ps-notice-preview">Dear [Borrower Name],
+                    <div class="ps-notice-preview" id="overdue-notice-preview">Dear [Borrower Name],
 
                         This is a reminder that the following item borrowed from the PUPSync Equipment Lending System is now overdue:
 
@@ -5175,15 +5184,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         PUPSync Admin — Biñan Campus</div>
                 </div>
                 <div class="ps-form-group">
-                    <label class="ps-form-label">Delivery Method</label>
+                    <label class="ps-form-label">Delivery</label>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px">
-                        <input type="checkbox" checked> Send via Email
+                        <input type="checkbox" checked disabled> Send to the borrower’s PUPSync notification inbox
                     </label>
                 </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
-                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
+                <button type="submit" form="overdue-notice-form" class="ps-btn ps-btn--primary" id="overdue-notice-send-btn">
                     <span class="material-symbols-outlined">send</span> Send Notice
                 </button>
             </div>
@@ -5723,6 +5732,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     }
 
     $flash_toasts = [
+        'notice_sent'   => 'Overdue notice sent to the borrower.',
         'room_added'    => 'Room added to the registry.',
         'room_updated'  => 'Room updated. Changes saved.',
         'room_archived' => 'Room archived. It has been removed from the active registry.',

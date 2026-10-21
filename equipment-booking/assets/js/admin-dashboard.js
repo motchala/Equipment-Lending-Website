@@ -5004,7 +5004,115 @@ function psSelectFmt(btn) {
             });
         }
 
+        /* Manual Return records a return verified by an administrator. It is
+           deliberately independent of the faculty member's QR return token. */
+        var returnModal = document.getElementById('ps-return-modal');
+        var returnId = document.getElementById('manual-return-request-id');
+        var returnCondition = document.getElementById('manual-return-condition');
+        var returnConditionValue = document.getElementById('manual-return-condition-value');
+        var returnNotes = document.getElementById('manual-return-notes');
+        var returnBtn = document.getElementById('manual-return-confirm-btn');
+        var returnForm = document.getElementById('manual-return-form');
+
+        function setReturnSummary(index, value) {
+            var cells = returnModal ? returnModal.querySelectorAll('.ps-req-summary .ps-rsv') : [];
+            if (cells[index]) cells[index].textContent = value || '\u2014';
+        }
+
+        if (returnModal && returnBtn && returnForm) {
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-return-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr.eq-loan-row');
+                if (!tr) return;
+                var d = tr.dataset;
+                if (returnId) returnId.value = d.id || '';
+                setReturnSummary(0, d.borrower);
+                setReturnSummary(1, d.idNumber);
+                setReturnSummary(2, d.equipment + (d.qty && d.qty !== '1' ? ' \u00d7' + d.qty : ''));
+                setReturnSummary(3, d.dueLabel);
+                if (returnCondition) returnCondition.selectedIndex = 0;
+                if (returnNotes) returnNotes.value = '';
+            });
+
+            returnForm.addEventListener('submit', function (e) {
+                var id = returnId ? returnId.value : '';
+                if (!id) {
+                    e.preventDefault();
+                    if (typeof window.showToast === 'function') window.showToast('Select a loan to return first.');
+                    return;
+                }
+                var selected = returnCondition && returnCondition.options[returnCondition.selectedIndex];
+                if (returnConditionValue) {
+                    returnConditionValue.value = selected ? selected.text.split(/\s+/)[0] : 'Good';
+                }
+                returnBtn.disabled = true;
+                returnBtn.textContent = 'Recording\u2026';
+                try { sessionStorage.setItem('openManualReturnLoanTab', '1'); } catch (_) { }
+            });
+        }
+
+        /* Send Notice: delivers an administrator-authored message to the
+           borrower’s PUPSync notification inbox. */
+        var noticeModal = document.getElementById('ps-notice-modal');
+        var noticeForm = document.getElementById('overdue-notice-form');
+        var noticeId = document.getElementById('overdue-notice-request-id');
+        var noticePreview = document.getElementById('overdue-notice-preview');
+        var noticeBtn = document.getElementById('overdue-notice-send-btn');
+
+        function setNoticeSummary(index, value) {
+            var cells = noticeModal ? noticeModal.querySelectorAll('.ps-req-summary .ps-rsv') : [];
+            if (cells[index]) cells[index].textContent = value || '\u2014';
+        }
+
+        if (noticeModal && noticeForm && noticeBtn) {
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-notice-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr.eq-loan-row');
+                if (!tr) return;
+                var d = tr.dataset;
+                var days = Math.max(1, parseInt(d.daysOverdue || '0', 10) || 1);
+                var due = d.dueLabel || d.returnDateDisplay || 'the due date';
+                if (noticeId) noticeId.value = d.id || '';
+                setNoticeSummary(0, d.borrower);
+                setNoticeSummary(1, d.idNumber);
+                setNoticeSummary(2, d.equipment + (d.qty && d.qty !== '1' ? ' \u00d7' + d.qty : ''));
+                setNoticeSummary(3, days + ' day' + (days === 1 ? '' : 's'));
+                if (noticePreview) {
+                    noticePreview.textContent = 'Dear ' + (d.borrower || 'Borrower') + ',\n\n'
+                        + 'This is an official overdue-return notice from PUPSync Admin. '
+                        + (d.equipment || 'The borrowed equipment') + ' was due on ' + due + ' and is now '
+                        + days + ' day' + (days === 1 ? '' : 's') + ' overdue.\n\n'
+                        + 'Please return this equipment to the Admin Office immediately. '
+                        + 'Your borrowing access remains blocked until the return is recorded.\n\n'
+                        + 'PUPSync Admin';
+                }
+            });
+
+            noticeForm.addEventListener('submit', function (e) {
+                if (!noticeId || !noticeId.value) {
+                    e.preventDefault();
+                    if (typeof window.showToast === 'function') window.showToast('Select an overdue loan first.');
+                    return;
+                }
+                noticeBtn.disabled = true;
+                noticeBtn.textContent = 'Sending\u2026';
+                try { sessionStorage.setItem('openOverdueLoanTab', '1'); } catch (_) { }
+            });
+        }
+
         render();
+        try {
+            if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {
+                sessionStorage.removeItem('openManualReturnLoanTab');
+                sessionStorage.removeItem('openOverdueLoanTab');
+                var onLoanTab = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                if (onLoanTab) onLoanTab.click();
+                var overdueTab = tabBar ? tabBar.querySelector('[data-loan-filter="overdue"]') : null;
+                if (overdueTab) overdueTab.click();
+            }
+        } catch (_) { }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
     else install();
