@@ -13,8 +13,8 @@
  * "overdue-12" or "roomapproved-7".
  *
  * Sources (all filtered to the logged-in faculty_id):
- *   tbl_requests            → submitted / approved / declined / due soon /
- *                             overdue / returned   (+ tbl_arbitration_log
+ *   tbl_requests            → submitted / approved / declined / booking cancelled /
+ *                             due soon / overdue / returned   (+ tbl_arbitration_log
  *                             for the decision rule, reason and admin notes)
  *   tbl_room_reservations   → confirmed / reminder / declined / cancelled
  *                             (+ tbl_room_arbitration_log for the rule)
@@ -433,6 +433,45 @@ if (!function_exists('fnotif_build_list')) {
 
                     case 'Declined':
                         if ($decidedTs < $windowTs) break;
+
+                        // A booking an admin cancelled after approving it (admin-override.php marks the decision
+                        // log row 'booking_cancelled'). Gets its own "Booking Cancelled" notice instead of the
+                        // generic "Declined" one, and shows the ADMIN'S reason (tbl_requests.reason is the
+                        // borrower's own purpose, so it is deliberately not used here).
+                        if (($r['log_rule'] ?? '') === 'booking_cancelled') {
+                            $cQty    = max(1, (int)($r['borrow_qty'] ?? 1));
+                            $cReason = trim((string)($r['log_override_reason'] ?? ''));
+                            if ($cReason === '') $cReason = trim((string)($r['log_reason'] ?? ''));
+                            $cStartTs = strtotime($r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00'));
+                            $cStart   = !empty($r['borrow_time']) ? date('M j, Y g:i A', $cStartTs) : $borrowStr;
+                            $cDue     = !empty($r['return_time'])
+                                ? date('M j, Y g:i A', strtotime($r['return_date'] . ' ' . $r['return_time'])) : $returnStr;
+                            $add([
+                                'key' => 'reqcancelled-' . $id,
+                                'cat' => 'borrow',
+                                'icon' => 'event_busy',
+                                'icon_class' => 'ni-overdue',
+                                'title' => 'Booking Cancelled: ' . $equip,
+                                'body'  => 'Your booking for <strong>' . $e($equip) . '</strong>' . ($cQty > 1 ? ' (×' . $cQty . ')' : '')
+                                    . ' on <strong>' . $e(date('M j', $cStartTs)) . '</strong> was cancelled by an administrator.'
+                                    . ($cReason !== '' ? ' Reason: ' . $e(fnotif_clip($cReason, 120)) : ''),
+                                'ts'    => $decidedTs,
+                                'detail' => [
+                                    $d('Status', 'Cancelled by an administrator'),
+                                    $d('Equipment', $equip),
+                                    $d('Quantity', $cQty > 1 ? (string)$cQty : ''),
+                                    $d('Was Scheduled For', $cStart),
+                                    $d('Return By', $cDue),
+                                    $d('Room / Instructor', (($r['room'] ?? '') !== '' ? $r['room'] : '—') . ' / ' . (($r['instructor'] ?? '') !== '' ? $r['instructor'] : '—')),
+                                    $d('Reason', $cReason, true),
+                                    $d('Cancelled On', date('M j, Y g:i A', $decidedTs)),
+                                    $d('Requested On', date('M j, Y g:i A', $reqTs)),
+                                ],
+                                'link' => $lendingLink,
+                            ]);
+                            break;
+                        }
+
                         $reason = trim((string)($r['reason'] ?? '')) !== '' ? trim($r['reason']) : trim((string)($r['log_reason'] ?? ''));
                         $add([
                             'key' => 'reqdeclined-' . $id,
