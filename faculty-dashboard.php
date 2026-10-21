@@ -4184,7 +4184,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                             <span class="acct-row-label">Email Address</span>
                                             <div class="acct-row-value">
                                                 <span class="acct-row-static <?php echo $sov_email_masked === '' ? 'acct-row-static-muted' : 'acct-row-email'; ?>" id="sovEmailMasked"
-                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? 'Not set' : htmlspecialchars($sov_email_masked); ?></span>
+                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, partially hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? 'Not set' : htmlspecialchars($sov_email_masked); ?></span>
                                             </div>
                                             <span class="material-symbols-outlined fid-lock" title="Your email is your sign-in ID and is managed by the administrator">lock</span>
                                         </div>

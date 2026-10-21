@@ -4,7 +4,7 @@
  * faculty-account.php
  *
  * Small, dependency-free helpers for the faculty Settings screen:
- *   - faculty_mask_email()           hide an email, keep only the first 5 letters visible
+ *   - faculty_mask_email()           mask an email's local part while keeping its domain visible
  *   - faculty_phone_normalize()      validate + format a Philippine mobile number
  *   - faculty_phone_display()        pretty-print a stored mobile number
  *   - faculty_device_info()          turn a User-Agent into "Chrome on Windows PC"
@@ -14,10 +14,9 @@
 require_once __DIR__ . '/faculty-departments.php';
 
 /**
- * "edmundodelacruz@pupsync.edu" -> "edmun••••••@••••••.•••"
- * Only the first 5 letters of the address (the part before the "@") are shown. Everything else is
- * hidden behind a FIXED number of dots, so the real length of the address is not revealed and the
- * result always fits on one line. The "@" and "." stay so it still reads as an email address.
+ * "edmundodelacruz@pupsync.edu" -> "edmun••••••@pupsync.edu"
+ * Only the first 5 letters of the address (the part before the "@") are shown. The rest of the
+ * local part is hidden behind a FIXED number of dots, while the domain remains visible.
  * Not HTML-escaped.
  */
 function faculty_mask_email(?string $email, int $visible = 5): string
@@ -44,7 +43,7 @@ function faculty_mask_email(?string $email, int $visible = 5): string
     if ($at === false) {
         return $maskedL;
     }
-    return $maskedL . '@' . $dots(6) . (strpos($domain, '.') !== false ? '.' . $dots(3) : '');
+    return $maskedL . '@' . $domain;
 }
 
 /**
