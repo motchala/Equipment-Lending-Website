@@ -210,18 +210,21 @@ final class BookingSchedule
 
     /**
      * Non-archived rooms grouped building > floor > room.
+     * $availableOnly = true leaves out rooms the admin set to Maintenance / Not Bookable
+     * (the Borrow Request room picker only offers rooms equipment can actually go to).
      * @return array<int, array<string,mixed>>
      */
-    public static function roomsTree(mysqli $conn): array
+    public static function roomsTree(mysqli $conn, bool $availableOnly = false): array
     {
         $out = [];
+        $statusSql = $availableOnly ? "AND r.status = 'Available'" : '';
         $res = $conn->query(
             "SELECT r.room_id, r.room_name, r.floor_number, r.floor_label, r.status,
                     b.building_id, b.name AS building_name, b.wing, c.campus_name
                FROM tbl_rooms r
                JOIN tbl_buildings b ON b.building_id = r.building_id
                JOIN tbl_campuses  c ON c.campus_id   = b.campus_id
-              WHERE r.is_archived = 0
+              WHERE r.is_archived = 0 $statusSql
               ORDER BY b.campus_id ASC, b.sort_order ASC, b.building_id ASC,
                        r.floor_number ASC, r.sort_order ASC, r.room_id ASC"
         );
@@ -310,6 +313,9 @@ final class BookingSchedule
         if ($row['status'] === 'Maintenance') {
             return ['ok' => false, 'error' => 'That room is under maintenance. Please choose another room.'];
         }
+        if ($row['status'] === 'Not Bookable') {
+            return ['ok' => false, 'error' => 'That room is not available for equipment. Please choose another room.'];
+        }
         return ['ok' => true, 'label' => self::roomLabel($row), 'id' => (int)$row['room_id']];
     }
 
@@ -319,12 +325,14 @@ final class BookingSchedule
 
     /**
      * Approved room reservations that overlap [startTs, endTs).
-     * @return array<int, array{room_id:int,faculty_id:string}>
+     * @return array<int, array{room_id:int,faculty_id:string,start:string,end:string}>
      */
     public static function reservationsIn(mysqli $conn, string $startTs, string $endTs): array
     {
         $stmt = $conn->prepare(
-            "SELECT room_id, faculty_id
+            "SELECT room_id, faculty_id,
+                    TIMESTAMP(reservation_date, start_time) AS s_ts,
+                    TIMESTAMP(reservation_date, end_time)   AS e_ts
                FROM tbl_room_reservations
               WHERE status = 'Approved'
                 AND TIMESTAMP(reservation_date, start_time) < ?
@@ -337,27 +345,40 @@ final class BookingSchedule
         $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
-        return array_map(fn($r) => ['room_id' => (int)$r['room_id'], 'faculty_id' => (string)$r['faculty_id']], $rows);
+        return array_map(fn($r) => [
+            'room_id'    => (int)$r['room_id'],
+            'faculty_id' => (string)$r['faculty_id'],
+            'start'      => (string)$r['s_ts'],
+            'end'        => (string)$r['e_ts'],
+        ], $rows);
     }
 
     /**
      * Rooms that are reserved by SOMEONE ELSE during the window (equipment cannot go there),
      * and rooms the given faculty reserved themselves (good suggestions).
-     * @return array{reserved:int[],mine:int[]}
+     * 'info' says WHEN each blocked room is taken (time range only, never who) so the room
+     * picker can show "Reserved 9:00 - 11:00 AM" on hover.
+     * @return array{reserved:int[],mine:int[],info:array<int,array<int,array{start:string,end:string}>>}
      */
     public static function roomsByReservation(mysqli $conn, string $startTs, string $endTs, string $facultyId): array
     {
         $reserved = [];
         $mine     = [];
+        $info     = [];
         foreach (self::reservationsIn($conn, $startTs, $endTs) as $r) {
             if ($r['faculty_id'] === $facultyId) {
                 $mine[$r['room_id']] = true;
             } else {
                 $reserved[$r['room_id']] = true;
+                $info[$r['room_id']][] = ['start' => $r['start'], 'end' => $r['end']];
             }
         }
         // a room both reserved by me and by someone else stays blocked
-        return ['reserved' => array_keys($reserved), 'mine' => array_values(array_diff(array_keys($mine), array_keys($reserved)))];
+        return [
+            'reserved' => array_keys($reserved),
+            'mine'     => array_values(array_diff(array_keys($mine), array_keys($reserved))),
+            'info'     => (object)$info,
+        ];
     }
 
     /** Error text when another faculty holds a reservation on this room during the window, else null. */
@@ -372,10 +393,12 @@ final class BookingSchedule
     }
 
     /**
-     * The faculty member's own upcoming (approved) room reservations: used to suggest a room.
+     * The faculty member's own approved room reservations that are still running or coming up
+     * (within the booking window): the room picker recommends these first (using now / later today /
+     * another day).
      * @return array<int, array<string,mixed>>
      */
-    public static function myUpcomingReservations(mysqli $conn, string $facultyId, int $limit = 4): array
+    public static function myUpcomingReservations(mysqli $conn, string $facultyId, int $limit = 12): array
     {
         $stmt = $conn->prepare(
             "SELECT rr.room_id, r.room_name, b.name AS building_name,
@@ -642,9 +665,10 @@ final class BookingSchedule
     }
 
     /**
-     * Room picker shell. The list itself (Your reservations / Outside / building tabs > floors > rooms)
-     * is built in the browser from window.BOOKING_META.rooms, which comes from the same tables the
-     * Facilities section uses, so renamed / moved / archived rooms follow along.
+     * Room picker field: a button that shows the chosen room and opens the "Choose a room"
+     * modal (#roomPickModal in faculty-dashboard.php, one shared by every form). The modal is
+     * built in the browser from window.BOOKING_META.rooms, which holds only rooms the admin has
+     * left Available, and marks the ones another faculty has reserved for the chosen window.
      * The chosen value goes in the hidden room_id field: a room id, or "outside".
      */
     public static function renderRoomPicker(string $id): string
@@ -655,18 +679,12 @@ final class BookingSchedule
             <span class="form-label" id="' . $id . 'Label">Room</span>
             <input type="hidden" name="room_id" value="" data-bm-room-input>
             <button type="button" class="bm-room-trigger" id="' . $id . '" data-bm-room-trigger
-                aria-haspopup="listbox" aria-expanded="false" aria-labelledby="' . $id . 'Label ' . $id . 'Value">
+                aria-haspopup="dialog" aria-labelledby="' . $id . 'Label ' . $id . 'Value">
+                <span class="bm-room-ico" aria-hidden="true"><span class="material-symbols-outlined">meeting_room</span></span>
                 <span class="bm-room-value" id="' . $id . 'Value" data-bm-room-value><span class="bm-room-ph">Choose a room</span></span>
-                <span class="material-symbols-outlined bm-room-chev" aria-hidden="true">expand_more</span>
+                <span class="material-symbols-outlined bm-room-chev" aria-hidden="true">chevron_right</span>
             </button>
             <p class="bm-hint" data-bm-room-hint hidden></p>
-            <div class="bm-room-panel" data-bm-room-panel hidden>
-                <label class="bm-room-search">
-                    <span class="material-symbols-outlined" aria-hidden="true">search</span>
-                    <input type="search" placeholder="Search rooms" autocomplete="off" aria-label="Search rooms" data-bm-room-search>
-                </label>
-                <div class="bm-room-list" role="listbox" aria-labelledby="' . $id . 'Label" data-bm-room-list></div>
-            </div>
         </div>';
     }
 
@@ -679,15 +697,15 @@ final class BookingSchedule
     {
         $p = self::h($p);
         $qty = $multi ? '' : '
-            <div class="form-group" data-bm-future-only hidden>
-                <span class="form-label">Quantity</span>
-                <div class="bm-stepper" data-bm-qty-wrap>
-                    <button type="button" data-bm-qty-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
-                    <input type="number" name="qty" value="1" min="1" max="1" inputmode="numeric" data-bm-qty aria-label="Quantity">
-                    <button type="button" data-bm-qty-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
-                </div>
-                <p class="bm-hint" data-bm-qty-hint></p>
-            </div>';
+                <div class="form-group bm-qty" data-bm-future-only hidden>
+                    <span class="form-label">Quantity</span>
+                    <div class="bm-stepper" data-bm-qty-wrap>
+                        <button type="button" data-bm-qty-dec aria-label="Decrease quantity"><span class="material-symbols-outlined">remove</span></button>
+                        <input type="number" name="qty" value="1" min="1" max="1" inputmode="numeric" data-bm-qty aria-label="Quantity">
+                        <button type="button" data-bm-qty-inc aria-label="Increase quantity"><span class="material-symbols-outlined">add</span></button>
+                    </div>
+                    <p class="bm-hint" data-bm-qty-hint></p>
+                </div>';
         return '
         <div class="bm-sched" data-bm-sched data-bm-multi="' . ($multi ? '1' : '0') . '" id="' . $p . 'Sched">
             <input type="hidden" name="booking_mode" value="today" data-bm-mode-input>
@@ -717,18 +735,17 @@ final class BookingSchedule
             </label>
 
             <div class="bm-sched-fields" data-bm-fields>
-                <div class="form-group" data-bm-future-only hidden>
-                    <label class="form-label" for="' . $p . 'Date">Borrow date</label>
-                    <input type="date" id="' . $p . 'Date" name="borrow_date" class="form-input" data-bm-date>
-                    <p class="bm-hint" data-bm-date-hint></p>
-                </div>
-
-                <div class="form-row-2">
-                    <div class="form-group">
+                <div class="bm-when">
+                    <div class="form-group bm-when-date" data-bm-future-only hidden>
+                        <label class="form-label" for="' . $p . 'Date">Borrow date</label>
+                        <input type="date" id="' . $p . 'Date" name="borrow_date" class="form-input" data-bm-date>
+                    </div>
+                    <div class="form-group bm-when-time">
                         <label class="form-label" for="' . $p . 'Time">Start time</label>
                         <select id="' . $p . 'Time" name="start_time" class="form-input bm-select" data-bm-time></select>
-                    </div>' . $qty . '
+                    </div>
                 </div>
+                <p class="bm-hint bm-date-hint" data-bm-date-hint data-bm-future-only hidden></p>
 
                 <div class="form-group">
                     <span class="form-label" data-bm-length-label>For how long?</span>
@@ -739,6 +756,7 @@ final class BookingSchedule
                         <span>hours</span>
                     </div>
                 </div>
+' . $qty . '
 
                 <div class="bm-summary" data-bm-summary aria-live="polite"></div>
                 <p class="bm-avail" data-bm-avail aria-live="polite"></p>

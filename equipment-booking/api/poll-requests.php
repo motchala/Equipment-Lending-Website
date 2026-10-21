@@ -14,6 +14,25 @@ $conn = getDB();
 
 $uid = $_SESSION['faculty_id'];
 
+// ── My Activity feed (?view=activity) ─────────────────────────────────────
+// The equipment half of the faculty "My Activity" screen, already rendered by the
+// same functions the dashboard uses on first paint (core/faculty-activity.php, fact_eq_*):
+//   { body: html, rows: html, stats: { loans, overdue, pending } }
+if (($_GET['view'] ?? '') === 'activity') {
+    require_once __DIR__ . '/../core/faculty-activity.php';
+    $root_url = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'], 3)), '/') . '/';
+    fact_eq_housekeeping($conn);
+    $activity = fact_eq_load($conn, is_scalar($uid) ? (string)$uid : '');
+    header('Cache-Control: no-store');
+    echo json_encode([
+        'body'   => fact_eq_render_body($activity, $root_url),
+        'rows'   => fact_eq_render_history_rows($activity, $root_url),
+        'stats'  => fact_eq_stats($activity),
+    ], JSON_INVALID_UTF8_SUBSTITUTE);
+    $conn->close();
+    exit();
+}
+
 // Guard: check if submitted_as column exists (dual-borrowing-mode migration may not be run yet)
 $_sa_col = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'submitted_as'");
 $_has_sa = $_sa_col && $_sa_col->num_rows > 0;

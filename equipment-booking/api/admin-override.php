@@ -162,6 +162,13 @@ if (!$direction_ok) {
     send_json(422, 'error', 'Invalid status transition.');
 }
 
+// An already-approved booking that an admin revokes is a CANCELLATION, not a plain decline.
+// The marker lives in the decision-log row only (tbl_requests.arbitration_rule stays 'override'),
+// and the faculty notification feed reads it to send a "Booking Cancelled" notice.
+// $log_rule only ever holds one of these two fixed strings (it is interpolated into the SQL below).
+$is_cancellation = $new_status === 'Declined' && in_array($current_status, ['Approved', 'Overdue'], true);
+$log_rule        = $is_cancellation ? 'booking_cancelled' : 'override';
+
 // ── Begin transaction — wraps status UPDATE, inventory adjustment, and log INSERT
 $conn->begin_transaction();
 
@@ -300,11 +307,11 @@ try {
              override_by, override_by_id, override_reason, created_at)
          VALUES
             (?, ?, ?, ?,
-             ?, 'override', ?,
+             ?, '{$log_rule}', ?,
              ?, ?, ?, NOW())
          ON DUPLICATE KEY UPDATE
             decision        = VALUES(decision),
-            rule_applied    = 'override',
+            rule_applied    = '{$log_rule}',
             reason          = VALUES(reason),
             override_by     = VALUES(override_by),
             override_by_id  = VALUES(override_by_id),
@@ -350,7 +357,7 @@ try {
 admin_log_activity(
     $conn,
     'request',
-    $new_status . ' request #' . $request_id . ': ' . $equipment_name . ($borrower_name !== '' ? ' for ' . $borrower_name : ''),
+    ($is_cancellation ? 'Cancelled booking' : $new_status . ' request') . ' #' . $request_id . ': ' . $equipment_name . ($borrower_name !== '' ? ' for ' . $borrower_name : ''),
     null,
     ['action' => $new_status === 'Approved' ? 'request_approved' : 'request_declined', 'ref_type' => 'request', 'ref_id' => $request_id]
 );

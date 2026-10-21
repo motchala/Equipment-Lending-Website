@@ -243,8 +243,8 @@ if (!function_exists('notif_build_list')) {
                         ['label' => 'Borrow Date', 'value' => date('M d, Y', strtotime($r['borrow_date']))],
                         ['label' => 'Room / Instructor', 'value' => ($r['room'] ?? '—') . ' / ' . ($r['instructor'] ?? '—')],
                     ],
-                    'view_label' => 'View in Overdue',
-                    'link'       => ['tab' => 'requests', 'chip' => 'rq-overdue', 'request_id' => (int)$r['id']],
+                    'view_label' => 'View in On Loan',
+                    'link'       => ['tab' => 'inventory', 'sub' => 'eq-onloan', 'chip' => 'overdue', 'request_id' => (int)$r['id']],
                     'is_read'    => $state[$key]['is_read']    ?? false,
                     'is_deleted' => $state[$key]['is_deleted'] ?? false,
                 ];
@@ -278,8 +278,8 @@ if (!function_exists('notif_build_list')) {
                         ['label' => 'Requested On', 'value' => date('M d, Y g:i A', strtotime($r['request_date']))],
                         ['label' => 'Room / Instructor', 'value' => ($r['room'] ?? '—') . ' / ' . ($r['instructor'] ?? '—')],
                     ],
-                    'view_label' => 'View in Requests',
-                    'link'       => ['tab' => 'requests', 'chip' => 'rq-waiting', 'request_id' => (int)$r['id']],
+                    'view_label' => 'View in On Loan',
+                    'link'       => ['tab' => 'inventory', 'sub' => 'eq-onloan', 'chip' => 'waiting', 'request_id' => (int)$r['id']],
                     'is_read'    => $state[$key]['is_read']    ?? false,
                     'is_deleted' => $state[$key]['is_deleted'] ?? false,
                 ];

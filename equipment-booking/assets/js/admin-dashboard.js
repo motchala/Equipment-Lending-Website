@@ -179,6 +179,7 @@
     /* ── Tab switcher ────────────────────────────────────────── */
     function _switchTabDOM(tabName, clickedEl) {
         const panel = document.getElementById('panel-' + tabName);
+        if (!panel) return;
         // If the pre-paint script already activated this panel (no flash), skip
         // the remove-all/re-add cycle so the slideIn animation doesn't re-fire.
         const alreadyActive = panel && panel.classList.contains('active');
@@ -449,8 +450,8 @@
 
     /* ── Navigate to the screen a notification is about ─────────
        Different categories go different places on purpose:
-         overdue  → Requests tab, Overdue filter, flash the row
-         request  → Requests tab, Waiting filter, opens the exact
+         overdue  → Equipment > On Loan, Overdue filter, flash the row
+         request  → Equipment > On Loan, Waiting filter, opens the exact
                      request's detail modal (same one the table uses)
          room     → Rooms tab, Issues sub-tab, opens the exact
                      issue's review modal
@@ -461,25 +462,7 @@
         _markCardRead(card);
         psCloseModal('notifOverlay');
 
-        if (tab === 'requests') {
-            _switchTabDOM('requests');
-            const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + card.dataset.linkChip + '"]');
-            if (chip) chip.click();
-
-            const reqId = card.dataset.linkRequestId;
-            if (!reqId) return;
-            setTimeout(() => {
-                const row = document.querySelector('.ps-req-row[data-id="' + reqId + '"]');
-                if (!row) return;
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.classList.add('notif-target-flash');
-                setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
-                // Waiting-table rows can open the real detail modal directly —
-                // reuse the exact trigger the table itself uses.
-                const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
-                if (trigger) setTimeout(() => trigger.click(), 280);
-            }, 120);
-        } else if (tab === 'rooms') {
+        if (tab === 'rooms') {
             _switchTabDOM('rooms');
             if (card.dataset.linkSub) switchRoomsTab(card.dataset.linkSub);
 
@@ -499,6 +482,25 @@
             }, 120);
         } else if (tab === 'inventory') {
             _switchTabDOM('inventory');
+            if (card.dataset.linkSub === 'eq-onloan') {
+                setTimeout(() => {
+                    const loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                    if (loanPanel) loanPanel.click();
+                    const filter = document.querySelector('#eqLoanFilter [data-loan-filter="' + card.dataset.linkChip + '"]');
+                    if (filter) filter.click();
+
+                    const requestId = card.dataset.linkRequestId;
+                    if (!requestId) return;
+                    const row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-id="' + requestId + '"]');
+                    if (!row) return;
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    row.classList.add('notif-target-flash');
+                    setTimeout(() => row.classList.remove('notif-target-flash'), 1800);
+                    const trigger = row.querySelector('[data-modal="ps-req-detail-modal"]');
+                    if (card.dataset.linkChip === 'waiting' && trigger) setTimeout(() => trigger.click(), 280);
+                }, 120);
+                return;
+            }
             const itemId = card.dataset.linkItemId;
             if (!itemId) return;
             setTimeout(() => {
@@ -1457,8 +1459,8 @@
                 case 'go-lending': {
                     // NOTE: this used to jump to a standalone "Lending" panel
                     // (Borrow Requests / Equipment Registry / Raw Data /
-                    // Arbitration Log) that's since been removed — Requests
-                    // and Inventory are now their own real top-level tabs.
+                    // Arbitration Log) that's since been removed. Request
+                    // handling now lives under Equipment > On Loan.
                     const dest = el.dataset.lending || 'waiting';
                     if (dest === 'inventory') {
                         _switchTabDOM('inventory');
@@ -1478,12 +1480,13 @@
                         }
                         if (fw) fw.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                        // "waiting" (Review Requests / View All) — go to the
-                        // Requests tab and make sure the waiting-for-approval
-                        // filter is the one showing.
-                        _switchTabDOM('requests');
-                        const chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="rq-waiting"]');
-                        if (chip) chip.click();
+                        // "waiting" (Review Requests / View All) — show pending
+                        // requests in Equipment > On Loan.
+                        _switchTabDOM('inventory');
+                        const eqTab = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                        if (eqTab) eqTab.click();
+                        const filter = document.querySelector('#eqLoanFilter [data-loan-filter="waiting"]');
+                        if (filter) filter.click();
                     }
                     break;
                 }
@@ -3588,6 +3591,7 @@
             const badgeMap = {
                 Waiting: ['ps-badge--waiting', 'Waiting for Approval'],
                 Approved: ['ps-badge--active', 'Active / Approved'],
+                Scheduled: ['ps-badge--scheduled', 'Scheduled (approved)'],
                 Overdue: ['ps-badge--overdue', 'Overdue'],
                 Returned: ['ps-badge--returned', 'Returned'],
                 Declined: ['ps-badge--returned', 'Declined']
@@ -3899,110 +3903,6 @@
 })();
 
 /* ════════════════════════════════════════════════════════════════
-   PHASE 3 — REQUESTS PANEL JS
-   Modal system + sub-tab switcher
-════════════════════════════════════════════════════════════════ */
-
-/* ── ps-modal open / close ────────────────────────────────────── */
-function psOpenModal(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.add('ps-modal-open');
-}
-function psCloseModal(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.remove('ps-modal-open');
-}
-
-/* Close modal when clicking the backdrop */
-document.querySelectorAll('.ps-modal-backdrop').forEach(function (bd) {
-    bd.addEventListener('click', function (e) {
-        if (e.target === bd) bd.classList.remove('ps-modal-open');
-    });
-});
-
-/* ── Requests filter-chip switcher ────────────────────────────── */
-(function () {
-    var tabGroup = document.getElementById('rqTabs');
-    if (!tabGroup) return;
-
-    tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            /* Deactivate all chips and panels */
-            tabGroup.querySelectorAll('.rq-filter-chip').forEach(function (t) {
-                t.classList.remove('active');
-            });
-            document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function (p) {
-                p.classList.remove('active');
-            });
-
-            /* Activate clicked chip and its panel */
-            tab.classList.add('active');
-            var panelId = tab.dataset.rqPanel;
-            var panel = document.getElementById(panelId);
-            if (panel) panel.classList.add('active');
-        });
-    });
-})();
-
-/* ── Live search — Waiting table ─────────────────────────────── */
-(function () {
-    var input = document.getElementById('rq-waiting-search');
-    var table = document.getElementById('rq-waiting-table');
-    if (!input || !table) return;
-    input.addEventListener('input', function () {
-        var q = input.value.toLowerCase();
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-            var text = row.textContent.toLowerCase();
-            row.style.display = text.includes(q) ? '' : 'none';
-        });
-    });
-})();
-
-/* ── Live search + return-date range filter — Returned Requests table ── */
-(function () {
-    var searchInput = document.getElementById('rq-all-search');
-    var rangeSel = document.getElementById('rq-all-range');
-    var table = document.getElementById('rq-all-table');
-    if (!table) return;
-
-    function inReturnRange(dateStr, range) {
-        if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
-        var d = new Date(dateStr + 'T00:00:00');
-        if (isNaN(d.getTime())) return true;
-        var now = new Date();
-        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        if (range === 'today') {
-            return d.getTime() === todayStart.getTime();
-        }
-        if (range === 'week') {
-            var weekStart = new Date(todayStart);
-            weekStart.setDate(todayStart.getDate() - todayStart.getDay());
-            return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
-        }
-        if (range === 'month') {
-            return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-        }
-        if (range === 'year') {
-            return d.getFullYear() === now.getFullYear();
-        }
-        return true;
-    }
-
-    function filterAll() {
-        var q = searchInput ? searchInput.value.toLowerCase() : '';
-        var range = rangeSel ? rangeSel.value : 'month';
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-            var text = row.textContent.toLowerCase();
-            var matchQ = !q || text.includes(q);
-            var matchRange = inReturnRange(row.dataset.returnDate, range);
-            row.style.display = (matchQ && matchRange) ? '' : 'none';
-        });
-    }
-    if (searchInput) searchInput.addEventListener('input', filterAll);
-    if (rangeSel) rangeSel.addEventListener('change', filterAll);
-    filterAll(); // apply the default "This Month" range immediately
-})();
-/* ════════════════════════════════════════════════════════════════
    PHASE 3 — ARBITRATION + EXPORT HELPERS
 ════════════════════════════════════════════════════════════════ */
 
@@ -4016,7 +3916,7 @@ function psSelectFmt(btn) {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   APPROVALS — review drawer for the Waiting table
+   APPROVALS — review drawer for the Equipment > On Loan table
    Additive block. Opens from the request ID in each row (and from the
    notification deep link, which clicks the same ID element). Approve /
    Decline in the drawer hand off to the EXISTING approve / decline
@@ -4079,11 +3979,11 @@ function psSelectFmt(btn) {
     }
 
     // Capture phase: runs before the generic data-action handler, so the ID
-    // inside the Waiting table opens this drawer instead of the old detail modal.
+    // in the waiting list opens this drawer instead of the old detail modal.
     document.addEventListener('click', function (e) {
-        var t = e.target.closest('#rq-waiting-table [data-modal="ps-req-detail-modal"]');
+        var t = e.target.closest('#eq-loan-table tr[data-loan-state="waiting"] [data-modal="ps-req-detail-modal"]');
         if (!t) return;
-        var row = t.closest('tr.ps-req-row');
+        var row = t.closest('tr.eq-loan-row');
         if (!row) return;
         e.preventDefault();
         e.stopPropagation();
@@ -4094,7 +3994,7 @@ function psSelectFmt(btn) {
     drawer.addEventListener('click', function (e) {
         var b = e.target.closest('[data-appr-decide]');
         if (!b || !currentId) return;
-        var row = document.querySelector('#rq-waiting-table tr.ps-req-row[data-id="' + currentId + '"]');
+        var row = document.querySelector('#eq-loan-table tr.eq-loan-row[data-loan-state="waiting"][data-id="' + currentId + '"]');
         if (!row) return;
         var sel = b.getAttribute('data-appr-decide') === 'approve'
             ? '[data-modal="ps-approve-modal"]'
@@ -4117,6 +4017,9 @@ function psSelectFmt(btn) {
    ROOMS — reservation details drawer (Rooms > Reservations table)
    Additive block. "Cancel reservation" in the drawer clicks the row's
    own Cancel button, so the existing cancel modal + API are reused.
+   Waiting requests (Org Adviser + attached letter) show a reason box and
+   Approve / Decline buttons for the Super Admin; the decision goes to
+   room-reservation/api/review-adviser-reservation.php (Super Admin only).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -4127,6 +4030,24 @@ function psSelectFmt(btn) {
     function txt(id, v) {
         var n = el(id);
         if (n) n.textContent = (v !== undefined && v !== null && String(v).trim() !== '') ? v : '\u2014';
+    }
+
+    var reviewSec = el('ps-rr-review-sec');
+    var reasonBox = el('ps-rr-review-reason');
+    var reviewErr = el('ps-rr-review-err');
+    var decideBtns = Array.prototype.slice.call(drawer.querySelectorAll('[data-rr-decide]'));
+
+    function showReviewError(msg) {
+        if (!reviewErr) return;
+        reviewErr.textContent = msg;
+        reviewErr.hidden = false;
+    }
+
+    function setReviewUI(on) {
+        if (reviewSec) reviewSec.hidden = !on;
+        decideBtns.forEach(function (b) { b.hidden = !on; b.disabled = false; });
+        if (reasonBox) reasonBox.value = '';
+        if (reviewErr) { reviewErr.hidden = true; reviewErr.textContent = ''; }
     }
 
     function openFor(row) {
@@ -4144,7 +4065,7 @@ function psSelectFmt(btn) {
         txt('ps-rr-type', d.type);
 
         var badge = el('ps-rr-status');
-        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned' };
+        var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned', Waiting: 'ps-badge--waiting' };
         badge.className = 'ps-badge ps-badge--dot ' + (cls[d.status] || 'ps-badge--returned');
         badge.textContent = d.status;
 
@@ -4176,31 +4097,34 @@ function psSelectFmt(btn) {
         // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
         el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
 
+        // Review controls: Waiting requests, Super Admin only (the table only flags those rows).
+        setReviewUI(d.status === 'Waiting' && d.canReview === '1');
+
         // Decision context. The room arbitration log records the rule used for
         // automatic decisions; an override/manual value denotes an admin decision.
-        var arbRule   = d.arbRule   || '';
+        var arbRule = d.arbRule || '';
         var arbReason = d.arbReason || d.reason || '';
-        var hasDoc    = !!d.docUrl;
-        var decSec    = el('ps-rr-decision-sec');
+        var hasDoc = !!d.docUrl;
+        var decSec = el('ps-rr-decision-sec');
         if (decSec) {
             var ruleMap = {
-                'rule_1_fifo':           'FIFO (first submitted)',
-                'rule_2_signatory':      'Request-letter/signatory priority',
-                'rule_3_role':           'Submitter role priority',
+                'rule_1_fifo': 'FIFO (first submitted)',
+                'rule_2_signatory': 'Request-letter/signatory priority',
+                'rule_3_role': 'Submitter role priority',
                 'rule_4_return_history': 'Return-history priority',
-                'rule_5_id_order':       'ID order tie-breaker',
-                'rule_past_datetime':    'Past date or time',
-                'rule_archived':          'Room availability policy',
-                'rule_missing_doc_hold':  'Supporting-document policy',
+                'rule_5_id_order': 'ID order tie-breaker',
+                'rule_past_datetime': 'Past date or time',
+                'rule_archived': 'Room availability policy',
+                'rule_missing_doc_hold': 'Supporting-document policy',
                 'rule_schedule_conflict': 'Schedule conflict',
-                'override':              'Admin override',
-                'manual':                'Manual admin decision'
+                'override': 'Admin override',
+                'manual': 'Manual admin decision'
             };
             var ruleLabel = ruleMap[arbRule] || (arbRule
                 ? arbRule.replace(/^rule_\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); })
                 : 'Not recorded');
             var isManual = arbRule === 'override' || arbRule === 'manual';
-            var isAuto   = arbRule !== '' && !isManual;
+            var isAuto = arbRule !== '' && !isManual;
             var methodLabel;
             if (isManual) {
                 methodLabel = 'Manual (admin decision)';
@@ -4213,7 +4137,7 @@ function psSelectFmt(btn) {
             if (methodEl) methodEl.textContent = methodLabel;
 
             var ruleRow = el('ps-rr-dec-rule-row');
-            var ruleEl  = el('ps-rr-dec-rule');
+            var ruleEl = el('ps-rr-dec-rule');
             if (ruleRow && ruleEl) {
                 ruleRow.hidden = false;
                 ruleEl.textContent = ruleLabel;
@@ -4221,15 +4145,104 @@ function psSelectFmt(btn) {
 
             // Reason row
             var reasonRow = el('ps-rr-dec-reason-row');
-            var reasonEl  = el('ps-rr-dec-reason');
+            var reasonEl = el('ps-rr-dec-reason');
             if (reasonRow && reasonEl) {
                 reasonRow.hidden = false;
                 reasonEl.textContent = arbReason || (hasDoc ? 'Supporting document attached to this reservation.' : 'No decision reason recorded.');
+            }
+            // Waiting: nothing has been decided yet
+            if (d.status === 'Waiting') {
+                if (methodEl) methodEl.textContent = 'Awaiting Super Admin review';
+                if (ruleRow) ruleRow.hidden = true;
+                if (reasonRow) reasonRow.hidden = true;
             }
             decSec.hidden = false;
         }
 
         if (typeof psOpenModal === 'function') psOpenModal('ps-room-drawer');
+    }
+
+    /* Reflect an approved/declined decision in the table row without a reload */
+    function applyDecision(row, decision, reason) {
+        var d = row.dataset;
+        d.status = decision;
+        d.reason = reason;
+        d.arbRule = 'override';
+        d.arbReason = reason;
+        d.canReview = '0';
+
+        var badge = row.querySelector('.ps-badge');
+        if (badge) {
+            badge.className = 'ps-badge ps-badge--dot ' + (decision === 'Approved' ? 'ps-badge--active' : 'ps-badge--overdue');
+            badge.textContent = decision;
+        }
+        var viewBtn = row.querySelector('[data-rr-detail]');
+        if (viewBtn) viewBtn.textContent = 'View';
+
+        // An approved reservation that has not ended yet can be cancelled, like any other
+        var endMs = Date.parse((d.isoDate || '') + 'T' + (d.endTime || '') + '+08:00'); // Asia/Manila
+        var cancellable = decision === 'Approved' && endMs > Date.now();
+        d.cancellable = cancellable ? '1' : '0';
+        if (cancellable && viewBtn && !row.querySelector('.btn-cancel-rr-admin')) {
+            var cb = document.createElement('button');
+            cb.type = 'button';
+            cb.className = 'pr-tbl-btn cancel-r btn-cancel-rr-admin';
+            cb.setAttribute('data-action', 'admin-cancel-reservation');
+            cb.setAttribute('data-rr-id', d.rrId);
+            cb.setAttribute('data-room-name', d.room || '');
+            cb.setAttribute('data-faculty-name', d.who || '');
+            cb.title = 'Cancel this reservation';
+            cb.textContent = 'Cancel';
+            viewBtn.parentNode.insertBefore(cb, viewBtn);
+        }
+        // Lets the table script re-sort, refresh the tab counts and re-apply the filter
+        document.dispatchEvent(new CustomEvent('rr:rows-changed'));
+    }
+
+    function submitDecision(decision, btn) {
+        if (!currentRow) return;
+        var row = currentRow;
+        var reason = reasonBox ? reasonBox.value.trim() : '';
+        if (reason.length < 5) {
+            showReviewError('Please enter a reason of at least 5 characters.');
+            if (reasonBox) reasonBox.focus();
+            return;
+        }
+        var tokenEl = document.querySelector('input[name="csrf_token"]');
+        var idleHtml = btn.innerHTML;
+        if (reviewErr) reviewErr.hidden = true;
+        decideBtns.forEach(function (b) { b.disabled = true; });
+        btn.textContent = decision === 'Approved' ? 'Approving\u2026' : 'Declining\u2026';
+
+        fetch('room-reservation/api/review-adviser-reservation.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                reservation_id: parseInt(row.dataset.rrId, 10),
+                decision: decision,
+                reason: reason,
+                csrf_token: tokenEl ? tokenEl.value : ''
+            })
+        })
+            .then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+            })
+            .then(function (res) {
+                if (!res.ok || res.j.status !== 'success') {
+                    var err = new Error(res.j.message || 'Could not save the decision.');
+                    err.fromServer = true;
+                    throw err;
+                }
+                applyDecision(row, decision, reason);
+                if (typeof psCloseModal === 'function') psCloseModal('ps-room-drawer');
+                if (typeof window.showToast === 'function') window.showToast(res.j.message || (decision === 'Approved' ? 'Reservation approved.' : 'Reservation declined.'));
+            })
+            .catch(function (err) {
+                showReviewError(err && err.fromServer ? err.message : 'Network error. Please try again.');
+                decideBtns.forEach(function (b) { b.disabled = false; });
+                btn.innerHTML = idleHtml;
+            });
     }
 
     document.addEventListener('click', function (e) {
@@ -4242,6 +4255,11 @@ function psSelectFmt(btn) {
     });
 
     drawer.addEventListener('click', function (e) {
+        var decideBtn = e.target.closest('[data-rr-decide]');
+        if (decideBtn) {
+            submitDecision(decideBtn.getAttribute('data-rr-decide'), decideBtn);
+            return;
+        }
         if (!e.target.closest('[data-rr-cancel]') || !currentRow) return;
         var btn = currentRow.querySelector('.btn-cancel-rr-admin');
         if (!btn) return;
@@ -4645,10 +4663,12 @@ function psSelectFmt(btn) {
             var nav = document.querySelector('.nav-item[data-tab="' + tab + '"]');
             if (nav) {
                 nav.click();
-                var chipKey = go.getAttribute('data-dash-chip');
-                if (chipKey) {
-                    var chip = document.querySelector('#rqTabs .rq-filter-chip[data-rq-panel="' + chipKey + '"]');
-                    if (chip) chip.click();
+                var loanFilter = go.getAttribute('data-dash-loan-filter');
+                if (loanFilter) {
+                    var loanPanel = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                    if (loanPanel) loanPanel.click();
+                    var loanTab = document.querySelector('#eqLoanFilter [data-loan-filter="' + loanFilter + '"]');
+                    if (loanTab) loanTab.click();
                 }
             }
             return;
@@ -4838,6 +4858,380 @@ function psSelectFmt(btn) {
         sync();
     }
 
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
+    else install();
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════
+   EQUIPMENT › sub-tabs (Catalog | On Loan) + On Loan filter/search
+   Additive block. Scoped to #eqTabs / #eq-onloan; nothing else is touched.
+   window.psOpenEquipmentTab('eq-onloan') can be called from deep links.
+   ═══════════════════════════════════════════════════════════════ */
+(function () {
+    function install() {
+        var tabs = document.getElementById('eqTabs');
+        if (!tabs) return;
+
+        function openPanel(panelId) {
+            var chip = null;
+            tabs.querySelectorAll('.rq-filter-chip').forEach(function (c) {
+                var on = c.getAttribute('data-eq-panel') === panelId;
+                c.classList.toggle('active', on);
+                if (on) chip = c;
+            });
+            if (!chip) return;
+            document.querySelectorAll('#panel-inventory .eq-sub-panel').forEach(function (p) {
+                p.classList.toggle('active', p.id === panelId);
+            });
+        }
+        window.psOpenEquipmentTab = openPanel;
+
+        tabs.addEventListener('click', function (e) {
+            var chip = e.target.closest('.rq-filter-chip[data-eq-panel]');
+            if (chip) openPanel(chip.getAttribute('data-eq-panel'));
+        });
+
+        /* On Loan: status tabs + live search + pagination (20 per page) */
+        var table = document.getElementById('eq-loan-table');
+        var search = document.getElementById('eq-loan-search');
+        var tabBar = document.getElementById('eqLoanFilter');
+        var titleEl = document.getElementById('eqLoanTitle');
+        var pager = document.getElementById('eq-loan-pager');
+        var pgInfo = document.getElementById('eq-loan-pager-info');
+        var pgCtl = document.getElementById('eq-loan-pager-ctl');
+        var pgNums = document.getElementById('eq-loan-pg-nums');
+        var pgPrev = document.getElementById('eq-loan-pg-prev');
+        var pgNext = document.getElementById('eq-loan-pg-next');
+        if (!table) return;
+
+        var PAGE_SIZE = 20;
+        var TITLES = {
+            all: 'All Loans',
+            waiting: 'Pending & Scheduled',
+            active: 'Active Borrowings',
+            overdue: 'Overdue Items',
+            returned: 'Returned Equipment'
+        };
+        var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
+        var noMatch = table.querySelector('tr.eq-loan-nomatch');
+        var mode = 'all';
+        var query = '';
+        var page = 1;
+        var removedAny = false;   /* a row was removed this session (e.g. a cancelled booking) */
+
+        function matchesMode(state) {
+            if (mode === 'all') return true;
+            if (mode === 'active') return state === 'ok' || state === 'due';
+            if (mode === 'waiting') return state === 'waiting' || state === 'scheduled';
+            return state === mode; /* overdue | returned */
+        }
+
+        function matchesQuery(row) {
+            if (!query) return true;
+            var d = row.dataset;
+            var hay = [d.borrower, d.equipment, d.idNumber, '#' + String(d.id || '').padStart(4, '0')].join(' ').toLowerCase();
+            return hay.indexOf(query) !== -1;
+        }
+
+        /* 1 … 4 5 6 … 12 — always first, last and the current page ±1 (same as the Equipment list) */
+        function pageList(total, current) {
+            var keep = [1, total, current - 1, current, current + 1];
+            var list = [], last = 0;
+            keep.filter(function (n, i) { return n >= 1 && n <= total && keep.indexOf(n) === i; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function render() {
+            var hits = rows.filter(function (r) { return matchesMode(r.dataset.loanState) && matchesQuery(r); });
+            var total = hits.length;
+            var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            page = Math.min(Math.max(page, 1), pages);
+            var start = (page - 1) * PAGE_SIZE;
+            var end = Math.min(start + PAGE_SIZE, total);
+            var visible = hits.slice(start, end);
+
+            rows.forEach(function (r) { r.style.display = visible.indexOf(r) !== -1 ? '' : 'none'; });
+            if (noMatch) noMatch.hidden = !((rows.length > 0 || removedAny) && total === 0);
+
+            if (!pager) return;
+            pager.hidden = rows.length === 0;
+            if (pgInfo) pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
+            if (pgCtl) pgCtl.hidden = pages <= 1;
+            if (pgPrev) pgPrev.disabled = page <= 1;
+            if (pgNext) pgNext.disabled = page >= pages;
+            if (pgNums) {
+                pgNums.textContent = '';
+                pageList(pages, page).forEach(function (n) {
+                    if (n === 'gap') {
+                        var gap = document.createElement('span');
+                        gap.className = 'inv-pager-gap';
+                        gap.textContent = '\u2026';
+                        pgNums.appendChild(gap);
+                        return;
+                    }
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.dataset.page = String(n);
+                    btn.textContent = String(n);
+                    btn.setAttribute('aria-label', 'Page ' + n);
+                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    pgNums.appendChild(btn);
+                });
+            }
+        }
+
+        if (tabBar) {
+            tabBar.addEventListener('click', function (e) {
+                var b = e.target.closest('.eq-loan-tab');
+                if (!b) return;
+                mode = b.getAttribute('data-loan-filter') || 'all';
+                tabBar.querySelectorAll('.eq-loan-tab').forEach(function (t) {
+                    var on = t === b;
+                    t.classList.toggle('active', on);
+                    t.setAttribute('aria-selected', on ? 'true' : 'false');
+                });
+                if (titleEl) titleEl.textContent = TITLES[mode] || TITLES.all;
+                page = 1;
+                render();
+            });
+        }
+        if (search) {
+            search.addEventListener('input', function () {
+                query = this.value.trim().toLowerCase();
+                page = 1;
+                render();
+            });
+        }
+        if (pgPrev) pgPrev.addEventListener('click', function () { page--; render(); });
+        if (pgNext) pgNext.addEventListener('click', function () { page++; render(); });
+        if (pgNums) {
+            pgNums.addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-page]');
+                if (!btn) return;
+                page = parseInt(btn.dataset.page, 10) || 1;
+                render();
+            });
+        }
+
+        /* ── Scheduled (later-date) bookings: cancel / revoke before they start ──
+           They are approved by default, so an admin can still revoke one here. Uses the existing
+           admin-override endpoint (Approved → Declined, reason required). A booking that has not
+           started never took stock off the shelf, so nothing has to be given back. */
+        var cModal = document.getElementById('ps-cancel-booking-modal');
+        var cId = document.getElementById('cancel-booking-id');
+        var cReason = document.getElementById('cancel-booking-reason');
+        var cBtn = document.getElementById('ps-cancel-booking-confirm-btn');
+        var cAlert = document.getElementById('ps-cancel-booking-alert');
+
+        function cText(id, v) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = v || '\u2014';
+        }
+        function cClearAlert() {
+            if (cAlert) { cAlert.style.display = 'none'; cAlert.textContent = ''; }
+        }
+        function cShowAlert(msg) {
+            if (!cAlert) return;
+            cAlert.style.display = 'block';
+            cAlert.style.background = '#ffeaea';
+            cAlert.style.color = 'var(--danger)';
+            cAlert.textContent = msg;
+        }
+
+        if (cModal && cBtn) {
+            /* fill the modal from the clicked row (the generic ps-open-modal handler opens it) */
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-cancel-booking-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr[data-id]');
+                if (!tr) return;
+                var d = tr.dataset;
+                if (cId) cId.value = d.id || '';
+                cText('ps-cancel-booking-reqno', '#R-' + String(d.id || 0).padStart(4, '0'));
+                cText('cancel-booking-borrower', d.borrower);
+                cText('cancel-booking-equipment', d.equipment);
+                cText('cancel-booking-start', d.startLabel);
+                cText('cancel-booking-due', d.dueLabel);
+                if (cReason) cReason.value = '';
+                cBtn.disabled = true;
+                cClearAlert();
+            });
+
+            if (cReason) {
+                cReason.addEventListener('input', function () {
+                    cBtn.disabled = this.value.trim().length < 5;
+                });
+            }
+
+            cBtn.addEventListener('click', function () {
+                var id = cId ? cId.value : '';
+                var reason = cReason ? cReason.value.trim() : '';
+                if (!id) return;
+                if (reason.length < 5) {
+                    cShowAlert('Please enter a reason (min. 5 characters).');
+                    return;
+                }
+                var orig = cBtn.innerHTML;
+                cBtn.disabled = true;
+                cBtn.textContent = 'Cancelling\u2026';
+                cClearAlert();
+
+                var tok = document.querySelector('input[name="csrf_token"]');
+                var fd = new FormData();
+                fd.append('request_id', id);
+                fd.append('new_status', 'Declined');
+                fd.append('override_reason', reason);
+                fd.append('csrf_token', tok ? tok.value : '');
+
+                fetch('equipment-booking/api/admin-override.php', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data && data.status === 'success') {
+                            if (typeof window.showToast === 'function') window.showToast('Booking cancelled.');
+                            cModal.classList.remove('ps-modal-open');
+                            cBtn.innerHTML = orig;
+
+                            /* take the row out of the table and update the Waiting count */
+                            var tr = table.querySelector('tr.eq-loan-row[data-id="' + id + '"]');
+                            var idx = rows.indexOf(tr);
+                            if (idx !== -1) rows.splice(idx, 1);
+                            if (tr && tr.parentNode) tr.parentNode.removeChild(tr);
+                            removedAny = true;
+                            var cnt = tabBar ? tabBar.querySelector('[data-loan-filter="waiting"] .eq-loan-tab-count') : null;
+                            if (cnt) cnt.textContent = String(Math.max(0, (parseInt(cnt.textContent, 10) || 0) - 1));
+                            render();
+                        } else {
+                            cShowAlert((data && data.message) || 'Action failed. Please try again.');
+                            cBtn.disabled = false;
+                            cBtn.innerHTML = orig;
+                        }
+                    })
+                    .catch(function () {
+                        cShowAlert('Network error. Please try again.');
+                        cBtn.disabled = false;
+                        cBtn.innerHTML = orig;
+                    });
+            });
+        }
+
+        /* Manual Return records a return verified by an administrator. It is
+           deliberately independent of the faculty member's QR return token. */
+        var returnModal = document.getElementById('ps-return-modal');
+        var returnId = document.getElementById('manual-return-request-id');
+        var returnCondition = document.getElementById('manual-return-condition');
+        var returnConditionValue = document.getElementById('manual-return-condition-value');
+        var returnNotes = document.getElementById('manual-return-notes');
+        var returnBtn = document.getElementById('manual-return-confirm-btn');
+        var returnForm = document.getElementById('manual-return-form');
+
+        function setReturnSummary(index, value) {
+            var cells = returnModal ? returnModal.querySelectorAll('.ps-req-summary .ps-rsv') : [];
+            if (cells[index]) cells[index].textContent = value || '\u2014';
+        }
+
+        if (returnModal && returnBtn && returnForm) {
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-return-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr.eq-loan-row');
+                if (!tr) return;
+                var d = tr.dataset;
+                if (returnId) returnId.value = d.id || '';
+                setReturnSummary(0, d.borrower);
+                setReturnSummary(1, d.idNumber);
+                setReturnSummary(2, d.equipment + (d.qty && d.qty !== '1' ? ' \u00d7' + d.qty : ''));
+                setReturnSummary(3, d.dueLabel);
+                if (returnCondition) returnCondition.selectedIndex = 0;
+                if (returnNotes) returnNotes.value = '';
+            });
+
+            returnForm.addEventListener('submit', function (e) {
+                var id = returnId ? returnId.value : '';
+                if (!id) {
+                    e.preventDefault();
+                    if (typeof window.showToast === 'function') window.showToast('Select a loan to return first.');
+                    return;
+                }
+                var selected = returnCondition && returnCondition.options[returnCondition.selectedIndex];
+                if (returnConditionValue) {
+                    returnConditionValue.value = selected ? selected.text.split(/\s+/)[0] : 'Good';
+                }
+                returnBtn.disabled = true;
+                returnBtn.textContent = 'Recording\u2026';
+                try { sessionStorage.setItem('openManualReturnLoanTab', '1'); } catch (_) { }
+            });
+        }
+
+        /* Send Notice: delivers an administrator-authored message to the
+           borrower’s PUPSync notification inbox. */
+        var noticeModal = document.getElementById('ps-notice-modal');
+        var noticeForm = document.getElementById('overdue-notice-form');
+        var noticeId = document.getElementById('overdue-notice-request-id');
+        var noticePreview = document.getElementById('overdue-notice-preview');
+        var noticeBtn = document.getElementById('overdue-notice-send-btn');
+
+        function setNoticeSummary(index, value) {
+            var cells = noticeModal ? noticeModal.querySelectorAll('.ps-req-summary .ps-rsv') : [];
+            if (cells[index]) cells[index].textContent = value || '\u2014';
+        }
+
+        if (noticeModal && noticeForm && noticeBtn) {
+            document.addEventListener('click', function (e) {
+                var trigger = e.target.closest('#eq-loan-table [data-modal="ps-notice-modal"]');
+                if (!trigger) return;
+                var tr = trigger.closest('tr.eq-loan-row');
+                if (!tr) return;
+                var d = tr.dataset;
+                var days = Math.max(1, parseInt(d.daysOverdue || '0', 10) || 1);
+                var due = d.dueLabel || d.returnDateDisplay || 'the due date';
+                if (noticeId) noticeId.value = d.id || '';
+                setNoticeSummary(0, d.borrower);
+                setNoticeSummary(1, d.idNumber);
+                setNoticeSummary(2, d.equipment + (d.qty && d.qty !== '1' ? ' \u00d7' + d.qty : ''));
+                setNoticeSummary(3, days + ' day' + (days === 1 ? '' : 's'));
+                if (noticePreview) {
+                    noticePreview.textContent = 'Dear ' + (d.borrower || 'Borrower') + ',\n\n'
+                        + 'This is an official overdue-return notice from PUPSync Admin. '
+                        + (d.equipment || 'The borrowed equipment') + ' was due on ' + due + ' and is now '
+                        + days + ' day' + (days === 1 ? '' : 's') + ' overdue.\n\n'
+                        + 'Please return this equipment to the Admin Office immediately. '
+                        + 'Your borrowing access remains blocked until the return is recorded.\n\n'
+                        + 'PUPSync Admin';
+                }
+            });
+
+            noticeForm.addEventListener('submit', function (e) {
+                if (!noticeId || !noticeId.value) {
+                    e.preventDefault();
+                    if (typeof window.showToast === 'function') window.showToast('Select an overdue loan first.');
+                    return;
+                }
+                noticeBtn.disabled = true;
+                noticeBtn.textContent = 'Sending\u2026';
+                try { sessionStorage.setItem('openOverdueLoanTab', '1'); } catch (_) { }
+            });
+        }
+
+        render();
+        try {
+            if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {
+                sessionStorage.removeItem('openManualReturnLoanTab');
+                sessionStorage.removeItem('openOverdueLoanTab');
+                var onLoanTab = document.querySelector('#eqTabs .rq-filter-chip[data-eq-panel="eq-onloan"]');
+                if (onLoanTab) onLoanTab.click();
+                var overdueTab = tabBar ? tabBar.querySelector('[data-loan-filter="overdue"]') : null;
+                if (overdueTab) overdueTab.click();
+            }
+        } catch (_) { }
+    }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
     else install();
 })();

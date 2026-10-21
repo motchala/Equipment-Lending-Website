@@ -680,7 +680,7 @@ CREATE TABLE `tbl_users` (
   `gender` varchar(30) DEFAULT NULL,
   `nationality` varchar(100) DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
-  `department` varchar(50) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
   `faculty_rank` varchar(20) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `present_address` text DEFAULT NULL,

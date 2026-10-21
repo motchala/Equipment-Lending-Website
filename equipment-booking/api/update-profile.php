@@ -25,6 +25,151 @@ $uid = mysqli_real_escape_string($conn, $_SESSION['faculty_id']);
 $action = trim($_POST['action'] ?? '');
 
 /* ══════════════════════════════════════════════════════════════════
+   ACTION: save_account
+   Settings > Personal Information ("Edit Account" -> "Save Changes").
+   Saves, in ONE request and with no extra confirmation step:
+     - fullname    always editable
+     - department  can be chosen ONCE; locked after that (same rule as the Faculty ID)
+     - phone       a Philippine mobile number, stored as "09XX XXX XXXX"; may be cleared
+   The email address is the sign-in ID and is managed by the administrator, so it is
+   deliberately NOT editable here.
+══════════════════════════════════════════════════════════════════ */
+if ($action === 'save_account') {
+    require_once __DIR__ . '/../../config/faculty-account.php';
+
+    $fail = static function (string $msg, string $field = '') {
+        echo json_encode(['success' => false, 'msg' => $msg, 'field' => $field]);
+        exit;
+    };
+
+    $faculty_id = (string)$_SESSION['faculty_id'];
+
+    $sel = $conn->prepare('SELECT fullname, department, phone FROM tbl_users WHERE faculty_id = ? LIMIT 1');
+    if (!$sel) {
+        $fail('Could not load your account. Please try again.');
+    }
+    $sel->bind_param('s', $faculty_id);
+    $sel->execute();
+    $cur = $sel->get_result()->fetch_assoc();
+    $sel->close();
+    if (!$cur) {
+        $fail('Account not found. Please log in again.');
+    }
+    $cur_name  = (string)($cur['fullname'] ?? '');
+    $cur_dept  = (string)($cur['department'] ?? '');
+    $cur_phone = (string)($cur['phone'] ?? '');
+
+    $set    = [];   // column => new value (null clears the column)
+    $errors = [];
+
+    /* ── Full name ── */
+    $in_name = trim((string)($_POST['fullname'] ?? $cur_name));
+    $in_name = preg_replace('/\s+/u', ' ', $in_name);
+    if ($in_name === '') {
+        $fail('Full name cannot be empty.', 'fullname');
+    }
+    if (mb_strlen($in_name) > 120) {
+        $fail('Name is too long (max 120 characters).', 'fullname');
+    }
+    if (!preg_match("/^[\p{L}\s.\-']+$/u", $in_name)) {
+        $fail('Name can only contain letters, spaces, dots, hyphens and apostrophes.', 'fullname');
+    }
+    if ($in_name !== $cur_name) {
+        $set['fullname'] = $in_name;
+    }
+
+    /* ── Department (set once) ── */
+    $in_dept = trim((string)($_POST['department'] ?? $cur_dept));
+    if ($in_dept !== $cur_dept) {
+        if ($cur_dept !== '') {
+            $fail('Your department is already set and cannot be changed here.', 'department');
+        }
+        if ($in_dept !== '') {
+            if (!faculty_department_is_valid($in_dept)) {
+                $fail('Please choose a department from the list.', 'department');
+            }
+            if (!faculty_ensure_department_column($conn)) {
+                $fail('Your department could not be saved because the database needs a one-time update. Please contact the administrator.', 'department');
+            }
+            $set['department'] = $in_dept;
+        }
+    }
+
+    /* ── Mobile number ── */
+    $in_phone = trim((string)($_POST['phone'] ?? $cur_phone));
+    if ($in_phone !== $cur_phone) {
+        if ($in_phone === '') {
+            $set['phone'] = null;
+        } else {
+            $norm = faculty_phone_normalize($in_phone);
+            if ($norm === null) {
+                $fail('Enter a valid mobile number, like 09XX XXX XXXX.', 'phone');
+            }
+            if ($norm !== $cur_phone) {
+                $set['phone'] = $norm;
+            }
+        }
+    }
+
+    if (!$set) {
+        echo json_encode(['success' => true, 'changed' => false, 'msg' => 'No changes to save.']);
+        exit;
+    }
+
+    $cols   = [];
+    $types  = '';
+    $values = [];
+    foreach ($set as $col => $val) {
+        $cols[]   = '`' . $col . '` = ?';      // $col comes from the fixed list above, never from input
+        $types   .= 's';
+        $values[] = $val;
+    }
+    $types   .= 's';
+    $values[] = $faculty_id;
+
+    $upd = $conn->prepare('UPDATE tbl_users SET ' . implode(', ', $cols) . ' WHERE faculty_id = ?');
+    if (!$upd) {
+        $fail('Could not save your changes. Please try again.');
+    }
+    $upd->bind_param($types, ...$values);
+    $ok = $upd->execute();
+    $upd->close();
+    if (!$ok) {
+        $fail('Could not save your changes. Please try again.');
+    }
+
+    if (isset($set['fullname'])) {
+        $_SESSION['faculty_name'] = $set['fullname'];
+    }
+
+    $new_name  = $set['fullname']   ?? $cur_name;
+    $new_dept  = $set['department'] ?? $cur_dept;
+    $new_phone = array_key_exists('phone', $set) ? (string)($set['phone'] ?? '') : $cur_phone;
+
+    $parts    = preg_split('/\s+/u', trim($new_name)) ?: [];
+    $initials = mb_strtoupper(mb_substr($parts[0] ?? '', 0, 1));
+    if (count($parts) > 1) {
+        $initials .= mb_strtoupper(mb_substr(end($parts), 0, 1));
+    }
+
+    echo json_encode([
+        'success' => true,
+        'changed' => true,
+        'msg'     => 'Your account details were updated.',
+        'data'    => [
+            'fullname'          => $new_name,
+            'first_name'        => $parts[0] ?? '',
+            'initials'          => $initials,
+            'department'        => $new_dept,
+            'department_locked' => $new_dept !== '',
+            'phone'             => $new_phone,
+            'phone_display'     => faculty_phone_display($new_phone),
+        ],
+    ]);
+    exit;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    ACTION: save_profile
    Updates fullname (always), and dob / gender / nationality only
    if they have NOT been set before (one-time-lock rule).

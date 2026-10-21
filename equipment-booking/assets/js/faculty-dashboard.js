@@ -82,19 +82,10 @@
         //     document.documentElement.style.setProperty('--radius', '9px');
         // }
 
-        // 4. Font size
-        const fs = LS.get('fontSize');
-        if (fs && fs !== '100') {
-            const fr = document.getElementById('fontSizeRange');
-            if (fr) fr.value = fs;
-            const lbl = document.getElementById('fontSizeLbl');
-            if (lbl) lbl.textContent = fs + '%';
-            document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
-            // Sync font scale buttons
-            document.querySelectorAll('.u-font-btn').forEach(b => {
-                b.classList.toggle('u-font-btn-active', b.dataset.scale === fs);
-            });
-        }
+        // 4. Font size: the Text Size setting was removed from Settings. Clear any size saved earlier
+        //    so nobody is left stuck on a custom size with no way to change it back.
+        if (LS.get('fontSize') !== null) LS.del('fontSize');
+        document.documentElement.style.fontSize = '';
 
         // 5. Reduce motion — removed from new settings design
         // if (LS.get('reduceMotion') === 'true') { ... }
@@ -249,6 +240,7 @@
         document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
         // Highlight the Settings sidebar item when settings overlay is open
         if (id === 'settingsOverlay') {
+            sovCancelEdit(true);   // Settings always opens in read-only mode
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
             // Settings lives inside the account menu, so mark the account toggle as the current item too
@@ -320,19 +312,19 @@
             // Deep-link: read params stored by the AI mini-form in sessionStorage
             (function () {
                 var raw = null;
-                try { raw = sessionStorage.getItem('ai_room_deeplink'); } catch (e) {}
+                try { raw = sessionStorage.getItem('ai_room_deeplink'); } catch (e) { }
                 if (!raw) return;
 
                 var params = null;
-                try { params = JSON.parse(raw); } catch (e) {}
+                try { params = JSON.parse(raw); } catch (e) { }
                 // Consume immediately — one-shot, never re-opens on back/forward
-                try { sessionStorage.removeItem('ai_room_deeplink'); } catch (e) {}
+                try { sessionStorage.removeItem('ai_room_deeplink'); } catch (e) { }
                 if (!params || !params.room) return;
 
                 var roomId = params.room;
-                var date   = params.date  || null;
-                var start  = params.start || null;
-                var end    = params.end   || null;
+                var date = params.date || null;
+                var start = params.start || null;
+                var end = params.end || null;
 
                 // Hard-reload path: sessionStorage was set, page reloaded,
                 // now we land on Facilities and open the room
@@ -360,7 +352,7 @@
                         if (el) el.textContent = d.remaining;
                         if (bar) {
                             bar.classList.remove('is-low', 'is-empty');
-                            if (d.remaining === 0)     bar.classList.add('is-empty');
+                            if (d.remaining === 0) bar.classList.add('is-empty');
                             else if (d.remaining <= 5) bar.classList.add('is-low');
                         }
                     }
@@ -540,12 +532,19 @@
 
     /* ── Borrow Form ───────────────────────────────────────────────────── */
     /* ================================================================
-       ROOM PICKER  (Borrow Request modal)
+       ROOM PICKER  (Borrow Request modal -> "Choose a room" modal)
        ----------------------------------------------------------------
-       Your reservations (suggested) · Outside · Building tabs > floors > rooms.
-       Rooms come from window.BOOKING_META.rooms (the same tables as Facilities).
-       Rooms that another faculty has reserved for the chosen time are greyed out
-       and cannot be picked (the server checks this again).
+       The Room field in the Borrow Request modal is a button. It opens a
+       separate modal (#roomPickModal) that lists ONLY rooms the admin left
+       Available (window.BOOKING_META.rooms is already filtered; Maintenance
+       and Not Bookable rooms never appear), grouped building > floor.
+
+       A room that another faculty has reserved for the chosen date and time
+       is still listed, but it is marked Reserved and cannot be picked: it is
+       focusable and hoverable (hover / focus shows when it is taken) but a
+       click does nothing. Reserved rooms are re-checked every time the modal
+       opens and every few seconds while it stays open. The server checks
+       again on submit.
     ================================================================ */
     const RoomPicker = (function () {
         const meta = () => window.BOOKING_META || {};
@@ -561,136 +560,83 @@
             const diff = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - t) / 86400000);
             return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
-        let index = null;   // room_id -> { id, name, building, floor, status }
+        const whenLabel = (s, e) => { const a = parseTs(s), b = parseTs(e); return (a && b) ? dayLabel(a) + ' · ' + rangeLabel(a, b) : ''; };
+        const pageLoadedAt = Date.now();
+        /* "now" on the server's clock: the page's own date + minutes since midnight, kept ticking */
+        function nowDate() {
+            const t = parseTs((meta().today || '') + ' 00:00');
+            if (!t) return new Date();
+            return new Date(t.getTime() + ((meta().nowMin || 0) + (Date.now() - pageLoadedAt) / 60000) * 60000);
+        }
+        const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+        /* ---- room index (only rooms that can take equipment) -------- */
+        let index = null;   // room_id -> { id, name, building, floor }
         function buildIndex() {
             index = {};
-            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => { index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label, status: r.status }; })));
+            (meta().rooms || []).forEach(b => (b.floors || []).forEach(f => (f.rooms || []).forEach(r => {
+                if (r.status && r.status !== 'Available') return;
+                index[r.room_id] = { id: r.room_id, name: r.name, building: b.name, floor: f.label };
+            })));
         }
 
+        /* ---- shared modal --------------------------------------------- */
+        const M = {};          // element refs, filled by modalRefs()
+        let active = null;     // the picker (Room field) currently using the modal
+        let lastFocus = null, pollTimer = null, tab = 0;
+
+        function modalRefs() {
+            if (M.root) return M.root;
+            M.root = document.getElementById('roomPickModal'); if (!M.root) return null;
+            M.sub = document.getElementById('roomPickSub'); M.search = document.getElementById('roomPickSearch');
+            M.tabs = document.getElementById('roomPickTabs'); M.body = document.getElementById('roomPickBody');
+            M.count = document.getElementById('roomPickCount');
+            M.root.addEventListener('click', e => {
+                if (e.target === M.root || e.target.closest('[data-rp-close]')) { close(true); return; }
+                const t = e.target.closest('[data-rp-tab]'); if (t) { tab = +t.dataset.rpTab; filter(); return; }
+                if (e.target.closest('[data-rp-retry]')) { load(active, true); return; }
+                const r = e.target.closest('[data-room]'); if (!r || !active) return;
+                if (r.getAttribute('aria-disabled') === 'true') return;       // reserved: hoverable, never clickable
+                pick(active, r.dataset.room, false);
+            });
+            M.search.addEventListener('input', filter);
+            M.root.addEventListener('keydown', onKey);
+            return M.root;
+        }
+
+        function focusables() { return Array.from(M.root.querySelectorAll('button, input')).filter(x => !x.disabled && !x.closest('[hidden]') && x.offsetParent !== null); }
+        function onKey(e) {
+            if (e.key === 'Tab') {
+                const f = focusables(); if (!f.length) return;
+                const first = f[0], last = f[f.length - 1];
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+                return;
+            }
+            const t = e.target.closest && e.target.closest('.rp-room, .rp-quick');
+            if (!t || ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].indexOf(e.key) < 0) return;
+            const tiles = Array.from(M.body.querySelectorAll('.rp-room, .rp-quick')).filter(x => !x.closest('[hidden]') && x.offsetParent !== null);
+            const i = tiles.indexOf(t); if (i < 0) return;
+            const cols = Math.max(1, getComputedStyle(t.parentElement).gridTemplateColumns.split(' ').length);
+            const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'ArrowDown' ? i + cols : i - cols;
+            if (n >= 0 && n < tiles.length) { e.preventDefault(); tiles[n].focus(); }
+        }
+        // Escape closes only this modal, never the Borrow Request modal underneath
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape' || !M.root || M.root.style.display !== 'flex') return;
+            e.stopImmediatePropagation(); e.preventDefault(); close(true);
+        }, true);
+
+        /* ---- per-field state ------------------------------------------ */
         function setup(root) {
             const st = {
                 root: root, form: root.closest('form'), input: root.querySelector('[data-bm-room-input]'),
                 trigger: root.querySelector('[data-bm-room-trigger]'), valueEl: root.querySelector('[data-bm-room-value]'),
-                hint: root.querySelector('[data-bm-room-hint]'), panel: root.querySelector('[data-bm-room-panel]'),
-                search: root.querySelector('[data-bm-room-search]'), list: root.querySelector('[data-bm-room-list]'),
-                reserved: new Set(), suggested: new Set(), tab: 0, tok: 0, open: false
+                hint: root.querySelector('[data-bm-room-hint]'),
+                query: null, label: '', reserved: new Set(), suggested: new Set(), info: {}, tok: 0, loaded: false
             };
             root._rp = st;
-            build(st);
-            st.trigger.addEventListener('click', () => toggle(st, !st.open));
-            st.search.addEventListener('input', () => filter(st));
-            st.list.addEventListener('click', e => {
-                const tab = e.target.closest('[data-tab]'); if (tab) { st.tab = +tab.dataset.tab; filter(st); return; }
-                const b = e.target.closest('[data-room]'); if (!b || b.disabled) return;
-                pick(st, b.dataset.room, false);
-            });
-            root.addEventListener('keydown', e => {
-                if (e.key === 'Escape' && st.open) { e.stopPropagation(); toggle(st, false); st.trigger.focus(); return; }
-                if (!st.open || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End')) return;
-                const items = focusables(st); if (!items.length) return;
-                const cur = items.indexOf(document.activeElement); let n;
-                if (e.key === 'Home') n = 0; else if (e.key === 'End') n = items.length - 1;
-                else if (e.key === 'ArrowDown') n = cur < 0 ? 0 : Math.min(items.length - 1, cur + 1);
-                else n = cur <= 0 ? -1 : cur - 1;
-                e.preventDefault(); if (n < 0) st.search.focus(); else items[n].focus();
-            });
-            document.addEventListener('click', e => { if (st.open && !root.contains(e.target)) toggle(st, false); });
-        }
-        function focusables(st) { return Array.from(st.list.querySelectorAll('button')).filter(b => !b.disabled && !b.closest('[hidden]')); }
-
-        function build(st) {
-            const m = meta(), list = st.list; list.innerHTML = '';
-            const top = el('div', 'bm-rp-top'); list.appendChild(top);
-            (m.mine || []).forEach(r => {
-                const a = parseTs(r.start), b = parseTs(r.end); if (!a || !b) return;
-                const btn = el('button', 'bm-rp-res'); btn.type = 'button'; btn.dataset.room = r.room_id; btn.dataset.mine = '1';
-                btn.setAttribute('role', 'option');
-                btn.appendChild(icon('event_available'));
-                const t = el('span', 'bm-rp-txt'); t.appendChild(el('strong', '', r.name)); t.appendChild(el('small', '', dayLabel(a) + ' · ' + rangeLabel(a, b) + ' · ' + r.building)); btn.appendChild(t);
-                const star = el('span', 'bm-rp-sug', 'Suggested'); star.hidden = true; btn.appendChild(star);
-                top.appendChild(btn);
-            });
-            if (top.children.length) { const h = el('div', 'bm-rp-head', 'Your reservations'); top.insertBefore(h, top.firstChild); }
-            const out = el('button', 'bm-rp-res bm-rp-outside'); out.type = 'button'; out.dataset.room = 'outside'; out.setAttribute('role', 'option');
-            out.appendChild(icon('park')); const ot = el('span', 'bm-rp-txt'); ot.appendChild(el('strong', '', 'Outside')); ot.appendChild(el('small', '', 'Off-campus / outdoors')); out.appendChild(ot);
-            top.appendChild(out);
-
-            const rooms = m.rooms || [];
-            if (rooms.length > 1) {
-                const tabs = el('div', 'bm-rp-tabs'); tabs.setAttribute('role', 'tablist');
-                rooms.forEach((b, i) => { const t = el('button', 'bm-rp-tab', b.name); t.type = 'button'; t.dataset.tab = i; t.setAttribute('role', 'tab'); tabs.appendChild(t); });
-                list.appendChild(tabs);
-            }
-            rooms.forEach((b, i) => {
-                const wrap = el('div', 'bm-rp-bldg'); wrap.dataset.b = i;
-                wrap.appendChild(el('div', 'bm-rp-bhead', b.name));
-                (b.floors || []).forEach(f => {
-                    const fl = el('div', 'bm-rp-floor'); fl.appendChild(el('div', 'bm-rp-fhead', f.label));
-                    const grid = el('div', 'bm-rp-grid');
-                    (f.rooms || []).forEach(r => {
-                        const o = el('button', 'bm-rp-opt'); o.type = 'button'; o.dataset.room = r.room_id; o.setAttribute('role', 'option');
-                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
-                        o.appendChild(el('span', 'bm-rp-dot')); o.appendChild(el('span', 'bm-rp-name', r.name)); o.appendChild(el('span', 'bm-rp-tag'));
-                        o.title = r.name; grid.appendChild(o);
-                    });
-                    fl.appendChild(grid); wrap.appendChild(fl);
-                });
-                list.appendChild(wrap);
-            });
-            list.appendChild(Object.assign(el('div', 'bm-rp-empty', 'No rooms match'), { hidden: true }));
-            applyStates(st); filter(st);
-        }
-
-        function stateOf(st, id) {
-            const r = index[id]; if (!r) return 'ok';
-            if (r.status === 'Maintenance') return 'maint';
-            if (st.reserved.has(+id)) return 'reserved';
-            return r.status === 'Not Bookable' ? 'office' : 'ok';
-        }
-        function applyStates(st) {
-            st.list.querySelectorAll('.bm-rp-opt').forEach(o => {
-                const s = stateOf(st, o.dataset.room); o.dataset.state = s; o.disabled = (s === 'maint' || s === 'reserved');
-                o.querySelector('.bm-rp-tag').textContent = s === 'maint' ? 'Maintenance' : s === 'reserved' ? 'Reserved' : '';
-                o.setAttribute('aria-selected', st.input.value === o.dataset.room ? 'true' : 'false');
-                o.classList.toggle('is-selected', st.input.value === o.dataset.room);
-            });
-            st.list.querySelectorAll('.bm-rp-res').forEach(b => {
-                const id = b.dataset.room, blocked = id !== 'outside' && stateOf(st, id) !== 'ok' && stateOf(st, id) !== 'office';
-                b.disabled = blocked;
-                const star = b.querySelector('.bm-rp-sug'); if (star) star.hidden = !(st.suggested.has(+id) && !blocked);
-                b.setAttribute('aria-selected', st.input.value === id ? 'true' : 'false'); b.classList.toggle('is-selected', st.input.value === id);
-            });
-        }
-
-        function filter(st) {
-            const term = st.search.value.trim().toLowerCase(), list = st.list;
-            const tabs = list.querySelector('.bm-rp-tabs'), top = list.querySelector('.bm-rp-top');
-            if (tabs) { tabs.hidden = !!term; tabs.querySelectorAll('.bm-rp-tab').forEach(t => { const on = +t.dataset.tab === st.tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); }); }
-            let any = false;
-            top.querySelectorAll('.bm-rp-res').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) any = true; });
-            const head = top.querySelector('.bm-rp-head'); if (head) head.hidden = !!term;
-            list.querySelectorAll('.bm-rp-bldg').forEach(w => {
-                let wAny = false;
-                w.querySelectorAll('.bm-rp-floor').forEach(fl => {
-                    let fAny = false;
-                    fl.querySelectorAll('.bm-rp-opt').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) { fAny = true; } });
-                    fl.hidden = !fAny; if (fAny) wAny = true;
-                });
-                const show = term ? wAny : (+w.dataset.b === st.tab);
-                w.hidden = !show; w.classList.toggle('is-searching', !!term); if (term && wAny) any = true;
-            });
-            if (!term) any = true;
-            list.querySelector('.bm-rp-empty').hidden = any;
-        }
-
-        function toggle(st, open) {
-            st.open = open; st.panel.hidden = !open; st.trigger.setAttribute('aria-expanded', open ? 'true' : 'false'); st.root.classList.toggle('is-open', open);
-            if (open) {
-                const cur = index[st.input.value]; if (cur) { const bi = (meta().rooms || []).findIndex(b => b.name === cur.building); if (bi > -1) st.tab = bi; }
-                st.search.value = ''; filter(st);
-                if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) st.search.focus({ preventScroll: true });
-                const sel = st.list.querySelector('.is-selected'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
-            }
+            st.trigger.addEventListener('click', () => open(st));
         }
 
         function show(st, value) {
@@ -701,40 +647,243 @@
             st.valueEl.appendChild(el('strong', '', r.name)); st.valueEl.appendChild(el('span', '', r.building + ' · ' + r.floor));
         }
         function setHint(st, msg, cls) { st.hint.hidden = !msg; st.hint.textContent = msg || ''; st.hint.className = 'bm-hint' + (cls ? ' ' + cls : ''); }
-
         function pick(st, value, auto) {
-            st.input.value = value; show(st, value); applyStates(st); toggle(st, false);
+            st.input.value = value; show(st, value);
             setHint(st, auto ? 'Suggested from your reservation.' : '', auto ? 'ok' : '');
             st.input.dispatchEvent(new Event('change', { bubbles: true }));
-            if (!auto) st.trigger.focus({ preventScroll: true });
+            if (!auto) close(true);
         }
-        function clear(st) { st.input.value = ''; show(st, ''); applyStates(st); }
+        function clear(st) { st.input.value = ''; show(st, ''); }
 
-        function setWindow(form, query) {
-            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+        /* ---- availability for the chosen window ----------------------- */
+        function fetchRooms(st) {
+            return fetch('equipment-booking/api/check-booking-availability.php?' + st.query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
+                .then(r => r.json()).then(j => (j && j.ok === true && j.rooms) ? j.rooms : null);
+        }
+        function apply(st, rooms) {
+            st.reserved = new Set((rooms.reserved || []).map(Number));
+            st.suggested = new Set((rooms.mine || []).map(Number));
+            st.info = rooms.info || {};
+            st.loaded = true;
+        }
+        function load(st, showSpinner) {
+            if (!st || !st.query) return;
             const token = ++st.tok;
-            if (!query) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
-            fetch('equipment-booking/api/check-booking-availability.php?' + query + '&rooms=1&items=%5B%5D', { credentials: 'same-origin' })
-                .then(r => r.json()).then(j => {
-                    if (token !== st.tok) return;
-                    if (!j || j.ok !== true || !j.rooms) { st.reserved = new Set(); st.suggested = new Set(); applyStates(st); return; }
-                    st.reserved = new Set((j.rooms.reserved || []).map(Number)); st.suggested = new Set((j.rooms.mine || []).map(Number));
-                    applyStates(st);
-                    const cur = st.input.value;
-                    if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'Reserved for that time. Pick another room.', 'bad'); }
-                    else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
-                    else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
-                }).catch(() => { });
+            if (showSpinner && active === st) paintMessage('Checking which rooms are free…', 'progress_activity', true);
+            fetchRooms(st).then(rooms => {
+                if (token !== st.tok) return;
+                if (!rooms) throw new Error('bad');
+                apply(st, rooms);
+                if (active === st) { if (M.body.querySelector('[data-rp-msg]')) build(); applyStates(); }
+            }).catch(() => {
+                if (token !== st.tok || active !== st) return;
+                if (!st.loaded) paintMessage('Could not check room availability.', 'wifi_off', false, true);
+            });
+        }
+
+        /* Called by BorrowSchedule whenever date / time / length change. */
+        function setWindow(form, query, label) {
+            const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
+            st.label = label || '';
+            if (!query) { st.query = null; st.tok++; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {}; if (active === st) close(false); return; }
+            if (query === st.query && st.loaded) return;
+            st.query = query; st.loaded = false;
+            const token = ++st.tok;
+            fetchRooms(st).then(rooms => {
+                if (token !== st.tok || !rooms) return;
+                apply(st, rooms);
+                const cur = st.input.value;
+                if (cur && cur !== 'outside' && st.reserved.has(+cur)) { clear(st); setHint(st, 'That room is reserved for the new time. Pick another room.', 'bad'); }
+                else if (!cur && st.suggested.size === 1) { pick(st, String(Array.from(st.suggested)[0]), true); }
+                else if (cur && st.hint.className.indexOf('bad') > -1) { setHint(st, ''); }
+                if (active === st) applyStates();
+            }).catch(() => { });
         }
         function reset(form) {
             const root = form && form.querySelector('[data-bm-room]'); const st = root && root._rp; if (!st) return;
-            st.tok++; st.reserved = new Set(); st.suggested = new Set(); st.tab = 0;
-            st.search.value = ''; clear(st); setHint(st, ''); toggle(st, false); filter(st);
+            st.tok++; st.query = null; st.label = ''; st.loaded = false; st.reserved = new Set(); st.suggested = new Set(); st.info = {};
+            clear(st); setHint(st, ''); if (active === st) close(false);
+        }
+
+        /* ---- open / close --------------------------------------------- */
+        function open(st) {
+            if (!modalRefs()) return;
+            if (!st.query) { setHint(st, 'Choose your date, start time and how long you need it first, so we can show which rooms are free.', 'bad'); return; }
+            setHint(st, st.hint.className.indexOf('ok') > -1 ? st.hint.textContent : '');
+            active = st; lastFocus = document.activeElement; tab = 0;
+            M.sub.textContent = st.label ? st.label : 'Where will the equipment be used?';
+            M.search.value = '';
+            M.root.style.display = 'flex';
+            M.body.scrollTop = 0;
+            if (st.loaded) { build(); applyStates(); } else { paintMessage('Checking which rooms are free…', 'progress_activity', true); }
+            load(st, false);
+            clearInterval(pollTimer); pollTimer = setInterval(() => { if (active) load(active, false); }, 10000);
+            if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) M.search.focus({ preventScroll: true });
+            else { const f = focusables(); if (f.length) f[0].focus({ preventScroll: true }); }
+        }
+        function close(restoreFocus) {
+            if (!M.root || M.root.style.display !== 'flex') { active = null; return; }
+            M.root.style.display = 'none'; clearInterval(pollTimer); pollTimer = null;
+            const st = active; active = null;
+            if (restoreFocus && st && st.trigger && st.trigger.offsetParent !== null) st.trigger.focus({ preventScroll: true });
+            else if (restoreFocus && lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
+        }
+
+        /* ---- rendering -------------------------------------------------- */
+        function paintMessage(text, ic, spin, retry) {
+            M.tabs.hidden = true; M.tabs.innerHTML = ''; M.count.textContent = '';
+            M.body.innerHTML = '';
+            const box = el('div', 'rp-empty'); box.setAttribute('data-rp-msg', '1');
+            const i = icon(ic); if (spin) i.classList.add('rp-spin'); box.appendChild(i);
+            box.appendChild(el('p', '', text));
+            if (retry) { const b = el('button', 'btn-cancel-acc', 'Try again'); b.type = 'button'; b.setAttribute('data-rp-retry', '1'); box.appendChild(b); }
+            M.body.appendChild(box);
+        }
+
+        function quick(roomId, iconName, title, sub, grp) {
+            const b = el('button', 'rp-quick'); b.type = 'button'; b.dataset.room = roomId; if (grp) b.dataset.grp = grp;
+            b.appendChild(icon(iconName));
+            const t = el('span', 'rp-quick-txt'); t.appendChild(el('strong', '', title)); t.appendChild(el('small', '', sub)); b.appendChild(t);
+            b.appendChild(el('span', 'rp-quick-tag'));
+            return b;
+        }
+
+        function build() {
+            const m = meta(); M.body.innerHTML = '';
+            const buildings = (m.rooms || []).map(b => ({
+                name: b.name,
+                floors: (b.floors || []).map(f => ({ label: f.label, rooms: (f.rooms || []).filter(r => !r.status || r.status === 'Available') })).filter(f => f.rooms.length)
+            })).filter(b => b.floors.length);
+
+            // Outside + the faculty's own reservations
+            const top = el('section', 'rp-sec rp-top'); top.dataset.rpTop = '1';
+            // Recommended first: rooms you are using right now, rooms you will use later today,
+            // then rooms you reserved for another day (each group in time order).
+            const nowD = nowDate();
+            const mine = (m.mine || []).filter(r => index[r.room_id] && parseTs(r.start) && parseTs(r.end))
+                .map(r => { const a = parseTs(r.start), z = parseTs(r.end); return { r: r, a: a, z: z, grp: (a <= nowD && nowD < z) ? 'now' : (sameDay(a, nowD) ? 'today' : 'later') }; })
+                .sort((x, y) => x.a - y.a);
+            const groups = [
+                { key: 'now', label: 'Using now', icon: 'door_open', sub: x => 'Until ' + hm(x.z) + ' ' + meridiem(x.z) },
+                { key: 'today', label: 'Later today', icon: 'event_available', sub: x => rangeLabel(x.a, x.z) },
+                { key: 'later', label: 'Reserved for another day', icon: 'calendar_month', sub: x => dayLabel(x.a) + ' · ' + rangeLabel(x.a, x.z) }
+            ];
+            if (mine.length) {
+                top.appendChild(el('h4', 'rp-sec-title', 'Recommended for you'));
+                groups.forEach(g => {
+                    const list = mine.filter(x => x.grp === g.key); if (!list.length) return;
+                    top.appendChild(el('div', 'rp-grp-label', g.label));
+                    const grid = el('div', 'rp-quick-grid');
+                    list.forEach(x => grid.appendChild(quick(x.r.room_id, g.icon, x.r.name, g.sub(x) + ' · ' + x.r.building, g.key)));
+                    top.appendChild(grid);
+                });
+            }
+            const og = el('div', 'rp-quick-grid rp-quick-grid--one');
+            og.appendChild(quick('outside', 'park', 'Outside', 'Off-campus / outdoors'));
+            top.appendChild(og);
+            M.body.appendChild(top);
+
+            if (!buildings.length) {
+                const none = el('div', 'rp-empty rp-empty--inline'); none.appendChild(icon('meeting_room'));
+                none.appendChild(el('p', '', 'No rooms are open for equipment right now. You can still choose Outside.'));
+                M.body.appendChild(none);
+            }
+
+            if (tab >= buildings.length) tab = 0;
+            M.tabs.innerHTML = '';
+            buildings.forEach((b, i) => {
+                const t = el('button', 'rp-tab'); t.type = 'button'; t.dataset.rpTab = i; t.setAttribute('role', 'tab');
+                t.appendChild(el('span', 'rp-tab-name', b.name)); t.appendChild(el('span', 'rp-tab-n'));
+                M.tabs.appendChild(t);
+            });
+            M.tabs.hidden = buildings.length < 2;
+
+            buildings.forEach((b, i) => {
+                const wrap = el('section', 'rp-sec rp-bldg'); wrap.dataset.b = i;
+                wrap.appendChild(el('h4', 'rp-bhead', b.name));
+                b.floors.forEach(f => {
+                    const fl = el('div', 'rp-floor'); fl.appendChild(el('h5', 'rp-fhead', f.label));
+                    const grid = el('div', 'rp-grid');
+                    f.rooms.forEach(r => {
+                        const o = el('button', 'rp-room'); o.type = 'button'; o.dataset.room = r.room_id; o.dataset.b = i;
+                        o.dataset.search = (r.name + ' ' + b.name + ' ' + f.label).toLowerCase();
+                        const head = el('span', 'rp-room-top'); head.appendChild(el('span', 'rp-room-name', r.name)); head.appendChild(icon('check_circle')); o.appendChild(head);
+                        const sub = el('span', 'rp-room-meta'); sub.appendChild(el('span', 'rp-room-status')); sub.appendChild(el('span', 'rp-room-when')); o.appendChild(sub);
+                        grid.appendChild(o);
+                    });
+                    fl.appendChild(grid); wrap.appendChild(fl);
+                });
+                M.body.appendChild(wrap);
+            });
+            M.body.appendChild(Object.assign(el('div', 'rp-empty rp-empty--search', 'No rooms match your search.'), { hidden: true }));
+            applyStates(); filter();
+        }
+
+        function whenTaken(st, id) {
+            const list = (st.info && st.info[id]) || [];
+            return list.slice(0, 2).map(x => whenLabel(x.start, x.end)).filter(Boolean).join(', ') + (list.length > 2 ? ' +' + (list.length - 2) : '');
+        }
+
+        /* free / reserved / selected state of every tile (cheap; runs on each refresh) */
+        function applyStates() {
+            const st = active; if (!st || !M.body) return;
+            let free = 0, taken = 0;
+            M.body.querySelectorAll('.rp-room').forEach(o => {
+                const id = +o.dataset.room, isTaken = st.reserved.has(id), isMine = st.suggested.has(id), sel = st.input.value === o.dataset.room;
+                const name = o.querySelector('.rp-room-name').textContent, when = isTaken ? whenTaken(st, id) : '';
+                o.classList.toggle('is-taken', isTaken); o.classList.toggle('is-mine', isMine && !isTaken); o.classList.toggle('is-selected', sel && !isTaken);
+                if (isTaken) { o.setAttribute('aria-disabled', 'true'); taken++; } else { o.removeAttribute('aria-disabled'); free++; }
+                o.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
+                o.querySelector('.rp-room-status').textContent = isTaken ? 'Reserved' : (isMine ? 'Your reservation' : 'Free');
+                o.querySelector('.rp-room-when').textContent = when;
+                if (when) o.setAttribute('data-when', '1'); else o.removeAttribute('data-when');
+                o.querySelector('.material-symbols-outlined').textContent = isTaken ? 'lock' : 'check_circle';
+                o.setAttribute('aria-label', isTaken ? name + ', already reserved' + (when ? ' ' + when : '') + ', not available' : name + ', ' + (isMine ? 'your reservation, ' : '') + 'free');
+            });
+            M.body.querySelectorAll('.rp-quick').forEach(b => {
+                const id = b.dataset.room, isOut = id === 'outside', isTaken = !isOut && st.reserved.has(+id), isMine = !isOut && st.suggested.has(+id), sel = st.input.value === id;
+                b.classList.toggle('is-taken', isTaken); b.classList.toggle('is-selected', sel && !isTaken);
+                if (isTaken) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
+                b.setAttribute('aria-pressed', sel && !isTaken ? 'true' : 'false');
+                const tag = b.querySelector('.rp-quick-tag'); tag.textContent = isTaken ? 'Reserved' : (isMine ? 'Fits your time' : (b.dataset.grp === 'now' ? 'In use now' : ''));
+                tag.classList.toggle('is-taken', isTaken);
+            });
+            M.tabs.querySelectorAll('.rp-tab').forEach(t => {
+                const n = M.body.querySelectorAll('.rp-room[data-b="' + t.dataset.rpTab + '"]:not(.is-taken)').length;
+                t.querySelector('.rp-tab-n').textContent = n;
+            });
+            M.count.textContent = free + ' free' + (taken ? ' · ' + taken + ' reserved' : '');
+        }
+
+        function filter() {
+            if (!M.body || !M.body.querySelector('.rp-bldg, .rp-top')) return;
+            const term = M.search.value.trim().toLowerCase();
+            M.tabs.querySelectorAll('.rp-tab').forEach(t => { const on = +t.dataset.rpTab === tab; t.classList.toggle('active', on); t.setAttribute('aria-selected', on ? 'true' : 'false'); });
+            const multi = !M.tabs.hidden;
+            M.tabs.classList.toggle('is-off', !!term);
+            const top = M.body.querySelector('.rp-top'); let any = false;
+            if (top) {
+                let topAny = false;
+                top.querySelectorAll('.rp-quick').forEach(b => { const hit = !term || b.textContent.toLowerCase().indexOf(term) > -1; b.hidden = !hit; if (hit) topAny = true; });
+                top.querySelectorAll('.rp-sec-title, .rp-grp-label').forEach(h => { h.hidden = !!term; });
+                top.hidden = !topAny; if (topAny) any = true;
+            }
+            M.body.querySelectorAll('.rp-bldg').forEach(w => {
+                let wAny = false;
+                w.querySelectorAll('.rp-floor').forEach(fl => {
+                    let fAny = false;
+                    fl.querySelectorAll('.rp-room').forEach(o => { const hit = !term || o.dataset.search.indexOf(term) > -1; o.hidden = !hit; if (hit) fAny = true; });
+                    fl.hidden = !fAny; if (fAny) wAny = true;
+                });
+                const showIt = term ? wAny : (!multi || +w.dataset.b === tab);
+                w.hidden = !showIt; w.classList.toggle('is-searching', !!term || !multi); if (term && wAny) any = true; if (!term && showIt) any = true;
+            });
+            const empty = M.body.querySelector('.rp-empty--search'); if (empty) empty.hidden = any;
         }
 
         return {
-            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); },
-            setWindow: setWindow, reset: reset,
+            init: function () { buildIndex(); document.querySelectorAll('[data-bm-room]').forEach(setup); modalRefs(); },
+            setWindow: setWindow, reset: reset, close: function () { close(false); },
             value: function (form) { const i = form && form.querySelector('[data-bm-room-input]'); return i ? i.value : ''; }
         };
     })();
@@ -955,7 +1104,8 @@
             const dayLabel = d => (st.mode === 'today' && d === w.start) ? 'Today' : fmtDay(d);
             st.els.summary.innerHTML = '<span class="material-symbols-outlined">schedule</span><span><strong>' + dayLabel(w.start) + ' · ' + fmtClock(w.startMin) + '</strong> → <strong>' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin)) + '</strong></span>';
             st.els.summary.classList.add('has');
-            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st)); check(st, w); }, 350);
+            const winText = (st.mode === 'today' ? 'Today' : fmtDay(w.start)) + ' · ' + fmtClock(w.startMin) + ' → ' + (st.mode === 'today' ? fmtClock(w.endMin) : fmtDay(w.endDate) + ' · ' + fmtClock(w.endMin));
+            clearTimeout(st.timer); st.timer = setTimeout(() => { RoomPicker.setWindow(st.form, windowQuery(st), winText); check(st, w); }, 350);
         }
         /* window as query-string, shared by the availability and room checks */
         function windowQuery(st) {
@@ -1058,6 +1208,7 @@
     function closeBorrowModal() {
         const modal = document.getElementById('borrowModal');
         if (modal) modal.style.display = 'none';
+        if (window.RoomPicker) window.RoomPicker.close();
     }
 
     /* Borrow modal: show the chosen file's name inside the styled drop area */
@@ -1919,6 +2070,285 @@
             });
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       SETTINGS > PERSONAL INFORMATION  ("Edit Account" -> Save / Cancel)
+       The card is read-only until Edit Account is clicked. Save only becomes
+       available once something actually changed. Email is never editable here.
+    ══════════════════════════════════════════════════════════════════ */
+    function _sovEsc(s) {
+        const d = document.createElement('div');
+        d.textContent = String(s == null ? '' : s);
+        return d.innerHTML;
+    }
+
+    function _sovCard() { return document.getElementById('sovPersonalCard'); }
+
+    function _sovFields() {
+        const c = _sovCard();
+        return c ? Array.from(c.querySelectorAll('[data-edit-field]')) : [];
+    }
+
+    function _sovClearErrors() {
+        const c = _sovCard();
+        if (!c) return;
+        c.querySelectorAll('[data-error-for]').forEach(p => { p.hidden = true; p.textContent = ''; });
+        c.querySelectorAll('.is-invalid').forEach(el => { el.classList.remove('is-invalid'); el.removeAttribute('aria-invalid'); });
+    }
+
+    function _sovShowError(field, msg) {
+        const c = _sovCard();
+        if (!c) return;
+        const p = c.querySelector('[data-error-for="' + field + '"]');
+        const el = c.querySelector('[data-edit-field="' + field + '"]');
+        if (p) { p.textContent = msg; p.hidden = false; }
+        if (el) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); el.focus(); }
+    }
+
+    function _sovIsDirty() {
+        return _sovFields().some(el => el.value.trim() !== (el.dataset.original || ''));
+    }
+
+    function _sovSyncSave() {
+        const btn = document.getElementById('sovSaveBtn');
+        if (btn && !btn.dataset.busy) btn.disabled = !_sovIsDirty();
+    }
+
+    // Same rules as the server: 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX or 9XXXXXXXXX (spaces / dashes allowed)
+    function _sovPhoneOk(v) {
+        return /^(?:\+?63|0)?9\d{9}$/.test(String(v).replace(/[\s\-().]/g, ''));
+    }
+
+    function sovStartEdit() {
+        const c = _sovCard();
+        if (!c) return;
+        _sovFields().forEach(el => { el.dataset.original = el.value.trim(); el.disabled = false; });
+        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = false; });
+        c.dataset.editing = 'true';
+        _sovClearErrors();
+        _sovSyncSave();
+        const first = c.querySelector('[data-edit-field="fullname"]');
+        if (first) { first.focus(); if (first.select) first.select(); }
+    }
+
+    function _sovLeaveEdit() {
+        const c = _sovCard();
+        if (!c) return;
+        _sovFields().forEach(el => { el.disabled = true; });
+        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = true; });
+        c.dataset.editing = 'false';
+        _sovClearErrors();
+    }
+
+    function sovCancelEdit(silent) {
+        const c = _sovCard();
+        if (!c || c.dataset.editing !== 'true') return;
+        _sovFields().forEach(el => { el.value = el.dataset.original || ''; });
+        _sovLeaveEdit();
+        if (!silent) {
+            const b = document.getElementById('sovEditBtn');
+            if (b) b.focus();
+        }
+    }
+
+    function _sovInitials(name) {
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
+        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
+        return ini;
+    }
+
+    // Update the avatar initials without ever touching a profile picture.
+    function _sovSetInitials(ini) {
+        document.querySelectorAll('.side-nav-avatar, .avatar-btn, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+            const fb = el.querySelector('.avatar-initials-fallback');
+            if (fb) { fb.textContent = ini; return; }
+            if (el.querySelector('img.avatar-img')) return;
+            const tn = Array.from(el.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+            if (tn) tn.textContent = ini;
+            else el.insertBefore(document.createTextNode(ini), el.firstChild);
+        });
+    }
+
+    function _sovApplySaved(d) {
+        const c = _sovCard();
+        if (!c) return;
+        const oldName = (document.querySelector('.acct-banner-name') || {}).textContent || '';
+
+        // inputs + read-only values
+        const nameIn = c.querySelector('[data-edit-field="fullname"]');
+        if (nameIn) nameIn.value = d.fullname;
+        const nameView = document.getElementById('sovFullNameView');
+        if (nameView) nameView.textContent = d.fullname;
+
+        const phoneIn = c.querySelector('[data-edit-field="phone"]');
+        if (phoneIn) phoneIn.value = d.phone_display || '';
+        const phoneView = document.getElementById('sovPhoneView');
+        if (phoneView) {
+            phoneView.textContent = d.phone_display || 'Not set';
+            phoneView.classList.toggle('acct-row-static-muted', !d.phone_display);
+        }
+
+        // department: once chosen it becomes a permanent, read-only value
+        const deptSel = c.querySelector('[data-edit-field="department"]');
+        const deptView = document.getElementById('sovDepartmentView');
+        if (d.department && deptSel && deptView) {
+            deptView.textContent = d.department;
+            deptView.classList.remove('acct-row-static-muted');
+            deptView.removeAttribute('data-view');
+            const row = deptSel.closest('.acct-row');
+            const hint = c.querySelector('[data-hint-for="department"]');
+            deptSel.remove();
+            if (hint) hint.remove();
+            if (row && !row.querySelector('.fid-lock')) {
+                const lock = document.createElement('span');
+                lock.className = 'material-symbols-outlined fid-lock';
+                lock.title = 'Your department is permanent once set';
+                lock.textContent = 'lock';
+                row.appendChild(lock);
+            }
+        }
+
+        // name shown elsewhere on the page
+        document.querySelectorAll('.side-nav-user-name, .acct-banner-name, .u-name, .acc-hero-info h2').forEach(el => {
+            el.textContent = d.fullname;
+        });
+        document.querySelectorAll('[data-first-name]').forEach(el => { el.textContent = d.first_name; });
+        document.querySelectorAll('input[type="hidden"][name="instructor"]').forEach(el => {
+            if (oldName && el.value === oldName) el.value = d.fullname;
+        });
+        _sovSetInitials(d.initials || _sovInitials(d.fullname));
+
+        // banner line: "<department> · ID: …"
+        const meta = document.querySelector('.acct-banner-meta');
+        if (meta && meta.firstChild && meta.firstChild.nodeType === Node.TEXT_NODE) {
+            meta.firstChild.textContent = (d.department || 'PUPSync Faculty') + ' \u00B7 ID: ';
+        }
+    }
+
+    function sovSaveAccount() {
+        const c = _sovCard();
+        const btn = document.getElementById('sovSaveBtn');
+        if (!c || !btn || btn.disabled) return;
+        _sovClearErrors();
+
+        const vals = {};
+        _sovFields().forEach(el => { vals[el.dataset.editField] = el.value.trim(); });
+        if (!vals.fullname) { _sovShowError('fullname', 'Full name cannot be empty.'); return; }
+        const phoneEl = c.querySelector('[data-edit-field="phone"]');
+        if (vals.phone && phoneEl && vals.phone !== (phoneEl.dataset.original || '') && !_sovPhoneOk(vals.phone)) {
+            _sovShowError('phone', 'Enter a valid mobile number, like 09XX XXX XXXX.');
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('action', 'save_account');
+        fd.append('csrf_token', getCsrfToken());
+        Object.keys(vals).forEach(k => fd.append(k, vals[k]));
+
+        const label = btn.textContent;
+        btn.dataset.busy = '1';
+        btn.disabled = true;
+        btn.textContent = 'Saving\u2026';
+        const cancelBtn = c.querySelector('[data-action="account-cancel"]');
+        if (cancelBtn) cancelBtn.disabled = true;
+
+        fetch('equipment-booking/api/update-profile.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.success) {
+                    if (data.changed === false) {
+                        _sovLeaveEdit();
+                        showToast('No changes to save.');
+                    } else {
+                        _sovApplySaved(data.data || {});
+                        _sovLeaveEdit();
+                        showToast(_sovEsc(data.msg || 'Your account details were updated.'), 'success');
+                    }
+                    const eb = document.getElementById('sovEditBtn');
+                    if (eb) eb.focus();
+                } else if (data && data.field) {
+                    _sovShowError(data.field, data.msg || 'Please check this field.');
+                } else {
+                    showToast(_sovEsc((data && (data.msg || data.error)) || 'Could not save your changes.'), 'error');
+                }
+            })
+            .catch(() => showToast('Network error. Please try again.', 'error'))
+            .finally(() => {
+                delete btn.dataset.busy;
+                btn.textContent = label;
+                if (cancelBtn) cancelBtn.disabled = false;
+                _sovSyncSave();
+            });
+    }
+
+    // Live "is there anything to save?" + clear the error on a field once the user edits it
+    document.addEventListener('input', function (e) {
+        const card = _sovCard();
+        if (!card || !card.contains(e.target)) return;
+        const f = e.target.closest('[data-edit-field]');
+        if (f) {
+            const p = card.querySelector('[data-error-for="' + f.dataset.editField + '"]');
+            if (p) { p.hidden = true; p.textContent = ''; }
+            f.classList.remove('is-invalid');
+            f.removeAttribute('aria-invalid');
+        }
+        _sovSyncSave();
+    });
+    document.addEventListener('change', function (e) {
+        const card = _sovCard();
+        if (card && card.contains(e.target)) _sovSyncSave();
+    });
+    document.addEventListener('keydown', function (e) {
+        const card = _sovCard();
+        if (!card || card.dataset.editing !== 'true' || !card.contains(e.target)) return;
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); sovCancelEdit(); }
+        else if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); sovSaveAccount(); }
+    });
+
+    /* ══════════════════════════════════════════════════════════════════
+       SETTINGS > DATA MANAGEMENT > EXPORT DATA
+       Downloads one CSV with the account info + PAST activity (server side).
+    ══════════════════════════════════════════════════════════════════ */
+    function exportMyData() {
+        const btn = document.getElementById('sovExportBtn');
+        if (!btn || btn.disabled) return;
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Preparing\u2026';
+
+        const fd = new FormData();
+        fd.append('csrf_token', getCsrfToken());
+
+        fetch('equipment-booking/api/export-faculty-data.php', { method: 'POST', body: fd })
+            .then(r => {
+                const type = r.headers.get('Content-Type') || '';
+                if (r.ok && type.indexOf('text/csv') !== -1) {
+                    const cd = r.headers.get('Content-Disposition') || '';
+                    const m = /filename="?([^";]+)"?/.exec(cd);
+                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-my-data.csv' }));
+                }
+                return r.json().catch(() => ({})).then(j => {
+                    throw new Error(j.msg || j.error || 'Could not export your data. Please try again.');
+                });
+            })
+            .then(res => {
+                const url = URL.createObjectURL(res.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = res.name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                showToast('Your data was downloaded.', 'success');
+            })
+            .catch(err => showToast(_sovEsc(err && err.message ? err.message : 'Could not export your data.'), 'error'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = label;
+            });
+    }
+
     /* ── Change Password ───────────────────────────────────────────────── */
     function openPwModal() {
         const modal = document.getElementById('pwModal');
@@ -2564,6 +2994,11 @@
                 case 'open-borrow-form':
                     openBorrowForm(el.dataset.item);
                     break;
+                case 'equip-search-clear': {
+                    var eqIn = document.getElementById('equipmentSearch');
+                    if (eqIn) { eqIn.value = ''; eqIn.dispatchEvent(new Event('input', { bubbles: true })); eqIn.focus(); }
+                    break;
+                }
                 case 'close-borrow-modal':
                     closeBorrowModal();
                     break;
@@ -2675,6 +3110,18 @@
                     break;
                 case 'close-notif-modal':
                     closeNotifModal();
+                    break;
+                case 'account-edit':
+                    sovStartEdit();
+                    break;
+                case 'account-cancel':
+                    sovCancelEdit();
+                    break;
+                case 'account-save':
+                    sovSaveAccount();
+                    break;
+                case 'export-my-data':
+                    exportMyData();
                     break;
                 case 'toast':
                     showToast(el.dataset.msg || '');
@@ -2876,19 +3323,6 @@
         });
     });
 
-    /* ── Settings font-size buttons (sov-font-btn mirroring font-scale-btn) */
-    document.querySelectorAll('.sov-font-btn[data-scale]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var scale = this.dataset.scale;
-            // Mirror onto the hidden font-scale-btn so the existing applyFontScale logic fires
-            var legacyBtn = document.querySelector('.font-scale-btn[data-scale="' + scale + '"]');
-            if (legacyBtn) legacyBtn.click();
-            // Update active state on sov buttons
-            document.querySelectorAll('.sov-font-btn').forEach(function (b) { b.classList.remove('font-scale-active'); });
-            this.classList.add('font-scale-active');
-        });
-    });
-
     /* ── Notification filter tabs ─────────────────────────────────────── */
     document.querySelectorAll('.notif-tab').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -2900,6 +3334,10 @@
     const eqSearch = document.getElementById('equipmentSearch');
     const eqCat = document.getElementById('categoryFilter');
     if (eqSearch) eqSearch.addEventListener('input', filterEquipment);
+    if (eqSearch) eqSearch.addEventListener('input', function () {
+        const clr = document.getElementById('equipmentSearchClear');
+        if (clr) clr.hidden = !eqSearch.value;
+    });
     if (eqCat) eqCat.addEventListener('change', filterEquipment);
 
     /* ── Global dashboard search ─────────────────────────────────────── */
@@ -2948,11 +3386,6 @@
     /* ── Settings toggles — compact/reduceMotion/focusRing removed from new design */
     // const compactToggle = document.getElementById('compactToggle');
     // if (compactToggle) compactToggle.addEventListener('change', function () { applyCompact(this.checked); });
-
-    const fontSizeRange = document.getElementById('fontSizeRange');
-    if (fontSizeRange) fontSizeRange.addEventListener('input', function () {
-        applyFontSize(this.value);
-    });
 
     // const reduceMotionToggle = document.getElementById('reduceMotionToggle');
     // if (reduceMotionToggle) reduceMotionToggle.addEventListener('change', function () { applyReduceMotion(this.checked); });
@@ -3860,7 +4293,8 @@
                             const canBookAhead = qty <= 0 && (isNaN(total) ? false : total > 0);
                             btn.disabled = qty <= 0 && !canBookAhead;
                             btn.classList.toggle('btn-borrow-ahead', canBookAhead);
-                            btn.textContent = qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable');
+                            btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">' + (qty > 0 ? 'add_shopping_cart' : (canBookAhead ? 'event' : 'block')) + '</span>' +
+                                '<span class="btn-borrow-label">' + (qty > 0 ? 'Borrow' : (canBookAhead ? 'Book ahead' : 'Unavailable')) + '</span>';
                         }
                     });
                 })
@@ -3915,6 +4349,8 @@
                         window.OVERDUE_COUNT = fresh.filter(r => r.status === 'Overdue').length; // keep checkOverdueState in sync
                         checkOverdueState();
                         _updateFacultyStatCards(fresh);
+                        // My Activity (equipment) re-draws itself when this fires
+                        document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
                     }
                 })
                 .catch(() => { }); // silently ignore network errors
@@ -3923,7 +4359,7 @@
 
     /* -- Room Reservation Notices ---------------------------------------- */
     /* Reservations are accepted on the spot, and My Activity refreshes its own
-       room list (faculty-activity.js), so there is no table to keep in sync
+       room list (the My Activity block at the end of this file), so there is no table to keep in sync
        here any more. This only watches for one thing: an admin cancelling a
        reservation, which is reported with a toast. */
     function startReservationsPolling() {
@@ -4352,8 +4788,8 @@
    timestamp). Dismissed by the × button or by opening the chat.
 ================================================================ */
 (function () {
-    var STORAGE_KEY  = 'eq_ai_tooltip_seen';
-    var RESET_MS     = 24 * 60 * 60 * 1000; // 24 hours
+    var STORAGE_KEY = 'eq_ai_tooltip_seen';
+    var RESET_MS = 24 * 60 * 60 * 1000; // 24 hours
 
     function _shouldShow() {
         try {
@@ -4363,7 +4799,7 @@
     }
 
     function _markSeen() {
-        try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, String(Date.now())); } catch (e) { }
     }
 
     window._aiTooltipMaybeShow = function () {
@@ -4420,8 +4856,8 @@
     function mdToHtml(s) {
         var t = escH(String(s));
         t = t.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        t = t.replace(/\*(.*?)\*/g,     '<em>$1</em>');
-        t = t.replace(/^[-•]\s+(.+)$/gm,'<li>$1</li>');
+        t = t.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        t = t.replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');
         t = t.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
         t = t.replace(/\n/g, '<br>');
         return t;
@@ -4429,7 +4865,7 @@
     function removeChips() {
         var c = document.getElementById('actAiChips');
         if (c) c.remove();
-        document.querySelectorAll('.act-campus-chips').forEach(function(el) { el.remove(); });
+        document.querySelectorAll('.act-campus-chips').forEach(function (el) { el.remove(); });
     }
     function setSending(on) {
         var btn = document.getElementById('actAiSendBtn');
@@ -4438,12 +4874,12 @@
         if (inp) inp.disabled = on;
     }
     function updateCounter(remaining) {
-        var el  = document.getElementById('actAiCounter');
+        var el = document.getElementById('actAiCounter');
         var bar = document.getElementById('actAiCounterBar');
         if (el) el.textContent = remaining;
         if (!bar) return;
         bar.classList.remove('is-low', 'is-empty');
-        if (remaining === 0)     bar.classList.add('is-empty');
+        if (remaining === 0) bar.classList.add('is-empty');
         else if (remaining <= 5) bar.classList.add('is-low');
     }
     function appendUserBubble(body, text) {
@@ -4451,11 +4887,11 @@
         row.className = 'act-chat-row act-chat-row-user';
         row.innerHTML =
             '<div class="act-chat-col act-chat-col-user">' +
-                '<div class="act-chat-bubble act-chat-bubble-user">' + escH(text) + '</div>' +
-                '<div class="act-chat-meta act-chat-meta-user">' +
-                    '<span>' + timeNow() + '</span>' +
-                    '<span class="material-symbols-outlined act-chat-tick">done_all</span>' +
-                '</div>' +
+            '<div class="act-chat-bubble act-chat-bubble-user">' + escH(text) + '</div>' +
+            '<div class="act-chat-meta act-chat-meta-user">' +
+            '<span>' + timeNow() + '</span>' +
+            '<span class="material-symbols-outlined act-chat-tick">done_all</span>' +
+            '</div>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4465,10 +4901,10 @@
         row.className = 'act-chat-row act-chat-row-ai';
         row.innerHTML =
             '<div class="act-chat-ai-avatar">' +
-                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '<span class="material-symbols-outlined">smart_toy</span>' +
             '</div>' +
             '<div class="act-chat-typing-dots">' +
-                '<span></span><span></span><span></span>' +
+            '<span></span><span></span><span></span>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4479,11 +4915,11 @@
         row.className = 'act-chat-row act-chat-row-ai';
         row.innerHTML =
             '<div class="act-chat-ai-avatar">' +
-                '<span class="material-symbols-outlined">smart_toy</span>' +
+            '<span class="material-symbols-outlined">smart_toy</span>' +
             '</div>' +
             '<div class="act-chat-col">' +
-                '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
-                '<div class="act-chat-meta"><span>' + timeNow() + '</span></div>' +
+            '<div class="act-chat-bubble act-chat-bubble-ai">' + mdToHtml(text) + '</div>' +
+            '<div class="act-chat-meta"><span>' + timeNow() + '</span></div>' +
             '</div>';
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
@@ -4506,81 +4942,81 @@
         var col = lastRow && lastRow.querySelector('.act-chat-col');
         if (!col) return;
 
-        var now    = new Date();
-        var today  = now.getFullYear() + '-' +
-                     String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                     String(now.getDate()).padStart(2, '0');
-        var maxDt  = new Date(now.getTime() + 21 * 86400000);
+        var now = new Date();
+        var today = now.getFullYear() + '-' +
+            String(now.getMonth() + 1).padStart(2, '0') + '-' +
+            String(now.getDate()).padStart(2, '0');
+        var maxDt = new Date(now.getTime() + 21 * 86400000);
         var maxDay = maxDt.getFullYear() + '-' +
-                     String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
-                     String(maxDt.getDate()).padStart(2, '0');
+            String(maxDt.getMonth() + 1).padStart(2, '0') + '-' +
+            String(maxDt.getDate()).padStart(2, '0');
 
         var form = document.createElement('div');
         form.className = 'act-mini-form';
         form.id = 'actMiniForm';
         form.innerHTML =
             '<div class="act-mini-form-title">' +
-                '<span class="material-symbols-outlined">calendar_month</span>' +
-                'Find an Available Room' +
+            '<span class="material-symbols-outlined">calendar_month</span>' +
+            'Find an Available Room' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
-                '<select id="actMfCampus">' +
-                    '<option value="" disabled selected>Select campus…</option>' +
-                    '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
-                    '<option value="cite">PUP CITE (Building C)</option>' +
-                '</select>' +
+            '<label for="actMfCampus">Campus <span class="act-mini-req">*</span></label>' +
+            '<select id="actMfCampus">' +
+            '<option value="" disabled selected>Select campus…</option>' +
+            '<option value="main">PUP Main (Buildings A &amp; B)</option>' +
+            '<option value="cite">PUP CITE (Building C)</option>' +
+            '</select>' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
-                '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
+            '<label for="actMfDate">Date <span class="act-mini-req">*</span></label>' +
+            '<input type="date" id="actMfDate" min="' + today + '" max="' + maxDay + '">' +
             '</div>' +
             '<div class="act-mini-row">' +
-                '<div class="act-mini-field">' +
-                    '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
-                    '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
-                '</div>' +
-                '<div class="act-mini-field">' +
-                    '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
-                    '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
-                '</div>' +
+            '<div class="act-mini-field">' +
+            '<label for="actMfStart">Start <span class="act-mini-req">*</span></label>' +
+            '<input type="time" id="actMfStart" min="07:00" max="20:00">' +
             '</div>' +
             '<div class="act-mini-field">' +
-                '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
-                '<div class="act-mini-combobox" id="actMfComboWrap">' +
-                    '<input type="text" id="actMfRoomSearch" ' +
-                           'placeholder="Fill campus, date & time first\u2026" ' +
-                           'autocomplete="off" disabled>' +
-                    '<input type="hidden" id="actMfRoomId">' +
-                    '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
-                '</div>' +
+            '<label for="actMfEnd">End <span class="act-mini-req">*</span></label>' +
+            '<input type="time" id="actMfEnd" min="07:00" max="20:00">' +
+            '</div>' +
+            '</div>' +
+            '<div class="act-mini-field">' +
+            '<label for="actMfRoomSearch">Room <span class="act-mini-req">*</span></label>' +
+            '<div class="act-mini-combobox" id="actMfComboWrap">' +
+            '<input type="text" id="actMfRoomSearch" ' +
+            'placeholder="Fill campus, date & time first\u2026" ' +
+            'autocomplete="off" disabled>' +
+            '<input type="hidden" id="actMfRoomId">' +
+            '<div class="act-mini-dropdown" id="actMfDropdown" style="display:none;"></div>' +
+            '</div>' +
             '</div>' +
             '<div id="actMfError" class="act-mini-error" style="display:none;"></div>' +
             '<div class="act-mini-actions">' +
-                '<button type="button" class="act-mini-btn act-mini-cancel" ' +
-                        'id="actMfCancelBtn">Cancel</button>' +
-                '<button type="button" class="act-mini-btn act-mini-submit" ' +
-                        'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
+            '<button type="button" class="act-mini-btn act-mini-cancel" ' +
+            'id="actMfCancelBtn">Cancel</button>' +
+            '<button type="button" class="act-mini-btn act-mini-submit" ' +
+            'id="actMfSubmitBtn" disabled>Find &amp; Reserve</button>' +
             '</div>';
 
         col.appendChild(form);
         _wireMiniForm();
     }
 
-    var _miniFormRooms        = [];
+    var _miniFormRooms = [];
     var _miniFormRoomSelected = false;
 
     function _wireMiniForm() {
-        var campusSel  = document.getElementById('actMfCampus');
-        var dateInp    = document.getElementById('actMfDate');
-        var startInp   = document.getElementById('actMfStart');
-        var endInp     = document.getElementById('actMfEnd');
+        var campusSel = document.getElementById('actMfCampus');
+        var dateInp = document.getElementById('actMfDate');
+        var startInp = document.getElementById('actMfStart');
+        var endInp = document.getElementById('actMfEnd');
         var roomSearch = document.getElementById('actMfRoomSearch');
-        var roomIdInp  = document.getElementById('actMfRoomId');
-        var dropdown   = document.getElementById('actMfDropdown');
-        var submitBtn  = document.getElementById('actMfSubmitBtn');
-        var errEl      = document.getElementById('actMfError');
-        var cancelBtn  = document.getElementById('actMfCancelBtn');
+        var roomIdInp = document.getElementById('actMfRoomId');
+        var dropdown = document.getElementById('actMfDropdown');
+        var submitBtn = document.getElementById('actMfSubmitBtn');
+        var errEl = document.getElementById('actMfError');
+        var cancelBtn = document.getElementById('actMfCancelBtn');
 
         if (!campusSel || !dateInp || !startInp || !endInp ||
             !roomSearch || !roomIdInp || !dropdown || !submitBtn) return;
@@ -4594,45 +5030,45 @@
 
         function onSlotChange() {
             var campus = campusSel.value;
-            var date   = dateInp.value;
-            var start  = startInp.value;
-            var end    = endInp.value;
+            var date = dateInp.value;
+            var start = startInp.value;
+            var end = endInp.value;
 
-            _miniFormRooms         = [];
-            _miniFormRoomSelected  = false;
-            roomSearch.value       = '';
-            roomIdInp.value        = '';
+            _miniFormRooms = [];
+            _miniFormRoomSelected = false;
+            roomSearch.value = '';
+            roomIdInp.value = '';
             dropdown.style.display = 'none';
-            submitBtn.disabled     = true;
+            submitBtn.disabled = true;
             clearErr();
 
             if (!campus || !date || !start || !end) {
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fill campus, date & time first\u2026';
                 return;
             }
             if (end <= start) {
                 showErr('End time must be after start time.');
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fix the time range first\u2026';
                 return;
             }
 
             // Past time check — only applies when the selected date is today
-            var todayStr = (function() {
+            var todayStr = (function () {
                 var n = new Date();
                 return n.getFullYear() + '-' +
                     String(n.getMonth() + 1).padStart(2, '0') + '-' +
                     String(n.getDate()).padStart(2, '0');
             })();
             if (date === todayStr) {
-                var nowH   = new Date().getHours();
-                var nowM   = new Date().getMinutes();
+                var nowH = new Date().getHours();
+                var nowM = new Date().getMinutes();
                 var startH = parseInt(start.split(':')[0], 10);
                 var startM = parseInt(start.split(':')[1], 10);
                 if (startH < nowH || (startH === nowH && startM <= nowM)) {
                     showErr('Start time cannot be in the past. Please choose a future time.');
-                    roomSearch.disabled    = true;
+                    roomSearch.disabled = true;
                     roomSearch.placeholder = 'Fix the start time first\u2026';
                     return;
                 }
@@ -4640,109 +5076,109 @@
 
             // Maximum booking duration: 5 hours (300 minutes)
             var startMin = parseInt(start.split(':')[0], 10) * 60 + parseInt(start.split(':')[1], 10);
-            var endMin   = parseInt(end.split(':')[0], 10)   * 60 + parseInt(end.split(':')[1], 10);
+            var endMin = parseInt(end.split(':')[0], 10) * 60 + parseInt(end.split(':')[1], 10);
             if (endMin - startMin > 300) {
                 showErr('Maximum booking duration is 5 hours.');
-                roomSearch.disabled    = true;
+                roomSearch.disabled = true;
                 roomSearch.placeholder = 'Fix the duration first\u2026';
                 return;
             }
 
-            roomSearch.disabled    = true;
+            roomSearch.disabled = true;
             roomSearch.placeholder = 'Loading rooms\u2026';
 
-            var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
             var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
             fetch('room-reservation/api/check-slot-availability.php', {
-                method:  'POST',
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
+                body: JSON.stringify({
                     csrf_token: csrfToken,
-                    campus:     campus,
-                    date:       date,
+                    campus: campus,
+                    date: date,
                     start_time: start,
-                    end_time:   end,
+                    end_time: end,
                 }),
             })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (data.error) {
-                    showErr(data.error);
-                    roomSearch.placeholder = 'No rooms available.';
-                    return;
-                }
-                _miniFormRooms = data.rooms || [];
-                if (_miniFormRooms.length === 0) {
-                    roomSearch.disabled    = true;
-                    roomSearch.placeholder = 'No rooms available for this slot.';
-                    showErr('No rooms are free for this campus, date and time. Try a different slot.');
-                    return;
-                }
-                roomSearch.disabled    = false;
-                roomSearch.placeholder = 'Type to search ' + _miniFormRooms.length +
-                    ' available room' + (_miniFormRooms.length === 1 ? '' : 's') + '\u2026';
-            })
-            .catch(function() {
-                showErr('Could not load rooms. Please try again.');
-                roomSearch.placeholder = 'Error loading rooms.';
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.error) {
+                        showErr(data.error);
+                        roomSearch.placeholder = 'No rooms available.';
+                        return;
+                    }
+                    _miniFormRooms = data.rooms || [];
+                    if (_miniFormRooms.length === 0) {
+                        roomSearch.disabled = true;
+                        roomSearch.placeholder = 'No rooms available for this slot.';
+                        showErr('No rooms are free for this campus, date and time. Try a different slot.');
+                        return;
+                    }
+                    roomSearch.disabled = false;
+                    roomSearch.placeholder = 'Type to search ' + _miniFormRooms.length +
+                        ' available room' + (_miniFormRooms.length === 1 ? '' : 's') + '\u2026';
+                })
+                .catch(function () {
+                    showErr('Could not load rooms. Please try again.');
+                    roomSearch.placeholder = 'Error loading rooms.';
+                });
         }
 
         campusSel.addEventListener('change', onSlotChange);
-        dateInp.addEventListener('change',   onSlotChange);
-        startInp.addEventListener('change',  onSlotChange);
-        endInp.addEventListener('change',    onSlotChange);
+        dateInp.addEventListener('change', onSlotChange);
+        startInp.addEventListener('change', onSlotChange);
+        endInp.addEventListener('change', onSlotChange);
 
         function renderDropdown(query) {
             var q = query.trim().toLowerCase();
             var filtered = q === ''
                 ? _miniFormRooms
-                : _miniFormRooms.filter(function(r) {
+                : _miniFormRooms.filter(function (r) {
                     return r.room_name.toLowerCase().includes(q) ||
-                           r.building_name.toLowerCase().includes(q) ||
-                           r.floor_label.toLowerCase().includes(q);
-                  });
+                        r.building_name.toLowerCase().includes(q) ||
+                        r.floor_label.toLowerCase().includes(q);
+                });
 
             if (filtered.length === 0) {
                 dropdown.innerHTML =
                     '<div class="act-mini-dd-empty">No rooms match "' + escH(query) + '"</div>';
             } else {
-                dropdown.innerHTML = filtered.map(function(r) {
+                dropdown.innerHTML = filtered.map(function (r) {
                     return '<div class="act-mini-dd-item" ' +
-                           'data-id="' + r.room_id + '" ' +
-                           'data-label="' + escH(r.room_name + ' \u00b7 ' +
-                               r.building_name + ' \u00b7 ' + r.floor_label) + '">' +
-                               '<strong>' + escH(r.room_name) + '</strong>' +
-                               '<span class="act-mini-dd-meta">' +
-                               escH(r.building_name) + ' \u00b7 ' + escH(r.floor_label) +
-                               '</span>' +
-                           '</div>';
+                        'data-id="' + r.room_id + '" ' +
+                        'data-label="' + escH(r.room_name + ' \u00b7 ' +
+                            r.building_name + ' \u00b7 ' + r.floor_label) + '">' +
+                        '<strong>' + escH(r.room_name) + '</strong>' +
+                        '<span class="act-mini-dd-meta">' +
+                        escH(r.building_name) + ' \u00b7 ' + escH(r.floor_label) +
+                        '</span>' +
+                        '</div>';
                 }).join('');
             }
             dropdown.style.display = 'block';
         }
 
-        roomSearch.addEventListener('input', function() {
-            roomIdInp.value       = '';
+        roomSearch.addEventListener('input', function () {
+            roomIdInp.value = '';
             _miniFormRoomSelected = false;
-            submitBtn.disabled    = true;
+            submitBtn.disabled = true;
             if (_miniFormRooms.length > 0) renderDropdown(this.value);
         });
 
-        roomSearch.addEventListener('focus', function() {
+        roomSearch.addEventListener('focus', function () {
             if (_miniFormRooms.length > 0) renderDropdown(this.value);
         });
 
-        dropdown.addEventListener('mousedown', function(e) {
+        dropdown.addEventListener('mousedown', function (e) {
             var item = e.target.closest('.act-mini-dd-item');
             if (!item) return;
             e.preventDefault();
-            roomIdInp.value       = item.dataset.id;
-            roomSearch.value      = item.dataset.label;
+            roomIdInp.value = item.dataset.id;
+            roomSearch.value = item.dataset.label;
             _miniFormRoomSelected = true;
             dropdown.style.display = 'none';
-            submitBtn.disabled    = false;
+            submitBtn.disabled = false;
             clearErr();
         });
 
@@ -4753,12 +5189,12 @@
                 dropdown.style.display = 'none';
                 if (!_miniFormRoomSelected) {
                     roomSearch.value = '';
-                    roomIdInp.value  = '';
+                    roomIdInp.value = '';
                 }
             }
         }, true);
 
-        cancelBtn.addEventListener('click', function() {
+        cancelBtn.addEventListener('click', function () {
             var f = document.getElementById('actMiniForm');
             if (f) f.remove();
             setSending(false);
@@ -4768,16 +5204,16 @@
                 'Facilities tab to browse and reserve directly.');
         });
 
-        submitBtn.addEventListener('click', function() {
+        submitBtn.addEventListener('click', function () {
             var roomId = roomIdInp.value;
-            var date   = dateInp.value;
-            var start  = startInp.value;
-            var end    = endInp.value;
+            var date = dateInp.value;
+            var start = startInp.value;
+            var end = endInp.value;
 
             if (!roomId) { showErr('Please select a room from the list.'); return; }
-            if (!date)   { showErr('Please select a date.'); return; }
-            if (!start)  { showErr('Please enter a start time.'); return; }
-            if (!end)    { showErr('Please enter an end time.'); return; }
+            if (!date) { showErr('Please select a date.'); return; }
+            if (!start) { showErr('Please enter a start time.'); return; }
+            if (!end) { showErr('Please enter an end time.'); return; }
             clearErr();
 
             // Close chat
@@ -4794,7 +5230,7 @@
                 sessionStorage.setItem('ai_room_deeplink', JSON.stringify({
                     room: roomId, date: date, start: start, end: end
                 }));
-            } catch(e) {}
+            } catch (e) { }
 
             // Switch to Facilities tab by clicking the sidebar nav item —
             // this uses the existing public delegation system and is accessible
@@ -4813,7 +5249,7 @@
     function actAiSend(prefill) {
 
         var input = document.getElementById('actAiInput');
-        var msg   = (prefill || (input ? input.value : '')).trim();
+        var msg = (prefill || (input ? input.value : '')).trim();
         if (!msg) return;
 
         var body = document.getElementById('actAiChatBody');
@@ -4827,61 +5263,61 @@
         if (input) input.value = '';
         setSending(true);
 
-        var typing    = appendTyping(body);
-        var csrfMeta  = document.querySelector('meta[name="csrf-token"]');
+        var typing = appendTyping(body);
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
         var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
 
         fetch('room-reservation/api/chat.php', {
-            method:  'POST',
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ message: msg, csrf_token: csrfToken }),
+            body: JSON.stringify({ message: msg, csrf_token: csrfToken }),
         })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            typing.remove();
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                typing.remove();
 
-            if (data.status === 'rate_limited') {
-                appendAiBubble(body, data.message);
-                updateCounter(0);
-                setSending(false);
-                return;
-            }
-            if (data.status !== 'success') {
-                appendAiBubble(body, data.message || 'Something went wrong. Please try again.');
-                setSending(false);
-                return;
-            }
-
-            var lastRow = appendAiBubble(body, data.reply);
-            if (typeof data.remaining === 'number') updateCounter(data.remaining);
-
-            // Campus disambiguation chips (availability queries)
-            if (data.ask_campus) {
-                var col = lastRow && lastRow.querySelector('.act-chat-col');
-                if (col) {
-                    var chips = document.createElement('div');
-                    chips.className = 'act-chat-chips act-campus-chips';
-                    chips.innerHTML =
-                        '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
-                        '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
-                    col.appendChild(chips);
+                if (data.status === 'rate_limited') {
+                    appendAiBubble(body, data.message);
+                    updateCounter(0);
+                    setSending(false);
+                    return;
                 }
-            }
+                if (data.status !== 'success') {
+                    appendAiBubble(body, data.message || 'Something went wrong. Please try again.');
+                    setSending(false);
+                    return;
+                }
 
-            // Reservation intent — show 4-field mini-form
-            if (data.intent_reserve) {
-                showMiniForm(lastRow);
-                // Keep send disabled until form is cancelled or submitted
-                return;
-            }
+                var lastRow = appendAiBubble(body, data.reply);
+                if (typeof data.remaining === 'number') updateCounter(data.remaining);
 
-            setSending(false);
-        })
-        .catch(function() {
-            typing.remove();
-            appendAiBubble(body, 'Network error. Please check your connection and try again.');
-            setSending(false);
-        });
+                // Campus disambiguation chips (availability queries)
+                if (data.ask_campus) {
+                    var col = lastRow && lastRow.querySelector('.act-chat-col');
+                    if (col) {
+                        var chips = document.createElement('div');
+                        chips.className = 'act-chat-chips act-campus-chips';
+                        chips.innerHTML =
+                            '<button class="act-chat-chip" data-chip="PUP Main">🏫 PUP Main</button>' +
+                            '<button class="act-chat-chip" data-chip="PUP CITE">🏛 PUP CITE</button>';
+                        col.appendChild(chips);
+                    }
+                }
+
+                // Reservation intent — show 4-field mini-form
+                if (data.intent_reserve) {
+                    showMiniForm(lastRow);
+                    // Keep send disabled until form is cancelled or submitted
+                    return;
+                }
+
+                setSending(false);
+            })
+            .catch(function () {
+                typing.remove();
+                appendAiBubble(body, 'Network error. Please check your connection and try again.');
+                setSending(false);
+            });
     }
 
     window.actAiSend = actAiSend;
@@ -4890,11 +5326,11 @@
     function init() {
         var inp = document.getElementById('actAiInput');
         if (inp) {
-            inp.addEventListener('keydown', function(e) {
+            inp.addEventListener('keydown', function (e) {
                 if (e.key === 'Enter' && !e.shiftKey) actAiSend();
             });
         }
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             var chip = e.target.closest('.act-chat-chip');
             if (!chip) return;
             actAiSend(chip.dataset.chip);
@@ -4915,11 +5351,13 @@
    1. History table   filter All / Equipment / Rooms, search, paging
    2. Show all        expands the Currently borrowing / Upcoming lists
    3. Download Report prints the whole record (CSS un-pages it)
-   4. Rooms, live     re-fetches room-reservation/api/poll-reservations.php?view=activity
-                      and swaps the Room reservations card, the room rows of
-                      the history table and the two room numbers in the summary
-                      strip. Runs after a booking / cancellation, when the tab
-                      is opened, and every 30 s while visible.
+   4. Live refresh    Rooms:     room-reservation/api/poll-reservations.php?view=activity
+                      Equipment: equipment-booking/api/poll-requests.php?view=activity
+                      Each swaps its card, its rows in the history table and its numbers
+                      in the summary strip (same renderers as the first page load).
+                      Runs when the tab is opened, after a booking / cancellation,
+                      the moment the 5 s requests poll sees a status change (e.g. admin
+                      confirms a return), and every 30 s while the tab is visible.
 
    Cancel / Join waitlist / Report issue / go-tab buttons are handled by the
    delegated handlers above (data-action="..."). No inline event handlers are
@@ -4934,6 +5372,7 @@
         var PER_PAGE = 10;
         var REFRESH_MS = 30000;
         var API_ROOMS = 'room-reservation/api/poll-reservations.php?view=activity';
+        var API_EQUIP = 'equipment-booking/api/poll-requests.php?view=activity';
 
         var panel = document.getElementById('panel-activity');
         var body = document.getElementById('factHistBody');
@@ -4985,14 +5424,20 @@
             return out;
         }
 
+        /* The page navigation lives in the History header, next to the filters:
+           "Showing 1-10 of 24" + previous / numbers / next. With one page only the count shows. */
         function renderPager(matched) {
             var pages = Math.max(1, Math.ceil(matched / PER_PAGE));
-            if (matched <= PER_PAGE) { pager.hidden = true; return; }
+            var ctl = pager.querySelector('.fact-pager-ctl');
+            if (matched === 0) { pager.hidden = true; return; }
             pager.hidden = false;
 
             var from = (state.page - 1) * PER_PAGE + 1;
             var to = Math.min(matched, state.page * PER_PAGE);
-            pagerInfo.textContent = 'Showing ' + from + '\u2013' + to + ' of ' + matched;
+            pagerInfo.textContent = pages > 1
+                ? 'Showing ' + from + '\u2013' + to + ' of ' + matched
+                : matched + (matched === 1 ? ' record' : ' records');
+            if (ctl) ctl.hidden = pages <= 1;
 
             btnPrev.disabled = state.page <= 1;
             btnNext.disabled = state.page >= pages;
@@ -5098,49 +5543,97 @@
             if (e.target.closest('[data-fact-print]')) window.print();
         });
 
-        /* ── 4. Rooms: live refresh ──────────────────────────────── */
-        var inFlight = false;
+        /* ── 4. Live refresh (equipment + rooms) ─────────────────── */
+        var inFlight = { rooms: false, equipment: false };
 
         function setStat(name, value) {
             var el = panel.querySelector('[data-fact-stat="' + name + '"]');
-            if (el) el.textContent = value;
+            if (!el) return;
+            el.textContent = value;
+            if (name === 'overdue') {
+                var box = el.closest('.fact-stat');
+                if (box) box.classList.toggle('is-alert', Number(value) > 0);
+            }
+        }
+
+        /* Swap a card's contents but keep any "Show all" the person already opened */
+        function swapBody(container, html) {
+            var opened = {};
+            container.querySelectorAll('.fact-group').forEach(function (g) {
+                var label = g.querySelector('.fact-group-label');
+                var list = g.querySelector('.fact-list');
+                if (label && list && g.querySelector('[data-fact-more]') && !list.classList.contains('is-collapsed')) {
+                    opened[label.textContent] = true;
+                }
+            });
+            container.innerHTML = html;
+            container.querySelectorAll('.fact-group').forEach(function (g) {
+                var label = g.querySelector('.fact-group-label');
+                var list = g.querySelector('.fact-list');
+                var more = g.querySelector('[data-fact-more]');
+                if (label && list && more && opened[label.textContent]) {
+                    list.classList.remove('is-collapsed');
+                    more.classList.add('is-open');
+                    more.setAttribute('aria-expanded', 'true');
+                    more.firstChild.nodeValue = 'Show less ';
+                }
+            });
+        }
+
+        /* Replace one kind of history row ("room" / "equipment") with fresh ones */
+        function swapHistory(kind, html) {
+            body.querySelectorAll('tr.fact-row[data-kind="' + kind + '"]').forEach(function (tr) { tr.remove(); });
+            body.insertAdjacentHTML('beforeend', html);
+            sortRows();
+            apply();
+        }
+
+        function load(url, key, done) {
+            if (inFlight[key]) return;
+            inFlight[key] = true;
+            fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    if (!data || data.error || Array.isArray(data)) return;
+                    done(data);
+                })
+                .catch(function () { /* a failed refresh must never disturb the screen */ })
+                .then(function () { inFlight[key] = false; });
         }
 
         function refreshRooms() {
-            if (inFlight) return;
-            inFlight = true;
-            fetch(API_ROOMS, { credentials: 'same-origin', cache: 'no-store' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (data) {
-                    if (!data || data.error) return;
-
-                    var card = $('factRoomsBody');
-                    if (card && typeof data.body === 'string') card.innerHTML = data.body;
-
-                    if (typeof data.rows === 'string') {
-                        body.querySelectorAll('tr.fact-row[data-kind="room"]').forEach(function (tr) { tr.remove(); });
-                        body.insertAdjacentHTML('beforeend', data.rows);
-                        sortRows();
-                        apply();
-                    }
-
-                    if (data.stats) {
-                        setStat('reserved', data.stats.reserved);
-                        setStat('reserved_sub', data.stats.reserved_sub);
-                        setStat('next', data.stats.next);
-                        setStat('next_sub', data.stats.next_sub);
-                    }
-                })
-                .catch(function () { /* a failed refresh must never disturb the screen */ })
-                .then(function () { inFlight = false; });
+            load(API_ROOMS, 'rooms', function (data) {
+                var card = $('factRoomsBody');
+                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                if (typeof data.rows === 'string') swapHistory('room', data.rows);
+                if (data.stats) setStat('reserved', data.stats.reserved);
+            });
         }
+
+        function refreshEquipment() {
+            load(API_EQUIP, 'equipment', function (data) {
+                var card = $('factEquipBody');
+                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
+                if (data.stats) {
+                    setStat('loans', data.stats.loans);
+                    setStat('overdue', data.stats.overdue);
+                    setStat('pending', data.stats.pending);
+                }
+            });
+        }
+
+        function refreshAll() { refreshEquipment(); refreshRooms(); }
 
         function panelIsOpen() {
             return panel.classList.contains('active') && !document.hidden;
         }
 
-        /* After booking or cancelling */
+        /* After booking or cancelling a room */
         document.addEventListener('pupsync:reservation-submitted', refreshRooms);
+
+        /* The 5 s requests poll saw a status change (approved, returned, overdue ...) */
+        document.addEventListener('pupsync:requests-changed', function () { if (panelIsOpen()) refreshEquipment(); });
 
         /* Joining a waitlist does not fire that event — look again shortly after */
         document.addEventListener('click', function (e) {
@@ -5150,12 +5643,14 @@
             }
         });
 
-        /* When the tab is opened, make sure it is current */
-        var navActivity = $('nav-activity');
-        if (navActivity) navActivity.addEventListener('click', function () { setTimeout(refreshRooms, 150); });
+        /* Whenever the tab is opened (sidebar, Home key figures, "View all"), make sure it is current */
+        if (typeof MutationObserver === 'function') {
+            new MutationObserver(function () { if (panel.classList.contains('active')) refreshAll(); })
+                .observe(panel, { attributes: true, attributeFilter: ['class'] });
+        }
 
-        setInterval(function () { if (panelIsOpen()) refreshRooms(); }, REFRESH_MS);
-        document.addEventListener('visibilitychange', function () { if (panelIsOpen()) refreshRooms(); });
+        setInterval(function () { if (panelIsOpen()) refreshAll(); }, REFRESH_MS);
+        document.addEventListener('visibilitychange', function () { if (panelIsOpen()) refreshAll(); });
 
         /* ── Start ───────────────────────────────────────────────── */
         sortRows();

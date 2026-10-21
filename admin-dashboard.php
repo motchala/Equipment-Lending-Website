@@ -286,18 +286,20 @@ function dash_attention(array $d): array
             'icon' => 'schedule',
             'title' => dash_pl($d['overdue'], 'overdue return'),
             'sub'   => $d['overdue_days'] > 0 ? 'Oldest is ' . dash_pl($d['overdue_days'], 'day') . ' past due' : 'Past its return date',
-            'go' => 'requests',
-            'chip' => 'rq-overdue'
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'overdue'
         ];
     }
     if ($d['waiting'] > 0) {
         $a[] = [
             'tone' => 'warn',
             'icon' => 'assignment',
-            'title' => dash_pl($d['waiting'], 'request') . ' awaiting approval',
-            'sub'   => 'Review and approve or decline',
-            'go' => 'requests',
-            'chip' => 'rq-waiting'
+            'title' => dash_pl($d['waiting'], 'pending request'),
+            'sub'   => 'Awaiting a decision',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting'
         ];
     }
     if ($d['due_today'] > 0) {
@@ -306,8 +308,9 @@ function dash_attention(array $d): array
             'icon' => 'event_available',
             'title' => dash_pl($d['due_today'], 'item') . ' due back today',
             'sub'   => 'Expect returns by end of day',
-            'go' => 'requests',
-            'chip' => 'rq-active'
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'active'
         ];
     }
     if ($d['rooms_issues'] > 0) {
@@ -358,11 +361,12 @@ function dash_render(array $d): void
         [
             'tone' => $d['waiting'] > 0 ? 'warn' : 'ok',
             'icon' => 'assignment',
-            'label' => 'Pending approvals',
+            'label' => 'Pending requests',
             'val' => $d['waiting'],
-            'sub' => $d['waiting'] > 0 ? 'Needs your review' : 'Queue is clear',
-            'go' => 'requests',
-            'chip' => 'rq-waiting',
+            'sub' => $d['waiting'] > 0 ? 'Awaiting a decision' : 'Queue is clear',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'waiting',
         ],
         [
             'tone' => 'ok',
@@ -370,8 +374,9 @@ function dash_render(array $d): void
             'label' => 'Active loans',
             'val' => $d['active'],
             'sub' => $d['due_today'] > 0 ? dash_pl($d['due_today'], 'item') . ' due back today' : 'None due today',
-            'go' => 'requests',
-            'chip' => 'rq-active',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'active',
         ],
         [
             'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
@@ -381,8 +386,9 @@ function dash_render(array $d): void
             'sub' => $d['overdue'] > 0
                 ? ($d['overdue_days'] > 0 ? 'Oldest ' . dash_pl($d['overdue_days'], 'day') . ' late' : 'Needs follow-up')
                 : 'Nothing overdue',
-            'go' => 'requests',
-            'chip' => 'rq-overdue',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'overdue',
         ],
         [
             'tone' => 'info',
@@ -412,7 +418,8 @@ function dash_render(array $d): void
     <section class="dash-kpis" aria-label="Key figures">
         <?php foreach ($kpis as $k): ?>
             <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
-                data-dash-go="<?php echo dash_h($k['go']); ?>" data-dash-chip="<?php echo dash_h($k['chip']); ?>">
+                data-dash-go="<?php echo dash_h($k['go']); ?>"
+                data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
                 <span class="dash-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($k['icon']); ?></span></span>
                 <span class="dash-kpi-body">
                     <span class="dash-kpi-label"><?php echo dash_h($k['label']); ?></span>
@@ -466,7 +473,8 @@ function dash_render(array $d): void
                     <?php foreach ($attn as $a): ?>
                         <li>
                             <button type="button" class="dash-attn-item dash-tone-<?php echo dash_h($a['tone']); ?>"
-                                data-dash-go="<?php echo dash_h($a['go']); ?>" data-dash-chip="<?php echo dash_h($a['chip']); ?>">
+                                data-dash-go="<?php echo dash_h($a['go']); ?>"
+                                data-dash-loan-filter="<?php echo dash_h($a['loan_filter'] ?? ''); ?>">
                                 <span class="dash-attn-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($a['icon']); ?></span></span>
                                 <span class="dash-attn-text">
                                     <strong><?php echo dash_h($a['title']); ?></strong>
@@ -481,7 +489,7 @@ function dash_render(array $d): void
                 <div class="dash-empty dash-empty--ok">
                     <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
                     <strong>You're all caught up</strong>
-                    <small>No approvals, overdue returns, room issues or stock problems.</small>
+                    <small>No pending requests, overdue returns, room issues or stock problems.</small>
                 </div>
             <?php endif; ?>
         </section>
@@ -606,7 +614,7 @@ function dash_render(array $d): void
                     <h2 id="dashLatestTitle">Latest requests</h2>
                     <p>Most recent equipment requests</p>
                 </div>
-                <button type="button" class="dash-link" data-dash-go="requests" data-dash-chip="rq-waiting">View all</button>
+                <button type="button" class="dash-link" data-dash-go="inventory" data-dash-loan-filter="all">View all</button>
             </header>
             <div class="ps-table-wrap">
                 <table class="ps-table dash-table">
@@ -1058,7 +1066,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 }
             }
 
-            if (['requests', 'rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
+            if (['rooms', 'faculty', 'admins', 'activity', 'inventory', 'settings'].indexOf(tab) === -1) return;
             try {
                 if (sessionStorage.getItem('adminHardRefresh') === '1') return;
             } catch (_) {}
@@ -1146,20 +1154,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="nav-group" role="group" aria-labelledby="navg-operations">
                     <span class="nav-group-title" id="navg-operations">Operations</span>
-                    <a class="nav-item" data-tab="requests" id="snav-requests" href="#">
-                        <span class="material-symbols-outlined">assignment</span>
-                        <span class="nav-label">Approvals</span>
-                        <?php if ($stat_waiting > 0): ?>
-                            <span class="nav-badge"><?php echo $stat_waiting; ?></span>
-                        <?php endif; ?>
-                    </a>
                     <a class="nav-item" data-tab="inventory" id="snav-inventory" href="#">
                         <span class="material-symbols-outlined">inventory_2</span>
                         <span class="nav-label">Equipment</span>
                     </a>
                     <a class="nav-item" data-tab="rooms" href="#">
                         <span class="material-symbols-outlined">meeting_room</span>
-                        <span class="nav-label">Rooms</span>
+                        <span class="nav-label">Facilities</span>
                     </a>
                 </div>
                 <?php if ($is_super_admin): ?>
@@ -1235,8 +1236,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                         <div class="dash-head-tools">
                             <!-- One quick action left on purpose: confirming a return by QR code has no other entry point
-                                 on this screen. "Review approvals" and "Add equipment" were removed because the
-                                 Pending approvals card and the Needs attention list already lead to the same places.
+                                 on this screen. "Review requests" and "Add equipment" were removed because the
+                                 Pending requests card and the Needs attention list already lead to the same places.
                                  Keeps id="openQrScannerBtn": initQrScanner() in admin-dashboard.js binds to it. -->
                             <div class="dash-actions">
                                 <button type="button" class="dash-btn dash-btn--primary" id="openQrScannerBtn">
@@ -1267,413 +1268,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             </div><!-- /panel-dashboard -->
 
 
-            <!-- ============================================================
-         TAB: REQUESTS  (Phase 3 redesign)
-    ============================================================ -->
-            <div class="tab-panel" id="panel-requests">
-
-                <!-- Page header -->
-                <div class="ps-page-header-row">
-                    <div class="ps-page-header">
-                        <h1>Approvals</h1>
-                        <p>Review special requests that need a policy override, mainly Organization Adviser submissions with supporting documents. Standard requests are processed automatically.</p>
-                    </div>
-                    <button class="ps-btn ps-btn--outline" data-action="ps-open-modal" data-modal="ps-export-modal">
-                        <span class="material-symbols-outlined">download</span> Export
-                    </button>
-                </div>
-
-                <!-- Sub-tabs -->
-                <div class="rq-filter-chips" id="rqTabs">
-                    <button class="rq-filter-chip active" data-rq-panel="rq-waiting">
-                        Waiting
-                        <?php if ($stat_waiting > 0): ?>
-                            <span class="rq-chip-count"><?php echo $stat_waiting; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-active">
-                        Active
-                        <?php if ($stat_approved > 0): ?>
-                            <span class="rq-chip-count rq-chip-count--ok"><?php echo $stat_approved; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-overdue">
-                        Overdue
-                        <?php if ($stat_overdue > 0): ?>
-                            <span class="rq-chip-count"><?php echo $stat_overdue; ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <button class="rq-filter-chip" data-rq-panel="rq-all">Returned</button>
-                </div>
-
-                <!-- ── WAITING ───────────────────────────────────────────── -->
-                <div class="rq-sub-panel active" id="rq-waiting">
-                    <div class="ps-help-note">
-                        <span class="material-symbols-outlined">info</span>
-                        Standard requests are approved automatically. Only requests that need a policy override appear here, usually from Organization Advisers with a supporting document. Open the document, then approve or decline.
-                    </div>
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">pending</span> Pending Review</h3>
-                            <div style="display:flex;gap:6px">
-                                <input class="ps-form-control" style="width:200px" placeholder="Search requester..." id="rq-waiting-search">
-                            </div>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table ps-appr-table" id="rq-waiting-table">
-                                <thead>
-                                    <tr>
-                                        <th>Request</th>
-                                        <th>Item</th>
-                                        <th>Document</th>
-                                        <th>Status</th>
-                                        <th class="ps-appr-th-act">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    // Collect rows, count batch sizes, and list rows WITH a document first
-                                    // (attachment-first workflow). Order within each group stays newest-first.
-                                    mysqli_data_seek($waiting_result, 0);
-                                    $ps_w_with = [];
-                                    $ps_w_without = [];
-                                    $ps_w_batch = [];
-                                    while ($rw = mysqli_fetch_assoc($waiting_result)) {
-                                        if (!empty($rw['batch_id'])) {
-                                            $ps_w_batch[$rw['batch_id']] = ($ps_w_batch[$rw['batch_id']] ?? 0) + 1;
-                                        }
-                                        if (ps_doc_info($rw['document_path'] ?? '')) $ps_w_with[] = $rw;
-                                        else $ps_w_without[] = $rw;
-                                    }
-                                    $ps_w_rows = array_merge($ps_w_with, $ps_w_without);
-                                    if (count($ps_w_rows) > 0):
-                                        foreach ($ps_w_rows as $r):
-                                            $doc      = ps_doc_info($r['document_path'] ?? '');
-                                            $qty      = max(1, (int)($r['borrow_qty'] ?? 1));
-                                            $who_type = ps_submitted_as_label($r['submitted_as'] ?? '');
-                                            $batch_n  = !empty($r['batch_id']) ? (int)($ps_w_batch[$r['batch_id']] ?? 1) : 1;
-                                    ?>
-                                            <tr class="ps-req-row ps-appr-row<?php echo $doc ? ' has-doc' : ''; ?>"
-                                                data-id="<?php echo (int)$r['id']; ?>"
-                                                data-status="Waiting"
-                                                data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="<?php echo htmlspecialchars($who_type); ?>"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-qty="<?php echo $qty; ?>"
-                                                data-batch-n="<?php echo $batch_n; ?>"
-                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
-                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
-                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
-                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
-                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
-                                                data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
-                                                data-doc-url="<?php echo $doc ? htmlspecialchars($doc['url']) : ''; ?>"
-                                                data-doc-open-url="<?php echo $doc ? htmlspecialchars($doc['open_url']) : ''; ?>"
-                                                data-doc-name="<?php echo $doc ? htmlspecialchars($doc['name']) : ''; ?>"
-                                                data-doc-kind="<?php echo $doc ? $doc['kind'] : ''; ?>">
-                                                <td>
-                                                    <button type="button" class="ps-appr-id"
-                                                        data-action="ps-open-modal" data-modal="ps-req-detail-modal"
-                                                        title="Open review panel">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
-                                                    <div class="ps-appr-who"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div class="ps-appr-sub"><?php echo htmlspecialchars($who_type); ?> &middot; <?php echo date('M d, g:i A', strtotime($r['request_date'])); ?></div>
-                                                </td>
-                                                <td>
-                                                    <div class="ps-appr-item">
-                                                        <?php echo htmlspecialchars($r['equipment_name']); ?>
-                                                        <?php if ($qty > 1): ?><span class="ps-appr-qty">&times;<?php echo $qty; ?></span><?php endif; ?>
-                                                    </div>
-                                                    <div class="ps-appr-sub">
-                                                        Needed <?php echo date('M d', strtotime($r['borrow_date'])); ?>
-                                                        <?php if ($batch_n > 1): ?><span class="ps-appr-batch" title="Part of one submission with <?php echo $batch_n; ?> items">Batch of <?php echo $batch_n; ?></span><?php endif; ?>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <?php if ($doc): ?>
-                                                        <a class="ps-doc-chip ps-doc-chip--<?php echo $doc['kind']; ?>"
-                                                            href="<?php echo htmlspecialchars($doc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
-                                                            title="Open <?php echo htmlspecialchars($doc['name']); ?> in a new tab">
-                                                            <span class="material-symbols-outlined"><?php echo ps_doc_icon($doc['kind']); ?></span>
-                                                            <span class="ps-doc-chip__name"><?php echo htmlspecialchars($doc['name']); ?></span>
-                                                            <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
-                                                        </a>
-                                                    <?php else: ?>
-                                                        <span class="ps-doc-chip ps-doc-chip--none">
-                                                            <span class="material-symbols-outlined">block</span> No document
-                                                        </span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td><span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span></td>
-                                                <td>
-                                                    <div class="ps-appr-actions">
-                                                        <button class="ps-btn ps-btn--success ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-approve-modal">
-                                                            <span class="material-symbols-outlined">check</span> Approve
-                                                        </button>
-                                                        <button class="ps-btn ps-btn--danger ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-decline-modal">
-                                                            <span class="material-symbols-outlined">close</span> Decline
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="5">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">assignment_turned_in</span>
-                                                    <p>Nothing needs your review. Standard requests are processed automatically.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-waiting -->
-
-                <!-- ── ACTIVE BORROWINGS ─────────────────────────────────── -->
-                <div class="rq-sub-panel" id="rq-active">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">check_circle</span>
-                                Active Borrowings (<?php echo $stat_approved; ?>)</h3>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Issued</th>
-                                        <th>Due</th>
-                                        <th>Approved by</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    // Who approved each request (an admin, or the rules engine) — shared with every admin.
-                                    $_act_ids = [];
-                                    mysqli_data_seek($approved_result, 0);
-                                    while ($_r = mysqli_fetch_assoc($approved_result)) {
-                                        $_act_ids[] = (int)$_r['id'];
-                                    }
-                                    $_act_dec = admin_request_decisions($conn, $_act_ids);
-                                    mysqli_data_seek($approved_result, 0);
-                                    if (mysqli_num_rows($approved_result) > 0):
-                                        while ($r = mysqli_fetch_assoc($approved_result)):
-                                            $isOD = strtotime($r['return_date']) < strtotime($today);
-                                    ?>
-                                            <tr>
-                                                <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d', strtotime($r['borrow_date'])); ?></td>
-                                                <td style="<?php echo $isOD ? 'color:var(--danger);font-weight:600' : ''; ?>">
-                                                    <?php echo date('M d', strtotime($r['return_date'])); ?>
-                                                </td>
-                                                <td><?php echo admin_decider_html($_act_dec[(int)$r['id']]['approved'] ?? null); ?></td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                        data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">inventory_2</span>
-                                                    <p>No active borrowings at the moment.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-active -->
-
-                <!-- ── OVERDUE ────────────────────────────────────────────── -->
-                <div class="rq-sub-panel" id="rq-overdue">
-                    <?php if ($stat_overdue > 0): ?>
-                        <div class="ps-alert ps-alert--danger" id="rq-overdue-alert">
-                            <span class="material-symbols-outlined">warning</span>
-                            <?php echo $stat_overdue; ?> item(s) are overdue. Contact the borrowers immediately.
-                            <button class="ps-alert__close" data-action="dismiss-alert" data-target="rq-overdue-alert"><span class="material-symbols-outlined">close</span></button>
-                        </div>
-                    <?php endif; ?>
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">schedule</span>
-                                Overdue Items (<?php echo $stat_overdue; ?>)</h3>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table">
-                                <thead>
-                                    <tr>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Due Date</th>
-                                        <th>Days Overdue</th>
-                                        <th>Approved by</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $overdue_q = mysqli_query($conn, "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
-                                        FROM tbl_requests
-                                        LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
-                                        WHERE tbl_requests.status='Overdue' OR (tbl_requests.status='Approved' AND tbl_requests.return_date < CURDATE())
-                                        ORDER BY tbl_requests.return_date ASC");
-                                    $_od_ids = [];
-                                    if ($overdue_q) {
-                                        while ($_r = mysqli_fetch_assoc($overdue_q)) {
-                                            $_od_ids[] = (int)$_r['id'];
-                                        }
-                                        mysqli_data_seek($overdue_q, 0);
-                                    }
-                                    $_od_dec = admin_request_decisions($conn, $_od_ids);
-                                    if ($overdue_q && mysqli_num_rows($overdue_q) > 0):
-                                        while ($r = mysqli_fetch_assoc($overdue_q)):
-                                            $days_od = max(0, (int)floor((strtotime($today) - strtotime($r['return_date'])) / 86400));
-                                    ?>
-                                            <tr data-id="<?php echo (int)$r['id']; ?>">
-                                                <td>
-                                                    <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                    <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td style="color:var(--danger);font-weight:600"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
-                                                <td><span class="ps-badge ps-badge--overdue"><?php echo $days_od; ?> days</span></td>
-                                                <td><?php echo admin_decider_html($_od_dec[(int)$r['id']]['approved'] ?? null); ?></td>
-                                                <td>
-                                                    <div style="display:flex;gap:6px">
-                                                        <button class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-return-modal">Confirm Return</button>
-                                                        <button class="ps-btn ps-btn--outline ps-btn--sm"
-                                                            data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">check_circle</span>
-                                                    <p>No overdue items. Great job!</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-overdue -->
-
-                <!-- ── RETURNED (merged: was "History" + "All Requests") ──── -->
-                <div class="rq-sub-panel" id="rq-all">
-                    <div class="ps-card">
-                        <div class="ps-card-header">
-                            <h3><span class="material-symbols-outlined">history</span> Returned Requests</h3>
-                            <div style="display:flex;gap:6px">
-                                <input class="ps-form-control" style="width:220px" placeholder="Search..." id="rq-all-search">
-                                <select class="ps-form-control" style="width:140px" id="rq-all-range">
-                                    <option value="today">Today</option>
-                                    <option value="week">This Week</option>
-                                    <option value="month" selected>This Month</option>
-                                    <option value="year">This Year</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="ps-table-wrap">
-                            <table class="ps-table" id="rq-all-table">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Borrower</th>
-                                        <th>Equipment</th>
-                                        <th>Returned</th>
-                                        <th>Returned by</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php
-                                    $all_q = mysqli_query($conn, "SELECT tbl_requests.*, tbl_inventory.`condition` AS item_condition
-                                        FROM tbl_requests
-                                        LEFT JOIN tbl_inventory ON tbl_inventory.item_name = tbl_requests.equipment_name
-                                        WHERE tbl_requests.status='Returned'
-                                        ORDER BY tbl_requests.return_date DESC LIMIT 100");
-                                    $_ret_ids = [];
-                                    if ($all_q) {
-                                        while ($_r = mysqli_fetch_assoc($all_q)) {
-                                            $_ret_ids[] = (int)$_r['id'];
-                                        }
-                                        mysqli_data_seek($all_q, 0);
-                                    }
-                                    $_ret_dec = admin_request_decisions($conn, $_ret_ids);
-                                    if ($all_q && mysqli_num_rows($all_q) > 0):
-                                        while ($r = mysqli_fetch_assoc($all_q)):
-                                    ?>
-                                            <tr class="ps-req-row"
-                                                data-id="<?php echo (int)$r['id']; ?>"
-                                                data-status="<?php echo htmlspecialchars($r['status']); ?>"
-                                                data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
-                                                data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
-                                                data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
-                                                data-req-type="Faculty"
-                                                data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
-                                                data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
-                                                data-room="<?php echo htmlspecialchars($r['room']); ?>"
-                                                data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
-                                                data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
-                                                data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
-                                                data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
-                                                data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>">
-                                                <td style="cursor:pointer;color:var(--accent-maroon);font-weight:600"
-                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">
-                                                    #<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?>
-                                                </td>
-                                                <td><?php echo htmlspecialchars($r['faculty_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($r['equipment_name']); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($r['return_date'])); ?></td>
-                                                <td><?php echo admin_decider_html($_ret_dec[(int)$r['id']]['returned'] ?? null); ?></td>
-                                                <td>
-                                                    <button class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile;
-                                    else: ?>
-                                        <tr>
-                                            <td colspan="6">
-                                                <div class="ps-empty-state">
-                                                    <span class="material-symbols-outlined">list_alt</span>
-                                                    <p>No requests found.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div><!-- /rq-all -->
-
-            </div><!-- /panel-requests -->
 
 
 
@@ -1688,7 +1282,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- ── Page header + Add Room button ──────────────────── -->
                 <div class="pr-page-header-row">
                     <div>
-                        <h1 class="pr-page-title">Room Management</h1>
+                        <h1 class="pr-page-title">Facilities Management</h1>
                         <p class="pr-page-subtitle">Browse rooms, reservations and reported issues.</p>
                     </div>
                     <?php if ($is_super_admin): ?>
@@ -1867,9 +1461,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <!-- Tabs: main tabs on the left, Archived in its own container on the far right -->
                 <div class="rm-tabbar">
                     <div class="pr-sub-tabs" id="rooms-toggle-wrap">
-                        <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">Rooms</button>
+                        <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">meeting_room</span> Rooms
+                        </button>
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-reservations">
-                            Reservations
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">event_available</span> Reservations
                             <?php
                             $rm_resv_approved = count(array_filter($admin_room_reservations ?? [], function ($r) {
                                 return ($r['status'] ?? '') === 'Approved';
@@ -1879,7 +1475,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <?php endif; ?>
                         </button>
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-issues">
-                            Issues
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">report_problem</span> Issues
                             <?php if (!empty($admin_room_issues_open)): ?>
                                 <span class="pr-tab-badge"><?php echo (int)$admin_room_issues_open; ?></span>
                             <?php endif; ?>
@@ -1887,7 +1483,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     </div>
                     <div class="pr-sub-tabs rm-tabs-solo" id="rooms-archived-tab-wrap">
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-archived">
-                            Archived
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">inventory_2</span> Archived
                             <span class="pr-tab-badge" id="roomsArchivedBadge" style="background:var(--text-light);<?php echo empty($rooms_archived) ? 'display:none;' : ''; ?>"><?php echo count($rooms_archived); ?></span>
                         </button>
                     </div>
@@ -2423,6 +2019,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                 <!-- RESERVATIONS -->
                 <div class="rooms-sub-panel" id="rooms-reservations-panel">
+                    <?php
+                    // Table rows start in "most recent request first" order (the sort dropdown re-orders them live).
+                    $rr_rows = $admin_room_reservations ?? [];
+                    usort($rr_rows, function ($a, $b) {
+                        $ta = !empty($a['request_date']) ? (int)strtotime($a['request_date']) : 0;
+                        $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
+                        return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
+                    });
+                    // Waiting (adviser requests with an attached letter) is a Super Admin-only queue.
+                    $rr_is_super = !empty($ps_rooms_can_view_sensitive_adviser_requests);
+                    ?>
                     <div class="pr-card">
                         <div class="pr-card-header">
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
@@ -2432,15 +2039,39 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                         </div>
                         <div class="rr-status-bar">
-                            <button type="button" class="rm-chip rr-active-chip" id="rrActiveToday" aria-pressed="false">
-                                <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today
-                            </button>
-                            <select id="rrStatus" class="pr-filter-select" aria-label="Reservation status">
-                                <option value="all">All statuses</option>
-                                <option value="Approved">Approved</option>
-                                <option value="Cancelled">Cancelled</option>
-                                <option value="Declined">Declined</option>
-                            </select>
+                            <div class="rr-tabs" id="rrTabs" role="group" aria-label="Filter reservations by status">
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="all" aria-pressed="true">
+                                    All <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
+                                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today <span class="rr-tab-count"></span>
+                                </button>
+                                <?php if ($rr_is_super): ?>
+                                    <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
+                                        Waiting <span class="rr-tab-count"></span>
+                                    </button>
+                                <?php endif; ?>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Approved" aria-pressed="false">
+                                    Approved <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Cancelled" aria-pressed="false">
+                                    Cancelled <span class="rr-tab-count"></span>
+                                </button>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Declined" aria-pressed="false">
+                                    Declined <span class="rr-tab-count"></span>
+                                </button>
+                            </div>
+                            <div class="rr-sort">
+                                <select id="rrSort" class="pr-filter-select" aria-label="Sort reservations by">
+                                    <option value="recent" selected>Recent requests</option>
+                                    <option value="date">Reservation date</option>
+                                </select>
+                                <button type="button" class="rr-sort-dir" id="rrSortDir" data-dir="desc"
+                                    title="Newest requests first (click to reverse)"
+                                    aria-label="Sort direction: newest requests first. Click to reverse.">
+                                    <span class="material-symbols-outlined" aria-hidden="true">arrow_downward</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="pr-tbl-wrap">
                             <table class="pr-table rm-table" id="rrTable">
@@ -2450,18 +2081,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <th>When</th>
                                         <th>Requested by</th>
                                         <th>Status</th>
-                                        <th><span class="rm-sr">Actions</span></th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if (empty($admin_room_reservations)): ?>
+                                    <?php if (empty($rr_rows)): ?>
                                         <tr>
                                             <td colspan="5" class="rm-empty-cell">No reservations yet.</td>
                                         </tr>
-                                        <?php else: foreach ($admin_room_reservations as $ar):
+                                        <?php else: foreach ($rr_rows as $ar):
                                             $ar_badge = 'ps-badge--active';
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
                                             if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
+                                            if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
+                                            // Only a Super Admin can decide a Waiting request (the API enforces this too).
+                                            $ar_reviewable = $ar['status'] === 'Waiting' && $rr_is_super;
 
                                             $ar_type    = ps_submitted_as_label($ar['submitted_as']);
                                             $ar_is_stud = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name']);
@@ -2498,6 +2132,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 data-end-time="<?php echo htmlspecialchars($ar['end_time']); ?>"
                                                 data-arb-rule="<?php echo htmlspecialchars($ar['arb_rule'] ?? ''); ?>"
                                                 data-arb-reason="<?php echo htmlspecialchars($ar['arb_reason'] ?? ''); ?>"
+                                                data-submitted-ts="<?php echo !empty($ar['request_date']) ? (int)strtotime($ar['request_date']) : 0; ?>"
+                                                data-can-review="<?php echo $ar_reviewable ? '1' : '0'; ?>"
                                                 data-cancellable="<?php echo $ar_cancellable ? '1' : '0'; ?>">
                                                 <td>
                                                     <div class="rm-main"><?php echo htmlspecialchars($ar['room_name']); ?></div>
@@ -2530,7 +2166,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                 data-faculty-name="<?php echo htmlspecialchars($ar['faculty_name']); ?>"
                                                                 title="Cancel this reservation">Cancel</button>
                                                         <?php endif; ?>
-                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail>View</button>
+                                                        <button type="button" class="pr-tbl-btn review" data-rr-detail><?php echo $ar_reviewable ? 'Review' : 'View'; ?></button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -2542,69 +2178,301 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </tbody>
                             </table>
                         </div>
+                        <div class="inv-pager" id="rrPager" hidden>
+                            <span class="inv-pager-info" id="rrPagerInfo"></span>
+                            <div class="inv-pager-ctl" id="rrPagerCtl">
+                                <button type="button" class="inv-pager-btn" id="rrPgPrev" aria-label="Previous page">
+                                    <span class="material-symbols-outlined">chevron_left</span>
+                                </button>
+                                <div class="inv-pager-nums" id="rrPgNums"></div>
+                                <button type="button" class="inv-pager-btn" id="rrPgNext" aria-label="Next page">
+                                    <span class="material-symbols-outlined">chevron_right</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <script nonce="<?php echo $csp_nonce; ?>">
                         (function() {
                             'use strict';
                             var tbl = document.getElementById('rrTable');
                             var q = document.getElementById('rrSearch');
-                            var st = document.getElementById('rrStatus');
-                            var activeToday = document.getElementById('rrActiveToday');
-                            var activeOnly = false;
+                            var sortSel = document.getElementById('rrSort');
+                            var dirBtn = document.getElementById('rrSortDir');
+                            var tabsWrap = document.getElementById('rrTabs');
                             var none = document.getElementById('rrNoMatch');
-                            if (!tbl || !q || !st || !activeToday) return;
+                            var pager = document.getElementById('rrPager');
+                            var pgInfo = document.getElementById('rrPagerInfo');
+                            var pgCtl = document.getElementById('rrPagerCtl');
+                            var pgPrev = document.getElementById('rrPgPrev');
+                            var pgNext = document.getElementById('rrPgNext');
+                            var pgNums = document.getElementById('rrPgNums');
+                            if (!tbl || !q || !sortSel || !dirBtn || !tabsWrap || !pager) return;
+                            var PAGE_SIZE = 15;
+                            var tbody = tbl.tBodies[0];
+                            var tab = 'all'; // all | active | Waiting | Approved | Cancelled | Declined
+                            var dir = 'desc'; // desc = newest / latest first, asc = oldest / earliest first
+                            var page = 1;
 
-                            function apply() {
-                                var s = (q.value || '').trim().toLowerCase();
-                                var f = st.value;
-                                var any = false;
-                                var nowISO = (function() {
-                                    try {
-                                        var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
-                                        var g = function(t) { return (parts.find(function(p) { return p.type === t; }) || {}).value; };
-                                        return { iso: g('year') + '-' + g('month') + '-' + g('day'), min: (+g('hour')) * 60 + (+g('minute')) };
-                                    } catch(e) { var d = new Date(); return { iso: d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2), min: d.getHours()*60+d.getMinutes() }; }
-                                })();
-                                function parseMin(v) {
-                                    var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
-                                    if (!m) return null;
-                                    var h = +m[1], mi = +m[2], ap = (m[3] || '').toUpperCase();
-                                    if (ap === 'PM' && h !== 12) h += 12;
-                                    if (ap === 'AM' && h === 12) h = 0;
-                                    return h * 60 + mi;
+                            function manilaNow() {
+                                try {
+                                    var parts = new Intl.DateTimeFormat('en-CA', {
+                                        timeZone: 'Asia/Manila',
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hourCycle: 'h23'
+                                    }).formatToParts(new Date());
+                                    var g = function(t) {
+                                        return (parts.find(function(p) {
+                                            return p.type === t;
+                                        }) || {}).value;
+                                    };
+                                    return {
+                                        iso: g('year') + '-' + g('month') + '-' + g('day'),
+                                        min: (+g('hour')) * 60 + (+g('minute'))
+                                    };
+                                } catch (e) {
+                                    var d = new Date();
+                                    return {
+                                        iso: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+                                        min: d.getHours() * 60 + d.getMinutes()
+                                    };
                                 }
-                                tbl.querySelectorAll('tbody tr.ps-rr-row').forEach(function(r) {
+                            }
+
+                            function parseMin(v) {
+                                var m = /^\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\s*$/.exec(v || '');
+                                if (!m) return null;
+                                var h = +m[1],
+                                    mi = +m[2],
+                                    ap = (m[3] || '').toUpperCase();
+                                if (ap === 'PM' && h !== 12) h += 12;
+                                if (ap === 'AM' && h === 12) h = 0;
+                                return h * 60 + mi;
+                            }
+
+                            function rows() {
+                                return Array.prototype.slice.call(tbody.querySelectorAll('tr.ps-rr-row'));
+                            }
+
+                            function isActiveNow(d, now) {
+                                var sMin = parseMin(d.startTime);
+                                var eMin = parseMin(d.endTime);
+                                return d.status === 'Approved' && d.isoDate === now.iso &&
+                                    sMin !== null && eMin !== null &&
+                                    sMin <= now.min && eMin > now.min;
+                            }
+
+                            /* ── Sorting ─────────────────────────────────────────
+                               Dropdown picks WHAT to sort by, the arrow button picks the direction:
+                               recent : submission time of the request
+                               date   : reservation date + start time */
+                            function startKey(d) {
+                                return (d.isoDate || '') + ' ' + (d.startTime || '');
+                            }
+
+                            function comparator() {
+                                var sign = dir === 'asc' ? 1 : -1;
+                                var byDate = sortSel.value === 'date';
+                                return function(a, b) {
+                                    var x = a.dataset,
+                                        y = b.dataset,
+                                        r;
+                                    if (byDate) {
+                                        var kx = startKey(x),
+                                            ky = startKey(y);
+                                        r = kx < ky ? -1 : (kx > ky ? 1 : 0);
+                                    } else {
+                                        r = (+x.submittedTs || 0) - (+y.submittedTs || 0);
+                                    }
+                                    if (!r) r = (+x.rrId || 0) - (+y.rrId || 0);
+                                    return r * sign;
+                                };
+                            }
+
+                            function sortRows() {
+                                var list = rows().sort(comparator());
+                                var frag = document.createDocumentFragment();
+                                list.forEach(function(r) {
+                                    frag.appendChild(r);
+                                });
+                                tbody.insertBefore(frag, none || null);
+                            }
+
+                            function syncDirBtn() {
+                                var asc = dir === 'asc';
+                                var label = sortSel.value === 'date' ?
+                                    (asc ? 'Earliest first' : 'Latest first') :
+                                    (asc ? 'Oldest requests first' : 'Newest requests first');
+                                dirBtn.setAttribute('data-dir', dir);
+                                dirBtn.title = label + ' (click to reverse)';
+                                dirBtn.setAttribute('aria-label', 'Sort direction: ' + label.toLowerCase() + '. Click to reverse.');
+                                var ico = dirBtn.querySelector('.material-symbols-outlined');
+                                if (ico) ico.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+                            }
+
+                            /* ── Tab counts (independent of the search box) ─────── */
+                            function updateCounts() {
+                                var now = manilaNow();
+                                var c = {
+                                    all: 0,
+                                    active: 0,
+                                    Waiting: 0,
+                                    Approved: 0,
+                                    Cancelled: 0,
+                                    Declined: 0
+                                };
+                                rows().forEach(function(r) {
+                                    var d = r.dataset;
+                                    c.all++;
+                                    if (typeof c[d.status] === 'number') c[d.status]++;
+                                    if (isActiveNow(d, now)) c.active++;
+                                });
+                                tabsWrap.querySelectorAll('[data-rr-tab]').forEach(function(b) {
+                                    var key = b.getAttribute('data-rr-tab');
+                                    var span = b.querySelector('.rr-tab-count');
+                                    if (!span) return;
+                                    span.textContent = c[key];
+                                    // Waiting is the to-do queue: highlight it while something needs a decision
+                                    span.classList.toggle('has', key === 'Waiting' && c[key] > 0);
+                                });
+                            }
+
+                            /* ── 1 … 4 5 6 … 12 : first, last and the current page ±1 ── */
+                            function pageList(total, current) {
+                                var keep = [1, total, current - 1, current, current + 1];
+                                var list = [],
+                                    last = 0;
+                                keep.filter(function(n, i) {
+                                        return n >= 1 && n <= total && keep.indexOf(n) === i;
+                                    })
+                                    .sort(function(x, y) {
+                                        return x - y;
+                                    })
+                                    .forEach(function(n) {
+                                        if (n - last > 1) list.push('gap');
+                                        list.push(n);
+                                        last = n;
+                                    });
+                                return list;
+                            }
+
+                            function renderPager(total, pages, start, end) {
+                                pager.hidden = total === 0;
+                                pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
+                                pgCtl.hidden = pages <= 1;
+                                pgPrev.disabled = page <= 1;
+                                pgNext.disabled = page >= pages;
+                                pgNums.textContent = '';
+                                pageList(pages, page).forEach(function(n) {
+                                    if (n === 'gap') {
+                                        var gap = document.createElement('span');
+                                        gap.className = 'inv-pager-gap';
+                                        gap.textContent = '\u2026';
+                                        pgNums.appendChild(gap);
+                                        return;
+                                    }
+                                    var btn = document.createElement('button');
+                                    btn.type = 'button';
+                                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                                    btn.dataset.page = String(n);
+                                    btn.textContent = String(n);
+                                    btn.setAttribute('aria-label', 'Page ' + n);
+                                    if (n === page) btn.setAttribute('aria-current', 'page');
+                                    pgNums.appendChild(btn);
+                                });
+                            }
+
+                            /* ── Filtering (active tab + search), then 15 rows per page ── */
+                            function applyFilter() {
+                                var s = (q.value || '').trim().toLowerCase();
+                                var now = manilaNow();
+                                var all = rows();
+                                var hits = all.filter(function(r) {
                                     var d = r.dataset;
                                     var hay = ((d.room || '') + ' ' + (d.who || '') + ' ' + (d.whoSub || '') + ' ' + (d.purpose || '')).toLowerCase();
-                                    var show;
-                                    if (activeOnly) {
-                                        var sMin = parseMin(d.startTime);
-                                        var eMin = parseMin(d.endTime);
-                                        show = d.status === 'Approved' && d.isoDate === nowISO.iso
-                                            && sMin !== null && eMin !== null
-                                            && sMin <= nowISO.min && eMin > nowISO.min;
-                                    } else {
-                                        show = (f === 'all' || d.status === f);
-                                    }
-                                    show = show && (!s || hay.indexOf(s) !== -1);
-                                    r.style.display = show ? '' : 'none';
-                                    if (show) any = true;
+                                    var show = tab === 'all' ? true : (tab === 'active' ? isActiveNow(d, now) : d.status === tab);
+                                    return show && (!s || hay.indexOf(s) !== -1);
                                 });
-                                var hasRows = tbl.querySelector('tbody tr.ps-rr-row');
-                                if (none) none.style.display = (hasRows && !any) ? '' : 'none';
+                                var total = hits.length;
+                                var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                                page = Math.min(Math.max(page, 1), pages);
+                                var start = (page - 1) * PAGE_SIZE;
+                                var end = Math.min(start + PAGE_SIZE, total);
+                                var visible = hits.slice(start, end);
+                                all.forEach(function(r) {
+                                    r.style.display = visible.indexOf(r) !== -1 ? '' : 'none';
+                                });
+                                var hasRows = all.length > 0;
+                                if (none) {
+                                    none.style.display = (hasRows && total === 0) ? '' : 'none';
+                                    var cell = none.firstElementChild;
+                                    if (cell) cell.textContent = (tab === 'Waiting' && !s) ? 'No reservations are waiting for review.' : 'No reservations match.';
+                                }
+                                renderPager(total, pages, start, end);
                             }
-                            q.addEventListener('input', apply);
-                            st.addEventListener('change', function() {
-                                activeOnly = false;
-                                activeToday.setAttribute('aria-pressed', 'false');
-                                apply();
+
+                            function goToPage(n) {
+                                page = n;
+                                applyFilter();
+                                // keep the top of the table in view after jumping pages
+                                var card = tbl.closest('.pr-card');
+                                if (card && card.scrollIntoView && card.getBoundingClientRect().top < 0) card.scrollIntoView({
+                                    block: 'start',
+                                    behavior: 'smooth'
+                                });
+                            }
+
+                            tabsWrap.addEventListener('click', function(e) {
+                                var b = e.target.closest('[data-rr-tab]');
+                                if (!b) return;
+                                tab = b.getAttribute('data-rr-tab');
+                                tabsWrap.querySelectorAll('[data-rr-tab]').forEach(function(x) {
+                                    x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+                                });
+                                page = 1;
+                                applyFilter();
                             });
-                            activeToday.addEventListener('click', function() {
-                                activeOnly = !activeOnly;
-                                activeToday.setAttribute('aria-pressed', activeOnly ? 'true' : 'false');
-                                if (activeOnly) st.value = 'all';
-                                apply();
+                            q.addEventListener('input', function() {
+                                page = 1;
+                                applyFilter();
                             });
+                            sortSel.addEventListener('change', function() {
+                                page = 1;
+                                syncDirBtn();
+                                sortRows();
+                                applyFilter();
+                            });
+                            dirBtn.addEventListener('click', function() {
+                                dir = dir === 'asc' ? 'desc' : 'asc';
+                                page = 1;
+                                syncDirBtn();
+                                sortRows();
+                                applyFilter();
+                            });
+                            pgPrev.addEventListener('click', function() {
+                                goToPage(page - 1);
+                            });
+                            pgNext.addEventListener('click', function() {
+                                goToPage(page + 1);
+                            });
+                            pgNums.addEventListener('click', function(e) {
+                                var b = e.target.closest('[data-page]');
+                                if (b) goToPage(parseInt(b.getAttribute('data-page'), 10));
+                            });
+                            // Fired after a Waiting request is approved/declined from the drawer
+                            document.addEventListener('rr:rows-changed', function() {
+                                sortRows();
+                                updateCounts();
+                                applyFilter();
+                            });
+
+                            syncDirBtn();
+                            sortRows(); // also honours a sort value the browser restored on refresh
+                            updateCounts();
+                            applyFilter();
                         })();
                     </script>
                 </div><!-- /#rooms-reservations-panel -->
@@ -3922,324 +3790,643 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div>
                     </div>
 
-                    <!-- Equipment layout: Add form (left) + All Equipment list (right).
+                    <?php
+                    // ── On Loan tab data (read-only; does not touch the shared $approved_result / $waiting_result) ──
+                    require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+                    BookingSchedule::ensureSchema($conn);   // later-date booking columns (idempotent, same call the return handler uses)
+                    $eq_today        = date('Y-m-d');
+                    $eq_now          = date('Y-m-d H:i:s');   // Asia/Manila
+                    $eq_loan_rows    = [];
+                    $eq_loan_overdue = 0;
+                    $eq_loan_q = mysqli_query($conn, "SELECT r.*,
+                            (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
+                        FROM tbl_requests r
+                        WHERE r.status IN ('Approved','Overdue')
+                          AND NOT COALESCE((r.status = 'Approved'
+                                AND COALESCE(r.booking_mode, '') = 'future'
+                                AND TIMESTAMP(r.borrow_date, COALESCE(r.borrow_time, '00:00:00')) > '{$eq_now}'), 0)
+                        ORDER BY r.return_date ASC, r.id ASC");
+                    if ($eq_loan_q) {
+                        while ($lr = mysqli_fetch_assoc($eq_loan_q)) {
+                            $lr['_days']  = (int)floor((strtotime($eq_today) - strtotime($lr['return_date'])) / 86400);
+                            $lr['_state'] = ($lr['status'] === 'Overdue' || $lr['_days'] > 0) ? 'overdue' : ($lr['_days'] === 0 ? 'due' : 'ok');
+                            if ($lr['_state'] === 'overdue') $eq_loan_overdue++;
+                            $eq_loan_rows[] = $lr;
+                        }
+                    }
+                    $eq_loan_total  = count($eq_loan_rows);
+                    $eq_loan_active = $eq_loan_total - $eq_loan_overdue;
+                    // Returned history for the Returned / All tabs (newest first, last 100)
+                    $eq_ret_rows = [];
+                    $eq_ret_q = mysqli_query($conn, "SELECT r.*,
+                            (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
+                        FROM tbl_requests r
+                        WHERE r.status = 'Returned'
+                        ORDER BY COALESCE(r.returned_at, r.return_date) DESC, r.id DESC
+                        LIMIT 100");
+                    if ($eq_ret_q) {
+                        while ($rr = mysqli_fetch_assoc($eq_ret_q)) {
+                            $rr['_days']  = 0;
+                            $rr['_state'] = 'returned';
+                            $eq_ret_rows[] = $rr;
+                        }
+                    }
+                    $eq_ret_total  = count($eq_ret_rows);
+                    // Waiting (Pending Review) rows — supporting-letter requests from
+                    // Organization Advisers are visible to a Super Admin only. Rows with a document come first.
+                    $eq_wait_sql = "SELECT tbl_requests.*,
+                            (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
+                        FROM tbl_requests
+                        WHERE tbl_requests.status = 'Waiting'";
+                    if (empty($can_view_sensitive_adviser_requests)) {
+                        $eq_wait_sql .= " AND NOT {$sensitive_adviser_request_sql}";
+                    }
+                    $eq_wait_sql .= " ORDER BY tbl_requests.request_date DESC";
+                    $eq_wait_with = [];
+                    $eq_wait_without = [];
+                    $eq_wait_q = mysqli_query($conn, $eq_wait_sql);
+                    if ($eq_wait_q) {
+                        while ($wr = mysqli_fetch_assoc($eq_wait_q)) {
+                            $wr['_days']  = 0;
+                            $wr['_state'] = 'waiting';
+                            $wr['_doc']   = ps_doc_info($wr['document_path'] ?? '');
+                            if ($wr['_doc']) $eq_wait_with[] = $wr;
+                            else $eq_wait_without[] = $wr;
+                        }
+                    }
+                    $eq_wait_rows  = array_merge($eq_wait_with, $eq_wait_without);
+                    $eq_pend_total = count($eq_wait_rows);   // pending-review requests only
+                    // Scheduled (later-date) bookings: approved by default but not started yet. They wait here
+                    // until their start time (then they move to Active) and an admin can cancel / revoke them.
+                    $eq_sched_rows = [];
+                    $eq_sched_q = mysqli_query($conn, "SELECT tbl_requests.*,
+                            (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
+                        FROM tbl_requests
+                        WHERE tbl_requests.status = 'Approved'
+                          AND COALESCE(tbl_requests.booking_mode, '') = 'future'
+                          AND TIMESTAMP(tbl_requests.borrow_date, COALESCE(tbl_requests.borrow_time, '00:00:00')) > '{$eq_now}'
+                        ORDER BY tbl_requests.borrow_date ASC, tbl_requests.borrow_time ASC, tbl_requests.id ASC");
+                    if ($eq_sched_q) {
+                        while ($sr = mysqli_fetch_assoc($eq_sched_q)) {
+                            $sr['_days']  = (int)floor((strtotime($sr['borrow_date']) - strtotime($eq_today)) / 86400);   // days until it starts
+                            $sr['_state'] = 'scheduled';
+                            $eq_sched_rows[] = $sr;
+                        }
+                    }
+                    $eq_wait_rows  = array_merge($eq_wait_rows, $eq_sched_rows);
+                    $eq_wait_total = count($eq_wait_rows);
+                    $eq_view_rows  = array_merge($eq_wait_rows, $eq_loan_rows, $eq_ret_rows);
+                    $eq_view_total = count($eq_view_rows);
+                    $eq_loan_dec   = admin_request_decisions($conn, array_map(function ($x) {
+                        return (int)$x['id'];
+                    }, $eq_view_rows));
+                    ?>
+
+                    <!-- Equipment sub-tabs: Catalog (the existing screen, unchanged) | On Loan -->
+                    <div class="rq-filter-chips eq-tabs" id="eqTabs">
+                        <button type="button" class="rq-filter-chip active" data-eq-panel="eq-catalog">
+                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Catalog
+                        </button>
+                        <button type="button" class="rq-filter-chip" data-eq-panel="eq-onloan">
+                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">assignment_return</span> On Loan
+                            <?php if ($eq_loan_total > 0): ?>
+                                <span class="rq-chip-count<?php echo $eq_loan_overdue > 0 ? '' : ' rq-chip-count--ok'; ?>" id="eqLoanChipCount"><?php echo $eq_loan_total; ?></span>
+                            <?php endif; ?>
+                        </button>
+                    </div>
+
+                    <!-- ── CATALOG (existing form + list + archived, wrapped as-is) ── -->
+                    <div class="eq-sub-panel active" id="eq-catalog">
+
+                        <!-- Equipment layout: Add form (left) + All Equipment list (right).
                          Same two-column pattern as the Faculty tab (.faculty-layout). -->
-                    <div class="faculty-layout inv-layout">
+                        <div class="faculty-layout inv-layout">
 
-                        <!-- ADD EQUIPMENT FORM -->
-                        <div class="eq-card inv-form-card" id="item-form-wrap">
-                            <div class="eq-card-header">
-                                <h2>
-                                    <span class="material-symbols-outlined inv-head-icon">add_box</span>
-                                    <span id="form-title"><?php echo $edit_item ? 'Edit Equipment' : 'Add Equipment'; ?></span>
-                                </h2>
-                            </div>
-                            <div class="eq-card-body">
-                                <form method="POST" enctype="multipart/form-data" id="itemForm">
-                                    <?= csrf_field() ?>
-                                    <?php if ($edit_item): ?>
-                                        <input type="hidden" name="item_id"
-                                            value="<?php echo $edit_item['item_id']; ?>">
-                                        <input type="hidden" name="old_image"
-                                            value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
-                                    <?php endif; ?>
+                            <!-- ADD EQUIPMENT FORM -->
+                            <div class="eq-card inv-form-card" id="item-form-wrap">
+                                <div class="eq-card-header">
+                                    <h2>
+                                        <span class="material-symbols-outlined inv-head-icon">add_box</span>
+                                        <span id="form-title"><?php echo $edit_item ? 'Edit Equipment' : 'Add Equipment'; ?></span>
+                                    </h2>
+                                </div>
+                                <div class="eq-card-body">
+                                    <form method="POST" enctype="multipart/form-data" id="itemForm">
+                                        <?= csrf_field() ?>
+                                        <?php if ($edit_item): ?>
+                                            <input type="hidden" name="item_id"
+                                                value="<?php echo $edit_item['item_id']; ?>">
+                                            <input type="hidden" name="old_image"
+                                                value="<?php echo htmlspecialchars($edit_item['image_path']); ?>">
+                                        <?php endif; ?>
 
-                                    <div class="fac-edit-section inv-section--first">Details</div>
+                                        <div class="fac-edit-section inv-section--first">Details</div>
 
-                                    <div class="form-group">
-                                        <label for="inv-item-name">Item name <span class="req-star">*</span></label>
-                                        <input type="text" id="inv-item-name" name="item_name"
-                                            class="form-control-custom" maxlength="150"
-                                            value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
-                                            placeholder="e.g. Extension Cord" required>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label for="inv-category">Category <span class="req-star">*</span></label>
-                                        <select id="inv-category" name="category"
-                                            class="form-control-custom inv-category-select" required>
-                                            <option value="">Select category...</option>
-                                            <?php
-                                            $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
-                                            foreach ($cats as $c) {
-                                                $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
-                                                echo '<option value="' . htmlspecialchars($c) . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="fac-edit-section">Stock</div>
-
-                                    <div class="form-row">
                                         <div class="form-group">
-                                            <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
-                                            <input type="number" id="inv-quantity" name="quantity"
-                                                class="form-control-custom" min="0"
-                                                value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
-                                                required>
+                                            <label for="inv-item-name">Item name <span class="req-star">*</span></label>
+                                            <input type="text" id="inv-item-name" name="item_name"
+                                                class="form-control-custom" maxlength="150"
+                                                value="<?php echo $edit_item ? htmlspecialchars($edit_item['item_name']) : ''; ?>"
+                                                placeholder="e.g. Extension Cord" required>
                                         </div>
+
                                         <div class="form-group">
-                                            <label for="inv-condition">Condition</label>
-                                            <select id="inv-condition" name="condition" class="form-control-custom">
+                                            <label for="inv-category">Category <span class="req-star">*</span></label>
+                                            <select id="inv-category" name="category"
+                                                class="form-control-custom inv-category-select" required>
+                                                <option value="">Select category...</option>
                                                 <?php
-                                                $cur_condition = $edit_item['condition'] ?? 'Good';
-                                                foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
-                                                    $sel = ($cur_condition === $condOpt) ? 'selected' : '';
-                                                    echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
+                                                $cats = ['Audio/Visual', 'Cables & Connectors', 'Computing', 'Lab Equipment', 'Networking', 'Power', 'Tools', 'Others'];
+                                                foreach ($cats as $c) {
+                                                    $sel = ($edit_item && $edit_item['category'] === $c) ? 'selected' : '';
+                                                    echo '<option value="' . htmlspecialchars($c) . '" ' . $sel . '>' . htmlspecialchars($c) . '</option>';
                                                 }
                                                 ?>
                                             </select>
                                         </div>
-                                    </div>
 
-                                    <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
+                                        <div class="fac-edit-section">Stock</div>
 
-                                    <div class="form-group">
-                                        <div class="drop-zone inv-drop" id="dropZone">
-                                            <span class="material-symbols-outlined">add_photo_alternate</span>
-                                            <p>Click, drag &amp; drop, or paste an image</p>
-                                            <p class="inv-drop-sub">JPG or PNG, up to 2 MB</p>
-                                            <input type="file" name="item_image" id="itemImageInput"
-                                                accept="image/jpeg,image/png" hidden>
-                                            <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
-                                                <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
-                                                    class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
-                                            <?php else: ?>
-                                                <img id="imagePreview" class="drop-zone-preview" alt="">
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="inv-quantity">Quantity <span class="req-star">*</span></label>
+                                                <input type="number" id="inv-quantity" name="quantity"
+                                                    class="form-control-custom" min="0"
+                                                    value="<?php echo $edit_item ? (int)$edit_item['quantity'] : '1'; ?>"
+                                                    required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="inv-condition">Condition</label>
+                                                <select id="inv-condition" name="condition" class="form-control-custom">
+                                                    <?php
+                                                    $cur_condition = $edit_item['condition'] ?? 'Good';
+                                                    foreach (['Good', 'Fair', 'For Repair'] as $condOpt) {
+                                                        $sel = ($cur_condition === $condOpt) ? 'selected' : '';
+                                                        echo "<option value=\"$condOpt\" $sel>$condOpt</option>";
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="fac-edit-section">Image <span class="inv-opt">(optional)</span></div>
+
+                                        <div class="form-group">
+                                            <div class="drop-zone inv-drop" id="dropZone">
+                                                <span class="material-symbols-outlined">add_photo_alternate</span>
+                                                <p>Click, drag &amp; drop, or paste an image</p>
+                                                <p class="inv-drop-sub">JPG or PNG, up to 2 MB</p>
+                                                <input type="file" name="item_image" id="itemImageInput"
+                                                    accept="image/jpeg,image/png" hidden>
+                                                <?php if ($edit_item && $edit_item['image_path'] !== 'uploads/default.png'): ?>
+                                                    <img src="<?php echo $root_url . htmlspecialchars($edit_item['image_path']); ?>"
+                                                        class="drop-zone-preview" id="imagePreview" style="display:block;" alt="">
+                                                <?php else: ?>
+                                                    <img id="imagePreview" class="drop-zone-preview" alt="">
+                                                <?php endif; ?>
+                                            </div>
+                                            <button type="button" id="removeImageBtn"
+                                                class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
+                                                &#x2715; Remove image
+                                            </button>
+                                        </div>
+
+                                        <div class="inv-form-actions">
+                                            <button type="submit"
+                                                name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
+                                                class="ps-btn ps-btn--primary inv-submit">
+                                                <span class="material-symbols-outlined">save</span>
+                                                <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
+                                            </button>
+                                            <?php if ($edit_item): ?>
+                                                <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
+                                                    class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        fill="none" stroke="currentColor" stroke-width="2"
+                                                        stroke-linecap="round" stroke-linejoin="round"
+                                                        width="15" height="15">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6l-1 14H6L5 6" />
+                                                        <path d="M10 11v6" />
+                                                        <path d="M14 11v6" />
+                                                        <path d="M9 6V4h6v2" />
+                                                    </svg>
+                                                </a>
                                             <?php endif; ?>
                                         </div>
-                                        <button type="button" id="removeImageBtn"
-                                            class="inv-remove-img<?php echo ($edit_item && $edit_item['image_path'] !== 'uploads/default.png') ? '' : ' hidden'; ?>">
-                                            &#x2715; Remove image
+
+                                    </form>
+                                </div><!-- /eq-card-body -->
+                            </div><!-- /inv-form-card -->
+
+
+                            <!-- ALL EQUIPMENT LIST -->
+                            <div class="eq-card inv-list-card" id="inv-table-card">
+                                <div class="eq-card-header fac-list-head">
+                                    <h2>
+                                        <span class="material-symbols-outlined inv-head-icon">inventory_2</span>
+                                        All Equipment
+                                        <span class="fac-count-badge" id="inv-count-badge">(<?php echo (int)mysqli_num_rows($inventory_result); ?>)</span>
+                                    </h2>
+                                    <div class="fac-search">
+                                        <span class="material-symbols-outlined">search</span>
+                                        <input type="text" id="inventorySearch" class="form-control-custom"
+                                            placeholder="Search name or category" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="tbl-wrap">
+                                    <table class="admin-table fac-table inv-table" id="inv-list-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Equipment</th>
+                                                <th>Category</th>
+                                                <th>Condition</th>
+                                                <th>Stock</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="inventory-body">
+                                            <?php
+                                            mysqli_data_seek($inventory_result, 0);
+                                            if (mysqli_num_rows($inventory_result) === 0): ?>
+                                                <tr id="inv-empty-row">
+                                                    <td colspan="5" class="inv-empty-cell">
+                                                        <span class="material-symbols-outlined">inventory_2</span>
+                                                        No equipment yet. Add your first item using the form.
+                                                    </td>
+                                                </tr>
+                                                <?php else:
+                                                while ($item = mysqli_fetch_assoc($inventory_result)):
+                                                    $inv_qty        = (int)$item['quantity'];
+                                                    $inv_cond       = $item['condition'] ?? 'Good';
+                                                    $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
+                                                    if ($inv_qty === 0) {
+                                                        $inv_stockClass = 'none';
+                                                        $inv_stockLabel = 'No stock';
+                                                    } elseif ($inv_qty <= 2) {
+                                                        $inv_stockClass = 'low';
+                                                        $inv_stockLabel = 'Low stock';
+                                                    } else {
+                                                        $inv_stockClass = 'ok';
+                                                        $inv_stockLabel = 'In stock';
+                                                    }
+                                                    $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
+                                                ?>
+                                                    <tr class="inv-row-item"
+                                                        data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                                        data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                                        data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
+                                                        data-item-quantity="<?php echo $inv_qty; ?>"
+                                                        data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
+                                                        data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
+                                                        data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                                                        <td>
+                                                            <div class="fac-person">
+                                                                <span class="inv-thumb">
+                                                                    <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                                        alt="<?php echo htmlspecialchars($item['item_name']); ?>"
+                                                                        loading="lazy">
+                                                                    <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
+                                                                </span>
+                                                                <div class="fac-person-text">
+                                                                    <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                                                    <?php if ($inv_addedTs): ?>
+                                                                        <div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
+                                                        <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
+                                                        <td>
+                                                            <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
+                                                        </td>
+                                                        <td class="fac-actions">
+                                                            <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
+                                                                data-action="eq-open-edit" aria-label="Edit equipment">
+                                                                <span class="material-symbols-outlined">edit</span>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endwhile; ?>
+                                                <tr id="inv-nomatch-row" class="inv-row-hidden">
+                                                    <td colspan="5" class="inv-empty-cell">
+                                                        <span class="material-symbols-outlined">search_off</span>
+                                                        No equipment matches your search.
+                                                    </td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination (10 per page, client-side; works together with the search box) -->
+                                <div class="inv-pager" id="inv-pager" hidden>
+                                    <span class="inv-pager-info" id="inv-pager-info"></span>
+                                    <div class="inv-pager-ctl" id="inv-pager-ctl">
+                                        <button type="button" class="inv-pager-btn" id="inv-pg-prev" aria-label="Previous page">
+                                            <span class="material-symbols-outlined">chevron_left</span>
+                                        </button>
+                                        <div class="inv-pager-nums" id="inv-pg-nums"></div>
+                                        <button type="button" class="inv-pager-btn" id="inv-pg-next" aria-label="Next page">
+                                            <span class="material-symbols-outlined">chevron_right</span>
                                         </button>
                                     </div>
+                                </div>
+                            </div><!-- /inv-list-card -->
 
-                                    <div class="inv-form-actions">
-                                        <button type="submit"
-                                            name="<?php echo $edit_item ? 'update_item' : 'add_item'; ?>"
-                                            class="ps-btn ps-btn--primary inv-submit">
-                                            <span class="material-symbols-outlined">save</span>
-                                            <?php echo $edit_item ? 'Update Item' : 'Save Equipment'; ?>
-                                        </button>
-                                        <?php if ($edit_item): ?>
-                                            <a href="admin-dashboard.php?delete_item=<?php echo $edit_item['item_id']; ?>"
-                                                class="btn-inv-delete" title="Archive item"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                    fill="none" stroke="currentColor" stroke-width="2"
-                                                    stroke-linecap="round" stroke-linejoin="round"
-                                                    width="15" height="15">
-                                                    <polyline points="3 6 5 6 21 6" />
-                                                    <path d="M19 6l-1 14H6L5 6" />
-                                                    <path d="M10 11v6" />
-                                                    <path d="M14 11v6" />
-                                                    <path d="M9 6V4h6v2" />
-                                                </svg>
-                                            </a>
-                                        <?php endif; ?>
+                        </div><!-- /faculty-layout inv-layout -->
+
+                        <!-- Archived Items -->
+                        <div class="inv-archived-wrap">
+                            <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
+                                <button class="history-toggle-btn" data-history-tab="reg-archived">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" width="14" height="14">
+                                        <polyline points="21 8 21 21 3 21 3 8" />
+                                        <rect x="1" y="3" width="22" height="5" />
+                                        <line x1="10" y1="12" x2="14" y2="12" />
+                                    </svg>
+                                    Archived Items
+                                </button>
+                            </div>
+                            <div class="history-panel" id="history-reg-archived">
+                                <div class="eq-card">
+                                    <div class="tbl-wrap">
+                                        <table class="admin-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Image</th>
+                                                    <th>Item Name</th>
+                                                    <th>Category</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="inv-archive-body">
+                                                <?php if (mysqli_num_rows($archive_result) === 0): ?>
+                                                    <tr>
+                                                        <td colspan="4" class="text-muted"
+                                                            style="text-align:center;padding:2.5rem;">
+                                                            No archived items.
+                                                        </td>
+                                                    </tr>
+                                                    <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
+                                                        <tr>
+                                                            <td>
+                                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
+                                                                    class="item-img"
+                                                                    onerror="this.src='../uploads/default.png'">
+                                                            </td>
+                                                            <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
+                                                            <td><?php echo htmlspecialchars($item['category']); ?></td>
+                                                            <td class="action-cell">
+                                                                <div class="action-btns">
+                                                                    <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
+                                                                        class="btn-action btn-restore" title="Restore">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                            fill="none" stroke="currentColor" stroke-width="2"
+                                                                            stroke-linecap="round" stroke-linejoin="round"
+                                                                            width="14" height="14">
+                                                                            <polyline points="1 4 1 10 7 10" />
+                                                                            <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+                                                                        </svg>
+                                                                    </a>
+                                                                    <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
+                                                                        class="btn-action btn-force-del" title="Delete permanently"
+                                                                        onclick="return confirm('Permanently delete? This cannot be undone.')">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                                            fill="none" stroke="currentColor" stroke-width="2"
+                                                                            stroke-linecap="round" stroke-linejoin="round"
+                                                                            width="14" height="14">
+                                                                            <polyline points="3 6 5 6 21 6" />
+                                                                            <path d="M19 6l-1 14H6L5 6" />
+                                                                            <path d="M10 11v6" />
+                                                                            <path d="M14 11v6" />
+                                                                            <path d="M9 6V4h6v2" />
+                                                                        </svg>
+                                                                    </a>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                <?php endwhile;
+                                                endif; ?>
+                                            </tbody>
+                                        </table>
                                     </div>
+                                </div>
+                            </div><!-- /history-reg-archived -->
+                        </div><!-- /inv-archived-wrap -->
 
-                                </form>
-                            </div><!-- /eq-card-body -->
-                        </div><!-- /inv-form-card -->
+                    </div><!-- /eq-catalog -->
 
-
-                        <!-- ALL EQUIPMENT LIST -->
-                        <div class="eq-card inv-list-card" id="inv-table-card">
-                            <div class="eq-card-header fac-list-head">
-                                <h2>
-                                    <span class="material-symbols-outlined inv-head-icon">inventory_2</span>
-                                    All Equipment
-                                    <span class="fac-count-badge" id="inv-count-badge">(<?php echo (int)mysqli_num_rows($inventory_result); ?>)</span>
-                                </h2>
-                                <div class="fac-search">
-                                    <span class="material-symbols-outlined">search</span>
-                                    <input type="text" id="inventorySearch" class="form-control-custom"
-                                        placeholder="Search name or category" autocomplete="off">
+                    <!-- ── ON LOAN (equipment currently out: Approved + Overdue) ───────────── -->
+                    <div class="eq-sub-panel" id="eq-onloan">
+                        <?php if ($eq_loan_overdue > 0): ?>
+                            <div class="ps-alert ps-alert--danger" id="eq-loan-overdue-alert">
+                                <span class="material-symbols-outlined">warning</span>
+                                <?php echo (int)$eq_loan_overdue; ?> item(s) are overdue. Contact the borrowers.
+                                <button class="ps-alert__close" data-action="dismiss-alert" data-target="eq-loan-overdue-alert"><span class="material-symbols-outlined">close</span></button>
+                            </div>
+                        <?php endif; ?>
+                        <div class="ps-card">
+                            <div class="ps-card-header eq-loan-head">
+                                <!-- Table title: text changes with the selected tab (see TITLES in admin-dashboard.js) -->
+                                <h2 class="eq-loan-title" id="eqLoanTitle">All Loans</h2>
+                                <!-- Loan status tabs live inside the table header -->
+                                <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
+                                    <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
+                                </div>
+                                <div class="eq-loan-tools">
+                                    <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
                                 </div>
                             </div>
-                            <div class="tbl-wrap">
-                                <table class="admin-table fac-table inv-table" id="inv-list-table">
+                            <div class="ps-table-wrap">
+                                <table class="ps-table" id="eq-loan-table">
                                     <thead>
                                         <tr>
+                                            <th>Borrower</th>
                                             <th>Equipment</th>
-                                            <th>Category</th>
-                                            <th>Condition</th>
-                                            <th>Stock</th>
+                                            <th>Issued</th>
+                                            <th>Due</th>
+                                            <th>Status</th>
+                                            <th>Handled by</th>
                                             <th>Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="inventory-body">
-                                        <?php
-                                        mysqli_data_seek($inventory_result, 0);
-                                        if (mysqli_num_rows($inventory_result) === 0): ?>
-                                            <tr id="inv-empty-row">
-                                                <td colspan="5" class="inv-empty-cell">
-                                                    <span class="material-symbols-outlined">inventory_2</span>
-                                                    No equipment yet. Add your first item using the form.
-                                                </td>
-                                            </tr>
-                                            <?php else:
-                                            while ($item = mysqli_fetch_assoc($inventory_result)):
-                                                $inv_qty        = (int)$item['quantity'];
-                                                $inv_cond       = $item['condition'] ?? 'Good';
-                                                $inv_condClass  = ($inv_cond === 'For Repair') ? 'repair' : (($inv_cond === 'Fair') ? 'fair' : 'good');
-                                                if ($inv_qty === 0) {
-                                                    $inv_stockClass = 'none';
-                                                    $inv_stockLabel = 'No stock';
-                                                } elseif ($inv_qty <= 2) {
-                                                    $inv_stockClass = 'low';
-                                                    $inv_stockLabel = 'Low stock';
-                                                } else {
-                                                    $inv_stockClass = 'ok';
-                                                    $inv_stockLabel = 'In stock';
-                                                }
-                                                $inv_addedTs    = !empty($item['created_at']) ? strtotime($item['created_at']) : false;
-                                            ?>
-                                                <tr class="inv-row-item"
-                                                    data-item-id="<?php echo (int)$item['item_id']; ?>"
-                                                    data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
-                                                    data-item-category="<?php echo htmlspecialchars($item['category'], ENT_QUOTES); ?>"
-                                                    data-item-quantity="<?php echo $inv_qty; ?>"
-                                                    data-item-condition="<?php echo htmlspecialchars($inv_cond, ENT_QUOTES); ?>"
-                                                    data-item-image="<?php echo htmlspecialchars($item['image_path'], ENT_QUOTES); ?>"
-                                                    data-item-image-full="<?php echo htmlspecialchars($root_url . $item['image_path'], ENT_QUOTES); ?>">
+                                    <tbody>
+                                        <?php if ($eq_view_total > 0):
+                                            foreach ($eq_view_rows as $r):
+                                                $lqty  = max(1, (int)($r['borrow_qty'] ?? 1));
+                                                $ltype = ps_submitted_as_label($r['submitted_as'] ?? '');
+                                                $ldays = (int)$r['_days'];
+                                                $lst   = $r['_state'];
+                                                $ldec  = $lst === 'returned'
+                                                    ? ($eq_loan_dec[(int)$r['id']]['returned'] ?? null)
+                                                    : ($eq_loan_dec[(int)$r['id']]['approved'] ?? null);
+                                                $lret  = !empty($r['returned_at']) ? $r['returned_at'] : $r['return_date'];
+                                                $ldoc  = $r['_doc'] ?? null;
+                                                $lbt   = !empty($r['borrow_time']) ? date('g:i A', strtotime($r['borrow_time'])) : '';
+                                                $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
+                                                $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
+                                                $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
+                                                // Same confidentiality rule as admin-override.php: adviser requests with a supporting
+                                                // document can only be changed by a Super Admin.
+                                                $lsens = (string)($r['submitted_as'] ?? '') === 'adviser' && trim((string)($r['document_path'] ?? '')) !== '';
+                                                $lcan_cancel = !$lsens || !empty($can_view_sensitive_adviser_requests);
+                                        ?>
+                                                <tr class="eq-loan-row is-<?php echo $lst; ?>"
+                                                    data-id="<?php echo (int)$r['id']; ?>"
+                                                    data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
+                                                    data-loan-state="<?php echo $lst; ?>"
+                                                    data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
+                                                    data-due-label="<?php echo htmlspecialchars($ldue_lbl); ?>"
+                                                    data-days-overdue="<?php echo max(0, $ldays); ?>"
+                                                    data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
+                                                    data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
+                                                    data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
+                                                    data-req-type="<?php echo htmlspecialchars($ltype); ?>"
+                                                    data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
+                                                    data-qty="<?php echo $lqty; ?>"
+                                                    data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
+                                                    data-room="<?php echo htmlspecialchars($r['room']); ?>"
+                                                    data-submitted="<?php echo date('M d, Y g:i A', strtotime($r['request_date'])); ?>"
+                                                    data-date-needed="<?php echo date('M d, Y', strtotime($r['borrow_date'])); ?>"
+                                                    data-return-date="<?php echo htmlspecialchars($r['return_date']); ?>"
+                                                    data-return-date-display="<?php echo date('M d, Y', strtotime($r['return_date'])); ?>"
+                                                    data-arb-rule="<?php echo htmlspecialchars($r['arbitration_rule'] ?? ''); ?>"
+                                                    data-note="<?php echo htmlspecialchars($r['reason'] ?? ''); ?>"
+                                                    data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
+                                                    data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
+                                                    data-doc-name="<?php echo $ldoc ? htmlspecialchars($ldoc['name']) : ''; ?>"
+                                                    data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>">
                                                     <td>
-                                                        <div class="fac-person">
-                                                            <span class="inv-thumb">
-                                                                <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                    alt="<?php echo htmlspecialchars($item['item_name']); ?>"
-                                                                    loading="lazy">
-                                                                <span class="material-symbols-outlined inv-thumb-ph">inventory_2</span>
-                                                            </span>
-                                                            <div class="fac-person-text">
-                                                                <div class="fac-person-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                                                <?php if ($inv_addedTs): ?>
-                                                                    <div class="fac-person-sub">Added <?php echo date('M j, Y', $inv_addedTs); ?></div>
+                                                        <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
+                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
+                                                    </td>
+                                                    <td>
+                                                        <div class="ps-appr-item">
+                                                            <?php echo htmlspecialchars($r['equipment_name']); ?>
+                                                            <?php if ($lqty > 1): ?><span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?>
+                                                        </div>
+                                                        <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal" title="View request details">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
+                                                        <?php if ($lst === 'waiting'): ?>
+                                                            <?php if ($ldoc): ?>
+                                                                <a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>"
+                                                                    href="<?php echo htmlspecialchars($ldoc['open_url']); ?>" target="_blank" rel="noopener noreferrer"
+                                                                    title="Open <?php echo htmlspecialchars($ldoc['name']); ?> in a new tab">
+                                                                    <span class="material-symbols-outlined"><?php echo ps_doc_icon($ldoc['kind']); ?></span>
+                                                                    <span class="ps-doc-chip__name"><?php echo htmlspecialchars($ldoc['name']); ?></span>
+                                                                    <span class="material-symbols-outlined ps-doc-chip__open">open_in_new</span>
+                                                                </a>
+                                                            <?php else: ?>
+                                                                <span class="ps-doc-chip ps-doc-chip--none"><span class="material-symbols-outlined">block</span> No document</span>
+                                                            <?php endif; ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php echo date('M d', strtotime($r['borrow_date'])); ?>
+                                                        <?php if ($lbt !== ''): ?><div class="ps-appr-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                                    </td>
+                                                    <td style="<?php echo $lst === 'overdue' ? 'color:var(--danger);font-weight:600' : ''; ?>">
+                                                        <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                                        <?php if ($lrt !== ''): ?><div class="ps-appr-sub" style="font-weight:400"><?php echo $lrt; ?></div><?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($lst === 'waiting'): ?>
+                                                            <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
+                                                        <?php elseif ($lst === 'scheduled'): ?>
+                                                            <span class="ps-badge ps-badge--scheduled">Scheduled</span>
+                                                            <div class="ps-appr-sub"><?php echo $ldays > 0 ? 'Starts in ' . $ldays . ' day' . ($ldays === 1 ? '' : 's') : 'Starts today'; ?></div>
+                                                        <?php elseif ($lst === 'overdue'): ?>
+                                                            <span class="ps-badge ps-badge--overdue"><?php echo max(1, $ldays); ?> day<?php echo max(1, $ldays) === 1 ? '' : 's'; ?> overdue</span>
+                                                        <?php elseif ($lst === 'due'): ?>
+                                                            <span class="ps-badge ps-badge--waiting">Due today</span>
+                                                        <?php elseif ($lst === 'returned'): ?>
+                                                            <span class="ps-badge ps-badge--returned">Returned</span>
+                                                            <div class="ps-appr-sub"><?php echo date('M d, Y', strtotime($lret)); ?></div>
+                                                        <?php else: ?>
+                                                            <span class="ps-badge ps-badge--active">Due in <?php echo abs($ldays); ?> day<?php echo abs($ldays) === 1 ? '' : 's'; ?></span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?php echo admin_decider_html($ldec); ?></td>
+                                                    <td>
+                                                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                                            <?php if ($lst === 'waiting'): ?>
+                                                                <button type="button" class="ps-btn ps-btn--success ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-approve-modal">
+                                                                    <span class="material-symbols-outlined">check</span> Approve
+                                                                </button>
+                                                                <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-decline-modal">
+                                                                    <span class="material-symbols-outlined">close</span> Decline
+                                                                </button>
+                                                            <?php elseif ($lst === 'scheduled'): ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
+                                                                <?php if ($lcan_cancel): ?>
+                                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
+                                                                        data-action="ps-open-modal" data-modal="ps-cancel-booking-modal">
+                                                                        <span class="material-symbols-outlined">event_busy</span> Cancel Booking
+                                                                    </button>
+                                                                <?php else: ?>
+                                                                    <span class="ps-appr-sub" title="Organization Adviser requests with a supporting document can only be changed by a Super Admin">Super Admin only</span>
                                                                 <?php endif; ?>
-                                                            </div>
+                                                            <?php elseif ($lst === 'returned'): ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
+                                                            <?php else: ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-return-modal">Manual Return</button>
+                                                                <?php if ($lst === 'overdue'): ?>
+                                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm"
+                                                                        data-action="ps-open-modal" data-modal="ps-notice-modal">Send Notice</button>
+                                                                <?php endif; ?>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </td>
-                                                    <td><span class="inv-pill inv-pill--cat"><?php echo htmlspecialchars($item['category']); ?></span></td>
-                                                    <td><span class="inv-pill inv-pill--<?php echo $inv_condClass; ?>"><?php echo htmlspecialchars($inv_cond); ?></span></td>
-                                                    <td>
-                                                        <span class="inv-pill inv-pill--stock inv-pill--<?php echo $inv_stockClass; ?>"><strong><?php echo $inv_qty; ?></strong> <?php echo $inv_stockLabel; ?></span>
-                                                    </td>
-                                                    <td class="fac-actions">
-                                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm inv-edit-btn"
-                                                            data-action="eq-open-edit" aria-label="Edit equipment">
-                                                            <span class="material-symbols-outlined">edit</span>
-                                                        </button>
-                                                    </td>
                                                 </tr>
-                                            <?php endwhile; ?>
-                                            <tr id="inv-nomatch-row" class="inv-row-hidden">
-                                                <td colspan="5" class="inv-empty-cell">
-                                                    <span class="material-symbols-outlined">search_off</span>
-                                                    No equipment matches your search.
+                                            <?php endforeach;
+                                        else: ?>
+                                            <tr class="eq-loan-empty">
+                                                <td colspan="7">
+                                                    <div class="ps-empty-state">
+                                                        <span class="material-symbols-outlined">inventory_2</span>
+                                                        <p>No loan records yet.</p>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <?php endif; ?>
+                                        <tr class="eq-loan-nomatch" hidden>
+                                            <td colspan="7">
+                                                <div class="ps-empty-state">
+                                                    <span class="material-symbols-outlined">search_off</span>
+                                                    <p>No items match your filter.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
 
-                            <!-- Pagination (10 per page, client-side; works together with the search box) -->
-                            <div class="inv-pager" id="inv-pager" hidden>
-                                <span class="inv-pager-info" id="inv-pager-info"></span>
-                                <div class="inv-pager-ctl" id="inv-pager-ctl">
-                                    <button type="button" class="inv-pager-btn" id="inv-pg-prev" aria-label="Previous page">
+                            <!-- Pagination (20 per page, client-side; works with the tabs and the search box) -->
+                            <div class="inv-pager" id="eq-loan-pager" hidden>
+                                <span class="inv-pager-info" id="eq-loan-pager-info"></span>
+                                <div class="inv-pager-ctl" id="eq-loan-pager-ctl">
+                                    <button type="button" class="inv-pager-btn" id="eq-loan-pg-prev" aria-label="Previous page">
                                         <span class="material-symbols-outlined">chevron_left</span>
                                     </button>
-                                    <div class="inv-pager-nums" id="inv-pg-nums"></div>
-                                    <button type="button" class="inv-pager-btn" id="inv-pg-next" aria-label="Next page">
+                                    <div class="inv-pager-nums" id="eq-loan-pg-nums"></div>
+                                    <button type="button" class="inv-pager-btn" id="eq-loan-pg-next" aria-label="Next page">
                                         <span class="material-symbols-outlined">chevron_right</span>
                                     </button>
                                 </div>
                             </div>
-                        </div><!-- /inv-list-card -->
-
-                    </div><!-- /faculty-layout inv-layout -->
-
-                    <!-- Archived Items -->
-                    <div class="inv-archived-wrap">
-                        <div class="history-toggle-wrap inv-arch-toggle" id="registry-toggle-wrap">
-                            <button class="history-toggle-btn" data-history-tab="reg-archived">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" width="14" height="14">
-                                    <polyline points="21 8 21 21 3 21 3 8" />
-                                    <rect x="1" y="3" width="22" height="5" />
-                                    <line x1="10" y1="12" x2="14" y2="12" />
-                                </svg>
-                                Archived Items
-                            </button>
                         </div>
-                        <div class="history-panel" id="history-reg-archived">
-                            <div class="eq-card">
-                                <div class="tbl-wrap">
-                                    <table class="admin-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Image</th>
-                                                <th>Item Name</th>
-                                                <th>Category</th>
-                                                <th>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="inv-archive-body">
-                                            <?php if (mysqli_num_rows($archive_result) === 0): ?>
-                                                <tr>
-                                                    <td colspan="4" class="text-muted"
-                                                        style="text-align:center;padding:2.5rem;">
-                                                        No archived items.
-                                                    </td>
-                                                </tr>
-                                                <?php else: while ($item = mysqli_fetch_assoc($archive_result)): ?>
-                                                    <tr>
-                                                        <td>
-                                                            <img src="<?php echo $root_url . htmlspecialchars($item['image_path']); ?>"
-                                                                class="item-img"
-                                                                onerror="this.src='../uploads/default.png'">
-                                                        </td>
-                                                        <td class="fw-bold"><?php echo htmlspecialchars($item['item_name']); ?></td>
-                                                        <td><?php echo htmlspecialchars($item['category']); ?></td>
-                                                        <td class="action-cell">
-                                                            <div class="action-btns">
-                                                                <a href="admin-dashboard.php?restore_item=<?php echo $item['item_id']; ?>"
-                                                                    class="btn-action btn-restore" title="Restore">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                                        width="14" height="14">
-                                                                        <polyline points="1 4 1 10 7 10" />
-                                                                        <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
-                                                                    </svg>
-                                                                </a>
-                                                                <a href="admin-dashboard.php?force_delete=<?php echo $item['item_id']; ?>"
-                                                                    class="btn-action btn-force-del" title="Delete permanently"
-                                                                    onclick="return confirm('Permanently delete? This cannot be undone.')">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                                        fill="none" stroke="currentColor" stroke-width="2"
-                                                                        stroke-linecap="round" stroke-linejoin="round"
-                                                                        width="14" height="14">
-                                                                        <polyline points="3 6 5 6 21 6" />
-                                                                        <path d="M19 6l-1 14H6L5 6" />
-                                                                        <path d="M10 11v6" />
-                                                                        <path d="M14 11v6" />
-                                                                        <path d="M9 6V4h6v2" />
-                                                                    </svg>
-                                                                </a>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                            <?php endwhile;
-                                            endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div><!-- /history-reg-archived -->
-                    </div><!-- /inv-archived-wrap -->
+                    </div><!-- /eq-onloan -->
 
                 </div><!-- /lending-inventory -->
 
@@ -4680,7 +4867,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Approvals</strong> in the sidebar. Pending requests appear at the top with an orange badge. Click <strong>Approve</strong> to confirm the loan or <strong>Decline</strong> to reject it — you can add a reason when declining. The faculty member will see the updated status on their portal immediately.
+                                                Go to <strong>Equipment → On Loan</strong> and select <strong>Waiting</strong>. Review the request, then approve or decline it. The faculty member will see the updated status on their portal.
                                             </div>
                                         </details>
 
@@ -4887,6 +5074,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
                 <button class="ps-btn ps-btn--danger" id="ps-decline-confirm-btn">
                     <span class="material-symbols-outlined">close</span> Decline Request
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CANCEL SCHEDULED BOOKING (Equipment › On Loan › Waiting) -->
+    <div class="ps-modal-backdrop" id="ps-cancel-booking-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">event_busy</span>
+                </div>
+                <h3>Cancel Booking</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-cancel-booking-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <input type="hidden" id="cancel-booking-id" value="">
+                <div id="ps-cancel-booking-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" id="ps-cancel-booking-reqno" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="cancel-booking-borrower">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="cancel-booking-equipment">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Starts</span><span class="ps-rsv" id="cancel-booking-start">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Return by</span><span class="ps-rsv" id="cancel-booking-due">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Reason for Cancelling <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
+                    <textarea class="ps-form-control" id="cancel-booking-reason" rows="3" placeholder="e.g. Equipment is reserved for a university event on that date..."></textarea>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-cancel-booking-modal">Keep Booking</button>
+                <button class="ps-btn ps-btn--danger" id="ps-cancel-booking-confirm-btn" disabled>
+                    <span class="material-symbols-outlined">event_busy</span> Cancel Booking
                 </button>
             </div>
         </div>
@@ -5121,47 +5344,52 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     <?php endif; ?>
 
-    <!-- MODAL: CONFIRM RETURN -->
+    <!-- MODAL: MANUAL RETURN (does not require the borrower's QR code) -->
     <div class="ps-modal-backdrop" id="ps-return-modal">
         <div class="ps-modal ps-modal--sm">
             <div class="ps-modal-head">
                 <div class="ps-modal-head-icon ps-mhi--maroon">
                     <span class="material-symbols-outlined">assignment_return</span>
                 </div>
-                <h3>Confirm Return</h3>
+                <h3>Manual Return</h3>
                 <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-return-modal">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
             <div class="ps-modal-body">
-                <div class="ps-req-summary">
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
-                    <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
-                </div>
-                <div class="ps-form-group">
-                    <label class="ps-form-label">Return Condition</label>
-                    <select class="ps-form-control">
-                        <option>Good — No visible damage</option>
-                        <option>Fair — Minor wear</option>
-                        <option>Damaged — Needs repair</option>
-                        <option>Missing — Item not returned</option>
-                    </select>
-                </div>
-                <div class="ps-form-group">
-                    <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
-                    <textarea class="ps-form-control" rows="2" placeholder="Any notes about the return..."></textarea>
-                </div>
-                <div class="ps-alert ps-alert--info" style="margin:0">
-                    <span class="material-symbols-outlined">info</span>
-                    Confirming will update the stock count and close this request.
-                </div>
+                <form id="manual-return-form" method="post" action="equipment-booking/api/manual-return.php">
+                    <?= csrf_field() ?>
+                    <input type="hidden" id="manual-return-request-id" name="request_id">
+                    <div class="ps-req-summary">
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv">—</span></div>
+                        <div class="ps-req-sum-row"><span class="ps-rsl">Due Date</span><span class="ps-rsv" style="color:var(--danger);font-weight:600">—</span></div>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Return Condition</label>
+                        <input type="hidden" id="manual-return-condition-value" name="return_condition" value="Good">
+                        <select class="ps-form-control" id="manual-return-condition">
+                            <option>Good — No visible damage</option>
+                            <option>Fair — Minor wear</option>
+                            <option>Damaged — Needs repair</option>
+                            <option>Missing — Item not returned</option>
+                        </select>
+                    </div>
+                    <div class="ps-form-group">
+                        <label class="ps-form-label">Admin Notes <span style="font-size:11px;color:var(--text-light)">(optional)</span></label>
+                        <textarea class="ps-form-control" id="manual-return-notes" name="admin_notes" rows="2" maxlength="2000" placeholder="Any notes about the return..."></textarea>
+                    </div>
+                    <div class="ps-alert ps-alert--info" style="margin:0">
+                        <span class="material-symbols-outlined">info</span>
+                        Recording this manual return updates the stock count and closes this request. No faculty QR code is required.
+                    </div>
+                </form>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-return-modal">Cancel</button>
-                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-return-modal">
-                    <span class="material-symbols-outlined">check</span> Confirm Return
+                <button type="submit" form="manual-return-form" class="ps-btn ps-btn--primary" id="manual-return-confirm-btn">
+                    <span class="material-symbols-outlined">check</span> Record Manual Return
                 </button>
             </div>
         </div>
@@ -5180,6 +5408,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </button>
             </div>
             <div class="ps-modal-body">
+                <form id="overdue-notice-form" method="post" action="equipment-booking/api/send-overdue-notice.php">
+                    <?= csrf_field() ?>
+                    <input type="hidden" id="overdue-notice-request-id" name="request_id">
+                </form>
                 <div class="ps-req-summary" style="margin-bottom:1rem">
                     <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" style="font-weight:600">—</span></div>
                     <div class="ps-req-sum-row"><span class="ps-rsl">Student ID</span><span class="ps-rsv">—</span></div>
@@ -5188,7 +5420,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 </div>
                 <div class="ps-form-group">
                     <label class="ps-form-label">Message Preview</label>
-                    <div class="ps-notice-preview">Dear [Borrower Name],
+                    <div class="ps-notice-preview" id="overdue-notice-preview">Dear [Borrower Name],
 
                         This is a reminder that the following item borrowed from the PUPSync Equipment Lending System is now overdue:
 
@@ -5202,15 +5434,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         PUPSync Admin — Biñan Campus</div>
                 </div>
                 <div class="ps-form-group">
-                    <label class="ps-form-label">Delivery Method</label>
+                    <label class="ps-form-label">Delivery</label>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin-top:6px">
-                        <input type="checkbox" checked> Send via Email
+                        <input type="checkbox" checked disabled> Send to the borrower’s PUPSync notification inbox
                     </label>
                 </div>
             </div>
             <div class="ps-modal-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-notice-modal">Cancel</button>
-                <button class="ps-btn ps-btn--primary" data-action="ps-close-modal" data-modal="ps-notice-modal">
+                <button type="submit" form="overdue-notice-form" class="ps-btn ps-btn--primary" id="overdue-notice-send-btn">
                     <span class="material-symbols-outlined">send</span> Send Notice
                 </button>
             </div>
@@ -5293,7 +5525,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
-    <!-- DRAWER: APPROVALS REVIEW (Waiting table). Reuses the ps-modal-backdrop open/close
+    <!-- DRAWER: REQUEST REVIEW (Equipment > On Loan). Reuses the ps-modal-backdrop open/close
          mechanism, so psOpenModal/psCloseModal, backdrop click and Esc all work unchanged.
          Approve / Decline here hand off to the existing approve/decline modals. -->
     <div class="ps-modal-backdrop ps-drawer-backdrop" id="ps-appr-drawer">
@@ -5451,12 +5683,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <h4>Notes</h4>
                     <div class="ps-drawer-note" id="ps-rr-notes">—</div>
                 </section>
+
+                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
+                    <!-- Super Admin only: shown for Waiting requests. Open the attached letter above, then decide. -->
+                    <section class="ps-drawer-sec" id="ps-rr-review-sec" hidden>
+                        <h4>Your decision</h4>
+                        <label class="ps-drawer-muted" for="ps-rr-review-reason">Reason (at least 5 characters). It is saved with the decision.</label>
+                        <textarea class="ps-rr-reason" id="ps-rr-review-reason" rows="3" maxlength="500"></textarea>
+                        <div class="ps-rr-review-err" id="ps-rr-review-err" role="alert" hidden></div>
+                    </section>
+                <?php endif; ?>
             </div>
             <div class="ps-drawer-foot">
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-room-drawer">Close</button>
                 <button class="ps-btn ps-btn--danger" type="button" id="ps-rr-cancel-btn" data-rr-cancel hidden>
                     <span class="material-symbols-outlined">cancel</span> Cancel reservation
                 </button>
+                <?php if (!empty($ps_rooms_can_view_sensitive_adviser_requests)): ?>
+                    <button class="ps-btn ps-btn--danger" type="button" data-rr-decide="Declined" hidden>
+                        <span class="material-symbols-outlined">close</span> Decline
+                    </button>
+                    <button class="ps-btn ps-btn--success" type="button" data-rr-decide="Approved" hidden>
+                        <span class="material-symbols-outlined">check</span> Approve
+                    </button>
+                <?php endif; ?>
             </div>
         </aside>
     </div>
@@ -5742,7 +5992,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         }
         $toast_queue[] = $lt_msg;
 
-        $ov_n = (int)$stat_overdue;
+        $ov_n = (int)($dash_data['overdue'] ?? 0);
         if ($ov_n > 0) {
             $toast_queue[] = 'Overdue alert: ' . $ov_n . ($ov_n === 1 ? ' item is' : ' items are')
                 . ' currently overdue and need immediate attention.';
@@ -5750,6 +6000,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     }
 
     $flash_toasts = [
+        'notice_sent'   => 'Overdue notice sent to the borrower.',
         'room_added'    => 'Room added to the registry.',
         'room_updated'  => 'Room updated. Changes saved.',
         'room_archived' => 'Room archived. It has been removed from the active registry.',
@@ -6016,7 +6267,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <div id="admin-poll-toast">
     </div>
 
-    <!-- Modal + sub-tab functions (inline for guaranteed global scope) -->
+    <!-- Modal helpers (inline for guaranteed global scope) -->
     <script nonce="<?php echo $csp_nonce; ?>">
         /* ── Modal open / close ─────────────────────────────────────── */
         function psOpenModal(id) {
@@ -6037,77 +6288,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 });
             });
 
-            /* Requests filter-chip switching */
-            var rqTabs = document.getElementById('rqTabs');
-            if (rqTabs) {
-                rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(tab) {
-                    tab.addEventListener('click', function() {
-                        rqTabs.querySelectorAll('.rq-filter-chip').forEach(function(t) {
-                            t.classList.remove('active');
-                        });
-                        document.querySelectorAll('#panel-requests .rq-sub-panel').forEach(function(p) {
-                            p.classList.remove('active');
-                        });
-                        tab.classList.add('active');
-                        var panel = document.getElementById(tab.dataset.rqPanel);
-                        if (panel) panel.classList.add('active');
-                    });
-                });
-            }
-
-            /* Live search — Waiting table */
-            var waitSearch = document.getElementById('rq-waiting-search');
-            var waitTable = document.getElementById('rq-waiting-table');
-            if (waitSearch && waitTable) {
-                waitSearch.addEventListener('input', function() {
-                    var q = waitSearch.value.toLowerCase();
-                    waitTable.querySelectorAll('tbody tr').forEach(function(row) {
-                        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-                    });
-                });
-            }
-
-            /* Live search + return-date range filter — Returned Requests */
-            var allSearch = document.getElementById('rq-all-search');
-            var allRange = document.getElementById('rq-all-range');
-            var allTable = document.getElementById('rq-all-table');
-
-            function inReturnRange(dateStr, range) {
-                if (!dateStr) return true; // rows with no date (e.g. empty-state) always show
-                var d = new Date(dateStr + 'T00:00:00');
-                if (isNaN(d.getTime())) return true;
-                var now = new Date();
-                var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                if (range === 'today') {
-                    return d.getTime() === todayStart.getTime();
-                }
-                if (range === 'week') {
-                    var weekStart = new Date(todayStart);
-                    weekStart.setDate(todayStart.getDate() - todayStart.getDay());
-                    return d.getTime() >= weekStart.getTime() && d.getTime() <= todayStart.getTime();
-                }
-                if (range === 'month') {
-                    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-                }
-                if (range === 'year') {
-                    return d.getFullYear() === now.getFullYear();
-                }
-                return true;
-            }
-
-            function filterAll() {
-                var q = allSearch ? allSearch.value.toLowerCase() : '';
-                var range = allRange ? allRange.value : 'month';
-                if (!allTable) return;
-                allTable.querySelectorAll('tbody tr').forEach(function(row) {
-                    var matchQ = !q || row.textContent.toLowerCase().includes(q);
-                    var matchRange = inReturnRange(row.dataset.returnDate, range);
-                    row.style.display = (matchQ && matchRange) ? '' : 'none';
-                });
-            }
-            if (allSearch) allSearch.addEventListener('input', filterAll);
-            if (allRange) allRange.addEventListener('change', filterAll);
-            filterAll(); // apply the default "This Month" range immediately
         });
     </script>
 

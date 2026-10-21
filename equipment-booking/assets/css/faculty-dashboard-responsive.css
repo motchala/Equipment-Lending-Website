@@ -1064,13 +1064,6 @@ html {
     }
 }
 
-/* A borrowed item can now carry three buttons (Return QR, Extend, Report);
-   let them wrap instead of pushing past the screen edge. */
-#panel-activity .fact-item-actions {
-    flex-wrap: wrap;
-}
-
-
 /* ── MY ACTIVITY (faculty): phone, reduced-motion and print ───────────────
    Base styles for this screen are in the MY ACTIVITY section at the end of faculty-dashboard.css.
    ──────────────────────────────────────────────────────────────────────── */
@@ -1080,6 +1073,10 @@ html {
     #panel-activity .fact-grid {
         grid-template-columns: minmax(0, 1fr);
     }
+
+    #panel-activity .fact-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 760px) {
@@ -1088,27 +1085,27 @@ html {
     }
 
     #panel-activity .fact-stats {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    #panel-activity .fact-stat:nth-child(3) {
-        border-left: 0;
-    }
-
-    #panel-activity .fact-stat:nth-child(n+3) {
-        border-top: 1px solid var(--color-outline-variant);
+        gap: 12px;
     }
 
     #panel-activity .fact-card-head {
-        padding: 16px 16px 12px;
+        padding: 12px 16px;
     }
 
     #panel-activity .fact-card-body {
-        padding: 0 16px 16px;
+        padding: 14px 16px 16px;
     }
 
+    /* History header: filters, search and page navigation stack, each on their own row */
     #panel-activity .fact-tools {
         width: 100%;
+    }
+
+    #panel-activity .fact-pager {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: space-between;
+        row-gap: 6px;
     }
 
     #panel-activity .fact-search {
@@ -1120,7 +1117,7 @@ html {
         min-width: 0;
     }
 
-    /* History: turn table rows into stacked cards */
+    /* History: turn table rows into stacked cards (Activity on top, When + Status below) */
     #panel-activity .fact-table thead {
         display: none;
     }
@@ -1134,7 +1131,7 @@ html {
     #panel-activity .fact-table tbody tr {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 4px 12px;
+        gap: 6px 12px;
         padding: 14px 16px;
     }
 
@@ -1149,11 +1146,9 @@ html {
 
     #panel-activity .fact-table td:nth-child(1) {
         grid-column: 1 / -1;
-        margin-bottom: 4px;
     }
 
-    #panel-activity .fact-table td:nth-child(2),
-    #panel-activity .fact-table td:nth-child(3) {
+    #panel-activity .fact-table td:nth-child(2) {
         grid-column: 1;
         font-size: 0.78rem;
         color: var(--color-on-surface-variant);
@@ -1161,18 +1156,19 @@ html {
 
     #panel-activity .fact-table td.fact-col-status {
         grid-column: 2;
-        grid-row: 2 / span 2;
         align-self: center;
     }
 
-    #panel-activity .fact-pager {
-        justify-content: center;
+    /* A long date range wraps instead of running under the status pill */
+    #panel-activity .fact-when {
+        white-space: normal;
     }
+
 }
 
 @media (max-width: 480px) {
 
-    /* Let long equipment names wrap instead of being cut off next to their chip */
+    /* Let long equipment names wrap instead of being cut off next to their pill */
     #panel-activity .fact-item-top {
         flex-wrap: wrap;
         align-items: flex-start;
@@ -1182,34 +1178,20 @@ html {
         white-space: normal;
     }
 
-    #panel-activity .fact-item-actions {
-        width: 100%;
-        margin-left: 0;
-    }
-
-    #panel-activity .fact-item-actions .fact-btn {
-        flex: 1;
-    }
-
-    #panel-activity .fact-loan .fact-item-actions {
-        padding-left: 0;
-    }
-
     #panel-activity .fact-stat {
-        padding: 14px 16px;
+        padding: 14px 14px 14px 20px;
     }
 
     #panel-activity .fact-stat-value {
         font-size: 1.5rem;
     }
+
+    #panel-activity .fact-stat-note {
+        display: none;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-
-    #panel-activity .fact-chip.is-live::before {
-        animation: none;
-    }
-
     #panel-activity * {
         transition: none !important;
     }
@@ -1220,12 +1202,11 @@ html {
 
     #panel-activity .fact-btn,
     #panel-activity .fact-linkbtn,
-    #panel-activity .fact-lock,
+    #panel-activity .fact-note,
     #panel-activity .fact-more,
     #panel-activity .fact-tools,
     #panel-activity .fact-pager,
-    #panel-activity .fact-item-actions,
-    #panel-activity .myact-download-btn {
+    #panel-activity .fact-item-actions {
         display: none !important;
     }
 

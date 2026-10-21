@@ -13,8 +13,8 @@
  * "overdue-12" or "roomapproved-7".
  *
  * Sources (all filtered to the logged-in faculty_id):
- *   tbl_requests            → submitted / approved / declined / due soon /
- *                             overdue / returned   (+ tbl_arbitration_log
+ *   tbl_requests            → submitted / approved / declined / booking cancelled /
+ *                             due soon / overdue / returned   (+ tbl_arbitration_log
  *                             for the decision rule, reason and admin notes)
  *   tbl_room_reservations   → confirmed / reminder / declined / cancelled
  *                             (+ tbl_room_arbitration_log for the rule)
@@ -58,6 +58,31 @@ if (!function_exists('fnotif_ensure_table')) {
                 `updated_at` datetime     DEFAULT current_timestamp() ON UPDATE current_timestamp(),
                 PRIMARY KEY (`id`),
                 UNIQUE KEY `uq_faculty_notif` (`faculty_id`, `notif_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+        );
+    }
+}
+
+if (!function_exists('fnotif_ensure_admin_notice_table')) {
+    /** One-off notices sent by an administrator to a specific faculty member. */
+    function fnotif_ensure_admin_notice_table(mysqli $conn): void
+    {
+        static $checked = false;
+        if ($checked) return;
+        $checked = true;
+        $conn->query(
+            "CREATE TABLE IF NOT EXISTS `tbl_faculty_admin_notice` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `faculty_id` varchar(50) NOT NULL,
+                `request_id` int(11) DEFAULT NULL,
+                `admin_id` int(11) DEFAULT NULL,
+                `admin_name` varchar(255) NOT NULL,
+                `title` varchar(255) NOT NULL,
+                `message` text NOT NULL,
+                `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+                PRIMARY KEY (`id`),
+                KEY `idx_faculty_time` (`faculty_id`, `created_at`),
+                KEY `idx_request` (`request_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
         );
     }
@@ -433,6 +458,45 @@ if (!function_exists('fnotif_build_list')) {
 
                     case 'Declined':
                         if ($decidedTs < $windowTs) break;
+
+                        // A booking an admin cancelled after approving it (admin-override.php marks the decision
+                        // log row 'booking_cancelled'). Gets its own "Booking Cancelled" notice instead of the
+                        // generic "Declined" one, and shows the ADMIN'S reason (tbl_requests.reason is the
+                        // borrower's own purpose, so it is deliberately not used here).
+                        if (($r['log_rule'] ?? '') === 'booking_cancelled') {
+                            $cQty    = max(1, (int)($r['borrow_qty'] ?? 1));
+                            $cReason = trim((string)($r['log_override_reason'] ?? ''));
+                            if ($cReason === '') $cReason = trim((string)($r['log_reason'] ?? ''));
+                            $cStartTs = strtotime($r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00'));
+                            $cStart   = !empty($r['borrow_time']) ? date('M j, Y g:i A', $cStartTs) : $borrowStr;
+                            $cDue     = !empty($r['return_time'])
+                                ? date('M j, Y g:i A', strtotime($r['return_date'] . ' ' . $r['return_time'])) : $returnStr;
+                            $add([
+                                'key' => 'reqcancelled-' . $id,
+                                'cat' => 'borrow',
+                                'icon' => 'event_busy',
+                                'icon_class' => 'ni-overdue',
+                                'title' => 'Booking Cancelled: ' . $equip,
+                                'body'  => 'Your booking for <strong>' . $e($equip) . '</strong>' . ($cQty > 1 ? ' (×' . $cQty . ')' : '')
+                                    . ' on <strong>' . $e(date('M j', $cStartTs)) . '</strong> was cancelled by an administrator.'
+                                    . ($cReason !== '' ? ' Reason: ' . $e(fnotif_clip($cReason, 120)) : ''),
+                                'ts'    => $decidedTs,
+                                'detail' => [
+                                    $d('Status', 'Cancelled by an administrator'),
+                                    $d('Equipment', $equip),
+                                    $d('Quantity', $cQty > 1 ? (string)$cQty : ''),
+                                    $d('Was Scheduled For', $cStart),
+                                    $d('Return By', $cDue),
+                                    $d('Room / Instructor', (($r['room'] ?? '') !== '' ? $r['room'] : '—') . ' / ' . (($r['instructor'] ?? '') !== '' ? $r['instructor'] : '—')),
+                                    $d('Reason', $cReason, true),
+                                    $d('Cancelled On', date('M j, Y g:i A', $decidedTs)),
+                                    $d('Requested On', date('M j, Y g:i A', $reqTs)),
+                                ],
+                                'link' => $lendingLink,
+                            ]);
+                            break;
+                        }
+
                         $reason = trim((string)($r['reason'] ?? '')) !== '' ? trim($r['reason']) : trim((string)($r['log_reason'] ?? ''));
                         $add([
                             'key' => 'reqdeclined-' . $id,
@@ -850,7 +914,47 @@ if (!function_exists('fnotif_build_list')) {
             error_log('[PUPSync] fnotif account source failed: ' . $ex->getMessage());
         }
 
-        /* ── 6. Static System notices (everyone, new and old accounts) ── */
+        /* ── 6. Administrator-authored notices ───────────────────────── */
+        try {
+            fnotif_ensure_admin_notice_table($conn);
+            $stmt = $conn->prepare(
+                'SELECT id, request_id, admin_name, title, message, created_at
+                   FROM tbl_faculty_admin_notice
+                  WHERE faculty_id = ?
+                  ORDER BY created_at DESC
+                  LIMIT 100'
+            );
+            if ($stmt) {
+                $stmt->bind_param('s', $facultyId);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                while ($notice = $res->fetch_assoc()) {
+                    $sentTs = strtotime((string)$notice['created_at']) ?: $now;
+                    $add([
+                        'key'        => 'adminnotice-' . (int)$notice['id'],
+                        'cat'        => 'overdue',
+                        'icon'       => 'priority_high',
+                        'icon_class' => 'ni-overdue',
+                        'urgent'     => true,
+                        'title'      => (string)$notice['title'],
+                        'body'       => $e((string)$notice['message']),
+                        'ts'         => $sentTs,
+                        'time_label' => 'Admin notice',
+                        'detail'     => [
+                            $d('Sent By', (string)$notice['admin_name']),
+                            $d('Sent On', date('M j, Y g:i A', $sentTs)),
+                            $d('Message', (string)$notice['message'], true),
+                        ],
+                        'link'       => $lendingLink,
+                    ]);
+                }
+                $stmt->close();
+            }
+        } catch (Throwable $ex) {
+            error_log('[PUPSync] fnotif admin notices failed: ' . $ex->getMessage());
+        }
+
+        /* ── 7. Static System notices (everyone, new and old accounts) ── */
         try {
             foreach (fnotif_static_notices() as $sn) {
                 $add([
