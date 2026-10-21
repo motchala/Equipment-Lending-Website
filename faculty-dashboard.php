@@ -22,6 +22,7 @@ $fullname = $_SESSION['faculty_name'];
 $user_slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $fullname)));
 
 require_once __DIR__ . '/config/db.php';
+require_once __DIR__ . '/config/faculty-account.php';   // department list, email mask, phone format, device label
 $conn = getDB();
 
 $base_url = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\') . '/';
@@ -1923,6 +1924,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
         }
 
+        #settingsOverlay .sx-grid--single {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
         @media (max-width: 1024px) {
 
             #settingsOverlay .sx-grid,
@@ -3105,7 +3110,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             <h1 class="dash-flat-title">Good <?php
                                                                 $fdb_v_h = (int)date('H');
                                                                 echo $fdb_v_h < 12 ? 'morning' : ($fdb_v_h < 17 ? 'afternoon' : 'evening');
-                                                                ?>, <?php echo htmlspecialchars($firstname); ?>.</h1>
+                                                                ?>, <span data-first-name><?php echo htmlspecialchars($firstname); ?></span>.</h1>
                             <p class="dash-flat-sub"><?php echo date('l, F j, Y'); ?></p>
                         </div>
                         <div class="fdb-head-tools">
@@ -4139,19 +4144,29 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                             </header>
                             <div class="sx-grid sx-grid--lead">
 
-                                <!-- Personal Information -->
-                                <div class="acct-card">
+                                <!-- Personal Information: read-only until "Edit Account" is clicked -->
+                                <?php
+                                $sov_email_masked = faculty_mask_email($db_email);
+                                $sov_phone_view   = faculty_phone_display($db_phone);
+                                ?>
+                                <div class="acct-card sov-edit-card" id="sovPersonalCard" data-editing="false">
                                     <div class="acct-card-head">
                                         <span class="material-symbols-outlined">badge</span>
                                         <h3>Personal Information</h3>
+                                        <button type="button" class="sov-btn-outline sov-edit-btn" id="sovEditBtn" data-action="account-edit">
+                                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                                            Edit Account
+                                        </button>
                                     </div>
                                     <div class="acct-rows">
                                         <div class="acct-row">
-                                            <span class="acct-row-label">Full Name</span>
+                                            <label class="acct-row-label" for="sovFullName">Full Name</label>
                                             <div class="acct-row-value">
-                                                <input class="acct-row-input" id="sovFullName" type="text"
-                                                    value="<?php echo htmlspecialchars($fullname); ?>"
-                                                    data-sov-field="fullname">
+                                                <span class="acct-row-static" id="sovFullNameView" data-view="fullname"><?php echo htmlspecialchars($fullname); ?></span>
+                                                <input class="acct-row-input" id="sovFullName" name="fullname" type="text" maxlength="120"
+                                                    autocomplete="name" value="<?php echo htmlspecialchars($fullname); ?>"
+                                                    data-edit-field="fullname" disabled>
+                                                <p class="acct-field-error" data-error-for="fullname" role="alert" hidden></p>
                                             </div>
                                         </div>
                                         <div class="acct-row">
@@ -4160,7 +4175,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
                                             </div>
                                             <?php if ($fid_unset): ?>
-                                                <button class="sov-btn-outline" data-action="open-faculty-id-modal">Add</button>
+                                                <button type="button" class="sov-btn-outline sov-fid-add" data-action="open-faculty-id-modal">Add</button>
                                             <?php else: ?>
                                                 <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
                                             <?php endif; ?>
@@ -4168,40 +4183,46 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                         <div class="acct-row">
                                             <span class="acct-row-label">Email Address</span>
                                             <div class="acct-row-value">
-                                                <input class="acct-row-input" id="sovEmail" type="email"
-                                                    value="<?php echo htmlspecialchars($db_email); ?>"
-                                                    data-sov-field="email">
+                                                <span class="acct-row-static <?php echo $sov_email_masked === '' ? 'acct-row-static-muted' : 'acct-row-email'; ?>" id="sovEmailMasked"
+                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? 'Not set' : htmlspecialchars($sov_email_masked); ?></span>
                                             </div>
+                                            <span class="material-symbols-outlined fid-lock" title="Your email is your sign-in ID and is managed by the administrator">lock</span>
                                         </div>
                                         <div class="acct-row">
-                                            <span class="acct-row-label">Department</span>
+                                            <label class="acct-row-label" for="sovDepartment">Department</label>
                                             <div class="acct-row-value">
                                                 <?php if ($department_locked): ?>
-                                                    <span class="acct-row-static" id="sovDepartment"><?php echo htmlspecialchars($db_department); ?></span>
+                                                    <span class="acct-row-static" id="sovDepartmentView"><?php echo htmlspecialchars($db_department); ?></span>
                                                 <?php else: ?>
-                                                    <select class="acct-row-input" id="sovDepartment" data-sov-field="department">
-                                                        <option value="">Select Department&hellip;</option>
-                                                        <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
-                                                            <option value="<?php echo $p; ?>" <?php echo $db_department === $p ? 'selected' : ''; ?>>
-                                                                <?php echo $p; ?>
-                                                            </option>
+                                                    <span class="acct-row-static acct-row-static-muted" id="sovDepartmentView" data-view="department">Not set</span>
+                                                    <select class="acct-row-input" id="sovDepartment" name="department" data-edit-field="department" disabled>
+                                                        <option value="">Select your department&hellip;</option>
+                                                        <?php foreach (faculty_departments() as $sov_dept): ?>
+                                                            <option value="<?php echo htmlspecialchars($sov_dept); ?>"><?php echo htmlspecialchars($sov_dept); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
+                                                    <p class="acct-field-hint" data-hint-for="department" hidden>You can choose this once &mdash; it can&rsquo;t be changed afterwards.</p>
                                                 <?php endif; ?>
+                                                <p class="acct-field-error" data-error-for="department" role="alert" hidden></p>
                                             </div>
+                                            <?php if ($department_locked): ?>
+                                                <span class="material-symbols-outlined fid-lock" title="Your department is permanent once set">lock</span>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="acct-row">
-                                            <span class="acct-row-label">Mobile Number</span>
+                                            <label class="acct-row-label" for="sovPhone">Mobile Number</label>
                                             <div class="acct-row-value">
-                                                <input class="acct-row-input" id="sovPhone" type="tel"
-                                                    value="<?php echo htmlspecialchars($db_phone); ?>"
-                                                    placeholder="+63 912 345 6789"
-                                                    data-sov-field="phone">
+                                                <span class="acct-row-static <?php echo $sov_phone_view === '' ? 'acct-row-static-muted' : ''; ?>" id="sovPhoneView" data-view="phone"><?php echo $sov_phone_view === '' ? 'Not set' : htmlspecialchars($sov_phone_view); ?></span>
+                                                <input class="acct-row-input" id="sovPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
+                                                    maxlength="20" placeholder="09XX XXX XXXX" value="<?php echo htmlspecialchars($sov_phone_view); ?>"
+                                                    data-edit-field="phone" disabled>
+                                                <p class="acct-field-error" data-error-for="phone" role="alert" hidden></p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="acct-card-foot">
-                                        <button class="sov-btn-primary" data-action="contact-save">Save Changes</button>
+                                    <div class="acct-card-foot sov-edit-foot">
+                                        <button type="button" class="sov-btn-outline" data-action="account-cancel">Cancel</button>
+                                        <button type="button" class="sov-btn-primary" id="sovSaveBtn" data-action="account-save" disabled>Save Changes</button>
                                     </div>
                                 </div>
 
@@ -4231,19 +4252,18 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
                                             </button>
                                         </div>
+                                        <?php
+                                        $sov_dev      = faculty_device_info($_SERVER['HTTP_USER_AGENT'] ?? '');
+                                        $sov_dev_icon = ['phone' => 'smartphone', 'tablet' => 'tablet_mac', 'desktop' => 'computer'][$sov_dev['kind']] ?? 'devices';
+                                        ?>
                                         <div class="acct-row">
-                                            <span class="acct-row-label">Session Status</span>
-                                            <div class="acct-row-value">
-                                                <span class="sov-badge sov-badge-success">
-                                                    <span class="acct-status-dot"></span>
-                                                    Active
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div class="acct-row acct-row-note">
                                             <span class="acct-row-label">This Device</span>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static acct-row-static-muted"><?php echo htmlspecialchars($_SERVER['HTTP_USER_AGENT'] ? substr($_SERVER['HTTP_USER_AGENT'], 0, 44) . '…' : 'Unknown'); ?></span>
+                                                <span class="acct-row-static acct-device">
+                                                    <span class="material-symbols-outlined" aria-hidden="true"><?php echo $sov_dev_icon; ?></span>
+                                                    <span><?php echo htmlspecialchars($sov_dev['label']); ?></span>
+                                                </span>
+                                                <span class="acct-device-note">The device you are signed in on right now</span>
                                             </div>
                                         </div>
                                     </div>
@@ -4260,7 +4280,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <p class="sx-section-sub">How PUPSync looks on your screen.</p>
                                 </div>
                             </header>
-                            <div class="sx-grid sx-grid--lead">
+                            <div class="sx-grid sx-grid--single">
 
                                 <!-- Theme -->
                                 <div class="acct-card">
@@ -4323,28 +4343,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                     <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
                                 </div>
 
-
-                                <!-- Text Size -->
-                                <div class="acct-card">
-                                    <div class="acct-card-head">
-                                        <span class="material-symbols-outlined">text_fields</span>
-                                        <h3>Text Size</h3>
-                                    </div>
-                                    <div class="sov-font-row">
-                                        <button class="sov-font-btn sov-font-sm" data-scale="80">A</button>
-                                        <button class="sov-font-btn sov-font-md font-scale-active" data-scale="100">A</button>
-                                        <button class="sov-font-btn sov-font-lg" data-scale="120">A</button>
-                                    </div>
-                                    <p class="sov-desc-small">Current size: <strong><span id="fontSizeLbl">100%</span></strong></p>
-                                    <input type="range" min="80" max="130" value="100" step="5" id="fontSizeRange" style="display:none;">
-                                    <!-- Legacy font-scale-btn kept for JS compatibility (hidden) -->
-                                    <div style="display:none;">
-                                        <button class="font-scale-btn" data-scale="80">A</button>
-                                        <button class="font-scale-btn font-scale-active" data-scale="100">A</button>
-                                        <button class="font-scale-btn" data-scale="120">A</button>
-                                    </div>
-                                </div>
-
                             </div>
                         </section>
 
@@ -4400,9 +4398,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                         <div class="acct-row">
                                             <span class="acct-row-label">Export Data</span>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static acct-row-static-muted">Download your activity &amp; profile</span>
+                                                <span class="acct-row-static acct-row-static-muted">Your account details and past activity (completed requests &amp; bookings) as a spreadsheet file</span>
                                             </div>
-                                            <button class="sov-btn-outline" data-action="toast" data-msg="Data export coming soon!">Export</button>
+                                            <button type="button" class="sov-btn-outline" id="sovExportBtn" data-action="export-my-data">Export</button>
                                         </div>
                                     </div>
                                 </div>

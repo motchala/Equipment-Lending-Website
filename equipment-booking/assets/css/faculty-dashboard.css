@@ -12372,3 +12372,133 @@ body .side-nav .side-nav-user .side-nav-user-name {
 [data-theme="dark"] .act-chat-bubble-ai code {
     background: rgba(255, 255, 255, .1);
 }
+
+/* ================================================================
+   SETTINGS > PERSONAL INFORMATION: read-only until "Edit Account"
+   The card shows plain values. Clicking Edit Account swaps them for
+   real inputs and reveals Cancel / Save Changes (data-editing="true").
+   ================================================================ */
+.sov-edit-card .acct-row-input,
+.sov-edit-card .sov-edit-foot {
+    display: none;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-value>[data-view] {
+    display: none;
+}
+
+.sov-edit-card[data-editing="true"] .sov-edit-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.sov-edit-btn {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+}
+
+.acct-card-head .sov-edit-btn .material-symbols-outlined {
+    font-size: 16px;
+    color: inherit;
+}
+
+.sov-edit-card[data-editing="true"] .sov-edit-btn {
+    display: none;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-input {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    margin: 0;
+    padding: 9px 12px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--control-border, var(--color-outline-variant));
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-input:hover {
+    background: var(--color-surface-lowest);
+    border-color: var(--color-outline);
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-input:focus {
+    background: var(--color-surface-lowest);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-input.is-invalid {
+    border-color: var(--color-error);
+}
+
+.sov-edit-card[data-editing="true"] .acct-row-input.is-invalid:focus {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 22%, transparent);
+}
+
+.sov-edit-card .acct-row-input::placeholder {
+    color: var(--color-secondary);
+    font-weight: 400;
+    opacity: .8;
+}
+
+.acct-field-error,
+.acct-field-hint {
+    margin: 6px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.acct-field-error {
+    font-weight: 600;
+    color: var(--color-error);
+}
+
+.acct-field-hint {
+    color: var(--color-secondary);
+}
+
+.acct-field-error[hidden],
+.acct-field-hint[hidden] {
+    display: none;
+}
+
+/* Masked email: keep the dots evenly spaced and let long addresses wrap */
+.acct-row-email {
+    letter-spacing: 0.02em;
+    overflow-wrap: anywhere;
+}
+
+/* Password & Security > This Device */
+.acct-device {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.acct-device .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--color-primary);
+}
+
+.acct-device-note {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: var(--color-secondary);
+}
+
+/* Disabled buttons in Settings (e.g. "Save Changes" before anything has changed) */
+.sov-btn-primary:disabled,
+.sov-btn-outline:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}

@@ -82,19 +82,10 @@
         //     document.documentElement.style.setProperty('--radius', '9px');
         // }
 
-        // 4. Font size
-        const fs = LS.get('fontSize');
-        if (fs && fs !== '100') {
-            const fr = document.getElementById('fontSizeRange');
-            if (fr) fr.value = fs;
-            const lbl = document.getElementById('fontSizeLbl');
-            if (lbl) lbl.textContent = fs + '%';
-            document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
-            // Sync font scale buttons
-            document.querySelectorAll('.u-font-btn').forEach(b => {
-                b.classList.toggle('u-font-btn-active', b.dataset.scale === fs);
-            });
-        }
+        // 4. Font size: the Text Size setting was removed from Settings. Clear any size saved earlier
+        //    so nobody is left stuck on a custom size with no way to change it back.
+        if (LS.get('fontSize') !== null) LS.del('fontSize');
+        document.documentElement.style.fontSize = '';
 
         // 5. Reduce motion — removed from new settings design
         // if (LS.get('reduceMotion') === 'true') { ... }
@@ -249,6 +240,7 @@
         document.querySelectorAll('.side-nav-item').forEach(b => b.classList.remove('active'));
         // Highlight the Settings sidebar item when settings overlay is open
         if (id === 'settingsOverlay') {
+            sovCancelEdit(true);   // Settings always opens in read-only mode
             const settingsNavItem = document.getElementById('nav-settings');
             if (settingsNavItem) settingsNavItem.classList.add('active');
             // Settings lives inside the account menu, so mark the account toggle as the current item too
@@ -2078,6 +2070,285 @@
             });
     }
 
+    /* ══════════════════════════════════════════════════════════════════
+       SETTINGS > PERSONAL INFORMATION  ("Edit Account" -> Save / Cancel)
+       The card is read-only until Edit Account is clicked. Save only becomes
+       available once something actually changed. Email is never editable here.
+    ══════════════════════════════════════════════════════════════════ */
+    function _sovEsc(s) {
+        const d = document.createElement('div');
+        d.textContent = String(s == null ? '' : s);
+        return d.innerHTML;
+    }
+
+    function _sovCard() { return document.getElementById('sovPersonalCard'); }
+
+    function _sovFields() {
+        const c = _sovCard();
+        return c ? Array.from(c.querySelectorAll('[data-edit-field]')) : [];
+    }
+
+    function _sovClearErrors() {
+        const c = _sovCard();
+        if (!c) return;
+        c.querySelectorAll('[data-error-for]').forEach(p => { p.hidden = true; p.textContent = ''; });
+        c.querySelectorAll('.is-invalid').forEach(el => { el.classList.remove('is-invalid'); el.removeAttribute('aria-invalid'); });
+    }
+
+    function _sovShowError(field, msg) {
+        const c = _sovCard();
+        if (!c) return;
+        const p = c.querySelector('[data-error-for="' + field + '"]');
+        const el = c.querySelector('[data-edit-field="' + field + '"]');
+        if (p) { p.textContent = msg; p.hidden = false; }
+        if (el) { el.classList.add('is-invalid'); el.setAttribute('aria-invalid', 'true'); el.focus(); }
+    }
+
+    function _sovIsDirty() {
+        return _sovFields().some(el => el.value.trim() !== (el.dataset.original || ''));
+    }
+
+    function _sovSyncSave() {
+        const btn = document.getElementById('sovSaveBtn');
+        if (btn && !btn.dataset.busy) btn.disabled = !_sovIsDirty();
+    }
+
+    // Same rules as the server: 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX or 9XXXXXXXXX (spaces / dashes allowed)
+    function _sovPhoneOk(v) {
+        return /^(?:\+?63|0)?9\d{9}$/.test(String(v).replace(/[\s\-().]/g, ''));
+    }
+
+    function sovStartEdit() {
+        const c = _sovCard();
+        if (!c) return;
+        _sovFields().forEach(el => { el.dataset.original = el.value.trim(); el.disabled = false; });
+        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = false; });
+        c.dataset.editing = 'true';
+        _sovClearErrors();
+        _sovSyncSave();
+        const first = c.querySelector('[data-edit-field="fullname"]');
+        if (first) { first.focus(); if (first.select) first.select(); }
+    }
+
+    function _sovLeaveEdit() {
+        const c = _sovCard();
+        if (!c) return;
+        _sovFields().forEach(el => { el.disabled = true; });
+        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = true; });
+        c.dataset.editing = 'false';
+        _sovClearErrors();
+    }
+
+    function sovCancelEdit(silent) {
+        const c = _sovCard();
+        if (!c || c.dataset.editing !== 'true') return;
+        _sovFields().forEach(el => { el.value = el.dataset.original || ''; });
+        _sovLeaveEdit();
+        if (!silent) {
+            const b = document.getElementById('sovEditBtn');
+            if (b) b.focus();
+        }
+    }
+
+    function _sovInitials(name) {
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        let ini = parts.length ? parts[0].charAt(0).toUpperCase() : '';
+        if (parts.length > 1) ini += parts[parts.length - 1].charAt(0).toUpperCase();
+        return ini;
+    }
+
+    // Update the avatar initials without ever touching a profile picture.
+    function _sovSetInitials(ini) {
+        document.querySelectorAll('.side-nav-avatar, .avatar-btn, .acc-avatar-large, .acct-banner-avatar').forEach(el => {
+            const fb = el.querySelector('.avatar-initials-fallback');
+            if (fb) { fb.textContent = ini; return; }
+            if (el.querySelector('img.avatar-img')) return;
+            const tn = Array.from(el.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+            if (tn) tn.textContent = ini;
+            else el.insertBefore(document.createTextNode(ini), el.firstChild);
+        });
+    }
+
+    function _sovApplySaved(d) {
+        const c = _sovCard();
+        if (!c) return;
+        const oldName = (document.querySelector('.acct-banner-name') || {}).textContent || '';
+
+        // inputs + read-only values
+        const nameIn = c.querySelector('[data-edit-field="fullname"]');
+        if (nameIn) nameIn.value = d.fullname;
+        const nameView = document.getElementById('sovFullNameView');
+        if (nameView) nameView.textContent = d.fullname;
+
+        const phoneIn = c.querySelector('[data-edit-field="phone"]');
+        if (phoneIn) phoneIn.value = d.phone_display || '';
+        const phoneView = document.getElementById('sovPhoneView');
+        if (phoneView) {
+            phoneView.textContent = d.phone_display || 'Not set';
+            phoneView.classList.toggle('acct-row-static-muted', !d.phone_display);
+        }
+
+        // department: once chosen it becomes a permanent, read-only value
+        const deptSel = c.querySelector('[data-edit-field="department"]');
+        const deptView = document.getElementById('sovDepartmentView');
+        if (d.department && deptSel && deptView) {
+            deptView.textContent = d.department;
+            deptView.classList.remove('acct-row-static-muted');
+            deptView.removeAttribute('data-view');
+            const row = deptSel.closest('.acct-row');
+            const hint = c.querySelector('[data-hint-for="department"]');
+            deptSel.remove();
+            if (hint) hint.remove();
+            if (row && !row.querySelector('.fid-lock')) {
+                const lock = document.createElement('span');
+                lock.className = 'material-symbols-outlined fid-lock';
+                lock.title = 'Your department is permanent once set';
+                lock.textContent = 'lock';
+                row.appendChild(lock);
+            }
+        }
+
+        // name shown elsewhere on the page
+        document.querySelectorAll('.side-nav-user-name, .acct-banner-name, .u-name, .acc-hero-info h2').forEach(el => {
+            el.textContent = d.fullname;
+        });
+        document.querySelectorAll('[data-first-name]').forEach(el => { el.textContent = d.first_name; });
+        document.querySelectorAll('input[type="hidden"][name="instructor"]').forEach(el => {
+            if (oldName && el.value === oldName) el.value = d.fullname;
+        });
+        _sovSetInitials(d.initials || _sovInitials(d.fullname));
+
+        // banner line: "<department> · ID: …"
+        const meta = document.querySelector('.acct-banner-meta');
+        if (meta && meta.firstChild && meta.firstChild.nodeType === Node.TEXT_NODE) {
+            meta.firstChild.textContent = (d.department || 'PUPSync Faculty') + ' \u00B7 ID: ';
+        }
+    }
+
+    function sovSaveAccount() {
+        const c = _sovCard();
+        const btn = document.getElementById('sovSaveBtn');
+        if (!c || !btn || btn.disabled) return;
+        _sovClearErrors();
+
+        const vals = {};
+        _sovFields().forEach(el => { vals[el.dataset.editField] = el.value.trim(); });
+        if (!vals.fullname) { _sovShowError('fullname', 'Full name cannot be empty.'); return; }
+        const phoneEl = c.querySelector('[data-edit-field="phone"]');
+        if (vals.phone && phoneEl && vals.phone !== (phoneEl.dataset.original || '') && !_sovPhoneOk(vals.phone)) {
+            _sovShowError('phone', 'Enter a valid mobile number, like 09XX XXX XXXX.');
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('action', 'save_account');
+        fd.append('csrf_token', getCsrfToken());
+        Object.keys(vals).forEach(k => fd.append(k, vals[k]));
+
+        const label = btn.textContent;
+        btn.dataset.busy = '1';
+        btn.disabled = true;
+        btn.textContent = 'Saving\u2026';
+        const cancelBtn = c.querySelector('[data-action="account-cancel"]');
+        if (cancelBtn) cancelBtn.disabled = true;
+
+        fetch('equipment-booking/api/update-profile.php', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.success) {
+                    if (data.changed === false) {
+                        _sovLeaveEdit();
+                        showToast('No changes to save.');
+                    } else {
+                        _sovApplySaved(data.data || {});
+                        _sovLeaveEdit();
+                        showToast(_sovEsc(data.msg || 'Your account details were updated.'), 'success');
+                    }
+                    const eb = document.getElementById('sovEditBtn');
+                    if (eb) eb.focus();
+                } else if (data && data.field) {
+                    _sovShowError(data.field, data.msg || 'Please check this field.');
+                } else {
+                    showToast(_sovEsc((data && (data.msg || data.error)) || 'Could not save your changes.'), 'error');
+                }
+            })
+            .catch(() => showToast('Network error. Please try again.', 'error'))
+            .finally(() => {
+                delete btn.dataset.busy;
+                btn.textContent = label;
+                if (cancelBtn) cancelBtn.disabled = false;
+                _sovSyncSave();
+            });
+    }
+
+    // Live "is there anything to save?" + clear the error on a field once the user edits it
+    document.addEventListener('input', function (e) {
+        const card = _sovCard();
+        if (!card || !card.contains(e.target)) return;
+        const f = e.target.closest('[data-edit-field]');
+        if (f) {
+            const p = card.querySelector('[data-error-for="' + f.dataset.editField + '"]');
+            if (p) { p.hidden = true; p.textContent = ''; }
+            f.classList.remove('is-invalid');
+            f.removeAttribute('aria-invalid');
+        }
+        _sovSyncSave();
+    });
+    document.addEventListener('change', function (e) {
+        const card = _sovCard();
+        if (card && card.contains(e.target)) _sovSyncSave();
+    });
+    document.addEventListener('keydown', function (e) {
+        const card = _sovCard();
+        if (!card || card.dataset.editing !== 'true' || !card.contains(e.target)) return;
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); sovCancelEdit(); }
+        else if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); sovSaveAccount(); }
+    });
+
+    /* ══════════════════════════════════════════════════════════════════
+       SETTINGS > DATA MANAGEMENT > EXPORT DATA
+       Downloads one CSV with the account info + PAST activity (server side).
+    ══════════════════════════════════════════════════════════════════ */
+    function exportMyData() {
+        const btn = document.getElementById('sovExportBtn');
+        if (!btn || btn.disabled) return;
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Preparing\u2026';
+
+        const fd = new FormData();
+        fd.append('csrf_token', getCsrfToken());
+
+        fetch('equipment-booking/api/export-faculty-data.php', { method: 'POST', body: fd })
+            .then(r => {
+                const type = r.headers.get('Content-Type') || '';
+                if (r.ok && type.indexOf('text/csv') !== -1) {
+                    const cd = r.headers.get('Content-Disposition') || '';
+                    const m = /filename="?([^";]+)"?/.exec(cd);
+                    return r.blob().then(b => ({ blob: b, name: m ? m[1] : 'pupsync-my-data.csv' }));
+                }
+                return r.json().catch(() => ({})).then(j => {
+                    throw new Error(j.msg || j.error || 'Could not export your data. Please try again.');
+                });
+            })
+            .then(res => {
+                const url = URL.createObjectURL(res.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = res.name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 2000);
+                showToast('Your data was downloaded.', 'success');
+            })
+            .catch(err => showToast(_sovEsc(err && err.message ? err.message : 'Could not export your data.'), 'error'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = label;
+            });
+    }
+
     /* ── Change Password ───────────────────────────────────────────────── */
     function openPwModal() {
         const modal = document.getElementById('pwModal');
@@ -2840,6 +3111,18 @@
                 case 'close-notif-modal':
                     closeNotifModal();
                     break;
+                case 'account-edit':
+                    sovStartEdit();
+                    break;
+                case 'account-cancel':
+                    sovCancelEdit();
+                    break;
+                case 'account-save':
+                    sovSaveAccount();
+                    break;
+                case 'export-my-data':
+                    exportMyData();
+                    break;
                 case 'toast':
                     showToast(el.dataset.msg || '');
                     break;
@@ -3040,19 +3323,6 @@
         });
     });
 
-    /* ── Settings font-size buttons (sov-font-btn mirroring font-scale-btn) */
-    document.querySelectorAll('.sov-font-btn[data-scale]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var scale = this.dataset.scale;
-            // Mirror onto the hidden font-scale-btn so the existing applyFontScale logic fires
-            var legacyBtn = document.querySelector('.font-scale-btn[data-scale="' + scale + '"]');
-            if (legacyBtn) legacyBtn.click();
-            // Update active state on sov buttons
-            document.querySelectorAll('.sov-font-btn').forEach(function (b) { b.classList.remove('font-scale-active'); });
-            this.classList.add('font-scale-active');
-        });
-    });
-
     /* ── Notification filter tabs ─────────────────────────────────────── */
     document.querySelectorAll('.notif-tab').forEach(btn => {
         btn.addEventListener('click', function () {
@@ -3116,11 +3386,6 @@
     /* ── Settings toggles — compact/reduceMotion/focusRing removed from new design */
     // const compactToggle = document.getElementById('compactToggle');
     // if (compactToggle) compactToggle.addEventListener('change', function () { applyCompact(this.checked); });
-
-    const fontSizeRange = document.getElementById('fontSizeRange');
-    if (fontSizeRange) fontSizeRange.addEventListener('input', function () {
-        applyFontSize(this.value);
-    });
 
     // const reduceMotionToggle = document.getElementById('reduceMotionToggle');
     // if (reduceMotionToggle) reduceMotionToggle.addEventListener('change', function () { applyReduceMotion(this.checked); });
