@@ -12,3 +12,6 @@ config/db.php
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Fred local stuff
+.amazonq/

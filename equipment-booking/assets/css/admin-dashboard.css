@@ -12179,3 +12179,15 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         width: 100% !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   EQUIPMENT › ON LOAN › Scheduled (later-date) bookings  (additive)
+═══════════════════════════════════════════════════════════════ */
+.ps-badge--scheduled {
+    background: #e6f0fb;
+    color: #1f5fa8;
+}
+
+.eq-loan-row.is-scheduled td:first-child {
+    box-shadow: inset 3px 0 0 #3b82c4;
+}

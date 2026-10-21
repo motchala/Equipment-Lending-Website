@@ -3510,11 +3510,12 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 /* ── My Activity ─────────────────────────────────────────────
                    Three layers, top to bottom:
 
-                     1. Summary strip   Active loans · Overdue · Pending · Room reservations
+                     1. Summary         four cards: Active loans · Overdue · Pending · Room reservations
                                         (same words and numbers as the Home tab's key figures)
                      2. Right now       Equipment card | Room reservations card
                                         each one: In progress / Upcoming (rooms also: Waitlist)
-                     3. History         one table for both, filtered All / Equipment / Rooms
+                     3. History         one table for both, filtered All / Equipment / Rooms,
+                                        with its page navigation in the header next to the filters
 
                    Both halves are drawn by shared renderers, so the first paint and the live
                    refresh are always identical:
@@ -3544,23 +3545,27 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     </button>
                 </header>
 
-                <!-- ── Summary strip ────────────────────────────────────── -->
+                <!-- ── Summary: four cards ──────────────────────────────── -->
                 <div class="fact-stats" role="group" aria-label="Activity summary">
-                    <div class="fact-stat">
-                        <span class="fact-stat-value" data-fact-stat="loans"><?php echo (int) $act_eq_stats['loans']; ?></span>
+                    <div class="fact-stat is-ok">
                         <span class="fact-stat-label">Active loans</span>
+                        <span class="fact-stat-value" data-fact-stat="loans"><?php echo (int) $act_eq_stats['loans']; ?></span>
+                        <span class="fact-stat-note">Approved equipment</span>
                     </div>
-                    <div class="fact-stat<?php echo $act_eq_stats['overdue'] > 0 ? ' is-alert' : ''; ?>">
-                        <span class="fact-stat-value" data-fact-stat="overdue"><?php echo (int) $act_eq_stats['overdue']; ?></span>
+                    <div class="fact-stat is-bad<?php echo $act_eq_stats['overdue'] > 0 ? ' is-alert' : ''; ?>">
                         <span class="fact-stat-label">Overdue</span>
+                        <span class="fact-stat-value" data-fact-stat="overdue"><?php echo (int) $act_eq_stats['overdue']; ?></span>
+                        <span class="fact-stat-note">Past the return time</span>
                     </div>
-                    <div class="fact-stat">
-                        <span class="fact-stat-value" data-fact-stat="pending"><?php echo (int) $act_eq_stats['pending']; ?></span>
+                    <div class="fact-stat is-wait">
                         <span class="fact-stat-label">Pending</span>
+                        <span class="fact-stat-value" data-fact-stat="pending"><?php echo (int) $act_eq_stats['pending']; ?></span>
+                        <span class="fact-stat-note">Awaiting approval</span>
                     </div>
                     <div class="fact-stat">
-                        <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
                         <span class="fact-stat-label">Room reservations</span>
+                        <span class="fact-stat-value" data-fact-stat="reserved"><?php echo fact_h($act_room_stats['reserved']); ?></span>
+                        <span class="fact-stat-note">Active, out of the limit</span>
                     </div>
                 </div>
 
@@ -3570,7 +3575,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <section class="fact-card" id="factEquipment" aria-labelledby="factEquipTitle">
                         <header class="fact-card-head">
                             <h3 class="fact-card-title" id="factEquipTitle">Equipment</h3>
-                            <span id="factEquipAction"><?php echo fact_eq_render_action($act_eq); ?></span>
                         </header>
                         <!-- Filled here on first paint; swapped live by the My Activity block at the end of faculty-dashboard.js -->
                         <div class="fact-card-body" id="factEquipBody"><?php echo fact_eq_render_body($act_eq, $root_url); ?></div>
@@ -3579,7 +3583,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
                         <header class="fact-card-head">
                             <h3 class="fact-card-title" id="factRoomsTitle">Room reservations</h3>
-                            <button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="rooms">Reserve Room</button>
                         </header>
                         <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
                     </section>
@@ -3600,6 +3603,14 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                 <span class="material-symbols-outlined" aria-hidden="true">search</span>
                                 <input type="text" id="factSearch" placeholder="Search history…" autocomplete="off" aria-label="Search history">
                             </label>
+                            <nav class="fact-pager" id="factPager" aria-label="History pages" hidden>
+                                <span class="fact-pager-info" id="factPagerInfo"></span>
+                                <div class="fact-pager-ctl">
+                                    <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
+                                    <div class="fact-pager-nums" id="factNums"></div>
+                                    <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
+                                </div>
+                            </nav>
                         </div>
                     </header>
 
@@ -3626,14 +3637,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                         <p class="fact-empty-sub">Returned equipment and past room reservations will show up here.</p>
                     </div>
 
-                    <div class="fact-pager" id="factPager" hidden>
-                        <span class="fact-pager-info" id="factPagerInfo"></span>
-                        <div class="fact-pager-ctl">
-                            <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
-                            <div class="fact-pager-nums" id="factNums"></div>
-                            <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
-                        </div>
-                    </div>
                 </section><!-- /factHistory -->
 
             </div><!-- /panel-activity -->

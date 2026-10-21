@@ -344,21 +344,6 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
 }
 
 /**
- * The "Borrow Equipment" button in the card header. While anything is overdue it is
- * replaced by the same "Overdue Block" the Home and Borrow screens show.
- *
- * @param array<string, mixed> $d result of fact_eq_load()
- */
-function fact_eq_render_action(array $d): string
-{
-    if (fact_eq_stats($d)['overdue'] > 0) {
-        return '<button type="button" class="fact-btn fact-btn-ghost" disabled'
-            . ' title="You have overdue equipment. Return it before borrowing again.">Overdue Block</button>';
-    }
-    return '<button type="button" class="fact-btn fact-btn-ghost" data-action="go-tab" data-tab="lending" data-lending="browse">Borrow Equipment</button>';
-}
-
-/**
  * Body of the "Equipment" card.
  *
  * @param array<string, mixed> $d result of fact_eq_load()
@@ -374,7 +359,7 @@ function fact_eq_render_body(array $d, string $rootUrl): string
     if ($overdue > 0) {
         // Same rule and wording as the "Borrowing Blocked" notice on the other screens
         $html .= '<div class="fact-notice" role="status">' . fact_icon('block')
-            . '<div><strong>Borrowing blocked</strong><span>You have overdue equipment. Return it to the Admin Office before you can borrow again.</span></div></div>';
+            . '<div><strong>Borrowing blocked</strong><span>You have overdue equipment. Return it immediately before you can borrow again.</span></div></div>';
     }
 
     if (!$live && !$upcoming) {

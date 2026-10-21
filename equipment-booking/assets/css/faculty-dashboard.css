@@ -10798,48 +10798,84 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-secondary);
 }
 
-/* ── Summary strip ───────────────────────────────────────────── */
+/* ── Summary: four cards ─────────────────────────────────────────
+   Label on top, big number, one short note. (The Home tab's key figures are
+   icon + number buttons; this is deliberately a different layout.)
+   The thin bar on the left carries the status colour only: green loans,
+   amber pending, red overdue (grey while nothing is overdue). */
 #panel-activity .fact-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
     margin-bottom: 20px;
-    background: var(--color-surface-lowest);
-    border: 1px solid var(--color-outline-variant);
-    border-radius: 14px;
-    overflow: hidden;
 }
 
 #panel-activity .fact-stat {
+    --tone: var(--color-primary);
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
     min-width: 0;
-    padding: 16px 20px;
+    padding: 16px 18px 16px 24px;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
 }
 
-#panel-activity .fact-stat+.fact-stat {
-    border-left: 1px solid var(--color-outline-variant);
+#panel-activity .fact-stat::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    bottom: 14px;
+    left: 0;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--tone);
+}
+
+#panel-activity .fact-stat.is-ok {
+    --tone: var(--color-success);
+}
+
+#panel-activity .fact-stat.is-wait {
+    --tone: var(--color-warning);
+}
+
+#panel-activity .fact-stat.is-bad {
+    --tone: var(--color-secondary);
+}
+
+#panel-activity .fact-stat.is-bad.is-alert {
+    --tone: var(--color-error);
+}
+
+#panel-activity .fact-stat-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary);
 }
 
 #panel-activity .fact-stat-value {
     font-family: var(--font-display);
-    font-size: 1.625rem;
+    font-size: 1.875rem;
     font-weight: 700;
-    line-height: 1.15;
+    line-height: 1.1;
     letter-spacing: -0.02em;
     color: var(--color-on-surface);
     font-variant-numeric: tabular-nums;
 }
 
-#panel-activity .fact-stat-label {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--color-secondary);
-}
-
-/* The one number that asks for action */
 #panel-activity .fact-stat.is-alert .fact-stat-value {
     color: var(--color-error);
+}
+
+#panel-activity .fact-stat-note {
+    font-size: 0.78rem;
+    color: var(--color-secondary);
 }
 
 /* ── Cards (same gold-framed card as the Home tab) ───────────── */
@@ -10883,13 +10919,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
     z-index: 1;
 }
 
+/* The line under the title is always there, so you can tell what you are looking at
+   even when the card has nothing in it. */
 #panel-activity .fact-card-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
-    padding: 18px 20px 12px;
+    min-height: 62px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--color-outline-variant);
 }
 
 #panel-activity .fact-card-title {
@@ -10904,7 +10944,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 0 20px 18px;
+    padding: 16px 20px 18px;
 }
 
 /* ── Groups & rows inside a card ─────────────────────────────── */
@@ -11354,7 +11394,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
     white-space: nowrap;
     color: var(--color-secondary);
     background: var(--color-surface-low);
-    border-top: 1px solid var(--color-outline-variant);
     border-bottom: 1px solid var(--color-outline-variant);
 }
 
@@ -11443,42 +11482,40 @@ body .side-nav .side-nav-user .side-nav-user-name {
     margin: 0 20px 20px;
 }
 
-/* Pager */
+/* Pager: lives in the History header, next to the filters */
 #panel-activity .fact-pager {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
     gap: 10px;
-    padding: 12px 20px;
-    border-top: 1px solid var(--color-outline-variant);
 }
 
-#panel-activity .fact-pager[hidden] {
+#panel-activity .fact-pager[hidden],
+#panel-activity .fact-pager-ctl[hidden] {
     display: none;
 }
 
 #panel-activity .fact-pager-info {
     font-size: 0.78rem;
+    white-space: nowrap;
     color: var(--color-secondary);
 }
 
 #panel-activity .fact-pager-ctl {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
 }
 
 #panel-activity .fact-pager-nums {
     display: flex;
-    gap: 4px;
+    gap: 2px;
 }
 
 #panel-activity .fact-pager-btn {
     display: inline-grid;
     place-items: center;
-    min-width: 32px;
-    height: 32px;
+    min-width: 30px;
+    height: 30px;
     padding: 0 6px;
     border: 1px solid transparent;
     border-radius: 8px;
@@ -11495,7 +11532,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 18px;
 }
 
-#panel-activity .fact-pager-btn:hover:not(:disabled) {
+#panel-activity .fact-pager-btn:hover:not(:disabled):not(.is-active) {
     background: var(--color-surface-container);
 }
 
@@ -11507,8 +11544,8 @@ body .side-nav .side-nav-user .side-nav-user-name {
 #panel-activity .fact-pager-gap {
     display: inline-grid;
     place-items: center;
-    min-width: 20px;
-    height: 32px;
+    min-width: 18px;
+    height: 30px;
     color: var(--color-secondary);
 }
 

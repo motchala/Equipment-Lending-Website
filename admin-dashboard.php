@@ -3948,13 +3948,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <?php
                     // ── On Loan tab data (read-only; does not touch the shared $approved_result / $waiting_result) ──
+                    require_once __DIR__ . '/equipment-booking/core/booking-schedule.php';
+                    BookingSchedule::ensureSchema($conn);   // later-date booking columns (idempotent, same call the return handler uses)
                     $eq_today        = date('Y-m-d');
+                    $eq_now          = date('Y-m-d H:i:s');   // Asia/Manila
                     $eq_loan_rows    = [];
                     $eq_loan_overdue = 0;
                     $eq_loan_q = mysqli_query($conn, "SELECT r.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests r
                         WHERE r.status IN ('Approved','Overdue')
+                          AND NOT COALESCE((r.status = 'Approved'
+                                AND COALESCE(r.booking_mode, '') = 'future'
+                                AND TIMESTAMP(r.borrow_date, COALESCE(r.borrow_time, '00:00:00')) > '{$eq_now}'), 0)
                         ORDER BY r.return_date ASC, r.id ASC");
                     if ($eq_loan_q) {
                         while ($lr = mysqli_fetch_assoc($eq_loan_q)) {
@@ -4005,6 +4011,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         }
                     }
                     $eq_wait_rows  = array_merge($eq_wait_with, $eq_wait_without);
+                    $eq_pend_total = count($eq_wait_rows);   // pending-review requests only
+                    // Scheduled (later-date) bookings: approved by default but not started yet. They wait here
+                    // until their start time (then they move to Active) and an admin can cancel / revoke them.
+                    $eq_sched_rows = [];
+                    $eq_sched_q = mysqli_query($conn, "SELECT tbl_requests.*,
+                            (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = tbl_requests.equipment_name LIMIT 1) AS item_condition
+                        FROM tbl_requests
+                        WHERE tbl_requests.status = 'Approved'
+                          AND COALESCE(tbl_requests.booking_mode, '') = 'future'
+                          AND TIMESTAMP(tbl_requests.borrow_date, COALESCE(tbl_requests.borrow_time, '00:00:00')) > '{$eq_now}'
+                        ORDER BY tbl_requests.borrow_date ASC, tbl_requests.borrow_time ASC, tbl_requests.id ASC");
+                    if ($eq_sched_q) {
+                        while ($sr = mysqli_fetch_assoc($eq_sched_q)) {
+                            $sr['_days']  = (int)floor((strtotime($sr['borrow_date']) - strtotime($eq_today)) / 86400);   // days until it starts
+                            $sr['_state'] = 'scheduled';
+                            $eq_sched_rows[] = $sr;
+                        }
+                    }
+                    $eq_wait_rows  = array_merge($eq_wait_rows, $eq_sched_rows);
                     $eq_wait_total = count($eq_wait_rows);
                     $eq_view_rows  = array_merge($eq_wait_rows, $eq_loan_rows, $eq_ret_rows);
                     $eq_view_total = count($eq_view_rows);
@@ -4366,7 +4391,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <!-- Loan status tabs live inside the table header -->
                                 <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
                                     <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
-                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_wait_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
@@ -4400,11 +4425,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     : ($eq_loan_dec[(int)$r['id']]['approved'] ?? null);
                                                 $lret  = !empty($r['returned_at']) ? $r['returned_at'] : $r['return_date'];
                                                 $ldoc  = $r['_doc'] ?? null;
+                                                $lbt   = !empty($r['borrow_time']) ? date('g:i A', strtotime($r['borrow_time'])) : '';
+                                                $lrt   = !empty($r['return_time']) ? date('g:i A', strtotime($r['return_time'])) : '';
+                                                $lstart_lbl = date('M d, Y', strtotime($r['borrow_date'])) . ($lbt !== '' ? ' · ' . $lbt : '');
+                                                $ldue_lbl   = date('M d, Y', strtotime($r['return_date'])) . ($lrt !== '' ? ' · ' . $lrt : '');
+                                                // Same confidentiality rule as admin-override.php: adviser requests with a supporting
+                                                // document can only be changed by a Super Admin.
+                                                $lsens = (string)($r['submitted_as'] ?? '') === 'adviser' && trim((string)($r['document_path'] ?? '')) !== '';
+                                                $lcan_cancel = !$lsens || !empty($can_view_sensitive_adviser_requests);
                                         ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
                                                     data-id="<?php echo (int)$r['id']; ?>"
-                                                    data-status="<?php echo htmlspecialchars($r['status']); ?>"
+                                                    data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
                                                     data-loan-state="<?php echo $lst; ?>"
+                                                    data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
+                                                    data-due-label="<?php echo htmlspecialchars($ldue_lbl); ?>"
                                                     data-days-overdue="<?php echo max(0, $ldays); ?>"
                                                     data-condition="<?php echo htmlspecialchars($r['item_condition'] ?? 'Good'); ?>"
                                                     data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
@@ -4448,11 +4483,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                             <?php endif; ?>
                                                         <?php endif; ?>
                                                     </td>
-                                                    <td><?php echo date('M d', strtotime($r['borrow_date'])); ?></td>
-                                                    <td style="<?php echo $lst === 'overdue' ? 'color:var(--danger);font-weight:600' : ''; ?>"><?php echo date('M d', strtotime($r['return_date'])); ?></td>
+                                                    <td>
+                                                        <?php echo date('M d', strtotime($r['borrow_date'])); ?>
+                                                        <?php if ($lbt !== ''): ?><div class="ps-appr-sub"><?php echo $lbt; ?></div><?php endif; ?>
+                                                    </td>
+                                                    <td style="<?php echo $lst === 'overdue' ? 'color:var(--danger);font-weight:600' : ''; ?>">
+                                                        <?php echo date('M d', strtotime($r['return_date'])); ?>
+                                                        <?php if ($lrt !== ''): ?><div class="ps-appr-sub" style="font-weight:400"><?php echo $lrt; ?></div><?php endif; ?>
+                                                    </td>
                                                     <td>
                                                         <?php if ($lst === 'waiting'): ?>
                                                             <span class="ps-badge ps-badge--dot ps-badge--waiting">Pending Review</span>
+                                                        <?php elseif ($lst === 'scheduled'): ?>
+                                                            <span class="ps-badge ps-badge--scheduled">Scheduled</span>
+                                                            <div class="ps-appr-sub"><?php echo $ldays > 0 ? 'Starts in ' . $ldays . ' day' . ($ldays === 1 ? '' : 's') : 'Starts today'; ?></div>
                                                         <?php elseif ($lst === 'overdue'): ?>
                                                             <span class="ps-badge ps-badge--overdue"><?php echo max(1, $ldays); ?> day<?php echo max(1, $ldays) === 1 ? '' : 's'; ?> overdue</span>
                                                         <?php elseif ($lst === 'due'): ?>
@@ -4476,6 +4520,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                                     data-action="ps-open-modal" data-modal="ps-decline-modal">
                                                                     <span class="material-symbols-outlined">close</span> Decline
                                                                 </button>
+                                                            <?php elseif ($lst === 'scheduled'): ?>
+                                                                <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
+                                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
+                                                                <?php if ($lcan_cancel): ?>
+                                                                    <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
+                                                                        data-action="ps-open-modal" data-modal="ps-cancel-booking-modal">
+                                                                        <span class="material-symbols-outlined">event_busy</span> Cancel Booking
+                                                                    </button>
+                                                                <?php else: ?>
+                                                                    <span class="ps-appr-sub" title="Organization Adviser requests with a supporting document can only be changed by a Super Admin">Super Admin only</span>
+                                                                <?php endif; ?>
                                                             <?php elseif ($lst === 'returned'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
                                                                     data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
@@ -5175,6 +5230,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-decline-modal">Cancel</button>
                 <button class="ps-btn ps-btn--danger" id="ps-decline-confirm-btn">
                     <span class="material-symbols-outlined">close</span> Decline Request
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CANCEL SCHEDULED BOOKING (Equipment › On Loan › Waiting) -->
+    <div class="ps-modal-backdrop" id="ps-cancel-booking-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--danger">
+                    <span class="material-symbols-outlined">event_busy</span>
+                </div>
+                <h3>Cancel Booking</h3>
+                <button class="ps-modal-close" data-action="ps-close-modal" data-modal="ps-cancel-booking-modal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <input type="hidden" id="cancel-booking-id" value="">
+                <div id="ps-cancel-booking-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
+                <div class="ps-req-summary">
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Request</span><span class="ps-rsv" id="ps-cancel-booking-reqno" style="font-weight:600;color:var(--accent-maroon)">#R-0000</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Borrower</span><span class="ps-rsv" id="cancel-booking-borrower">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Equipment</span><span class="ps-rsv" id="cancel-booking-equipment">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Starts</span><span class="ps-rsv" id="cancel-booking-start">—</span></div>
+                    <div class="ps-req-sum-row"><span class="ps-rsl">Return by</span><span class="ps-rsv" id="cancel-booking-due">—</span></div>
+                </div>
+                <div class="ps-form-group">
+                    <label class="ps-form-label">Reason for Cancelling <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
+                    <textarea class="ps-form-control" id="cancel-booking-reason" rows="3" placeholder="e.g. Equipment is reserved for a university event on that date..."></textarea>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" data-action="ps-close-modal" data-modal="ps-cancel-booking-modal">Keep Booking</button>
+                <button class="ps-btn ps-btn--danger" id="ps-cancel-booking-confirm-btn" disabled>
+                    <span class="material-symbols-outlined">event_busy</span> Cancel Booking
                 </button>
             </div>
         </div>

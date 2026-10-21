@@ -17,7 +17,7 @@ $uid = $_SESSION['faculty_id'];
 // ── My Activity feed (?view=activity) ─────────────────────────────────────
 // The equipment half of the faculty "My Activity" screen, already rendered by the
 // same functions the dashboard uses on first paint (core/faculty-activity.php, fact_eq_*):
-//   { body: html, action: html, rows: html, stats: { loans, overdue, pending } }
+//   { body: html, rows: html, stats: { loans, overdue, pending } }
 if (($_GET['view'] ?? '') === 'activity') {
     require_once __DIR__ . '/../core/faculty-activity.php';
     $root_url = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'], 3)), '/') . '/';
@@ -26,7 +26,6 @@ if (($_GET['view'] ?? '') === 'activity') {
     header('Cache-Control: no-store');
     echo json_encode([
         'body'   => fact_eq_render_body($activity, $root_url),
-        'action' => fact_eq_render_action($activity),
         'rows'   => fact_eq_render_history_rows($activity, $root_url),
         'stats'  => fact_eq_stats($activity),
     ], JSON_INVALID_UTF8_SUBSTITUTE);

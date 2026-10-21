@@ -4990,14 +4990,20 @@
             return out;
         }
 
+        /* The page navigation lives in the History header, next to the filters:
+           "Showing 1-10 of 24" + previous / numbers / next. With one page only the count shows. */
         function renderPager(matched) {
             var pages = Math.max(1, Math.ceil(matched / PER_PAGE));
-            if (matched <= PER_PAGE) { pager.hidden = true; return; }
+            var ctl = pager.querySelector('.fact-pager-ctl');
+            if (matched === 0) { pager.hidden = true; return; }
             pager.hidden = false;
 
             var from = (state.page - 1) * PER_PAGE + 1;
             var to = Math.min(matched, state.page * PER_PAGE);
-            pagerInfo.textContent = 'Showing ' + from + '\u2013' + to + ' of ' + matched;
+            pagerInfo.textContent = pages > 1
+                ? 'Showing ' + from + '\u2013' + to + ' of ' + matched
+                : matched + (matched === 1 ? ' record' : ' records');
+            if (ctl) ctl.hidden = pages <= 1;
 
             btnPrev.disabled = state.page <= 1;
             btnNext.disabled = state.page >= pages;
@@ -5174,8 +5180,6 @@
             load(API_EQUIP, 'equipment', function (data) {
                 var card = $('factEquipBody');
                 if (card && typeof data.body === 'string') swapBody(card, data.body);
-                var action = $('factEquipAction');
-                if (action && typeof data.action === 'string') action.innerHTML = data.action;
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
                 if (data.stats) {
                     setStat('loans', data.stats.loans);
