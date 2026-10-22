@@ -277,7 +277,8 @@ CREATE TABLE `tbl_faculty_registry` (
   `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
   `uploaded_by` varchar(255) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_registry_faculty_id` (`faculty_id`)
+  UNIQUE KEY `uq_registry_faculty_id` (`faculty_id`),
+  UNIQUE KEY `uq_registry_full_name` (`full_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

@@ -3317,7 +3317,94 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and remove faculty accounts.</p>
                     </div>
 
+                    <?php
+                    // Registry status for the upload card
+                    $reg_status = ['count' => 0, 'last_date' => '', 'last_by' => ''];
+                    $reg_tbl_exists = $conn->query("SHOW TABLES LIKE 'tbl_faculty_registry'")->num_rows > 0;
+                    if ($reg_tbl_exists) {
+                        $rs = $conn->query("SELECT COUNT(*) AS cnt, MAX(uploaded_at) AS last_at, MAX(uploaded_by) AS last_by FROM tbl_faculty_registry");
+                        if ($rs) {
+                            $rrow = $rs->fetch_assoc();
+                            $reg_status['count']     = (int)($rrow['cnt'] ?? 0);
+                            $reg_status['last_date'] = (string)($rrow['last_at'] ?? '');
+                            $reg_status['last_by']   = (string)($rrow['last_by'] ?? '');
+                        }
+                    }
+                    ?>
+
                     <div class="faculty-layout">
+
+                        <!-- REGISTRY UPLOAD CARD -->
+                        <div class="eq-card fac-registry-card" id="fac-registry-card" style="margin-bottom:1.25rem;grid-column:1/-1">
+                            <div class="eq-card-header" id="fac-registry-header" style="cursor:pointer;user-select:none" role="button" aria-expanded="false" aria-controls="fac-registry-body" tabindex="0">
+                                <h2>
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">upload_file</span>
+                                    Faculty Registry
+                                    <?php if ($reg_status['count'] > 0): ?>
+                                        <span class="fac-reg-badge fac-reg-badge--active"><?= $reg_status['count'] ?> entries</span>
+                                    <?php else: ?>
+                                        <span class="fac-reg-badge fac-reg-badge--empty">Not uploaded yet</span>
+                                    <?php endif; ?>
+                                </h2>
+                                <span class="material-symbols-outlined fac-registry-chevron" id="fac-registry-chevron" style="color:var(--text-light);transition:transform .2s">expand_more</span>
+                            </div>
+
+                            <div id="fac-registry-body" style="display:none">
+                                <div class="eq-card-body" style="padding-top:0">
+
+                                    <?php if ($reg_status['count'] > 0 && $reg_status['last_date'] !== ''): ?>
+                                    <p style="font-size:12px;color:var(--text-light);margin:0 0 1rem">
+                                        Last imported:
+                                        <strong style="color:var(--text-dark)"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($reg_status['last_date']))) ?></strong>
+                                        by <?= htmlspecialchars($reg_status['last_by']) ?> &mdash;
+                                        <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
+                                    </p>
+                                    <?php endif; ?>
+
+                                    <div class="fac-reg-upload-row">
+                                        <label for="fac-reg-file-input" class="fac-reg-file-label" id="fac-reg-file-label">
+                                            <span class="material-symbols-outlined">attach_file</span>
+                                            <span id="fac-reg-file-name">Choose file (PDF or XLSX)…</span>
+                                        </label>
+                                        <input type="file" id="fac-reg-file-input" accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
+                                        <button type="button" id="fac-reg-import-btn" class="ps-btn ps-btn--primary" disabled>
+                                            <span class="material-symbols-outlined">cloud_upload</span> Import
+                                        </button>
+                                    </div>
+
+                                    <label class="fac-reg-replace-row" for="fac-reg-replace-all" style="margin-top:.5rem">
+                                        <input type="checkbox" id="fac-reg-replace-all">
+                                        <span style="font-size:12.5px;color:var(--text-light)">Replace entire registry (removes all existing entries before importing)</span>
+                                    </label>
+
+                                    <div id="fac-reg-alert" class="alert-banner hidden" role="alert" style="margin-top:.75rem"></div>
+
+                                    <!-- Preview table — shown after parsing, before import -->
+                                    <div id="fac-reg-preview" style="display:none;margin-top:1rem">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+                                            <p style="font-size:12.5px;font-weight:600;color:var(--text-dark);margin:0" id="fac-reg-preview-count"></p>
+                                            <button type="button" id="fac-reg-clear-btn" class="ps-btn ps-btn--ghost ps-btn--sm">
+                                                <span class="material-symbols-outlined">close</span> Clear
+                                            </button>
+                                        </div>
+                                        <div class="tbl-wrap" style="max-height:260px;overflow-y:auto">
+                                            <table class="admin-table" style="font-size:12px">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width:40px">#</th>
+                                                        <th>Faculty ID</th>
+                                                        <th>Name</th>
+                                                        <th style="width:60px;text-align:center">New</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="fac-reg-preview-tbody"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div><!-- /registry card -->
 
                         <!-- CREATE FORM -->
                         <div class="eq-card faculty-form-card">
