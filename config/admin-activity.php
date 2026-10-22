@@ -273,6 +273,6 @@ if (!function_exists('admin_activity_room_name')) {
         } catch (Throwable $e) {
             // fall through
         }
-        return 'room #' . $room_id;
+        return 'facility #' . $room_id;
     }
 }

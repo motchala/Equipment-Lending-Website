@@ -248,7 +248,8 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
                 <td colspan="3">
                     <span class="rm-div-bld"><?php echo htmlspecialchars($b['name']); ?><span class="rm-div-sep">&middot;</span></span>
                     <span class="rm-div-floor"><?php echo htmlspecialchars($fData['label']); ?></span>
-                    <span class="pr-floor-count"><?php echo count($fData['rooms']); ?></span>
+                    <span class="pr-floor-count" aria-live="polite"><?php $fc = count($fData['rooms']);
+                                                                    echo $fc . ($fc === 1 ? ' facility' : ' facilities'); ?></span>
                 </td>
             </tr>
             <?php $isFirstFloorOfBuilding = false; ?>
@@ -284,7 +285,7 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
                     <td class="td-fw rm-name" title="<?php echo htmlspecialchars($room['room_name']); ?>"><?php echo htmlspecialchars($room['room_name']); ?></td>
                     <td class="rm-stat"><span class="rc-status <?php echo $rc_status_cls; ?>"><?php echo htmlspecialchars($room['status']); ?></span><?php if ($rc_locked): ?><span class="rc-lock" title="Locked: the schedule can't be opened"><span class="material-symbols-outlined">lock</span>Locked</span><?php endif; ?></td>
                     <td class="pr-row-actions">
-                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit room" aria-label="Edit room">
+                        <button type="button" class="pr-icon-btn" data-action="edit-room-inline" title="Edit facility" aria-label="Edit facility">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
                     </td>
@@ -295,7 +296,7 @@ function ps_render_rooms_tbody(array $rooms_buildings, array $rooms_grouped, arr
     <tr class="pr-no-match-row" style="display:none;">
         <td colspan="4" class="rm-nomatch">
             <span class="material-symbols-outlined">search_off</span>
-            No rooms match your filters.
+            No facilities match your filters.
         </td>
     </tr>
     <?php
@@ -339,7 +340,7 @@ function ps_render_archived_tbody(array $rooms_archived, bool $can_delete): stri
     ob_start();
     if (empty($rooms_archived)): ?>
         <tr>
-            <td colspan="2" class="rm-empty-cell">No archived rooms.</td>
+            <td colspan="2" class="rm-empty-cell">No archived facilities.</td>
         </tr>
         <?php else: foreach ($rooms_archived as $ar):
             $ar_floor = !empty($ar['floor_label']) ? $ar['floor_label'] : $ar['floor_number'] . 'F';
@@ -437,7 +438,7 @@ if (isset($_POST['add_room'])) {
 
     if ($building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] add_room: missing required fields');
-        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a room name.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a facility name.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -462,14 +463,14 @@ if (isset($_POST['add_room'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
-        admin_log_activity($conn, 'room', 'Added room: ' . $room_name);
-        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room added.');
+        admin_log_activity($conn, 'room', 'Added facility: ' . $room_name);
+        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Facility added.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_added=1");
     } else {
         error_log('[PUPSync] add_room DB insert failed: ' . $conn->error);
         $stmt->close();
-        if ($is_ajax) ps_send_rooms_ajax_error('Could not save the room. Please try again.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Could not save the facility. Please try again.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
     }
@@ -506,7 +507,7 @@ if (isset($_POST['update_room'])) {
 
     if ($room_id <= 0 || $building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] update_room: missing required fields');
-        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a room name.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a facility name.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -532,8 +533,8 @@ if (isset($_POST['update_room'])) {
 
     if ($stmt->execute()) {
         $stmt->close();
-        admin_log_activity($conn, 'room', 'Updated room: ' . $room_name);
-        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room updated.');
+        admin_log_activity($conn, 'room', 'Updated facility: ' . $room_name);
+        if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Facility updated.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_updated=1");
     } else {
@@ -559,13 +560,13 @@ if (isset($_POST['toggle_room_lock'])) {
     $lock    = (($_POST['lock'] ?? '') === '1') ? 1 : 0;
 
     if ($room_id <= 0) {
-        if ($is_ajax) ps_send_rooms_ajax_error('Room not found.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Facility not found.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
     }
     if (!ps_rooms_lock_column_ready($conn)) {
-        if ($is_ajax) ps_send_rooms_ajax_error('Room locking is not available yet. Please run the room lock database migration.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Facility locking is not available yet. Please run the facility lock database migration.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -578,7 +579,7 @@ if (isset($_POST['toggle_room_lock'])) {
     $exists = $stmt->get_result()->num_rows > 0;
     $stmt->close();
     if (!$exists) {
-        if ($is_ajax) ps_send_rooms_ajax_error('Room not found.');
+        if ($is_ajax) ps_send_rooms_ajax_error('Facility not found.');
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -588,8 +589,8 @@ if (isset($_POST['toggle_room_lock'])) {
     $stmt->bind_param('ii', $lock, $room_id);
     $stmt->execute();
     $stmt->close();
-    admin_log_activity($conn, 'room', ($lock ? 'Locked room: ' : 'Unlocked room: ') . admin_activity_room_name($conn, $room_id));
-    if ($is_ajax) ps_send_rooms_ajax_response($conn, $lock ? 'Room locked.' : 'Room unlocked.');
+    admin_log_activity($conn, 'room', ($lock ? 'Locked facility: ' : 'Unlocked facility: ') . admin_activity_room_name($conn, $room_id));
+    if ($is_ajax) ps_send_rooms_ajax_response($conn, $lock ? 'Facility locked.' : 'Facility unlocked.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_updated=1");
     exit();
@@ -602,15 +603,15 @@ if (isset($_POST['toggle_room_lock'])) {
 // ════════════════════════════════════════════════════════════════
 if (isset($_GET['archive_room'])) {
     if (!admin_is_super_admin($conn)) {
-        ps_rooms_forbidden(($_GET['ajax'] ?? '') === '1', 'Only a Super Admin can archive rooms.');
+        ps_rooms_forbidden(($_GET['ajax'] ?? '') === '1', 'Only a Super Admin can archive facilities.');
     }
     $room_id = intval($_GET['archive_room']);
     $stmt = $conn->prepare("UPDATE tbl_rooms SET is_archived = 1 WHERE room_id = ?");
     $stmt->bind_param('i', $room_id);
     $stmt->execute();
     $stmt->close();
-    admin_log_activity($conn, 'room', 'Archived room: ' . admin_activity_room_name($conn, $room_id));
-    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Room archived.');
+    admin_log_activity($conn, 'room', 'Archived facility: ' . admin_activity_room_name($conn, $room_id));
+    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Facility archived.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_archived=1");
     exit();
@@ -626,8 +627,8 @@ if (isset($_GET['restore_room'])) {
     $stmt->bind_param('i', $room_id);
     $stmt->execute();
     $stmt->close();
-    admin_log_activity($conn, 'room', 'Restored room: ' . admin_activity_room_name($conn, $room_id));
-    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Room restored.');
+    admin_log_activity($conn, 'room', 'Restored facility: ' . admin_activity_room_name($conn, $room_id));
+    if (($_GET['ajax'] ?? '') === '1') ps_send_rooms_ajax_response($conn, 'Facility restored.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_restored=1");
     exit();
@@ -649,7 +650,7 @@ if (isset($_POST['delete_room_permanently'])) {
     $is_ajax = ($_POST['ajax'] ?? '') === '1';
 
     if (!admin_is_super_admin($conn)) {
-        ps_rooms_forbidden($is_ajax, 'Only a Super Admin can permanently delete rooms.');
+        ps_rooms_forbidden($is_ajax, 'Only a Super Admin can permanently delete facilities.');
     }
 
     $room_id = intval($_POST['room_id'] ?? 0);
@@ -669,7 +670,7 @@ if (isset($_POST['delete_room_permanently'])) {
     $stmt->execute();
     $target = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    if (!$target) $fail('Only archived rooms can be permanently deleted.');
+    if (!$target) $fail('Only archived facilities can be permanently deleted.');
 
     $room_name   = (string)$target['room_name'];
     $building_id = (int)$target['building_id'];
@@ -696,7 +697,7 @@ if (isset($_POST['delete_room_permanently'])) {
         $st->execute();
         $deleted = $st->affected_rows;
         $st->close();
-        if ($deleted !== 1) throw new RuntimeException('Room row was not deleted.');
+        if ($deleted !== 1) throw new RuntimeException('Facility row was not deleted.');
 
         // A building's floor count follows its highest remaining floor with rooms.
         $st = $conn->prepare(
@@ -718,11 +719,11 @@ if (isset($_POST['delete_room_permanently'])) {
         } catch (Throwable $e2) { /* nothing to roll back */
         }
         error_log('[PUPSync] delete_room_permanently failed: ' . $e->getMessage());
-        $fail('Could not delete the room. Nothing was changed.');
+        $fail('Could not delete the facility. Nothing was changed.');
     }
 
-    admin_log_activity($conn, 'room', 'Permanently deleted room: ' . $room_name);
-    if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Room permanently deleted.');
+    admin_log_activity($conn, 'room', 'Permanently deleted facility: ' . $room_name);
+    if ($is_ajax) ps_send_rooms_ajax_response($conn, 'Facility permanently deleted.');
     $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
     header("Location: {$base}/admin-dashboard.php?tab=rooms&room_deleted=1");
     exit();

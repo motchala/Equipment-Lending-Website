@@ -206,7 +206,7 @@ function dash_collect(mysqli $conn): array
         if (!isset($idx[$r['d']])) continue;
         $key = (string)$r['room_id'];
         if (!isset($roomsTop[$key])) {
-            $roomsTop[$key] = ['label' => $r['room_name'] ?: ('Room #' . $r['room_id']), 'sub' => (string)($r['building'] ?? ''), 'values' => $zeros];
+            $roomsTop[$key] = ['label' => $r['room_name'] ?: ('Facility #' . $r['room_id']), 'sub' => (string)($r['building'] ?? ''), 'values' => $zeros];
         }
         $roomsTop[$key]['values'][$idx[$r['d']]] += (int)$r['c'];
     }
@@ -223,7 +223,7 @@ function dash_collect(mysqli $conn): array
                 ['key' => 'declined', 'label' => 'Declined', 'values' => $eq['declined']],
                 ['key' => 'waiting',  'label' => 'Waiting',  'values' => $eq['waiting']],
             ]],
-            'rooms' => ['title' => 'Room bookings', 'unit' => 'booking', 'series' => [
+            'rooms' => ['title' => 'Facility bookings', 'unit' => 'booking', 'series' => [
                 ['key' => 'approved',  'label' => 'Approved',  'values' => $rm['approved']],
                 ['key' => 'declined',  'label' => 'Declined',  'values' => $rm['declined']],
                 ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $rm['cancelled']],
@@ -231,7 +231,7 @@ function dash_collect(mysqli $conn): array
         ],
         'extras' => [
             'equipment' => ['title' => 'Top decline reason', 'rows' => $byTotal($reasons, 4)],
-            'rooms'     => ['title' => 'Most booked room',   'rows' => $byTotal($roomsTop, 5)],
+            'rooms'     => ['title' => 'Most booked facility',   'rows' => $byTotal($roomsTop, 5)],
         ],
     ];
 
@@ -317,7 +317,7 @@ function dash_attention(array $d): array
         $a[] = [
             'tone' => 'warn',
             'icon' => 'build',
-            'title' => dash_pl($d['rooms_issues'], 'open room issue'),
+            'title' => dash_pl($d['rooms_issues'], 'open facility issue'),
             'sub'   => 'Reported by faculty, not yet resolved',
             'go' => 'rooms',
             'chip' => ''
@@ -393,11 +393,11 @@ function dash_render(array $d): void
         [
             'tone' => 'info',
             'icon' => 'meeting_room',
-            'label' => 'Rooms today',
+            'label' => 'Facilities today',
             'val' => $d['rooms_today'],
             'sub' => $d['rooms_bookable'] > 0
-                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' rooms in use (' . $d['rooms_pct'] . '%)'
-                : 'No bookable rooms yet',
+                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' facilities in use (' . $d['rooms_pct'] . '%)'
+                : 'No bookable facilities yet',
             'go' => 'rooms',
             'chip' => '',
         ],
@@ -443,7 +443,7 @@ function dash_render(array $d): void
                 <div class="dash-controls">
                     <div class="dash-seg" role="group" aria-label="Dataset">
                         <button type="button" class="dash-seg-btn active" data-dash-set="equipment" aria-pressed="true">Equipment</button>
-                        <button type="button" class="dash-seg-btn" data-dash-set="rooms" aria-pressed="false">Rooms</button>
+                        <button type="button" class="dash-seg-btn" data-dash-set="rooms" aria-pressed="false">Facilities</button>
                     </div>
                     <div class="dash-seg" role="group" aria-label="Range">
                         <button type="button" class="dash-seg-btn" data-dash-range="7" aria-pressed="false">7D</button>
@@ -489,7 +489,7 @@ function dash_render(array $d): void
                 <div class="dash-empty dash-empty--ok">
                     <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
                     <strong>You're all caught up</strong>
-                    <small>No pending requests, overdue returns, room issues or stock problems.</small>
+                    <small>No pending requests, overdue returns, facility issues or stock problems.</small>
                 </div>
             <?php endif; ?>
         </section>
@@ -498,17 +498,17 @@ function dash_render(array $d): void
         <section class="dash-card dash-area-rooms" aria-labelledby="dashRoomsTitle">
             <header class="dash-card-head">
                 <div class="dash-card-title">
-                    <h2 id="dashRoomsTitle">Rooms</h2>
+                    <h2 id="dashRoomsTitle">Facilities</h2>
                     <p>Today's usage and what's coming up</p>
                 </div>
                 <button type="button" class="dash-link" data-dash-go="rooms">Manage</button>
             </header>
             <div class="dash-meter">
                 <div class="dash-meter-top">
-                    <span><strong><?php echo (int)$d['rooms_in_use']; ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> rooms in use today</span>
+                    <span><strong><?php echo (int)$d['rooms_in_use']; ?></strong> of <?php echo (int)$d['rooms_bookable']; ?> facilities in use today</span>
                     <span class="dash-meter-pct"><?php echo (int)$d['rooms_pct']; ?>%</span>
                 </div>
-                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Room utilization today">
+                <div class="dash-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo (int)$d['rooms_pct']; ?>" aria-label="Facility utilization today">
                     <span style="width:<?php echo max($d['rooms_pct'] > 0 ? 2 : 0, (int)$d['rooms_pct']); ?>%"></span>
                 </div>
                 <?php if ($d['rooms_issues'] > 0): ?>
@@ -523,7 +523,7 @@ function dash_render(array $d): void
                         <li class="dash-row">
                             <span class="dash-row-when"><strong><?php echo dash_h($dayLbl); ?></strong><small><?php echo dash_h(date('g:i A', strtotime($u['start_time']))); ?></small></span>
                             <span class="dash-row-main">
-                                <strong><?php echo dash_h($u['room_name'] ?? 'Room'); ?></strong>
+                                <strong><?php echo dash_h($u['room_name'] ?? 'Facility'); ?></strong>
                                 <small><?php echo dash_h(trim(($u['purpose'] ?? '') . ' · ' . ($u['faculty_name'] ?? ''), ' ·')); ?></small>
                             </span>
                         </li>
@@ -1283,12 +1283,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="pr-page-header-row">
                     <div>
                         <h1 class="pr-page-title">Facilities Management</h1>
-                        <p class="pr-page-subtitle">Browse rooms, reservations and reported issues.</p>
+                        <p class="pr-page-subtitle">Browse facilities, reservations and reported issues.</p>
                     </div>
                     <?php if ($is_super_admin): ?>
                         <button type="button" class="pr-btn pr-btn-primary" data-action="show-room-form" id="addRoomBtn">
                             <span class="material-symbols-outlined">add</span>
-                            Add Room
+                            Add Facility
                         </button>
                     <?php endif; ?>
                 </div>
@@ -1308,8 +1308,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                             <h2 id="room-form-title">
                                 <?php echo $edit_room
-                                    ? 'Edit Room &mdash; ' . htmlspecialchars($edit_room['room_name'])
-                                    : 'Add New Room'; ?>
+                                    ? 'Edit Facility &mdash; ' . htmlspecialchars($edit_room['room_name'])
+                                    : 'Add New Facility'; ?>
                             </h2>
                             <button type="button" class="rmod-close-btn" data-action="hide-room-form" aria-label="Close">
                                 <span class="material-symbols-outlined">close</span>
@@ -1338,7 +1338,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </select>
                                     </div>
                                     <div class="form-group">
-                                        <label for="rf-name">Room name <span class="req-star" aria-label="required">*</span></label>
+                                        <label for="rf-name">Facility name <span class="req-star" aria-label="required">*</span></label>
                                         <input type="text" name="room_name" id="rf-name" class="form-control-custom"
                                             value="<?php echo $edit_room ? htmlspecialchars($edit_room['room_name']) : ''; ?>"
                                             placeholder="e.g. Computer Lab 1" required>
@@ -1364,7 +1364,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </select>
                                     </div>
                                 </div>
-                                <p class="rf-hint rf-hint-flush">Maintenance and Not Bookable rooms can&rsquo;t be reserved.</p>
+                                <p class="rf-hint rf-hint-flush">Maintenance and Not Bookable facilities can&rsquo;t be reserved.</p>
 
                                 <!-- Features -->
                                 <?php
@@ -1416,7 +1416,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
-                                    <span id="room-submit-inner-label"><?php echo $edit_room ? 'Update Room' : 'Add Room'; ?></span>
+                                    <span id="room-submit-inner-label"><?php echo $edit_room ? 'Update Facility' : 'Add Facility'; ?></span>
                                 </button>
                             </form>
 
@@ -1430,14 +1430,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     data-action="toggle-room-lock"
                                     data-lock="<?php echo $edit_locked ? '0' : '1'; ?>">
                                     <span class="material-symbols-outlined" id="room-lock-icon" style="font-size:15px;"><?php echo $edit_locked ? 'lock_open' : 'lock'; ?></span>
-                                    <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Room' : 'Lock Room'; ?></span>
+                                    <span id="room-lock-label"><?php echo $edit_locked ? 'Unlock Facility' : 'Lock Facility'; ?></span>
                                 </button>
                                 <?php if ($is_super_admin): ?>
                                     <a href="admin-dashboard.php?archive_room=<?php echo $edit_room ? (int)$edit_room['room_id'] : ''; ?>"
                                         id="room-archive-link"
                                         class="pr-btn pr-btn-danger pr-btn-sm">
                                         <span class="material-symbols-outlined" style="font-size:15px;">archive</span>
-                                        Archive Room
+                                        Archive Facility
                                     </a>
                                 <?php endif; ?>
                             </div>
@@ -1451,7 +1451,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 name="<?php echo $edit_room ? 'update_room' : 'add_room'; ?>"
                                 class="pr-btn pr-btn-primary">
                                 <span class="material-symbols-outlined" style="font-size:15px;">save</span>
-                                <span id="room-submit-foot-label"><?php echo $edit_room ? 'Save Changes' : 'Add Room'; ?></span>
+                                <span id="room-submit-foot-label"><?php echo $edit_room ? 'Save Changes' : 'Add Facility'; ?></span>
                             </button>
                         </div>
 
@@ -1462,7 +1462,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rm-tabbar">
                     <div class="pr-sub-tabs" id="rooms-toggle-wrap">
                         <button type="button" class="pr-sub-tab active" data-rooms-tab="rooms-active">
-                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">meeting_room</span> Rooms
+                            <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">meeting_room</span> Facilities
                         </button>
                         <button type="button" class="pr-sub-tab" data-rooms-tab="rooms-reservations">
                             <span class="material-symbols-outlined rm-tab-ico" aria-hidden="true">event_available</span> Reservations
@@ -1503,22 +1503,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <?php if (empty($rooms_buildings)): ?>
                         <div class="pr-card rm-rooms-card">
-                            <div class="pr-empty">No rooms yet. Click <strong>Add Room</strong> to get started.</div>
+                            <div class="pr-empty">No facilities yet. Click <strong>Add Facility</strong> to get started.</div>
                         </div>
                     <?php else: ?>
                         <div class="pr-card rm-rooms-card">
                             <div class="pr-card-header">
-                                <h3><span class="material-symbols-outlined">meeting_room</span> All Rooms</h3>
-                                <span class="rm-showing" id="rmShowing" aria-live="polite"></span>
+                                <h3><span class="material-symbols-outlined">meeting_room</span> All Facilities</h3>
+                                <div class="pr-search-wrap">
+                                    <span class="material-symbols-outlined">search</span>
+                                    <input type="text" id="roomSearchInput" placeholder="Search facilities" autocomplete="off" aria-label="Search facilities">
+                                </div>
                             </div>
-                            <!-- Filters: building + floor pills, search, status -->
+                            <!-- Filters: building + floor pills, status (search lives in the header) -->
                             <div class="rm-toolbar" id="rmToolbar">
                                 <div class="rm-tb-row">
                                     <div class="rm-bld-pills" id="rmBuildingPills" role="group" aria-label="Building"></div>
-                                    <div class="pr-search-wrap">
-                                        <span class="material-symbols-outlined">search</span>
-                                        <input type="text" id="roomSearchInput" placeholder="Search rooms" autocomplete="off">
-                                    </div>
                                 </div>
                                 <div class="rm-tb-row">
                                     <div class="rm-floor-chips" id="rmFloorChips" role="group" aria-label="Floor"></div>
@@ -1552,7 +1551,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                             <!-- One floor-grouped list for every building (drawn as tiles) -->
                             <div class="pr-tbl-wrap">
-                                <table class="pr-rooms-table rm-grid" id="roomsRegistryTable" aria-label="Rooms">
+                                <table class="pr-rooms-table rm-grid" id="roomsRegistryTable" aria-label="Facilities">
                                     <colgroup>
                                         <col>
                                         <col style="width:150px;">
@@ -1560,7 +1559,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </colgroup>
                                     <thead>
                                         <tr>
-                                            <th>Room</th>
+                                            <th>Facility</th>
                                             <th>Status</th>
                                             <th>Actions</th>
                                         </tr>
@@ -1769,7 +1768,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     const ico = document.getElementById('room-lock-icon');
                                     const lbl = document.getElementById('room-lock-label');
                                     if (ico) ico.textContent = isLocked ? 'lock_open' : 'lock';
-                                    if (lbl) lbl.textContent = isLocked ? 'Unlock Room' : 'Lock Room';
+                                    if (lbl) lbl.textContent = isLocked ? 'Unlock Facility' : 'Lock Facility';
                                 };
 
                                 const submitBtns = ['room-form-submit-inner', 'room-form-submit-foot']
@@ -1826,7 +1825,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     const link = e.target.closest('a[href*="archive_room="]');
                                     if (!link) return;
                                     e.preventDefault();
-                                    if (!confirm('Archive this room? It will be hidden from the registry and can be restored later.')) return;
+                                    if (!confirm('Archive this facility? It will be hidden from the registry and can be restored later.')) return;
 
                                     const href = link.getAttribute('href');
                                     const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
@@ -1846,7 +1845,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     const link = e.target.closest('a[href*="restore_room="]');
                                     if (!link) return;
                                     e.preventDefault();
-                                    if (!confirm('Restore this room? It will reappear in the active registry.')) return;
+                                    if (!confirm('Restore this facility? It will reappear in the active registry.')) return;
 
                                     const href = link.getAttribute('href');
                                     const url = href + (href.indexOf('?') !== -1 ? '&' : '?') + 'ajax=1';
@@ -1864,10 +1863,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     window.psRefreshRoomsRegistry(json.html, json.floors_by_building);
                                                 }
                                                 refreshArchived(json);
-                                                if (typeof showToast === 'function') showToast(json.message || 'Room restored.');
+                                                if (typeof showToast === 'function') showToast(json.message || 'Facility restored.');
                                                 if (typeof switchRoomsTab === 'function') switchRoomsTab('rooms-active');
                                             } else {
-                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not restore room.');
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not restore facility.');
                                             }
                                         })
                                         .catch(onNetworkError);
@@ -1909,7 +1908,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 }
                                                 refreshArchived(json);
                                                 window.psSetLockButton(lock === '1');
-                                                if (typeof showToast === 'function') showToast(json.message || (lock === '1' ? 'Room locked.' : 'Room unlocked.'));
+                                                if (typeof showToast === 'function') showToast(json.message || (lock === '1' ? 'Facility locked.' : 'Facility unlocked.'));
                                             } else if (typeof showToast === 'function') {
                                                 showToast((json && json.message) || 'Could not change the lock. Please try again.');
                                             }
@@ -1989,10 +1988,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 }
                                                 refreshArchived(json);
                                                 closeDeleteModal();
-                                                if (typeof showToast === 'function') showToast(json.message || 'Room permanently deleted.');
+                                                if (typeof showToast === 'function') showToast(json.message || 'Facility permanently deleted.');
                                             } else {
                                                 go.disabled = !ack.checked;
-                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not delete the room.');
+                                                if (typeof showToast === 'function') showToast((json && json.message) || 'Could not delete the facility.');
                                             }
                                         })
                                         .catch(function() {
@@ -2035,7 +2034,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <h3><span class="material-symbols-outlined">calendar_month</span> Reservations</h3>
                             <div class="pr-search-wrap">
                                 <span class="material-symbols-outlined">search</span>
-                                <input type="text" id="rrSearch" placeholder="Search room or name" autocomplete="off" aria-label="Search reservations">
+                                <input type="text" id="rrSearch" placeholder="Search facility or name" autocomplete="off" aria-label="Search reservations">
                             </div>
                         </div>
                         <div class="rr-status-bar">
@@ -2077,7 +2076,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <table class="pr-table rm-table" id="rrTable">
                                 <thead>
                                     <tr>
-                                        <th>Room</th>
+                                        <th>Facility</th>
                                         <th>When</th>
                                         <th>Requested by</th>
                                         <th>Status</th>
@@ -2481,13 +2480,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rooms-sub-panel" id="rooms-issues-panel">
                     <div class="pr-card">
                         <div class="pr-card-header">
-                            <h3><span class="material-symbols-outlined">report_problem</span> Room Issues</h3>
+                            <h3><span class="material-symbols-outlined">report_problem</span> Facility Issues</h3>
                         </div>
                         <div class="pr-tbl-wrap">
                             <table class="pr-table rm-table">
                                 <thead>
                                     <tr>
-                                        <th>Room</th>
+                                        <th>Facility</th>
                                         <th>Report</th>
                                         <th>Status</th>
                                         <th><span class="rm-sr">Actions</span></th>
@@ -2542,13 +2541,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rooms-sub-panel" id="rooms-archived-panel">
                     <div class="pr-card">
                         <div class="pr-card-header">
-                            <h3><span class="material-symbols-outlined">archive</span> Archived Rooms</h3>
+                            <h3><span class="material-symbols-outlined">archive</span> Archived Facilities</h3>
                         </div>
                         <div class="pr-tbl-wrap">
                             <table class="pr-table rm-table">
                                 <thead>
                                     <tr>
-                                        <th>Room</th>
+                                        <th>Facility</th>
                                         <th><span class="rm-sr">Actions</span></th>
                                     </tr>
                                 </thead>
@@ -3042,7 +3041,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 })
                                 .catch(err => {
                                     if (token !== _reqToken) return;
-                                    console.warn('Room schedule refresh failed:', err);
+                                    console.warn('Facility schedule refresh failed:', err);
                                     setSyncNote(true);
                                 });
                         }
@@ -3071,7 +3070,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             _mobDay = todayColumn(manilaNow());
                             _rows = embeddedRows();
                             const title = $('rsm-title');
-                            if (title) title.textContent = 'Room Schedule – ' + _roomName;
+                            if (title) title.textContent = 'Facility Schedule – ' + _roomName;
                             const meta = $('rsm-meta');
                             if (meta) {
                                 const campus = card.dataset.roomCampus || '';
@@ -3196,7 +3195,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                             /* Update title + icon */
                             el = document.getElementById('room-form-title');
-                            if (el) el.textContent = 'Edit Room — ' + (d.roomName || '');
+                            if (el) el.textContent = 'Edit Facility — ' + (d.roomName || '');
                             el = document.querySelector('#room-form-wrap .rmod-head-icon .material-symbols-outlined');
                             if (el) el.textContent = 'edit';
 
@@ -3206,7 +3205,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 if (b) b.name = 'update_room';
                             });
                             el = document.getElementById('room-submit-inner-label');
-                            if (el) el.textContent = 'Update Room';
+                            if (el) el.textContent = 'Update Facility';
                             el = document.getElementById('room-submit-foot-label');
                             if (el) el.textContent = 'Save Changes';
 
@@ -3237,7 +3236,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             var form = document.getElementById('roomForm');
                             var el;
                             el = document.getElementById('room-form-title');
-                            if (el) el.textContent = 'Add New Room';
+                            if (el) el.textContent = 'Add New Facility';
                             el = document.querySelector('#room-form-wrap .rmod-head-icon .material-symbols-outlined');
                             if (el) el.textContent = 'add_home_work';
                             ['room-form-submit-inner', 'room-form-submit-foot'].forEach(function(id) {
@@ -3245,9 +3244,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 if (b) b.name = 'add_room';
                             });
                             el = document.getElementById('room-submit-inner-label');
-                            if (el) el.textContent = 'Add Room';
+                            if (el) el.textContent = 'Add Facility';
                             el = document.getElementById('room-submit-foot-label');
-                            if (el) el.textContent = 'Add Room';
+                            if (el) el.textContent = 'Add Facility';
                             var az = document.getElementById('room-archive-zone');
                             if (az) az.classList.add('hidden');
                             el = document.getElementById('room-form-id');
@@ -3353,12 +3352,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <div class="eq-card-body" style="padding-top:0">
 
                                     <?php if ($reg_status['count'] > 0 && $reg_status['last_date'] !== ''): ?>
-                                    <p style="font-size:12px;color:var(--text-light);margin:0 0 1rem">
-                                        Last imported:
-                                        <strong style="color:var(--text-dark)"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($reg_status['last_date']))) ?></strong>
-                                        by <?= htmlspecialchars($reg_status['last_by']) ?> &mdash;
-                                        <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
-                                    </p>
+                                        <p style="font-size:12px;color:var(--text-light);margin:0 0 1rem">
+                                            Last imported:
+                                            <strong style="color:var(--text-dark)"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($reg_status['last_date']))) ?></strong>
+                                            by <?= htmlspecialchars($reg_status['last_by']) ?> &mdash;
+                                            <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
+                                        </p>
                                     <?php endif; ?>
 
                                     <div class="fac-reg-upload-row">
@@ -3431,7 +3430,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     </div>
                                 </div>
                                 <button type="button" id="fac-lookup-btn"
-                                    class="ps-btn ps-btn--ghost" style="width:100%;margin-bottom:0.5rem">
+                                    class="ps-btn ps-btn--outline fac-lookup-btn">
                                     <span class="material-symbols-outlined">manage_search</span>
                                     Look up in Faculty Registry
                                 </button>
@@ -3451,8 +3450,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <input type="email" id="fac-email"
                                         class="form-control-custom" maxlength="254"
                                         autocomplete="off" placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1"
-                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                        readonly tabindex="-1">
                                     <small class="fac-field-hint">Generated automatically. Not submitted — the server re-derives this.</small>
                                 </div>
                                 <div class="form-group">
@@ -3461,8 +3459,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         class="form-control-custom" maxlength="30"
                                         autocomplete="off" spellcheck="false"
                                         placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1"
-                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                        readonly tabindex="-1">
                                     <small class="fac-field-hint">From the Faculty Identification Records. Permanent after account creation.</small>
                                 </div>
 
@@ -3538,7 +3535,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <div id="fac-form-alert" class="alert-banner hidden" role="alert"></div>
 
                                 <button type="button" id="fac-submit-btn"
-                                    class="ps-btn ps-btn--primary" style="width:100%;margin-top:1rem">
+                                    class="ps-btn ps-btn--primary fac-submit-btn">
                                     <span class="material-symbols-outlined">person_add</span>
                                     Create Account
                                 </button>
@@ -3786,7 +3783,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <div class="act-chips" id="am-chips" role="group" aria-label="Filter activity">
                                             <button type="button" class="act-chip active" data-filter="all">All</button>
                                             <button type="button" class="act-chip" data-filter="requests">Requests</button>
-                                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                                            <button type="button" class="act-chip" data-filter="rooms">Facilities</button>
                                             <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
                                             <button type="button" class="act-chip" data-filter="system">System</button>
                                             <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
@@ -3832,7 +3829,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="act-chips" id="act-chips" role="group" aria-label="Filter by type">
                             <button type="button" class="act-chip active" data-filter="all">All</button>
                             <button type="button" class="act-chip" data-filter="requests">Requests</button>
-                            <button type="button" class="act-chip" data-filter="rooms">Rooms</button>
+                            <button type="button" class="act-chip" data-filter="rooms">Facilities</button>
                             <button type="button" class="act-chip" data-filter="equipment">Equipment</button>
                             <button type="button" class="act-chip" data-filter="system">System</button>
                             <button type="button" class="act-chip" data-filter="signins">Sign-ins</button>
@@ -4775,8 +4772,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <span class="toggle-track"></span>
                                     </label>
                                     <div>
-                                        <div class="sett-notif-title">Room Issues</div>
-                                        <div class="sett-notif-sub">Alert when a room issue is reported</div>
+                                        <div class="sett-notif-title">Facility Issues</div>
+                                        <div class="sett-notif-sub">Alert when a facility issue is reported</div>
                                     </div>
                                 </div>
                             </div>
@@ -4989,21 +4986,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                                         <details class="hc-faq-item">
                                             <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">What happens when I archive a room?</span>
+                                                <span class="hc-faq-q-text">What happens when I archive a facility?</span>
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Archiving a room hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived room at any time from <strong>Rooms → Archived</strong> tab by clicking <strong>Restore</strong>. Only a Super Admin can archive a room, and only a Super Admin can permanently delete an archived room (this removes it and its reservation history for good). To keep a room visible but stop its schedule from opening, open the room's <strong>Edit</strong> window and choose <strong>Lock Room</strong> — Admins and Super Admins can lock and unlock.
+                                                Archiving a facility hides it from faculty when they submit new reservations. Existing reservation history is preserved. You can restore an archived facility at any time from <strong>Facilities → Archived</strong> tab by clicking <strong>Restore</strong>. Only a Super Admin can archive a facility, and only a Super Admin can permanently delete an archived facility (this removes it and its reservation history for good). To keep a facility visible but stop its schedule from opening, open the facility's <strong>Edit</strong> window and choose <strong>Lock Facility</strong> — Admins and Super Admins can lock and unlock.
                                             </div>
                                         </details>
 
                                         <details class="hc-faq-item">
                                             <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">How do faculty members submit room reservations?</span>
+                                                <span class="hc-faq-q-text">How do faculty members submit facility reservations?</span>
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Faculty log in to their portal and go to <strong>Room Reservations</strong>. They select the campus, building, room, date, time slot, and purpose. The request appears in your <strong>Rooms → Reservations</strong> panel. The room slot is not blocked until you confirm it.
+                                                Faculty log in to their portal and go to the <strong>Facilities</strong> tab. They select the campus, building, facility, date, time slot, and purpose. The request appears in your <strong>Facilities → Reservations</strong> panel. The facility slot is not blocked until you confirm it.
                                             </div>
                                         </details>
 
@@ -5023,37 +5020,37 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Arbitration handles conflicts when two or more faculty members compete for the same resource — a room or equipment — at the same time. You review both claims, see who has stronger grounds, and make a final ruling. The ruling overrides the normal approval flow and is logged.
+                                                Arbitration handles conflicts when two or more faculty members compete for the same resource — a facility or equipment — at the same time. You review both claims, see who has stronger grounds, and make a final ruling. The ruling overrides the normal approval flow and is logged.
                                             </div>
                                         </details>
 
                                         <details class="hc-faq-item">
                                             <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">How do I handle a reported room issue?</span>
+                                                <span class="hc-faq-q-text">How do I handle a reported facility issue?</span>
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                In <strong>Rooms → Issues</strong>, you'll see all open reports submitted by faculty. Click <strong>Review</strong> on any open issue. You can mark it as <em>Resolved</em> (problem fixed, room stays active) or <em>Dismissed</em> (not a valid concern). Note: rooms are <strong>not</strong> automatically set to Maintenance — you must edit the room status separately if needed.
+                                                In <strong>Facilities → Issues</strong>, you'll see all open reports submitted by faculty. Click <strong>Review</strong> on any open issue. You can mark it as <em>Resolved</em> (problem fixed, facility stays active) or <em>Dismissed</em> (not a valid concern). Note: facilities are <strong>not</strong> automatically set to Maintenance — you must edit the facility status separately if needed.
                                             </div>
                                         </details>
 
                                         <details class="hc-faq-item">
                                             <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">Can I restore an archived room or equipment item?</span>
+                                                <span class="hc-faq-q-text">Can I restore an archived facility or equipment item?</span>
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Yes. For rooms, go to <strong>Rooms → Archived</strong> and click <strong>Restore</strong> next to the room. For equipment, go to <strong>Inventory → Archived</strong> and click <strong>Restore</strong>. The item or room returns to the active list immediately and is available again.
+                                                Yes. For facilities, go to <strong>Facilities → Archived</strong> and click <strong>Restore</strong> next to the facility. For equipment, go to <strong>Inventory → Archived</strong> and click <strong>Restore</strong>. The item or facility returns to the active list immediately and is available again.
                                             </div>
                                         </details>
 
                                         <details class="hc-faq-item">
                                             <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">How do I cancel an approved room reservation?</span>
+                                                <span class="hc-faq-q-text">How do I cancel an approved facility reservation?</span>
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Rooms → Reservations</strong>. Find the reservation with an <em>Approved</em> status and click <strong>Cancel</strong>. You can add a reason for the cancellation. Please note: you cannot cancel a reservation within 1 hour of its scheduled start time — this restriction is enforced to protect faculty planning.
+                                                Go to <strong>Facilities → Reservations</strong>. Find the reservation with an <em>Approved</em> status and click <strong>Cancel</strong>. You can add a reason for the cancellation. Please note: you cannot cancel a reservation within 1 hour of its scheduled start time — this restriction is enforced to protect faculty planning.
                                             </div>
                                         </details>
 
@@ -5065,7 +5062,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <div class="hc-faq-a">
                                                 <div class="hc-status-table">
                                                     <div class="hc-st-row"><span class="hc-st-pill pending">Pending</span><span>Awaiting admin review and action.</span></div>
-                                                    <div class="hc-st-row"><span class="hc-st-pill approved">Approved</span><span>Admin confirmed — item loaned or room reserved.</span></div>
+                                                    <div class="hc-st-row"><span class="hc-st-pill approved">Approved</span><span>Admin confirmed — item loaned or facility reserved.</span></div>
                                                     <div class="hc-st-row"><span class="hc-st-pill declined">Declined</span><span>Admin rejected the request.</span></div>
                                                     <div class="hc-st-row"><span class="hc-st-pill cancelled">Cancelled</span><span>Cancelled by the admin or the faculty member.</span></div>
                                                     <div class="hc-st-row"><span class="hc-st-pill returned">Returned</span><span>Equipment was returned and processed (lending only).</span></div>
@@ -5587,7 +5584,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="ps-detail-value" id="detail-req-type">Faculty</div>
                     </div>
                     <div class="ps-detail-item">
-                        <div class="ps-detail-label">Room</div>
+                        <div class="ps-detail-label">Facility</div>
                         <div class="ps-detail-value" id="detail-room" style="font-size:12px">—</div>
                     </div>
                     <div class="ps-detail-item">
@@ -5693,7 +5690,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div><span>Quantity</span><strong id="ps-appr-qty">—</strong></div>
                         <div><span>Date needed</span><strong id="ps-appr-needed">—</strong></div>
                         <div><span>Return by</span><strong id="ps-appr-return">—</strong></div>
-                        <div><span>Room</span><strong id="ps-appr-room">—</strong></div>
+                        <div><span>Facility</span><strong id="ps-appr-room">—</strong></div>
                         <div><span>Instructor</span><strong id="ps-appr-instr">—</strong></div>
                     </div>
                 </section>
@@ -5759,7 +5756,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <section class="ps-drawer-sec">
                     <h4>Reservation</h4>
                     <div class="ps-kv">
-                        <div><span>Room</span><strong id="ps-rr-room">—</strong></div>
+                        <div><span>Facility</span><strong id="ps-rr-room">—</strong></div>
                         <div><span>Location</span><strong id="ps-rr-where">—</strong></div>
                         <div><span>Date</span><strong id="ps-rr-date">—</strong></div>
                         <div><span>Time</span><strong id="ps-rr-time">—</strong></div>
@@ -5916,7 +5913,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     'unread'  => ['Unread',   $notif_unread],
                     'request' => ['Requests', $notif_cat_counts['request']],
                     'overdue' => ['Overdue',  $notif_cat_counts['overdue']],
-                    'room'    => ['Rooms',    $notif_cat_counts['room']],
+                    'room'    => ['Facilities',    $notif_cat_counts['room']],
                     'system'  => ['System',   $notif_cat_counts['system']],
                 ];
                 foreach ($anotif_pills as $pill_key => [$pill_label, $pill_n]): ?>
@@ -6107,11 +6104,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     $flash_toasts = [
         'notice_sent'   => 'Overdue notice sent to the borrower.',
-        'room_added'    => 'Room added to the registry.',
-        'room_updated'  => 'Room updated. Changes saved.',
-        'room_archived' => 'Room archived. It has been removed from the active registry.',
-        'room_restored' => 'Room restored. It is now back in the active registry.',
-        'room_error'    => 'Error: Could not save room. Please check required fields and try again.',
+        'room_added'    => 'Facility added to the registry.',
+        'room_updated'  => 'Facility updated. Changes saved.',
+        'room_archived' => 'Facility archived. It has been removed from the active registry.',
+        'room_restored' => 'Facility restored. It is now back in the active registry.',
+        'room_error'    => 'Error: Could not save facility. Please check required fields and try again.',
     ];
     $flash_strip = [];
     foreach ($flash_toasts as $flash_key => $flash_msg) {
@@ -6288,10 +6285,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="form-group" style="margin-top:.75rem;">
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500;">
                         <input type="checkbox" id="issueSetMaintenance" style="width:16px;height:16px;">
-                        Set room to <strong>Maintenance</strong> mode
+                        Set facility to <strong>Maintenance</strong> mode
                     </label>
                     <small style="color:var(--text-light);font-size:.75rem;margin-top:4px;display:block;">
-                        Only applies when resolving (not dismissing). You can change the room status back any time from the Rooms registry.
+                        Only applies when resolving (not dismissing). You can change the facility status back any time from the Facilities registry.
                     </small>
                 </div>
                 <input type="hidden" id="issueReviewId">
@@ -6599,7 +6596,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="rsm-head-icon">
                     <span class="material-symbols-outlined">calendar_month</span>
                 </div>
-                <h3 id="rsm-title">Room Schedule</h3>
+                <h3 id="rsm-title">Facility Schedule</h3>
                 <button class="rsm-close-btn" data-action="close-room-schedule" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
@@ -6654,16 +6651,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
             <div class="rdc-card">
                 <div class="rdc-head">
                     <div class="rdc-icon"><span class="material-symbols-outlined">delete_forever</span></div>
-                    <h3 id="rdc-title">Delete room permanently?</h3>
+                    <h3 id="rdc-title">Delete facility permanently?</h3>
                 </div>
                 <div class="rdc-body">
                     <p class="rdc-room" id="rdc-room-name"></p>
-                    <p>This cannot be undone. The room and the following will be removed for good:</p>
+                    <p>This cannot be undone. The facility and the following will be removed for good:</p>
                     <ul class="rdc-list">
                         <li id="rdc-resv">No reservation records</li>
                         <li>Its issue reports and waitlist entries</li>
                     </ul>
-                    <p class="rdc-note">Equipment requests that mention this room are kept.</p>
+                    <p class="rdc-note">Equipment requests that mention this facility are kept.</p>
                     <label class="rdc-check">
                         <input type="checkbox" id="rdc-ack">
                         <span>I understand this cannot be undone</span>
@@ -7061,7 +7058,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 var rows = [
                     [d.waiting, 'pending request', 'pending requests', 'Will be declined'],
                     [d.out, 'item still borrowed', 'items still borrowed', 'Can still be returned'],
-                    [d.rooms, 'upcoming room booking', 'upcoming room bookings', 'Will be cancelled']
+                    [d.rooms, 'upcoming facility booking', 'upcoming facility bookings', 'Will be cancelled']
                 ];
                 rows.forEach(function(r) {
                     var n = parseInt(r[0], 10) || 0;

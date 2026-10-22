@@ -97,7 +97,7 @@ require_once __DIR__ . '/../../config/admin-activity.php';
 admin_log_activity(
     $conn,
     'room',
-    $resolution . ' room issue #' . $issueId . ' (' . admin_activity_room_name($conn, (int)$issue['room_id']) . ')',
+    $resolution . ' facility issue #' . $issueId . ' (' . admin_activity_room_name($conn, (int)$issue['room_id']) . ')',
     null,
     ['action' => $resolution === 'Resolved' ? 'issue_resolved' : 'issue_dismissed', 'ref_type' => 'issue', 'ref_id' => $issueId]
 );

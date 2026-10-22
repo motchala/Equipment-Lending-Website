@@ -141,7 +141,7 @@ $stmt = $conn->prepare(
              OR (reservation_date = ? AND end_time > ?))"
 );
 if (!$stmt) {
-    error_log('[delete-faculty-account] room check prepare failed: ' . $conn->error);
+    error_log('[delete-faculty-account] facility check prepare failed: ' . $conn->error);
     respond(500, 'error', 'Could not delete this account. Please try again.');
 }
 $stmt->bind_param('ssss', $faculty_id, $today_ph, $today_ph, $now_ph);
@@ -257,7 +257,7 @@ try {
 
         // 3) Equipment already out is deliberately left alone (see header).
         error_log(sprintf(
-            '[delete-faculty-account] OVERRIDE by %s: %s deleted with %d pending, %d still borrowed, %d upcoming room reservation(s)',
+            '[delete-faculty-account] OVERRIDE by %s: %s deleted with %d pending, %d still borrowed, %d upcoming facility reservation(s)',
             (string)($_SESSION['admin_email'] ?? '?'),
             $faculty_id,
             $waiting_count,

@@ -1,9 +1,11 @@
 <?php
+
 /**
  * Super-Admin-only decision endpoint for Organization Adviser reservations
  * that have a supporting document. Ordinary admins are intentionally denied
  * even if they call this endpoint directly.
  */
+
 declare(strict_types=1);
 
 ini_set('display_errors', '0');
@@ -79,14 +81,14 @@ try {
                 AND start_time < ? AND end_time > ?
               LIMIT 1"
         );
-        if (!$conflict) throw new RuntimeException('Could not check room availability.');
+        if (!$conflict) throw new RuntimeException('Could not check facility availability.');
         $conflict->bind_param('isss', $reservation['room_id'], $reservation['reservation_date'], $reservation['end_time'], $reservation['start_time']);
         $conflict->execute();
         $has_conflict = $conflict->get_result()->num_rows > 0;
         $conflict->close();
         if ($has_conflict) {
             $conn->rollback();
-            adviser_review_reply(409, 'This room is already reserved for an overlapping time. Decline it or choose another time.');
+            adviser_review_reply(409, 'This facility is already reserved for an overlapping time. Decline it or choose another time.');
         }
     }
 
@@ -134,7 +136,10 @@ try {
     if ($conn->errno === 0) {
         // no-op; rollback below is safe even if the query failed first
     }
-    try { $conn->rollback(); } catch (Throwable $ignored) { }
+    try {
+        $conn->rollback();
+    } catch (Throwable $ignored) {
+    }
     error_log('[review-adviser-reservation] ' . $e->getMessage());
     adviser_review_reply(500, 'Could not save the reservation decision.');
 }
