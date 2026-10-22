@@ -45,12 +45,15 @@
     }
 
     function showAdminToast(msg) {
-        // Reuse the existing app-toast element already in the page
+        // Same pop-up alert as every other admin message (showToast in admin-dashboard.js);
+        // a leading ✅ / ⚠️ / 🔔 in the text picks its colour and icon.
+        if (typeof window.showToast === 'function') { window.showToast(msg); return; }
+        // Fallback only if admin-dashboard.js has not loaded
         const t = document.getElementById('app-toast');
         if (!t) return;
         t.textContent = msg;
         t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3500);
+        setTimeout(() => t.classList.remove('show'), 4500);
     }
 
     /* ── Row builders — produce the exact same HTML as admin-dashboard.php ─ */
@@ -317,20 +320,20 @@
         fetch('admin-dashboard.php?action=return_confirm&id=' + encodeURIComponent(reqId) + '&ajax=1', {
             credentials: 'same-origin'
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            btn.disabled = false;
-            if (data.status === 'success') {
-                showAdminToast('✅ Return confirmed.');
-                if (typeof window.adminDoPoll === 'function') window.adminDoPoll(); // refresh the return-body table immediately
-            } else {
-                showAdminToast('⚠️ ' + (data.message || 'Could not confirm return.'));
-            }
-        })
-        .catch(function () {
-            btn.disabled = false;
-            showAdminToast('⚠️ Network error. Please try again.');
-        });
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                btn.disabled = false;
+                if (data.status === 'success') {
+                    showAdminToast('✅ Return confirmed.');
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll(); // refresh the return-body table immediately
+                } else {
+                    showAdminToast('⚠️ ' + (data.message || 'Could not confirm return.'));
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                showAdminToast('⚠️ Network error. Please try again.');
+            });
     });
 
     // Kick off after the page is ready

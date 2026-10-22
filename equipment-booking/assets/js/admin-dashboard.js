@@ -17,17 +17,84 @@
         setJ: (k, v) => { try { localStorage.setItem('adm_' + k, JSON.stringify(v)); } catch (e) { } }
     };
 
-    /* ── Toast ───────────────────────────────────────────────── */
+    /* ── Toast / pop-up alert ────────────────────────────────────
+       Every admin snackbar is this one alert: a card at the bottom-centre of the
+       screen (same design as the faculty "Borrowing Blocked" alert) with an icon,
+       the message and a close button. It fades up, stays ~4.5 s, then disappears.
+         showToast(msg)                        → type is worked out from the message
+         showToast(msg, 'success' | 'error' | 'warning' | 'info')
+         showToast(msg, ms) / showToast(msg, type, ms)   → custom time on screen
+       A leading ✅ ⚠️ ❌ 🔔 in the message picks the type and is dropped (the alert
+       draws its own icon). */
     let toastTimer;
-    function showToast(msg, ms) {
+    const TOAST_MS = 4500;
+    const TOAST_ICONS = { info: 'info', success: 'check_circle', error: 'error', warning: 'warning' };
+
+    function hideToast() {
         const t = document.getElementById('app-toast');
         if (!t) return;
-        t.textContent = msg;
+        clearTimeout(toastTimer);
+        t.classList.remove('show');
+    }
+
+    function showToast(msg, a, b) {
+        const t = document.getElementById('app-toast');
+        if (!t) return;
+
+        let type = '', ms = TOAST_MS;
+        [a, b].forEach(function (v) {
+            if (typeof v === 'number') ms = v;
+            else if (typeof v === 'string') type = v.toLowerCase();
+        });
+        // Older callers pass labels like 't-danger'
+        if (type === 't-danger' || type === 'danger') type = 'error';
+        else if (type === 'warn') type = 'warning';
+        if (!TOAST_ICONS[type]) type = '';
+
+        let text = String(msg == null ? '' : msg);
+        const lead = text.match(/^\s*(✅|⚠️?|❌|🔔|ℹ️?)\s*/);
+        if (lead) {
+            text = text.slice(lead[0].length);
+            if (!type) type = lead[1] === '✅' ? 'success' : (lead[1] === '❌' ? 'error' : (lead[1][0] === '⚠' ? 'warning' : 'info'));
+        }
+        if (!type) {
+            if (/^(overdue alert|warning)\b/i.test(text)) type = 'warning';
+            else if (/^error\b|^(could not|couldn[’']t|failed|network error|invalid|something went wrong)|\b(cannot be empty|is required|are allowed|please try again|please reload)\b/i.test(text)) type = 'error';
+            else if (/\bsuccessfully\b/i.test(text)) type = 'success';
+            else type = 'info';
+        }
+
+        t.textContent = '';
+        t.dataset.type = type;
+        t.setAttribute('role', (type === 'error' || type === 'warning') ? 'alert' : 'status');
+
+        const ico = document.createElement('span');
+        ico.className = 'material-symbols-outlined app-toast__icon';
+        ico.setAttribute('aria-hidden', 'true');
+        ico.textContent = TOAST_ICONS[type];
+
+        const txt = document.createElement('span');
+        txt.className = 'app-toast__text';
+        txt.textContent = text;
+
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'app-toast__close';
+        close.setAttribute('aria-label', 'Close');
+        const closeIco = document.createElement('span');
+        closeIco.className = 'material-symbols-outlined';
+        closeIco.setAttribute('aria-hidden', 'true');
+        closeIco.textContent = 'close';
+        close.appendChild(closeIco);
+        close.addEventListener('click', hideToast);
+
+        t.appendChild(ico);
+        t.appendChild(txt);
+        t.appendChild(close);
+
         t.classList.add('show');
         clearTimeout(toastTimer);
-        // Optional 2nd argument = how long to stay (ms). Other callers pass a
-        // label like 'success' there; those are ignored and keep the 2.8s default.
-        toastTimer = setTimeout(() => t.classList.remove('show'), typeof ms === 'number' ? ms : 2800);
+        toastTimer = setTimeout(hideToast, ms);
     }
     /* -- Toast queue (welcome, overdue alert, room save/archive/restore results) --
        The server renders #toast-queue only when there is something to say:
@@ -70,7 +137,7 @@
         function next() {
             if (i >= msgs.length) return;
             const m = msgs[i++];
-            const ms = Math.min(5000, Math.max(2800, m.length * 45)); // a couple of seconds; longer text a bit more
+            const ms = Math.min(5000, Math.max(4000, m.length * 45)); // 4–5 s; longer text a bit more
             showToast(m, ms);
             setTimeout(next, ms + 650); // let it fade out before the next one
         }
@@ -5052,8 +5119,19 @@ function psSelectFmt(btn) {
         var tabs = document.getElementById('eqTabs');
         if (!tabs) return;
 
+        /* Overdue warning for the On Loan tab. This used to be a banner at the top of the
+           tab; it is now the bottom-centre pop-up alert and goes away on its own. */
+        function announceOverdue() {
+            var n = document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row[data-loan-state="overdue"]').length;
+            if (n > 0 && typeof window.showToast === 'function') {
+                window.showToast(n + ' item(s) are overdue. Contact the borrowers.', 'warning');
+            }
+        }
+
         function openPanel(panelId) {
             var chip = null;
+            var loanPanel = document.getElementById('eq-onloan');
+            var wasOnLoan = !!(loanPanel && loanPanel.classList.contains('active'));
             tabs.querySelectorAll('.rq-filter-chip').forEach(function (c) {
                 var on = c.getAttribute('data-eq-panel') === panelId;
                 c.classList.toggle('active', on);
@@ -5063,6 +5141,7 @@ function psSelectFmt(btn) {
             document.querySelectorAll('#panel-inventory .eq-sub-panel').forEach(function (p) {
                 p.classList.toggle('active', p.id === panelId);
             });
+            if (panelId === 'eq-onloan' && !wasOnLoan) announceOverdue();
         }
         window.psOpenEquipmentTab = openPanel;
 
@@ -5756,6 +5835,10 @@ function psSelectFmt(btn) {
                             badge.textContent = data.total_after + ' entries';
                             badge.className = 'fac-reg-badge fac-reg-badge--active';
                         }
+
+                        // Show the "View registry list" button once the registry has entries
+                        var viewRow = document.getElementById('fac-reg-view-row');
+                        if (viewRow && typeof data.total_after !== 'undefined') viewRow.hidden = !(data.total_after > 0);
                     } else {
                         showRegAlert(data.error || 'Import failed. Please try again.', true);
                         if (importBtn) importBtn.disabled = false;
@@ -5778,4 +5861,201 @@ function psSelectFmt(btn) {
         });
     }
 
+})();
+
+
+/* ================================================================
+   FACULTY REGISTRY — "View registry list" (password-gated)
+   Faculty tab -> Faculty Registry -> View registry list.
+   1) button opens a small modal asking for the Super Admin's own password
+   2) equipment-booking/api/view-faculty-registry.php checks it server-side and
+      only then returns the entries (read-only)
+   3) the list opens in a searchable modal; the data (and the password field)
+      are wiped from memory as soon as either modal closes
+   ================================================================ */
+(function () {
+    'use strict';
+
+    var RENDER_LIMIT = 200;   // rows drawn at once; the search box narrows the rest
+    var _rows = [];           // entries held in memory only while the list modal is open
+
+    function $(id) { return document.getElementById(id); }
+    function csrfToken() {
+        var el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+    function openModal(id) { var m = $(id); if (m) m.classList.add('ps-modal-open'); }
+    function closeModal(id) { var m = $(id); if (m) m.classList.remove('ps-modal-open'); }
+    function isOpen(id) { var m = $(id); return !!(m && m.classList.contains('ps-modal-open')); }
+
+    function init() {
+        var viewBtn = $('fac-reg-view-btn');
+        var pwInput = $('fac-reg-auth-password');
+        var errBox = $('fac-reg-auth-error');
+        var okBtn = $('fac-reg-auth-confirm');
+        var tbody = $('fac-reg-list-tbody');
+        var searchEl = $('fac-reg-list-search');
+        var emptyEl = $('fac-reg-list-empty');
+        var metaEl = $('fac-reg-list-meta');
+        var countEl = $('fac-reg-list-count');
+        if (!viewBtn || !pwInput || !okBtn || !tbody) return; // not the Super Admin Faculty tab
+
+        var okBtnHtml = okBtn.innerHTML;
+
+        function showAuthError(msg) {
+            errBox.textContent = msg;
+            errBox.classList.remove('hidden');
+        }
+        function clearAuthError() {
+            errBox.textContent = '';
+            errBox.classList.add('hidden');
+        }
+        function resetAuth() {
+            pwInput.value = '';
+            pwInput.type = 'password';
+            clearAuthError();
+            okBtn.disabled = false;
+            okBtn.innerHTML = okBtnHtml;
+        }
+
+        /* ── Step 1: password prompt ───────────────────────────── */
+        viewBtn.addEventListener('click', function () {
+            resetAuth();
+            openModal('fac-reg-auth-modal');
+            setTimeout(function () { pwInput.focus(); }, 50);
+        });
+
+        ['fac-reg-auth-close', 'fac-reg-auth-cancel'].forEach(function (id) {
+            var el = $(id);
+            if (el) el.addEventListener('click', function () { closeModal('fac-reg-auth-modal'); });
+        });
+
+        pwInput.addEventListener('input', clearAuthError);
+        pwInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
+        });
+
+        okBtn.addEventListener('click', function () {
+            if (okBtn.disabled) return;
+            var pw = pwInput.value;
+            if (pw === '') { showAuthError('Enter your password to continue.'); pwInput.focus(); return; }
+
+            okBtn.disabled = true;
+            okBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Checking\u2026';
+            clearAuthError();
+
+            fetch('equipment-booking/api/view-faculty-registry.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    csrf_token: csrfToken(),
+                    current_password: pw
+                }).toString()
+            })
+                .then(function (res) {
+                    return res.json().catch(function () {
+                        return { status: 'error', error: 'Unexpected response from the server. Please try again.' };
+                    });
+                })
+                .then(function (data) {
+                    if (data && data.status === 'success' && Array.isArray(data.entries)) {
+                        _rows = data.entries;
+                        resetAuth();                       // wipe the password straight away
+                        closeModal('fac-reg-auth-modal');
+                        openList();
+                    } else {
+                        showAuthError((data && data.error) || 'Could not open the registry. Please try again.');
+                        if (data && data.code === 'bad_password') { pwInput.value = ''; pwInput.focus(); }
+                    }
+                })
+                .catch(function () {
+                    showAuthError('Network error. Please try again.');
+                })
+                .finally(function () {
+                    okBtn.disabled = false;
+                    okBtn.innerHTML = okBtnHtml;
+                });
+        });
+
+        /* ── Step 2: the list ──────────────────────────────────── */
+        function td(text, cls) {
+            var c = document.createElement('td');
+            if (cls) c.className = cls;
+            c.textContent = text;
+            return c;
+        }
+
+        function renderList() {
+            var q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+            var matches = !q ? _rows : _rows.filter(function (r) {
+                return (r.faculty_id || '').toLowerCase().indexOf(q) !== -1 ||
+                    (r.full_name || '').toLowerCase().indexOf(q) !== -1 ||
+                    (r.department || '').toLowerCase().indexOf(q) !== -1;
+            });
+
+            tbody.textContent = '';
+            matches.slice(0, RENDER_LIMIT).forEach(function (r, i) {
+                var tr = document.createElement('tr');
+                tr.appendChild(td(String(i + 1)));
+                if (r.faculty_id) tr.appendChild(td(r.faculty_id));
+                else tr.appendChild(td('Not assigned yet', 'fac-reg-list-pending'));
+                tr.appendChild(td(r.full_name || ''));
+                tr.appendChild(td(r.department || '\u2014'));
+                tbody.appendChild(tr);
+            });
+
+            if (emptyEl) emptyEl.classList.toggle('hidden', matches.length > 0);
+            if (metaEl) {
+                if (matches.length > RENDER_LIMIT) {
+                    metaEl.textContent = 'Showing first ' + RENDER_LIMIT + ' of ' + matches.length +
+                        (q ? ' matches' : ' entries') + ' \u2014 search to narrow down';
+                } else {
+                    metaEl.textContent = q
+                        ? matches.length + (matches.length === 1 ? ' match' : ' matches') + ' of ' + _rows.length
+                        : _rows.length + (_rows.length === 1 ? ' entry' : ' entries');
+                }
+            }
+        }
+
+        function openList() {
+            if (searchEl) searchEl.value = '';
+            if (countEl) countEl.textContent = '(' + _rows.length + ')';
+            renderList();
+            openModal('fac-reg-list-modal');
+            if (searchEl) setTimeout(function () { searchEl.focus(); }, 50);
+        }
+
+        if (searchEl) searchEl.addEventListener('input', renderList);
+
+        ['fac-reg-list-close', 'fac-reg-list-done'].forEach(function (id) {
+            var el = $(id);
+            if (el) el.addEventListener('click', function () { closeModal('fac-reg-list-modal'); });
+        });
+
+        /* ── Clean-up: however a modal gets closed (buttons, backdrop click,
+              Esc), drop the registry data / password from the page ── */
+        function watch(id, onClosed) {
+            var m = $(id);
+            if (!m || typeof MutationObserver === 'undefined') return;
+            new MutationObserver(function () {
+                if (!m.classList.contains('ps-modal-open')) onClosed();
+            }).observe(m, { attributes: true, attributeFilter: ['class'] });
+        }
+        watch('fac-reg-auth-modal', resetAuth);
+        watch('fac-reg-list-modal', function () {
+            _rows = [];
+            tbody.textContent = '';
+            if (searchEl) searchEl.value = '';
+            if (viewBtn) viewBtn.focus();
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            if (isOpen('fac-reg-list-modal')) closeModal('fac-reg-list-modal');
+            else if (isOpen('fac-reg-auth-modal')) closeModal('fac-reg-auth-modal');
+        });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
