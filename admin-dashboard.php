@@ -3360,6 +3360,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         </p>
                                     <?php endif; ?>
 
+                                    <!-- View the imported list (asks for the Super Admin password first) -->
+                                    <div class="fac-reg-view-row" id="fac-reg-view-row" <?= $reg_status['count'] > 0 ? '' : 'hidden' ?>>
+                                        <button type="button" id="fac-reg-view-btn" class="ps-btn ps-btn--outline ps-btn--sm">
+                                            <span class="material-symbols-outlined">lock</span> View registry list
+                                        </button>
+                                        <span class="fac-reg-view-hint">Asks for your password</span>
+                                    </div>
+
                                     <div class="fac-reg-upload-row">
                                         <label for="fac-reg-file-input" class="fac-reg-file-label" id="fac-reg-file-label">
                                             <span class="material-symbols-outlined">attach_file</span>
@@ -6829,6 +6837,84 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <button class="ps-btn ps-btn--danger" id="fac-delete-confirm" disabled>
                     <span class="material-symbols-outlined">delete</span> <span id="fac-delete-confirm-label">Delete Account</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ================================================================
+     MODALS: VIEW FACULTY REGISTRY
+     Step 1 (auth)  -> the Super Admin re-enters their own password
+     Step 2 (list)  -> read-only list of the imported registry entries
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="fac-reg-auth-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">lock</span>
+                </div>
+                <h3>View Faculty Registry</h3>
+                <button class="ps-modal-close" id="fac-reg-auth-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="fac-reg-auth-lead">The registry holds every faculty ID and name. Enter your password to open it.</p>
+                <label class="fac-del-pw-label" for="fac-reg-auth-password">Your password</label>
+                <div class="fac-pw-wrap">
+                    <input type="password" id="fac-reg-auth-password" class="form-control-custom"
+                        maxlength="128" autocomplete="current-password" placeholder="Your password">
+                    <button type="button" class="fac-pw-toggle"
+                        data-target="fac-reg-auth-password" aria-label="Toggle password">
+                        <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                    </button>
+                </div>
+                <p class="fac-del-error hidden" id="fac-reg-auth-error" role="alert"></p>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="fac-reg-auth-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--primary" id="fac-reg-auth-confirm">
+                    <span class="material-symbols-outlined">lock_open</span> Unlock
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ps-modal-backdrop" id="fac-reg-list-modal">
+        <div class="ps-modal ps-modal--lg fac-reg-list-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">badge</span>
+                </div>
+                <h3>Faculty Registry <span class="fac-count-badge" id="fac-reg-list-count"></span></h3>
+                <button class="ps-modal-close" id="fac-reg-list-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body fac-reg-list-body">
+                <div class="fac-search fac-reg-list-search">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text" id="fac-reg-list-search" class="form-control-custom"
+                        placeholder="Search name, ID or department" autocomplete="off">
+                </div>
+                <div class="tbl-wrap fac-reg-list-wrap">
+                    <table class="admin-table fac-reg-list-table">
+                        <thead>
+                            <tr>
+                                <th style="width:44px">#</th>
+                                <th>Faculty ID</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fac-reg-list-tbody"></tbody>
+                    </table>
+                    <p class="fac-reg-list-empty hidden" id="fac-reg-list-empty">No matching entries.</p>
+                </div>
+            </div>
+            <div class="ps-modal-foot fac-reg-list-foot">
+                <span class="fac-reg-list-meta" id="fac-reg-list-meta"></span>
+                <button class="ps-btn ps-btn--ghost" id="fac-reg-list-done">Close</button>
             </div>
         </div>
     </div>

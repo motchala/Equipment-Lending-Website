@@ -12842,3 +12842,102 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         margin-left: 0;
     }
 }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   FACULTY REGISTRY — "View registry list" (button row + 2 modals)
+   (additive block — only touches the new .fac-reg-view-* / .fac-reg-list-*
+   / .fac-reg-auth-* classes)
+   ════════════════════════════════════════════════════════════════════ */
+.fac-reg-view-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 0.9rem;
+}
+
+.fac-reg-view-row[hidden] {
+    display: none;
+}
+
+.fac-reg-view-row .ps-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.fac-reg-view-hint {
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.fac-reg-auth-lead {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-light);
+    margin: 0 0 1rem;
+}
+
+.fac-reg-list-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.fac-reg-list-search {
+    margin-left: 0;
+}
+
+.fac-reg-list-search input {
+    width: 100%;
+}
+
+.fac-reg-list-wrap {
+    overflow: auto;
+    max-height: 52vh;
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+}
+
+.fac-reg-list-table {
+    width: 100%;
+    margin: 0;
+}
+
+.fac-reg-list-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--secondary-cream);
+}
+
+.fac-reg-list-table td {
+    font-size: 12.5px;
+    color: var(--text-dark);
+}
+
+.fac-reg-list-table td:first-child {
+    color: var(--text-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.fac-reg-list-pending {
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.fac-reg-list-empty {
+    margin: 0;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+.fac-reg-list-foot {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.fac-reg-list-meta {
+    font-size: 11.5px;
+    color: var(--text-light);
+}
