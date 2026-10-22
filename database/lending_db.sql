@@ -265,6 +265,24 @@ INSERT INTO `tbl_faculty_admin_notice` (`id`, `faculty_id`, `request_id`, `admin
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_faculty_registry`
+--
+
+CREATE TABLE `tbl_faculty_registry` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `faculty_id` varchar(50) DEFAULT NULL,
+  `full_name` varchar(255) NOT NULL,
+  `department` varchar(255) DEFAULT NULL,
+  `is_newly_hired` tinyint(1) NOT NULL DEFAULT 0,
+  `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `uploaded_by` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_registry_faculty_id` (`faculty_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_faculty_codes`
 --
 

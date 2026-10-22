@@ -36,32 +36,14 @@ if (!admin_is_super_admin($conn)) {
 }
 
 // -- Input collection --------------------------------------------------------
-$pupsync_email_raw = (string)($_POST['pupsync_email'] ?? '');
-$faculty_id_raw    = (string)($_POST['faculty_id'] ?? '');
-$first_name    = trim($_POST['first_name'] ?? '');
-$last_name     = trim($_POST['last_name'] ?? '');
-$password_raw  = $_POST['password'] ?? '';
-$confirm_raw   = $_POST['confirm_password'] ?? '';
-$is_org_adviser = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
+// NOTE: pupsync_email and faculty_id are NOT read from POST — they are
+// re-derived server-side from the registry to prevent client-side tampering.
+$first_name          = trim($_POST['first_name'] ?? '');
+$last_name           = trim($_POST['last_name'] ?? '');
+$password_raw        = $_POST['password'] ?? '';
+$confirm_raw         = $_POST['confirm_password'] ?? '';
+$is_org_adviser      = (($_POST['is_org_adviser'] ?? '0') === '1') ? 1 : 0;
 $organization_id_raw = intval($_POST['organization_id'] ?? 0);
-
-// -- Validation: PUPSync email (must end in @pupsync.edu) ---------------------
-if (trim($pupsync_email_raw) === '') {
-    send_json(422, 'error', 'PUPSync email is required.');
-}
-$pupsync_email = faculty_email_normalize($pupsync_email_raw);
-if ($pupsync_email === null) {
-    send_json(422, 'error', 'Use a PUPSync email ending in @' . FACULTY_EMAIL_DOMAIN . '.');
-}
-
-// -- Validation: Faculty ID (entered here; permanent, admins cannot edit it later) --
-if (trim($faculty_id_raw) === '') {
-    send_json(422, 'error', 'Faculty ID is required.');
-}
-$faculty_id = faculty_id_normalize($faculty_id_raw);
-if ($faculty_id === null) {
-    send_json(422, 'error', 'Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).');
-}
 
 // -- Validation: first_name ---------------------------------------------------
 if ($first_name === '' || strlen($first_name) > 100) {
@@ -71,6 +53,73 @@ if ($first_name === '' || strlen($first_name) > 100) {
 // -- Validation: last_name ----------------------------------------------------
 if ($last_name === '' || strlen($last_name) > 100) {
     send_json(422, 'error', 'Last name is required.');
+}
+
+// -- Registry lookup: derive faculty_id and email server-side -----------------
+// Check if any registry entries exist. If not, allow creation without
+// registry validation (permissive opt-in: registry is inactive until first upload).
+$reg_count_res = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_faculty_registry");
+$registry_active = $reg_count_res && (int)$reg_count_res->fetch_assoc()['cnt'] > 0;
+
+$faculty_id    = null;
+$pupsync_email = null;
+
+if ($registry_active) {
+    $matches = faculty_registry_lookup($conn, $first_name, $last_name);
+
+    if (empty($matches)) {
+        send_json(422, 'error',
+            htmlspecialchars($first_name . ' ' . $last_name, ENT_QUOTES, 'UTF-8') .
+            ' was not found in the official faculty registry. ' .
+            'Make sure the name matches the Faculty Identification Records document exactly, ' .
+            'or upload an updated registry file.');
+    }
+
+    if (count($matches) > 1) {
+        // Disambiguation required — return structured data so JS can show a picker
+        http_response_code(409);
+        echo json_encode([
+            'status'    => 'disambiguation',
+            'message'   => 'Multiple faculty members match this name. Please select the correct one.',
+            'matches'   => array_map(fn($m) => [
+                'registry_id'    => (int)$m['id'],
+                'full_name'      => (string)$m['full_name'],
+                'faculty_id'     => (string)($m['faculty_id'] ?? ''),
+                'is_newly_hired' => (bool)$m['is_newly_hired'],
+            ], $matches),
+        ]);
+        exit;
+    }
+
+    $reg_row = $matches[0];
+
+    if (!empty($reg_row['is_newly_hired'])) {
+        send_json(422, 'error',
+            htmlspecialchars($first_name . ' ' . $last_name, ENT_QUOTES, 'UTF-8') .
+            ' is listed as newly hired and does not have a Faculty ID yet. ' .
+            'They can be registered once their ID is assigned. ' .
+            'Upload an updated faculty registry to proceed.');
+    }
+
+    // Derive faculty_id from registry (already validated format when uploaded)
+    $faculty_id = strtoupper(trim((string)$reg_row['faculty_id']));
+
+    // Derive email server-side — NEVER trust the client-submitted value
+    $parts  = preg_split('/\s+/', trim($reg_row['full_name']));
+    $middle = '';
+    foreach ($parts as $p) {
+        if (preg_match('/^[A-Za-z]\.$/', $p)) {
+            $middle = strtoupper(substr($p, 0, 1));
+            break;
+        }
+    }
+    $base_email    = faculty_email_generate($first_name, $last_name);
+    $pupsync_email = faculty_email_resolve_conflict($conn, $base_email, $middle);
+} else {
+    // Registry not yet active: use placeholder ID and generate email normally
+    $faculty_id    = faculty_id_make_placeholder();
+    $base_email    = faculty_email_generate($first_name, $last_name);
+    $pupsync_email = faculty_email_resolve_conflict($conn, $base_email, '');
 }
 
 // -- Validation: password -----------------------------------------------------

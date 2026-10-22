@@ -1667,6 +1667,148 @@
         return tr;
     };
 
+    /* ── Faculty: registry lookup ────────────────────────────── */
+    const facLookupBtn    = document.getElementById('fac-lookup-btn');
+    const facLookupAlert  = document.getElementById('fac-lookup-alert');
+    const facDisambig     = document.getElementById('fac-disambiguation');
+    const facDisambigSel  = document.getElementById('fac-disambig-select');
+
+    // Stores the currently confirmed registry match {faculty_id, email_preview, full_name}
+    // null means no successful lookup yet — submit is blocked until set.
+    let _facRegistryMatch = null;
+
+    function _showLookupAlert(msg, isError) {
+        if (!facLookupAlert) return;
+        facLookupAlert.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
+        facLookupAlert.textContent = msg;
+        facLookupAlert.classList.remove('hidden');
+    }
+    function _clearLookupAlert() {
+        if (!facLookupAlert) return;
+        facLookupAlert.classList.add('hidden');
+        facLookupAlert.textContent = '';
+    }
+
+    function _applyRegistryMatch(match) {
+        _facRegistryMatch = match;
+        const emailEl = document.getElementById('fac-email');
+        const idEl    = document.getElementById('fac-faculty-id');
+        if (emailEl) emailEl.value = match.email_preview || '';
+        if (idEl)    idEl.value    = match.faculty_id    || '';
+    }
+
+    function _clearRegistryPreview() {
+        _facRegistryMatch = null;
+        const emailEl = document.getElementById('fac-email');
+        const idEl    = document.getElementById('fac-faculty-id');
+        if (emailEl) emailEl.value = '';
+        if (idEl)    idEl.value    = '';
+        if (facDisambig) facDisambig.style.display = 'none';
+        if (facDisambigSel) facDisambigSel.innerHTML = '';
+        _clearLookupAlert();
+    }
+
+    // Clear the preview whenever name fields change
+    ['fac-first', 'fac-last'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', _clearRegistryPreview);
+    });
+
+    // Disambiguation select → apply the chosen match
+    if (facDisambigSel) {
+        facDisambigSel.addEventListener('change', function() {
+            try {
+                const data = JSON.parse(this.value || 'null');
+                if (data) _applyRegistryMatch(data);
+            } catch (e) {}
+        });
+    }
+
+    if (facLookupBtn) {
+        facLookupBtn.addEventListener('click', function() {
+            _clearRegistryPreview();
+            const firstName = (document.getElementById('fac-first')?.value || '').trim();
+            const lastName  = (document.getElementById('fac-last')?.value  || '').trim();
+            if (!firstName || !lastName) {
+                _showLookupAlert('Enter both first name and last name before looking up.', true);
+                return;
+            }
+
+            facLookupBtn.disabled = true;
+            facLookupBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Looking up...';
+
+            const body = new URLSearchParams({
+                csrf_token: getCsrfToken(),
+                first_name: firstName,
+                last_name:  lastName,
+            });
+
+            fetch('equipment-booking/api/lookup-faculty-registry.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'no_registry') {
+                    // Registry not yet uploaded — show a soft notice but allow creation
+                    _showLookupAlert(
+                        'No faculty registry has been uploaded yet. Account will be created without ID validation.',
+                        false
+                    );
+                    // Allow submit without a registry match
+                    _facRegistryMatch = { faculty_id: '', email_preview: '' };
+                    return;
+                }
+                if (data.status === 'not_found') {
+                    _showLookupAlert(
+                        firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
+                        'Check the spelling or upload an updated registry file.',
+                        true
+                    );
+                    return;
+                }
+                if (data.status === 'found' && data.matches && data.matches.length === 1) {
+                    const m = data.matches[0];
+                    if (m.is_newly_hired) {
+                        _showLookupAlert(
+                            firstName + ' ' + lastName + ' is listed as newly hired and does not have a Faculty ID yet. ' +
+                            'Upload an updated registry once their ID is assigned.',
+                            true
+                        );
+                        return;
+                    }
+                    _applyRegistryMatch(m);
+                    _showLookupAlert('Registry match found. Review the details below, then complete the form.', false);
+                    return;
+                }
+                if (data.status === 'found' && data.matches && data.matches.length > 1) {
+                    // Show disambiguation picker
+                    if (facDisambig && facDisambigSel) {
+                        facDisambigSel.innerHTML =
+                            '<option value="">— Select the correct faculty member —</option>' +
+                            data.matches.map(m =>
+                                '<option value=\'' + JSON.stringify(m).replace(/'/g, '&#39;') + '\'>' +
+                                m.full_name + (m.faculty_id ? ' (' + m.faculty_id + ')' : ' — Newly Hired') +
+                                '</option>'
+                            ).join('');
+                        facDisambig.style.display = '';
+                        _showLookupAlert('Multiple matches found. Select the correct faculty member above.', false);
+                    }
+                    return;
+                }
+                _showLookupAlert('Unexpected response. Please try again.', true);
+            })
+            .catch(() => {
+                _showLookupAlert('Network error. Please try again.', true);
+            })
+            .finally(() => {
+                facLookupBtn.disabled = false;
+                facLookupBtn.innerHTML = '<span class="material-symbols-outlined">manage_search</span> Look up in Faculty Registry';
+            });
+        });
+    }
+
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
@@ -1705,6 +1847,7 @@
         if (facAdviserChk) facAdviserChk.checked = false;
         _syncAdviserToggle();
         _clearFacAlert();
+        _clearRegistryPreview();
 
         const ov = document.createElement('div');
         ov.className = 'fac-created-overlay';
@@ -1747,19 +1890,9 @@
             const isAdviser = facAdviserChk?.checked ? '1' : '0';
             const orgId = facOrgSelect?.value || '';
 
-            // Client-side pre-checks (mirror server validation for immediate UX feedback)
-            if (!email) {
-                _showFacAlert('PUPSync email is required.', true); return;
-            }
-            if (!/^[^\s@]+@pupsync\.edu$/i.test(email)) {
-                _showFacAlert('Use a PUPSync email ending in @pupsync.edu.', true); return;
-            }
-            if (!facultyId) {
-                _showFacAlert('Faculty ID is required.', true); return;
-            }
-            // letters/digits in hyphen-separated groups, 5-30 characters, at least one digit (same rule as the server)
-            if (facultyId.length < 5 || facultyId.length > 30 || !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(facultyId) || !/\d/.test(facultyId)) {
-                _showFacAlert('Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).', true); return;
+            // Client-side pre-checks
+            if (!_facRegistryMatch) {
+                _showFacAlert('Please look up the faculty member in the registry first.', true); return;
             }
             if (!firstName) {
                 _showFacAlert('First name is required.', true); return;
@@ -1786,8 +1919,6 @@
 
             const body = new URLSearchParams({
                 csrf_token: getCsrfToken(),
-                pupsync_email: email,
-                faculty_id: facultyId,
                 first_name: firstName,
                 last_name: lastName,
                 password: password,

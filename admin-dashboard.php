@@ -3330,22 +3330,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <div class="eq-card-body">
                                 <?= csrf_field() ?>
 
-                                <div class="fac-edit-section">Account</div>
-                                <div class="form-group">
-                                    <label for="fac-email">PUPSync email <span class="req-star">*</span></label>
-                                    <input type="email" id="fac-email" name="pupsync_email"
-                                        class="form-control-custom" maxlength="254" required
-                                        autocomplete="off" placeholder="name@pupsync.edu">
-                                </div>
-                                <div class="form-group">
-                                    <label for="fac-faculty-id">Faculty ID <span class="req-star">*</span></label>
-                                    <input type="text" id="fac-faculty-id" name="faculty_id"
-                                        class="form-control-custom" maxlength="30" required
-                                        autocomplete="off" autocapitalize="characters" spellcheck="false"
-                                        placeholder="2023-00123-BN-0">
-                                    <small class="fac-field-hint">Permanent. It can&rsquo;t be changed after the account is created.</small>
-                                </div>
-
                                 <div class="fac-edit-section">Name</div>
                                 <div class="form-row">
                                     <div class="form-group">
@@ -3358,6 +3342,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <input type="text" id="fac-last" name="last_name"
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
+                                </div>
+                                <button type="button" id="fac-lookup-btn"
+                                    class="ps-btn ps-btn--ghost" style="width:100%;margin-bottom:0.5rem">
+                                    <span class="material-symbols-outlined">manage_search</span>
+                                    Look up in Faculty Registry
+                                </button>
+                                <div id="fac-lookup-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0.5rem"></div>
+
+                                <!-- Disambiguation picker — shown only when multiple registry matches exist -->
+                                <div id="fac-disambiguation" style="display:none;margin-bottom:0.75rem">
+                                    <label for="fac-disambig-select" style="font-size:12px;color:var(--text-light);margin-bottom:4px;display:block">
+                                        Multiple matches found — select the correct faculty member:
+                                    </label>
+                                    <select id="fac-disambig-select" class="form-control-custom"></select>
+                                </div>
+
+                                <div class="fac-edit-section">Account <span style="font-size:11px;font-weight:400;color:var(--text-light)">(auto-filled from registry)</span></div>
+                                <div class="form-group">
+                                    <label for="fac-email">PUPSync email</label>
+                                    <input type="email" id="fac-email"
+                                        class="form-control-custom" maxlength="254"
+                                        autocomplete="off" placeholder="Auto-filled after lookup"
+                                        readonly tabindex="-1"
+                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                    <small class="fac-field-hint">Generated automatically. Not submitted — the server re-derives this.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="fac-faculty-id">Faculty ID</label>
+                                    <input type="text" id="fac-faculty-id"
+                                        class="form-control-custom" maxlength="30"
+                                        autocomplete="off" spellcheck="false"
+                                        placeholder="Auto-filled after lookup"
+                                        readonly tabindex="-1"
+                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                    <small class="fac-field-hint">From the Faculty Identification Records. Permanent after account creation.</small>
                                 </div>
 
                                 <div class="fac-edit-section">Password</div>
@@ -3436,7 +3455,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <span class="material-symbols-outlined">person_add</span>
                                     Create Account
                                 </button>
-                                <p class="fac-form-hint">The faculty member adds their own Faculty ID after signing in.</p>
+                                <p class="fac-form-hint">Faculty ID and email are sourced from the Faculty Identification Records document.</p>
                             </div><!-- /eq-card-body -->
                         </div><!-- /faculty-form-card -->
 
