@@ -4332,13 +4332,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                     <!-- ── ON LOAN (equipment currently out: Approved + Overdue) ───────────── -->
                     <div class="eq-sub-panel" id="eq-onloan">
-                        <?php if ($eq_loan_overdue > 0): ?>
-                            <div class="ps-alert ps-alert--danger" id="eq-loan-overdue-alert">
-                                <span class="material-symbols-outlined">warning</span>
-                                <?php echo (int)$eq_loan_overdue; ?> item(s) are overdue. Contact the borrowers.
-                                <button class="ps-alert__close" data-action="dismiss-alert" data-target="eq-loan-overdue-alert"><span class="material-symbols-outlined">close</span></button>
-                            </div>
-                        <?php endif; ?>
+                        <!-- Overdue warning: no inline banner here any more. It pops up at the bottom-centre of the
+                             screen when this tab is opened (announceOverdue() in admin-dashboard.js). -->
                         <div class="ps-card">
                             <div class="ps-card-header eq-loan-head">
                                 <!-- Table title: text changes with the selected tab (see TITLES in admin-dashboard.js) -->
