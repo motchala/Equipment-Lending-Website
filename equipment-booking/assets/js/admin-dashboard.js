@@ -1667,6 +1667,148 @@
         return tr;
     };
 
+    /* ── Faculty: registry lookup ────────────────────────────── */
+    const facLookupBtn    = document.getElementById('fac-lookup-btn');
+    const facLookupAlert  = document.getElementById('fac-lookup-alert');
+    const facDisambig     = document.getElementById('fac-disambiguation');
+    const facDisambigSel  = document.getElementById('fac-disambig-select');
+
+    // Stores the currently confirmed registry match {faculty_id, email_preview, full_name}
+    // null means no successful lookup yet — submit is blocked until set.
+    let _facRegistryMatch = null;
+
+    function _showLookupAlert(msg, isError) {
+        if (!facLookupAlert) return;
+        facLookupAlert.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
+        facLookupAlert.textContent = msg;
+        facLookupAlert.classList.remove('hidden');
+    }
+    function _clearLookupAlert() {
+        if (!facLookupAlert) return;
+        facLookupAlert.classList.add('hidden');
+        facLookupAlert.textContent = '';
+    }
+
+    function _applyRegistryMatch(match) {
+        _facRegistryMatch = match;
+        const emailEl = document.getElementById('fac-email');
+        const idEl    = document.getElementById('fac-faculty-id');
+        if (emailEl) emailEl.value = match.email_preview || '';
+        if (idEl)    idEl.value    = match.faculty_id    || '';
+    }
+
+    function _clearRegistryPreview() {
+        _facRegistryMatch = null;
+        const emailEl = document.getElementById('fac-email');
+        const idEl    = document.getElementById('fac-faculty-id');
+        if (emailEl) emailEl.value = '';
+        if (idEl)    idEl.value    = '';
+        if (facDisambig) facDisambig.style.display = 'none';
+        if (facDisambigSel) facDisambigSel.innerHTML = '';
+        _clearLookupAlert();
+    }
+
+    // Clear the preview whenever name fields change
+    ['fac-first', 'fac-last'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', _clearRegistryPreview);
+    });
+
+    // Disambiguation select → apply the chosen match
+    if (facDisambigSel) {
+        facDisambigSel.addEventListener('change', function() {
+            try {
+                const data = JSON.parse(this.value || 'null');
+                if (data) _applyRegistryMatch(data);
+            } catch (e) {}
+        });
+    }
+
+    if (facLookupBtn) {
+        facLookupBtn.addEventListener('click', function() {
+            _clearRegistryPreview();
+            const firstName = (document.getElementById('fac-first')?.value || '').trim();
+            const lastName  = (document.getElementById('fac-last')?.value  || '').trim();
+            if (!firstName || !lastName) {
+                _showLookupAlert('Enter both first name and last name before looking up.', true);
+                return;
+            }
+
+            facLookupBtn.disabled = true;
+            facLookupBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Looking up...';
+
+            const body = new URLSearchParams({
+                csrf_token: getCsrfToken(),
+                first_name: firstName,
+                last_name:  lastName,
+            });
+
+            fetch('equipment-booking/api/lookup-faculty-registry.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'no_registry') {
+                    // Registry not yet uploaded — show a soft notice but allow creation
+                    _showLookupAlert(
+                        'No faculty registry has been uploaded yet. Account will be created without ID validation.',
+                        false
+                    );
+                    // Allow submit without a registry match
+                    _facRegistryMatch = { faculty_id: '', email_preview: '' };
+                    return;
+                }
+                if (data.status === 'not_found') {
+                    _showLookupAlert(
+                        firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
+                        'Check the spelling or upload an updated registry file.',
+                        true
+                    );
+                    return;
+                }
+                if (data.status === 'found' && data.matches && data.matches.length === 1) {
+                    const m = data.matches[0];
+                    if (m.is_newly_hired) {
+                        _showLookupAlert(
+                            firstName + ' ' + lastName + ' is listed as newly hired and does not have a Faculty ID yet. ' +
+                            'Upload an updated registry once their ID is assigned.',
+                            true
+                        );
+                        return;
+                    }
+                    _applyRegistryMatch(m);
+                    _showLookupAlert('Registry match found. Review the details below, then complete the form.', false);
+                    return;
+                }
+                if (data.status === 'found' && data.matches && data.matches.length > 1) {
+                    // Show disambiguation picker
+                    if (facDisambig && facDisambigSel) {
+                        facDisambigSel.innerHTML =
+                            '<option value="">— Select the correct faculty member —</option>' +
+                            data.matches.map(m =>
+                                '<option value=\'' + JSON.stringify(m).replace(/'/g, '&#39;') + '\'>' +
+                                m.full_name + (m.faculty_id ? ' (' + m.faculty_id + ')' : ' — Newly Hired') +
+                                '</option>'
+                            ).join('');
+                        facDisambig.style.display = '';
+                        _showLookupAlert('Multiple matches found. Select the correct faculty member above.', false);
+                    }
+                    return;
+                }
+                _showLookupAlert('Unexpected response. Please try again.', true);
+            })
+            .catch(() => {
+                _showLookupAlert('Network error. Please try again.', true);
+            })
+            .finally(() => {
+                facLookupBtn.disabled = false;
+                facLookupBtn.innerHTML = '<span class="material-symbols-outlined">manage_search</span> Look up in Faculty Registry';
+            });
+        });
+    }
+
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
@@ -1705,6 +1847,7 @@
         if (facAdviserChk) facAdviserChk.checked = false;
         _syncAdviserToggle();
         _clearFacAlert();
+        _clearRegistryPreview();
 
         const ov = document.createElement('div');
         ov.className = 'fac-created-overlay';
@@ -1747,19 +1890,9 @@
             const isAdviser = facAdviserChk?.checked ? '1' : '0';
             const orgId = facOrgSelect?.value || '';
 
-            // Client-side pre-checks (mirror server validation for immediate UX feedback)
-            if (!email) {
-                _showFacAlert('PUPSync email is required.', true); return;
-            }
-            if (!/^[^\s@]+@pupsync\.edu$/i.test(email)) {
-                _showFacAlert('Use a PUPSync email ending in @pupsync.edu.', true); return;
-            }
-            if (!facultyId) {
-                _showFacAlert('Faculty ID is required.', true); return;
-            }
-            // letters/digits in hyphen-separated groups, 5-30 characters, at least one digit (same rule as the server)
-            if (facultyId.length < 5 || facultyId.length > 30 || !/^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/.test(facultyId) || !/\d/.test(facultyId)) {
-                _showFacAlert('Enter a valid Faculty ID: letters, numbers and hyphens only (for example 2023-00123-BN-0).', true); return;
+            // Client-side pre-checks
+            if (!_facRegistryMatch) {
+                _showFacAlert('Please look up the faculty member in the registry first.', true); return;
             }
             if (!firstName) {
                 _showFacAlert('First name is required.', true); return;
@@ -1786,8 +1919,6 @@
 
             const body = new URLSearchParams({
                 csrf_token: getCsrfToken(),
-                pupsync_email: email,
-                faculty_id: facultyId,
                 first_name: firstName,
                 last_name: lastName,
                 password: password,
@@ -5235,3 +5366,369 @@ function psSelectFmt(btn) {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
     else install();
 })();
+
+/* ================================================================
+   FACULTY REGISTRY UPLOAD
+   Self-contained block. Uses PDF.js (loaded on demand) for PDF
+   parsing. Falls back to a server-side parse notice for XLSX
+   (SimpleXLSX is not vendored yet — the user is guided to use PDF).
+   Calls upload-faculty-registry.php with the parsed rows as JSON.
+================================================================ */
+(function () {
+    'use strict';
+
+    var header      = document.getElementById('fac-registry-header');
+    var body        = document.getElementById('fac-registry-body');
+    var chevron     = document.getElementById('fac-registry-chevron');
+    var fileInput   = document.getElementById('fac-reg-file-input');
+    var fileLabel   = document.getElementById('fac-reg-file-label');
+    var fileNameEl  = document.getElementById('fac-reg-file-name');
+    var importBtn   = document.getElementById('fac-reg-import-btn');
+    var replaceChk  = document.getElementById('fac-reg-replace-all');
+    var alertEl     = document.getElementById('fac-reg-alert');
+    var previewWrap = document.getElementById('fac-reg-preview');
+    var previewTbody = document.getElementById('fac-reg-preview-tbody');
+    var previewCount = document.getElementById('fac-reg-preview-count');
+    var clearBtn    = document.getElementById('fac-reg-clear-btn');
+
+    if (!header) return; // Faculty tab not rendered for this admin role
+
+    // ── Collapse / expand ──────────────────────────────────────────
+    function setOpen(open) {
+        if (!body || !chevron || !header) return;
+        body.style.display = open ? '' : 'none';
+        chevron.style.transform = open ? 'rotate(180deg)' : '';
+        header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    header.addEventListener('click', function () {
+        setOpen(body.style.display === 'none');
+    });
+    header.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(body.style.display === 'none'); }
+    });
+
+    // ── Alert helpers ──────────────────────────────────────────────
+    function showRegAlert(msg, isError) {
+        if (!alertEl) return;
+        alertEl.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
+        alertEl.textContent = msg;
+        alertEl.classList.remove('hidden');
+    }
+    function clearRegAlert() {
+        if (!alertEl) return;
+        alertEl.classList.add('hidden');
+        alertEl.textContent = '';
+    }
+
+    // ── Parsed rows store ──────────────────────────────────────────
+    var _parsedRows = [];
+
+    function resetParsed() {
+        _parsedRows = [];
+        if (previewWrap) previewWrap.style.display = 'none';
+        if (previewTbody) previewTbody.innerHTML = '';
+        if (fileInput) fileInput.value = '';
+        if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+        if (importBtn) importBtn.disabled = true;
+        clearRegAlert();
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', resetParsed);
+    }
+
+    // ── Render preview table ───────────────────────────────────────
+    function renderPreview(rows) {
+        if (!previewTbody || !previewWrap || !previewCount) return;
+        var html = '';
+        var newlyHiredCount = 0;
+        rows.forEach(function (r, i) {
+            var isNew = r.faculty_id === '' || r.faculty_id.toUpperCase() === 'NEWLY HIRED';
+            if (isNew) newlyHiredCount++;
+            html +=
+                '<tr>' +
+                '<td>' + (i + 1) + '</td>' +
+                '<td>' + _esc(isNew ? 'NEWLY HIRED' : r.faculty_id) + '</td>' +
+                '<td>' + _esc(r.full_name) + '</td>' +
+                '<td style="text-align:center">' + (isNew ? '<span style="color:var(--warning,#e08000)">&#9679;</span>' : '') + '</td>' +
+                '</tr>';
+        });
+        previewTbody.innerHTML = html;
+        previewCount.textContent = rows.length + ' rows parsed' + (newlyHiredCount > 0 ? ' · ' + newlyHiredCount + ' newly hired' : '');
+        previewWrap.style.display = '';
+        if (importBtn) importBtn.disabled = rows.length === 0;
+    }
+
+    // XSS helper (re-uses the one in the outer IIFE if available, otherwise local)
+    function _esc(str) {
+        var d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    // ── PDF parsing via PDF.js ─────────────────────────────────────
+    var _pdfJsReady = false;
+    var _pdfJsLoading = false;
+
+    function loadPdfJs(callback) {
+        if (_pdfJsReady) { callback(); return; }
+        if (_pdfJsLoading) { setTimeout(function () { loadPdfJs(callback); }, 100); return; }
+        _pdfJsLoading = true;
+
+        // Self-hosted — no CDN dependency, no CSP worker-src issues.
+        var script = document.createElement('script');
+        script.src = 'assets/js/vendor/pdf.min.js';
+        script.onload = function () {
+            if (window.pdfjsLib) {
+                // Point the worker at the self-hosted copy using an absolute path
+                // so it resolves correctly regardless of which tab is active.
+                var base = window.location.origin +
+                    window.location.pathname.replace(/\/[^/]*$/, '/');
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                    base + 'assets/js/vendor/pdf.worker.min.js';
+                window._pdfJsLib = window.pdfjsLib;
+            }
+            _pdfJsReady = true;
+            _pdfJsLoading = false;
+            callback();
+        };
+        script.onerror = function () {
+            _pdfJsLoading = false;
+            callback();
+        };
+        document.head.appendChild(script);
+    }
+
+    /**
+     * Parse the Faculty Identification Records PDF.
+     * Expected table format (from the document in the screenshot):
+     *   Col 0: Faculty ID  (or "NEWLY HIRED")
+     *   Col 1: Professor Name
+     *   Col 2: Programs Handled  (stored as department)
+     *
+     * Strategy: extract all text items per page with their x/y positions,
+     * cluster them into rows by y-coordinate, then columns by x-coordinate.
+     * Rows whose first cell is a Faculty ID pattern or "NEWLY HIRED" are kept.
+     */
+    function parsePdf(file, onDone, onError) {
+        loadPdfJs(function () {
+            var pdfjsLib = window._pdfJsLib;
+            if (!pdfjsLib) { onError('The PDF reader could not be loaded. Please check your internet connection and try again.'); return; }
+
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var typedArray = new Uint8Array(e.target.result);
+                pdfjsLib.getDocument({ data: typedArray }).promise.then(function (pdf) {
+                    var allRows = [];
+                    var pagePromises = [];
+                    for (var p = 1; p <= pdf.numPages; p++) {
+                        pagePromises.push(pdf.getPage(p).then(function (page) {
+                            return page.getTextContent().then(function (tc) {
+                                return tc.items;
+                            });
+                        }));
+                    }
+
+                    Promise.all(pagePromises).then(function (pages) {
+                        pages.forEach(function (items) {
+                            // Group items into lines by rounded y-coordinate
+                            var lineMap = {};
+                            items.forEach(function (item) {
+                                if (!item.str || !item.str.trim()) return;
+                                var y = Math.round(item.transform[5]);
+                                if (!lineMap[y]) lineMap[y] = [];
+                                lineMap[y].push({ x: item.transform[4], text: item.str.trim() });
+                            });
+
+                            // Sort lines top-to-bottom (descending y in PDF coords)
+                            var yKeys = Object.keys(lineMap).map(Number).sort(function (a, b) { return b - a; });
+
+                            yKeys.forEach(function (y) {
+                                var cells = lineMap[y].sort(function (a, b) { return a.x - b.x; });
+                                var col0 = (cells[0] && cells[0].text) || '';
+                                var col1 = (cells[1] && cells[1].text) || '';
+                                var col2 = cells.slice(2).map(function (c) { return c.text; }).join(' ');
+
+                                // Skip header rows and empty rows
+                                var c0up = col0.toUpperCase();
+                                if (!col0 || c0up === 'FACULTY ID' || c0up === 'PROFESSOR NAME') return;
+
+                                // Accept rows where col0 is a Faculty ID pattern OR "NEWLY HIRED"
+                                var isFacultyId = /^FA\d+[A-Z]{2}\d+$/i.test(col0.replace(/\s/g, ''));
+                                var isNewlyHired = c0up.replace(/\s+/g, ' ') === 'NEWLY HIRED';
+
+                                if (!isFacultyId && !isNewlyHired) return;
+
+                                // col1 may be split across cells — rejoin if needed
+                                var name = col1;
+                                if (!name) return;
+
+                                allRows.push({
+                                    faculty_id: isNewlyHired ? 'NEWLY HIRED' : col0.replace(/\s/g, '').toUpperCase(),
+                                    full_name:  name,
+                                    department: col2
+                                });
+                            });
+                        });
+
+                        if (allRows.length === 0) {
+                            onError(
+                                'No faculty rows were found in this PDF. ' +
+                                'Make sure it is the Faculty Identification Records document ' +
+                                'and not a scanned image PDF.'
+                            );
+                            return;
+                        }
+                        onDone(allRows);
+                    }).catch(function (err) {
+                        onError('Could not read PDF pages: ' + err.message);
+                    });
+                }).catch(function (err) {
+                    onError('Could not open PDF: ' + err.message);
+                });
+            };
+            reader.onerror = function () { onError('Could not read the file.'); };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    // ── XLSX parsing — placeholder ─────────────────────────────────
+    // SimpleXLSX is not yet vendored. Guide the user to PDF for now.
+    function parseXlsx(file, onDone, onError) {
+        onError('XLSX import is not yet available. Please export the Faculty Identification Records as a PDF and upload that instead.');
+    }
+
+    // ── File input change ──────────────────────────────────────────
+    if (fileInput) {
+        fileInput.addEventListener('change', function () {
+            var file = this.files && this.files[0];
+            if (!file) return;
+            resetParsed();
+            fileNameEl.textContent = file.name;
+            clearRegAlert();
+
+            // Size guard: 10 MB
+            if (file.size > 10 * 1024 * 1024) {
+                showRegAlert('File is too large. Maximum size is 10 MB.', true);
+                fileInput.value = '';
+                fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+                return;
+            }
+
+            var ext = file.name.split('.').pop().toLowerCase();
+
+            if (ext === 'pdf') {
+                alertEl.className = 'alert-banner alert-info';
+                alertEl.innerHTML = '<span class="fac-reg-parsing">Parsing PDF, this may take a moment</span>';
+                alertEl.classList.remove('hidden');
+                parsePdf(file,
+                    function (rows) {
+                        _parsedRows = rows;
+                        renderPreview(rows);
+                        clearRegAlert();
+                    },
+                    function (err) {
+                        showRegAlert(err, true);
+                        fileInput.value = '';
+                        fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+                    }
+                );
+            } else if (ext === 'xlsx') {
+                parseXlsx(file,
+                    function (rows) {
+                        _parsedRows = rows;
+                        renderPreview(rows);
+                        clearRegAlert();
+                    },
+                    function (err) {
+                        showRegAlert(err, true);
+                        fileInput.value = '';
+                        fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+                    }
+                );
+            } else {
+                showRegAlert('Unsupported file type. Please choose a PDF or XLSX file.', true);
+                fileInput.value = '';
+                fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+            }
+        });
+    }
+
+    // ── Import button ──────────────────────────────────────────────
+    if (importBtn) {
+        importBtn.addEventListener('click', function () {
+            if (_parsedRows.length === 0) {
+                showRegAlert('No rows to import. Please choose a file first.', true);
+                return;
+            }
+
+            var csrfEl = document.querySelector('input[name="csrf_token"]');
+            var csrfToken = csrfEl ? csrfEl.value : '';
+            if (!csrfToken) {
+                showRegAlert('Session expired. Please refresh the page.', true);
+                return;
+            }
+
+            importBtn.disabled = true;
+            importBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Importing\u2026';
+
+            fetch('equipment-booking/api/upload-faculty-registry.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    csrf_token:  csrfToken,
+                    rows:        _parsedRows,
+                    replace_all: replaceChk ? replaceChk.checked : false
+                })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.status === 'success') {
+                    var msg = 'Import complete: ' + data.inserted + ' added, ' + data.updated + ' updated';
+                    if (data.skipped > 0) msg += ', ' + data.skipped + ' skipped';
+                    if (data.errors && data.errors.length > 0) msg += '. Some rows had errors — check the page.';
+                    showRegAlert(msg, false);
+
+                    // Show row-level errors if any
+                    if (data.errors && data.errors.length > 0) {
+                        var errHtml = data.errors.map(function (e) { return '<li>' + _esc(e) + '</li>'; }).join('');
+                        alertEl.innerHTML = alertEl.textContent + '<ul style="margin:.5rem 0 0;padding-left:1.2rem;font-size:11px">' + errHtml + '</ul>';
+                    }
+
+                    // Reset file picker; keep the preview visible so Super Admin can see what was imported
+                    if (fileInput) fileInput.value = '';
+                    if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+                    _parsedRows = [];
+                    if (importBtn) importBtn.disabled = true;
+
+                    // Update the badge count without a full page reload
+                    var badge = document.querySelector('#fac-registry-card .fac-reg-badge');
+                    if (badge && typeof data.total_after !== 'undefined') {
+                        badge.textContent = data.total_after + ' entries';
+                        badge.className = 'fac-reg-badge fac-reg-badge--active';
+                    }
+                } else {
+                    showRegAlert(data.error || 'Import failed. Please try again.', true);
+                    if (importBtn) importBtn.disabled = false;
+                }
+            })
+            .catch(function () {
+                showRegAlert('Network error. Please try again.', true);
+                if (importBtn) importBtn.disabled = false;
+            })
+            .finally(function () {
+                importBtn.innerHTML = '<span class="material-symbols-outlined">cloud_upload</span> Import';
+            });
+        });
+    }
+
+    // ── File label click → trigger hidden input ────────────────────
+    if (fileLabel) {
+        fileLabel.addEventListener('click', function () {
+            if (fileInput) fileInput.click();
+        });
+    }
+
+})();
+

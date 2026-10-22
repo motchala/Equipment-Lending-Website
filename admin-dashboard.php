@@ -3317,7 +3317,94 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and remove faculty accounts.</p>
                     </div>
 
+                    <?php
+                    // Registry status for the upload card
+                    $reg_status = ['count' => 0, 'last_date' => '', 'last_by' => ''];
+                    $reg_tbl_exists = $conn->query("SHOW TABLES LIKE 'tbl_faculty_registry'")->num_rows > 0;
+                    if ($reg_tbl_exists) {
+                        $rs = $conn->query("SELECT COUNT(*) AS cnt, MAX(uploaded_at) AS last_at, MAX(uploaded_by) AS last_by FROM tbl_faculty_registry");
+                        if ($rs) {
+                            $rrow = $rs->fetch_assoc();
+                            $reg_status['count']     = (int)($rrow['cnt'] ?? 0);
+                            $reg_status['last_date'] = (string)($rrow['last_at'] ?? '');
+                            $reg_status['last_by']   = (string)($rrow['last_by'] ?? '');
+                        }
+                    }
+                    ?>
+
                     <div class="faculty-layout">
+
+                        <!-- REGISTRY UPLOAD CARD -->
+                        <div class="eq-card fac-registry-card" id="fac-registry-card" style="margin-bottom:1.25rem;grid-column:1/-1">
+                            <div class="eq-card-header" id="fac-registry-header" style="cursor:pointer;user-select:none" role="button" aria-expanded="false" aria-controls="fac-registry-body" tabindex="0">
+                                <h2>
+                                    <span class="material-symbols-outlined" style="font-size:18px;color:var(--accent-maroon);margin-right:6px;vertical-align:middle">upload_file</span>
+                                    Faculty Registry
+                                    <?php if ($reg_status['count'] > 0): ?>
+                                        <span class="fac-reg-badge fac-reg-badge--active"><?= $reg_status['count'] ?> entries</span>
+                                    <?php else: ?>
+                                        <span class="fac-reg-badge fac-reg-badge--empty">Not uploaded yet</span>
+                                    <?php endif; ?>
+                                </h2>
+                                <span class="material-symbols-outlined fac-registry-chevron" id="fac-registry-chevron" style="color:var(--text-light);transition:transform .2s">expand_more</span>
+                            </div>
+
+                            <div id="fac-registry-body" style="display:none">
+                                <div class="eq-card-body" style="padding-top:0">
+
+                                    <?php if ($reg_status['count'] > 0 && $reg_status['last_date'] !== ''): ?>
+                                    <p style="font-size:12px;color:var(--text-light);margin:0 0 1rem">
+                                        Last imported:
+                                        <strong style="color:var(--text-dark)"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($reg_status['last_date']))) ?></strong>
+                                        by <?= htmlspecialchars($reg_status['last_by']) ?> &mdash;
+                                        <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
+                                    </p>
+                                    <?php endif; ?>
+
+                                    <div class="fac-reg-upload-row">
+                                        <label for="fac-reg-file-input" class="fac-reg-file-label" id="fac-reg-file-label">
+                                            <span class="material-symbols-outlined">attach_file</span>
+                                            <span id="fac-reg-file-name">Choose file (PDF or XLSX)…</span>
+                                        </label>
+                                        <input type="file" id="fac-reg-file-input" accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
+                                        <button type="button" id="fac-reg-import-btn" class="ps-btn ps-btn--primary" disabled>
+                                            <span class="material-symbols-outlined">cloud_upload</span> Import
+                                        </button>
+                                    </div>
+
+                                    <label class="fac-reg-replace-row" for="fac-reg-replace-all" style="margin-top:.5rem">
+                                        <input type="checkbox" id="fac-reg-replace-all">
+                                        <span style="font-size:12.5px;color:var(--text-light)">Replace entire registry (removes all existing entries before importing)</span>
+                                    </label>
+
+                                    <div id="fac-reg-alert" class="alert-banner hidden" role="alert" style="margin-top:.75rem"></div>
+
+                                    <!-- Preview table — shown after parsing, before import -->
+                                    <div id="fac-reg-preview" style="display:none;margin-top:1rem">
+                                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+                                            <p style="font-size:12.5px;font-weight:600;color:var(--text-dark);margin:0" id="fac-reg-preview-count"></p>
+                                            <button type="button" id="fac-reg-clear-btn" class="ps-btn ps-btn--ghost ps-btn--sm">
+                                                <span class="material-symbols-outlined">close</span> Clear
+                                            </button>
+                                        </div>
+                                        <div class="tbl-wrap" style="max-height:260px;overflow-y:auto">
+                                            <table class="admin-table" style="font-size:12px">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width:40px">#</th>
+                                                        <th>Faculty ID</th>
+                                                        <th>Name</th>
+                                                        <th style="width:60px;text-align:center">New</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="fac-reg-preview-tbody"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div><!-- /registry card -->
 
                         <!-- CREATE FORM -->
                         <div class="eq-card faculty-form-card">
@@ -3329,22 +3416,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             </div>
                             <div class="eq-card-body">
                                 <?= csrf_field() ?>
-
-                                <div class="fac-edit-section">Account</div>
-                                <div class="form-group">
-                                    <label for="fac-email">PUPSync email <span class="req-star">*</span></label>
-                                    <input type="email" id="fac-email" name="pupsync_email"
-                                        class="form-control-custom" maxlength="254" required
-                                        autocomplete="off" placeholder="name@pupsync.edu">
-                                </div>
-                                <div class="form-group">
-                                    <label for="fac-faculty-id">Faculty ID <span class="req-star">*</span></label>
-                                    <input type="text" id="fac-faculty-id" name="faculty_id"
-                                        class="form-control-custom" maxlength="30" required
-                                        autocomplete="off" autocapitalize="characters" spellcheck="false"
-                                        placeholder="2023-00123-BN-0">
-                                    <small class="fac-field-hint">Permanent. It can&rsquo;t be changed after the account is created.</small>
-                                </div>
 
                                 <div class="fac-edit-section">Name</div>
                                 <div class="form-row">
@@ -3358,6 +3429,41 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <input type="text" id="fac-last" name="last_name"
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
+                                </div>
+                                <button type="button" id="fac-lookup-btn"
+                                    class="ps-btn ps-btn--ghost" style="width:100%;margin-bottom:0.5rem">
+                                    <span class="material-symbols-outlined">manage_search</span>
+                                    Look up in Faculty Registry
+                                </button>
+                                <div id="fac-lookup-alert" class="alert-banner hidden" role="alert" style="margin-bottom:0.5rem"></div>
+
+                                <!-- Disambiguation picker — shown only when multiple registry matches exist -->
+                                <div id="fac-disambiguation" style="display:none;margin-bottom:0.75rem">
+                                    <label for="fac-disambig-select" style="font-size:12px;color:var(--text-light);margin-bottom:4px;display:block">
+                                        Multiple matches found — select the correct faculty member:
+                                    </label>
+                                    <select id="fac-disambig-select" class="form-control-custom"></select>
+                                </div>
+
+                                <div class="fac-edit-section">Account <span style="font-size:11px;font-weight:400;color:var(--text-light)">(auto-filled from registry)</span></div>
+                                <div class="form-group">
+                                    <label for="fac-email">PUPSync email</label>
+                                    <input type="email" id="fac-email"
+                                        class="form-control-custom" maxlength="254"
+                                        autocomplete="off" placeholder="Auto-filled after lookup"
+                                        readonly tabindex="-1"
+                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                    <small class="fac-field-hint">Generated automatically. Not submitted — the server re-derives this.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="fac-faculty-id">Faculty ID</label>
+                                    <input type="text" id="fac-faculty-id"
+                                        class="form-control-custom" maxlength="30"
+                                        autocomplete="off" spellcheck="false"
+                                        placeholder="Auto-filled after lookup"
+                                        readonly tabindex="-1"
+                                        style="background:var(--bg-subtle,#f5f5f5);cursor:default;color:var(--text-light)">
+                                    <small class="fac-field-hint">From the Faculty Identification Records. Permanent after account creation.</small>
                                 </div>
 
                                 <div class="fac-edit-section">Password</div>
@@ -3436,7 +3542,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <span class="material-symbols-outlined">person_add</span>
                                     Create Account
                                 </button>
-                                <p class="fac-form-hint">The faculty member adds their own Faculty ID after signing in.</p>
+                                <p class="fac-form-hint">Faculty ID and email are sourced from the Faculty Identification Records document.</p>
                             </div><!-- /eq-card-body -->
                         </div><!-- /faculty-form-card -->
 
