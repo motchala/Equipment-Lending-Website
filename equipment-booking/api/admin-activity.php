@@ -99,7 +99,7 @@ $query = [
 if ($format === 'csv') {
     $feed = admin_activity_feed($conn, $query + ['offset' => 0, 'limit' => 5000]);
 
-    $labels = ['requests' => 'Requests', 'rooms' => 'Rooms', 'equipment' => 'Equipment', 'system' => 'System', 'signins' => 'Sign-ins'];
+    $labels = ['requests' => 'Requests', 'rooms' => 'Facilities', 'equipment' => 'Equipment', 'system' => 'System', 'signins' => 'Sign-ins'];
     // A cell starting with = + - @ would run as a formula when opened in Excel.
     $safe = static function ($v): string {
         $v = (string)$v;

@@ -1229,3 +1229,715 @@ html {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+
+
+/* ================================================================
+   ROUND 2 — ADAPTIVE REFINEMENTS  (§ 41 – § 49)
+   ----------------------------------------------------------------
+   HOW THE CASCADE WORKS HERE
+   faculty-dashboard.php now loads this file LAST, after its big
+   inline <style> block. That block sets the desktop layout with
+   !important, so any mobile override only wins when it comes later
+   and is at least as specific. Everything below follows that rule.
+
+   BREAKPOINTS (same ones used by the rest of this file)
+     ≤ 360   small phones   (2-col grids stay, labels shorten)
+     ≤ 480   phones         (compact cards, 1-line summaries)
+     ≤ 600   large phones   (stacked toolbars)
+     ≤ 768   mobile layout  (drawer nav, bottom sheets)
+     769-1024 tablet        (icon-rail nav)
+     ≥ 1025  desktop
+
+   UTILITY CLASSES (opt-in, safe to use in any markup)  § 49
+     .rx-min0      min-width:0 — lets a flex/grid child shrink so text can truncate
+     .rx-trunc     one line, ellipsis
+     .rx-clamp-2   two lines, ellipsis
+     .rx-hide-xs   hidden on phones     .rx-show-xs  phones only
+     .rx-more      "Details" toggle added by faculty-dashboard-responsive.js
+================================================================ */
+
+
+/* ================================================================
+   § 41  SHELL — drawer shadow, safe areas
+   The closed drawer was moved off-screen with translateX(-100%) but
+   kept its 24px box-shadow, which bled a grey band onto the left
+   edge of every screen. It is now shadowless and invisible (not just
+   off-screen) until opened, which also keeps it out of the keyboard
+   tab order while closed.
+================================================================ */
+@media (max-width: 768px) {
+    body .side-nav {
+        box-shadow: none !important;
+        visibility: hidden;
+        transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+            box-shadow 0.28s,
+            visibility 0s linear 0.28s;
+    }
+
+    body .side-nav.open {
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.28) !important;
+        visibility: visible;
+        transition-delay: 0s;
+    }
+
+}
+
+/* Icon rail (769–1024px): the nav is only 72px wide, so the "PUPSYNC /
+   Faculty Portal" text can't fit — its title was hidden but the subtitle
+   stayed behind and wrapped into the narrow rail as "Facu / Porta". */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .side-nav .side-nav-brand-text {
+        display: none;
+    }
+}
+
+/* Side padding.  The base stylesheet sets `.app-main { padding: 32px 40px !important }`
+   at EVERY width, which beat the mobile padding in § 5 and wasted ~80px of a 360px
+   screen. Only left/right/bottom are overridden: the top padding (space for the
+   menu button) is left to the base rules. */
+:root {
+    --rx-pad: 16px;
+}
+
+@media (max-width: 768px) {
+    .app-main {
+        padding-left: max(var(--rx-pad), env(safe-area-inset-left, 0px)) !important;
+        padding-right: max(var(--rx-pad), env(safe-area-inset-right, 0px)) !important;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --rx-pad: 12px;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .app-main {
+        padding-left: 24px !important;
+        padding-right: 24px !important;
+    }
+}
+
+
+/* ================================================================
+   § 42  AI ASSISTANT — floating button, popover and chat sheet
+   • The popover used to live INSIDE the floating <button> (invalid
+     HTML: its own <button> got ejected and floated at the top-right
+     of every tab). It is now a sibling, so it is positioned here.
+   • On phones the chat becomes a bottom sheet and the round button
+     hides while it is open, so it can no longer cover the footer.
+================================================================ */
+.act-ai-fab-popover {
+    position: fixed;
+    right: 32px;
+    bottom: calc(24px + 56px + 14px + env(safe-area-inset-bottom, 0px));
+    width: min(230px, calc(100vw - 32px));
+    left: auto;
+}
+
+.act-ai-fab-popover::after {
+    right: 21px;
+    /* centre the tail over the 56px button */
+}
+
+@media (max-width: 768px) {
+    .act-ai-fab {
+        right: 16px;
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .act-ai-fab-popover {
+        right: 16px;
+        bottom: calc(16px + 56px + 12px + env(safe-area-inset-bottom, 0px));
+        width: min(210px, calc(100vw - 32px));
+        font-size: 0.76rem;
+    }
+
+    /* Chat → bottom sheet */
+    .act-ai-chat {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-height: min(82vh, 640px);
+        border-radius: 20px 20px 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .act-ai-chat.open:not(.minimized) {
+        height: min(82vh, 640px);
+    }
+
+    .act-ai-chat .act-ai-chat-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    /* Hide the round button + its popover while the chat is open */
+    .act-ai-chat.open:not(.minimized)~.act-ai-fab,
+    .act-ai-chat.open:not(.minimized)~.act-ai-fab-popover {
+        display: none !important;
+    }
+}
+
+
+/* ================================================================
+   § 43  EQUIPMENT TAB — "Most Borrowed" as compact rows
+   Each featured item becomes a 76px thumbnail + title + badge +
+   one small button, instead of a 400px-tall card.
+================================================================ */
+@media (max-width: 600px) {
+    #panel-lending .featured-grid {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 8px !important;
+    }
+
+    #panel-lending .feat-hero,
+    #panel-lending .feat-secondary {
+        display: grid !important;
+        grid-template-columns: 84px minmax(0, 1fr);
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 0 !important;
+        overflow: hidden;
+    }
+
+    /* thumbnail column (hero stores its image LAST in the markup) */
+    #panel-lending .feat-hero-img,
+    #panel-lending .feat-hero-img-placeholder,
+    #panel-lending .feat-secondary-img {
+        grid-column: 1;
+        grid-row: 1;
+        width: 84px !important;
+        height: 100% !important;
+        min-height: 84px;
+        max-height: none !important;
+        border-radius: 0 !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    #panel-lending .feat-hero-img img,
+    #panel-lending .feat-secondary-img img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    #panel-lending .feat-hero-body,
+    #panel-lending .feat-secondary-body {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+        padding: 10px 12px !important;
+        gap: 4px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    /* the secondary card's overlay badges would crowd an 84px thumbnail */
+    #panel-lending .feat-secondary-img .stock-popular {
+        display: none !important;
+    }
+
+    #panel-lending .feat-secondary-img .stock-badge {
+        top: auto !important;
+        bottom: 4px !important;
+        left: 4px !important;
+        right: auto !important;
+        padding: 2px 5px !important;
+        font-size: 0.58rem !important;
+        max-width: calc(100% - 8px);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* no room for an icon inside an 84px thumbnail badge */
+    #panel-lending .feat-secondary-img .stock-badge .material-symbols-outlined {
+        display: none;
+    }
+
+    #panel-lending .feat-hero-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px !important;
+        margin: 0 !important;
+    }
+
+    #panel-lending .feat-hero-title,
+    #panel-lending .feat-secondary-title {
+        margin: 2px 0 0 !important;
+        font-size: 0.95rem !important;
+        line-height: 1.25;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    /* Anti-text-bombardment: the marketing blurb is hidden on phones */
+    #panel-lending .feat-hero-desc {
+        display: none !important;
+    }
+
+    #panel-lending .feat-secondary-cat {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 0.7rem;
+    }
+
+    #panel-lending .feat-hero-actions,
+    #panel-lending .feat-secondary-body>div[style] {
+        margin-top: 6px !important;
+    }
+
+    #panel-lending .feat-hero-actions .btn-borrow-primary,
+    #panel-lending .feat-secondary-body .btn-borrow-primary {
+        width: 100%;
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: 0.78rem;
+        justify-content: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+
+/* Tablet / small laptop (601–1100px): keep the desktop "2 + 1" arrangement
+   (hero card beside the second card). Two older rules in this file turned it
+   into a full-width hero plus a stranded half-width card (≤1100px) and then a
+   tall stacked hero with a 160px banner image (≤768px). */
+@media (min-width: 601px) and (max-width: 1100px) {
+    #panel-lending .featured-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    #panel-lending .feat-hero {
+        grid-column: span 2;
+        flex-direction: row;
+        min-height: 0;
+    }
+
+    #panel-lending .feat-hero-img,
+    #panel-lending .feat-hero-img-placeholder {
+        width: 44%;
+        height: auto;
+    }
+
+    #panel-lending .feat-hero-body {
+        padding: 20px 20px 18px;
+        min-width: 0;
+    }
+
+    #panel-lending .feat-hero-title {
+        font-size: 1.25rem;
+    }
+}
+
+
+/* ================================================================
+   § 44  EQUIPMENT TAB — catalog grid (2 columns, compact cards)
+================================================================ */
+@media (max-width: 768px) {
+    #panel-lending .eq-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 12px !important;
+    }
+}
+
+@media (max-width: 600px) {
+    #panel-lending .eq-grid {
+        gap: 10px !important;
+    }
+
+    #panel-lending .eq-item-card {
+        min-width: 0;
+    }
+
+    #panel-lending .eq-item-img-wrap {
+        height: 104px !important;
+    }
+
+    #panel-lending .eq-item-body {
+        padding: 10px 10px 12px !important;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    #panel-lending .eq-item-name {
+        font-size: 0.85rem !important;
+        line-height: 1.25;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    /* flex container + bare text node can't ellipsise → make it a block */
+    #panel-lending .eq-item-cat {
+        display: block !important;
+        min-width: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: 0.64rem !important;
+        letter-spacing: 0.04em;
+    }
+
+    #panel-lending .eq-item-cat .material-symbols-outlined {
+        font-size: 12px !important;
+        vertical-align: -2px;
+        margin-right: 2px;
+    }
+
+    #panel-lending .eq-item-body .btn-borrow {
+        width: 100%;
+        min-height: 38px;
+        padding: 6px 8px;
+        font-size: 0.78rem;
+        gap: 4px;
+        justify-content: center;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    /* Disabled state reads "Overdue Block": drop the icon and let it wrap
+       to two centred lines rather than cutting it to "Overd…" */
+    #panel-lending .eq-item-body .btn-borrow:disabled {
+        white-space: normal;
+        line-height: 1.15;
+        height: auto;
+        text-align: center;
+    }
+
+    #panel-lending .eq-item-body .btn-borrow:disabled .material-symbols-outlined {
+        display: none;
+    }
+
+    #panel-lending .eq-item-body .btn-borrow .btn-borrow-label,
+    #panel-lending .eq-item-body .btn-borrow:not(:has(.btn-borrow-label)) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* stock pill on the photo: smaller so it never covers the whole image */
+    #panel-lending .eq-stock-overlay .stock-badge {
+        padding: 2px 7px !important;
+        font-size: 0.64rem !important;
+    }
+}
+
+/* Only a truly tiny screen (≤ 319px) drops to a single column */
+@media (max-width: 360px) {
+    #panel-lending .eq-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+}
+
+@media (max-width: 319px) {
+    #panel-lending .eq-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
+
+
+/* ================================================================
+   § 45  MY ACTIVITY — toolbar + condensed rows
+   • History filters: tabs on one row, search on its own full row
+     (it was squeezed to ~60px so the placeholder read "Se").
+   • Long titles clamp to 2 lines; long secondary text (place,
+     purpose, decline reason) clamps to 1 line. Tap "Details"
+     (added by faculty-dashboard-responsive.js) to read it all.
+================================================================ */
+@media (max-width: 600px) {
+    #panel-activity .fact-tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+    }
+
+    #panel-activity .fact-seg {
+        display: flex;
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    #panel-activity .fact-seg-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 0 8px;
+        text-align: center;
+    }
+
+    #panel-activity .fact-search {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        height: 40px;
+    }
+
+    #panel-activity .fact-search input {
+        flex: 1 1 auto;
+        width: 100% !important;
+        min-width: 0;
+        font-size: 16px;
+        /* ≥16px stops iOS zooming the page on focus */
+    }
+
+    /* ----- loan / reservation rows ----- */
+    #panel-activity .fact-item-top {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    #panel-activity .fact-item-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    #panel-activity .fact-item-top .fact-chip {
+        flex: 0 0 auto;
+    }
+
+    #panel-activity .fact-item:not(.rx-open) .fact-item-sub,
+    #panel-activity .fact-item:not(.rx-open) .fact-note {
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    /* ----- history cards ----- */
+    #panel-activity .fact-row:not(.rx-open) .fact-row-title,
+    #panel-activity .fact-row:not(.rx-open) .fact-row-sub {
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+    }
+
+    /* show only the FIRST secondary line (place) until expanded; the reason
+       line is the long one, so it stays behind "Details" */
+    #panel-activity .fact-row:not(.rx-open) .fact-row-sub+.fact-row-sub {
+        display: none;
+    }
+
+    #panel-activity .fact-when {
+        white-space: normal;
+        font-size: 0.76rem;
+    }
+}
+
+
+/* ================================================================
+   § 46  "DETAILS" TOGGLE  (created by faculty-dashboard-responsive.js
+         only on rows whose text was actually cut off)
+================================================================ */
+.rx-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin: 4px 0 0;
+    padding: 4px 8px 4px 6px;
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary, #800000) 8%, transparent);
+    color: var(--color-primary, #800000);
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.rx-more .material-symbols-outlined {
+    font-size: 16px;
+    transition: transform 0.18s ease;
+}
+
+.rx-more[aria-expanded="true"] .material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+.rx-more:focus-visible {
+    outline: 2px solid var(--color-primary, #800000);
+    outline-offset: 2px;
+}
+
+/* the toggle is only meant for phones; wider screens show full text */
+@media (min-width: 601px) {
+    .rx-more {
+        display: none !important;
+    }
+}
+
+
+/* ================================================================
+   § 47  HOME — stat cards + student access code on small phones
+   • Stat cards: on 320px screens the 42px icon tile left too little
+     room for "Reservations", so the tile shrinks (words are never
+     broken mid-word).
+   • Access code: 34px monospace wrapped as "szs-67p-mc / d". It now
+     scales with the screen and stays on one line, because it is a
+     code people read out and copy.
+================================================================ */
+@media (max-width: 480px) {
+    #panel-home .fdb-kpi {
+        min-width: 0;
+    }
+
+    #panel-home .fdb-kpi-body {
+        min-width: 0;
+    }
+
+    #panel-home .fcc-code-value {
+        font-size: clamp(1.25rem, 8vw, 2.1rem);
+        letter-spacing: 1px;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 360px) {
+    #panel-home .fdb-kpi {
+        gap: 8px;
+        padding-left: 12px;
+        padding-right: 10px;
+    }
+
+    #panel-home .fdb-kpi-icon {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        border-radius: 10px;
+    }
+
+    #panel-home .fdb-kpi-icon .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    #panel-home .fdb-kpi-label {
+        font-size: 0.7rem;
+        line-height: 1.2;
+    }
+}
+
+
+/* ================================================================
+   § 48  VERY SMALL PHONES (≤ 360px) — final squeeze
+================================================================ */
+@media (max-width: 360px) {
+
+    #panel-lending .feat-hero,
+    #panel-lending .feat-secondary {
+        grid-template-columns: 72px minmax(0, 1fr);
+    }
+
+    #panel-lending .feat-hero-img,
+    #panel-lending .feat-hero-img-placeholder,
+    #panel-lending .feat-secondary-img {
+        width: 72px !important;
+    }
+}
+
+
+/* ================================================================
+   § 49  UTILITY CLASSES  (Bootstrap-style helpers, no framework)
+================================================================ */
+.rx-min0 {
+    min-width: 0 !important;
+}
+
+.rx-trunc {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.rx-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
+@media (max-width: 600px) {
+    .rx-hide-xs {
+        display: none !important;
+    }
+}
+
+@media (min-width: 601px) {
+    .rx-show-xs {
+        display: none !important;
+    }
+}
+
+/* ================================================================
+   § 50  SETTINGS OVERLAY — header + view switch on small phones
+   • "Help & Support" was clipped at 320px (the switch was wider than
+     the screen); the two tabs now share the row equally.
+   • The one-line explainer under the title is hidden on phones.
+================================================================ */
+@media (max-width: 480px) {
+    #settingsOverlay .sov-pagehead-sub {
+        display: none;
+    }
+
+    #settingsOverlay .sx-switch {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    #settingsOverlay .sx-switch .sov-nav-item {
+        flex: 1 1 0;
+        min-width: 0;
+        justify-content: center;
+        padding-left: 10px;
+        padding-right: 10px;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 360px) {
+    #settingsOverlay .sx-switch .sov-nav-item .material-symbols-outlined {
+        display: none;
+    }
+}

@@ -398,7 +398,7 @@
             if (item.classList.contains('unread')) counts.unread++;
             if (counts.hasOwnProperty(item.dataset.cat)) counts[item.dataset.cat]++;
         });
-        const labels = { all: 'All', unread: 'Unread', request: 'Requests', overdue: 'Overdue', room: 'Rooms', system: 'System' };
+        const labels = { all: 'All', unread: 'Unread', request: 'Requests', overdue: 'Overdue', room: 'Facilities', system: 'System' };
         Object.keys(labels).forEach(cat => {
             const chip = bar.querySelector('.rq-filter-chip[data-notif-filter="' + cat + '"]');
             if (chip) chip.innerHTML = _esc(labels[cat]) + (counts[cat] > 0 ? ' <span class="notif-chip-count">' + counts[cat] + '</span>' : '');
@@ -1668,10 +1668,10 @@
     };
 
     /* ── Faculty: registry lookup ────────────────────────────── */
-    const facLookupBtn    = document.getElementById('fac-lookup-btn');
-    const facLookupAlert  = document.getElementById('fac-lookup-alert');
-    const facDisambig     = document.getElementById('fac-disambiguation');
-    const facDisambigSel  = document.getElementById('fac-disambig-select');
+    const facLookupBtn = document.getElementById('fac-lookup-btn');
+    const facLookupAlert = document.getElementById('fac-lookup-alert');
+    const facDisambig = document.getElementById('fac-disambiguation');
+    const facDisambigSel = document.getElementById('fac-disambig-select');
 
     // Stores the currently confirmed registry match {faculty_id, email_preview, full_name}
     // null means no successful lookup yet — submit is blocked until set.
@@ -1692,43 +1692,43 @@
     function _applyRegistryMatch(match) {
         _facRegistryMatch = match;
         const emailEl = document.getElementById('fac-email');
-        const idEl    = document.getElementById('fac-faculty-id');
+        const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = match.email_preview || '';
-        if (idEl)    idEl.value    = match.faculty_id    || '';
+        if (idEl) idEl.value = match.faculty_id || '';
     }
 
     function _clearRegistryPreview() {
         _facRegistryMatch = null;
         const emailEl = document.getElementById('fac-email');
-        const idEl    = document.getElementById('fac-faculty-id');
+        const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = '';
-        if (idEl)    idEl.value    = '';
+        if (idEl) idEl.value = '';
         if (facDisambig) facDisambig.style.display = 'none';
         if (facDisambigSel) facDisambigSel.innerHTML = '';
         _clearLookupAlert();
     }
 
     // Clear the preview whenever name fields change
-    ['fac-first', 'fac-last'].forEach(function(id) {
+    ['fac-first', 'fac-last'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.addEventListener('input', _clearRegistryPreview);
     });
 
     // Disambiguation select → apply the chosen match
     if (facDisambigSel) {
-        facDisambigSel.addEventListener('change', function() {
+        facDisambigSel.addEventListener('change', function () {
             try {
                 const data = JSON.parse(this.value || 'null');
                 if (data) _applyRegistryMatch(data);
-            } catch (e) {}
+            } catch (e) { }
         });
     }
 
     if (facLookupBtn) {
-        facLookupBtn.addEventListener('click', function() {
+        facLookupBtn.addEventListener('click', function () {
             _clearRegistryPreview();
             const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const lastName  = (document.getElementById('fac-last')?.value  || '').trim();
+            const lastName = (document.getElementById('fac-last')?.value || '').trim();
             if (!firstName || !lastName) {
                 _showLookupAlert('Enter both first name and last name before looking up.', true);
                 return;
@@ -1740,7 +1740,7 @@
             const body = new URLSearchParams({
                 csrf_token: getCsrfToken(),
                 first_name: firstName,
-                last_name:  lastName,
+                last_name: lastName,
             });
 
             fetch('equipment-booking/api/lookup-faculty-registry.php', {
@@ -1748,64 +1748,64 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString(),
             })
-            .then(r => r.json())
-            .then(data => {
-                if (data.status === 'no_registry') {
-                    // Registry not yet uploaded — show a soft notice but allow creation
-                    _showLookupAlert(
-                        'No faculty registry has been uploaded yet. Account will be created without ID validation.',
-                        false
-                    );
-                    // Allow submit without a registry match
-                    _facRegistryMatch = { faculty_id: '', email_preview: '' };
-                    return;
-                }
-                if (data.status === 'not_found') {
-                    _showLookupAlert(
-                        firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
-                        'Check the spelling or upload an updated registry file.',
-                        true
-                    );
-                    return;
-                }
-                if (data.status === 'found' && data.matches && data.matches.length === 1) {
-                    const m = data.matches[0];
-                    if (m.is_newly_hired) {
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'no_registry') {
+                        // Registry not yet uploaded — show a soft notice but allow creation
                         _showLookupAlert(
-                            firstName + ' ' + lastName + ' is listed as newly hired and does not have a Faculty ID yet. ' +
-                            'Upload an updated registry once their ID is assigned.',
+                            'No faculty registry has been uploaded yet. Account will be created without ID validation.',
+                            false
+                        );
+                        // Allow submit without a registry match
+                        _facRegistryMatch = { faculty_id: '', email_preview: '' };
+                        return;
+                    }
+                    if (data.status === 'not_found') {
+                        _showLookupAlert(
+                            firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
+                            'Check the spelling or upload an updated registry file.',
                             true
                         );
                         return;
                     }
-                    _applyRegistryMatch(m);
-                    _showLookupAlert('Registry match found. Review the details below, then complete the form.', false);
-                    return;
-                }
-                if (data.status === 'found' && data.matches && data.matches.length > 1) {
-                    // Show disambiguation picker
-                    if (facDisambig && facDisambigSel) {
-                        facDisambigSel.innerHTML =
-                            '<option value="">— Select the correct faculty member —</option>' +
-                            data.matches.map(m =>
-                                '<option value=\'' + JSON.stringify(m).replace(/'/g, '&#39;') + '\'>' +
-                                m.full_name + (m.faculty_id ? ' (' + m.faculty_id + ')' : ' — Newly Hired') +
-                                '</option>'
-                            ).join('');
-                        facDisambig.style.display = '';
-                        _showLookupAlert('Multiple matches found. Select the correct faculty member above.', false);
+                    if (data.status === 'found' && data.matches && data.matches.length === 1) {
+                        const m = data.matches[0];
+                        if (m.is_newly_hired) {
+                            _showLookupAlert(
+                                firstName + ' ' + lastName + ' is listed as newly hired and does not have a Faculty ID yet. ' +
+                                'Upload an updated registry once their ID is assigned.',
+                                true
+                            );
+                            return;
+                        }
+                        _applyRegistryMatch(m);
+                        _showLookupAlert('Registry match found. Review the details below, then complete the form.', false);
+                        return;
                     }
-                    return;
-                }
-                _showLookupAlert('Unexpected response. Please try again.', true);
-            })
-            .catch(() => {
-                _showLookupAlert('Network error. Please try again.', true);
-            })
-            .finally(() => {
-                facLookupBtn.disabled = false;
-                facLookupBtn.innerHTML = '<span class="material-symbols-outlined">manage_search</span> Look up in Faculty Registry';
-            });
+                    if (data.status === 'found' && data.matches && data.matches.length > 1) {
+                        // Show disambiguation picker
+                        if (facDisambig && facDisambigSel) {
+                            facDisambigSel.innerHTML =
+                                '<option value="">— Select the correct faculty member —</option>' +
+                                data.matches.map(m =>
+                                    '<option value=\'' + JSON.stringify(m).replace(/'/g, '&#39;') + '\'>' +
+                                    m.full_name + (m.faculty_id ? ' (' + m.faculty_id + ')' : ' — Newly Hired') +
+                                    '</option>'
+                                ).join('');
+                            facDisambig.style.display = '';
+                            _showLookupAlert('Multiple matches found. Select the correct faculty member above.', false);
+                        }
+                        return;
+                    }
+                    _showLookupAlert('Unexpected response. Please try again.', true);
+                })
+                .catch(() => {
+                    _showLookupAlert('Network error. Please try again.', true);
+                })
+                .finally(() => {
+                    facLookupBtn.disabled = false;
+                    facLookupBtn.innerHTML = '<span class="material-symbols-outlined">manage_search</span> Look up in Faculty Registry';
+                });
         });
     }
 
@@ -1833,6 +1833,13 @@
        FAC_CREATED_OVERLAY_MS must match the .fac-created-bar animation (2s) in admin-dashboard.css. */
     const FAC_CREATED_OVERLAY_MS = 2000;
     let _facReloading = false;
+
+    // Put the Create Account button back to its normal, clickable state.
+    function _facResetSubmitBtn() {
+        if (!facSubmitBtn) return;
+        facSubmitBtn.disabled = false;
+        facSubmitBtn.innerHTML = '<span class="material-symbols-outlined">person_add</span> Create Account';
+    }
 
     function _facAccountCreated(fullname) {
         _facReloading = true;
@@ -1864,14 +1871,17 @@
         document.body.appendChild(ov);
 
         setTimeout(function () {
+            // Unlock the button first: the click handler's .finally() skips its reset while
+            // _facReloading is true, so nothing else ever re-enables it. Doing it up front
+            // also means an error further down can never leave it stuck on "Creating...".
+            _facReloading = false;
+            _facResetSubmitBtn();
             // Switch to Faculty tab in-place — no page reload needed.
             document.body.removeChild(ov);
             _switchTabDOM('faculty');
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
-            // Reset the flag so the submit button is re-enabled for the next account.
-            _facReloading = false;
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -1944,9 +1954,8 @@
                     _showFacAlert('Network error. Please try again.', true);
                 })
                 .finally(() => {
-                    if (_facReloading) return; // stay locked: the page is about to reload
-                    facSubmitBtn.disabled = false;
-                    facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Create Account';
+                    if (_facReloading) return; // stay locked until the "Account created" overlay finishes
+                    _facResetSubmitBtn();
                 });
         });
     }
@@ -4245,7 +4254,7 @@ function psSelectFmt(btn) {
                 'rule_4_return_history': 'Return-history priority',
                 'rule_5_id_order': 'ID order tie-breaker',
                 'rule_past_datetime': 'Past date or time',
-                'rule_archived': 'Room availability policy',
+                'rule_archived': 'Facility availability policy',
                 'rule_missing_doc_hold': 'Supporting-document policy',
                 'rule_schedule_conflict': 'Schedule conflict',
                 'override': 'Admin override',
@@ -4430,7 +4439,7 @@ function psSelectFmt(btn) {
     if (!root || !live) return;
 
     var POLL_MS = 15000;
-    var state = { set: 'equipment', range: 14 };
+    var state = { set: 'equipment', range: 14, more: false };   // more = "See more" panel open
     var lastHtml = null;
     var inflight = false;
     var stopped = false;
@@ -4450,6 +4459,7 @@ function psSelectFmt(btn) {
     }
     var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var DOWF = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     function shortDate(s) { var d = parseYmd(s); return MON[d.getMonth()] + ' ' + d.getDate(); }
     function longDate(s) { var d = parseYmd(s); return DOW[d.getDay()] + ', ' + MON[d.getMonth()] + ' ' + d.getDate(); }
     function sum(a) { return a.reduce(function (x, y) { return x + y; }, 0); }
@@ -4476,10 +4486,23 @@ function psSelectFmt(btn) {
             esc(t.text) + (tail ? ' <small>' + esc(tail) + '</small>' : '') + '</em>';
     }
 
-    /* Busiest day(s) for 7D / 14D, busiest week for 30D, plus a few "at a glance" facts. */
+    /* Busiest day(s) for 7D / 14D, busiest week for 30D (also returned as "bands" so the chart can
+       mark them), and a short "See more" pair of facts. */
     function insightsHtml(c) {
         var unit = c.set.unit, units = unit + 's', n = c.n, N = c.N;
-        var lead = '', rows = '', note = '', heading = '';
+        var lead = '', rows = '', heading = '', hint = '', bands = [];
+
+        /* one horizontal bar as SVG (no inline styles) */
+        function bar(pct) {
+            return '<span class="dash-rank-bar"><svg viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+                '<rect x="0" y="0" width="' + pct + '" height="1"/></svg></span>';
+        }
+        function rankRow(name, small, t, base, total, isTop) {
+            return '<li' + (isTop ? ' class="is-top"' : '') + '><span class="dash-rank-name">' + esc(name) +
+                (small ? '<small>' + esc(small) + '</small>' : '') + '</span>' +
+                bar(base ? Math.round(t / base * 100) : 0) +
+                '<span class="dash-rank-val"><b>' + t + '</b><small>' + share(t, total) + '%</small></span></li>';
+        }
 
         if (n <= 14) {
             heading = 'Busiest days';
@@ -4488,93 +4511,89 @@ function psSelectFmt(btn) {
             order.sort(function (a, b) { return b.t - a.t || b.i - a.i; });   // ties: most recent first
             var top = order[0].t;
             var tied = order.filter(function (x) { return x.t === top; });
-            var dayName = function (i) { return i === n - 1 ? 'Today (' + longDate(c.labels[i]) + ')' : longDate(c.labels[i]); };
+            // 7D: plain weekday names ("Tuesday"); 14D: "Tue, Oct 14" (a weekday alone would be ambiguous)
+            var nm = function (i) {
+                var d = parseYmd(c.labels[i]);
+                var base = n <= 7 ? DOWF[d.getDay()] : longDate(c.labels[i]);
+                return i === n - 1 ? 'Today (' + base + ')' : base;
+            };
             if (top < 2) {
                 lead = 'Activity was light: no day had more than one ' + unit + '.';
-            } else if (tied.length >= 3) {
-                lead = 'No single busiest day: <b>' + tied.length + ' days</b> tied at ' + plural(top, unit) + ' each.';
+            } else if (tied.length > 3) {
+                // too many to name: say so, and mark every tied day on the chart instead
+                lead = '<b>' + tied.length + ' days</b> tied for busiest, with ' + plural(top, unit) + ' each (marked on the chart).';
+                tied.forEach(function (p) { bands.push({ from: p.i, to: p.i + 1, labels: ['Busiest'], top: true }); });
             } else {
-                var picks = [order[0]];
-                // a second day only counts if it is close to the first (at least 60% of it, and 2+)
-                if (order[1] && order[1].t >= Math.max(2, Math.ceil(top * 0.6))) picks.push(order[1]);
+                var picks;
+                if (tied.length >= 2) {
+                    picks = tied.slice();            // an exact tie for first place: name every tied day (2 or 3)
+                } else {
+                    picks = [order[0]];
+                    // a lone leader gets a runner-up only if it is close (at least 60% of it, and 2+)
+                    if (order[1] && order[1].t >= Math.max(2, Math.ceil(top * 0.6))) picks.push(order[1]);
+                }
                 var pt = picks.reduce(function (a, p) { return a + p.t; }, 0);
                 var chrono = picks.slice().sort(function (a, b) { return a.i - b.i; });
-                lead = chrono.map(function (p) { return '<b>' + esc(dayName(p.i)) + '</b>'; }).join(' and ') +
+                var names = chrono.map(function (p) { return '<b>' + esc(nm(p.i)) + '</b>'; });
+                lead = (names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names[0]) +
                     (picks.length > 1 ? ' were the busiest days: ' + plural(pt, unit) + ' together' : ' was the busiest day: ' + plural(pt, unit)) +
                     ', ' + share(pt, c.grand) + '% of all ' + units + '.';
-                rows = picks.map(function (p) {
-                    return '<li class="is-top"><span class="dash-rank-name">' + esc(dayName(p.i)) + '</span>' +
-                        '<span class="dash-rank-bar"><i style="width:' + Math.round(p.t / top * 100) + '%"></i></span>' +
-                        '<span class="dash-rank-val"><b>' + p.t + '</b><small>' + share(p.t, c.grand) + '%</small></span></li>';
+                rows = chrono.map(function (p) {
+                    var d = parseYmd(c.labels[p.i]);
+                    return rankRow(n <= 7 ? DOWF[d.getDay()] : longDate(c.labels[p.i]),
+                        (n <= 7 ? shortDate(c.labels[p.i]) : '') + (p.i === n - 1 ? (n <= 7 ? ' · today' : 'today') : ''),
+                        p.t, top, c.grand, true);
                 }).join('');
+                chrono.forEach(function (p) { bands.push({ from: p.i, to: p.i + 1, labels: ['Busiest'], top: true }); });
             }
         } else {
             heading = 'Busiest week';
+            hint = 'Last 28 days, in 7-day blocks';
             var wk = [], wsum = 0, wmax = 0;
             for (var w = 0; w < 4; w++) {
                 var st = n - 28 + w * 7, en = st + 7, tot = rangeSum(c.totals, st, en);
-                wk.push({ w: w + 1, t: tot, from: c.labels[st], to: c.labels[en - 1] });
+                wk.push({ w: w + 1, t: tot, st: st, en: en, from: c.labels[st], to: c.labels[en - 1] });
                 wsum += tot; if (tot > wmax) wmax = tot;
             }
             var best = wk.filter(function (x) { return x.t === wmax; });
+            var emphasise = wsum > 0 && best.length <= 2;     // 3+ way tie = nothing to single out
             if (wsum === 0) {
                 lead = 'No ' + units + ' in the last 4 weeks.';
             } else if (best.length === 1) {
                 lead = '<b>Week ' + best[0].w + '</b> (' + esc(span(best[0].from, best[0].to)) + ') was the busiest: ' +
                     plural(wmax, unit) + ', ' + share(wmax, wsum) + '% of the last 4 weeks.';
             } else if (best.length === 2) {
-                lead = '<b>Weeks ' + best[0].w + ' and ' + best[1].w + '</b> tied for busiest at ' + plural(wmax, unit) + ' each.';
+                lead = '<b>Weeks ' + best[0].w + ' and ' + best[1].w + '</b> tied for busiest, with ' + plural(wmax, unit) + ' each.';
             } else {
                 lead = 'Activity was spread evenly across the weeks.';
             }
-            var w3 = wk[2].t, w4 = wk[3].t;
-            if (wsum > 0 && (w3 > 0 || w4 > 0)) {
-                if (w3 === 0) lead += ' The latest week is the first with any activity.';
-                else {
-                    var dw = Math.round((w4 - w3) / w3 * 100);
-                    lead += ' The latest week is ' + (dw === 0 ? 'level with' : Math.abs(dw) + '% ' + (dw > 0 ? 'above' : 'below')) + ' the week before.';
-                }
-            }
             if (wsum > 0) {
                 rows = wk.map(function (x) {
-                    var isTop = x.t === wmax && wmax > 0;
-                    return '<li' + (isTop ? ' class="is-top"' : '') + '><span class="dash-rank-name">Week ' + x.w +
-                        '<small>' + esc(span(x.from, x.to)) + (x.w === 4 ? ' · latest' : '') + '</small></span>' +
-                        '<span class="dash-rank-bar"><i style="width:' + (wmax ? Math.round(x.t / wmax * 100) : 0) + '%"></i></span>' +
-                        '<span class="dash-rank-val"><b>' + x.t + '</b><small>' + share(x.t, wsum) + '%</small></span></li>';
+                    return rankRow('Week ' + x.w, span(x.from, x.to) + (x.w === 4 ? ' · latest' : ''), x.t, wmax, wsum, emphasise && x.t === wmax);
                 }).join('');
-                note = '<p class="dash-ins-note">Weeks are 7-day blocks counting back from today (the most recent 28 days).</p>';
+                wk.forEach(function (x) {
+                    var isTop = emphasise && x.t === wmax;
+                    bands.push({
+                        from: x.st, to: x.en, top: isTop, sep: x.st > 0,   // a boundary wherever a week doesn't start at the left edge
+                        labels: isTop ? ['Week ' + x.w + ' · busiest', 'Week ' + x.w, 'W' + x.w] : ['Week ' + x.w, 'W' + x.w]
+                    });
+                });
             }
         }
 
-        /* at a glance */
-        var sers = c.set.series;
-        function outcome(a, b) {
-            var ap = 0, de = 0;
-            sers.forEach(function (s) {
-                if (s.key === 'approved') ap = rangeSum(s.values, a, b);
-                if (s.key === 'declined') de = rangeSum(s.values, a, b);
-            });
-            return { ap: ap, de: de, rate: (ap + de) > 0 ? Math.round(ap / (ap + de) * 100) : null };
-        }
-        var cur = outcome(N - n, N);
-        var prev = N >= 2 * n ? outcome(N - 2 * n, N - n) : null;
-        var rateDelta = '';
-        if (cur.rate != null && prev && prev.rate != null) {
-            var pts = cur.rate - prev.rate;
-            rateDelta = chipHtml({ dir: pts > 0 ? 'up' : (pts < 0 ? 'down' : 'flat'), text: pts === 0 ? 'no change' : Math.abs(pts) + ' pts' }, 'vs previous ' + n + ' days');
-        }
-        var quiet = c.totals.filter(function (t) { return t === 0; }).length;
-
+        /* "See more": two facts only */
+        var ap = 0, de = 0;
+        c.set.series.forEach(function (s) {
+            if (s.key === 'approved') ap = rangeSum(s.values, N - n, N);
+            if (s.key === 'declined') de = rangeSum(s.values, N - n, N);
+        });
+        var rate = (ap + de) > 0 ? Math.round(ap / (ap + de) * 100) : null;
         var facts = '';
-        function fact(label, value, small, extra) {
-            facts += '<div class="dash-fact"><dt>' + esc(label) + '</dt><dd>' + value + (small ? ' <small>' + small + '</small>' : '') + (extra || '') + '</dd></div>';
+        function fact(label, value, sub, isText) {
+            facts += '<div class="dash-fact"><dt>' + esc(label) + '</dt><dd><span class="dash-fact-val' + (isText ? ' is-text' : '') + '">' +
+                esc(value) + '</span>' + (sub ? '<span class="dash-fact-sub">' + esc(sub) + '</span>' : '') + '</dd></div>';
         }
-        fact('Daily average', '<b>' + (c.grand / n).toFixed(1) + '</b>', 'per day');
-        fact('Approval rate',
-            cur.rate == null ? '<b>—</b>' : '<b>' + cur.rate + '%</b>',
-            cur.rate == null ? 'nothing decided yet' : cur.ap + ' approved · ' + cur.de + ' declined',
-            rateDelta);
+        fact('Approval rate', rate == null ? '—' : rate + '%', rate == null ? 'Nothing decided yet' : ap + ' of ' + (ap + de) + ' decided');
 
         var ex = c.data.extras && c.data.extras[state.set];
         if (ex) {
@@ -4584,25 +4603,25 @@ function psSelectFmt(btn) {
                 if (t > bestSum) { bestSum = t; bestRow = r; }
             });
             if (state.set === 'equipment') {
-                if (cur.de === 0) fact(ex.title, '<b>None</b>', 'nothing was declined');
-                else if (bestRow) fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + cur.de + ' declined');
+                if (de === 0) fact(ex.title, 'None', 'Nothing was declined', true);
+                else if (bestRow) fact(ex.title, bestRow.label, bestSum + ' of ' + de + ' declined', true);
             } else if (bestRow) {
-                fact(ex.title, '<b class="is-text">' + esc(bestRow.label) + '</b>', bestSum + ' of ' + plural(cur.ap, 'booking') + (bestRow.sub ? ' · ' + esc(bestRow.sub) : ''));
+                fact(ex.title, bestRow.label, bestSum + ' of ' + plural(ap, 'booking') + (bestRow.sub ? ' · ' + bestRow.sub : ''), true);
             }
         }
-        fact('Days with no activity', '<b>' + quiet + ' <span class="dash-of">of ' + n + '</span></b>');
 
-        return '<section class="dash-ins-col"><h3>' + esc(heading) + '</h3><p class="dash-ins-lead">' + lead + '</p>' +
-            (rows ? '<ul class="dash-rank">' + rows + '</ul>' : '') + note + '</section>' +
-            '<section class="dash-ins-col"><h3>At a glance</h3>' +
-            '<div class="dash-ins-more" aria-expanded="false">' +
-            '<dl class="dash-facts">' + facts + '</dl>' +
-            '</div>' +
-            '<button type="button" class="dash-ins-toggle" aria-expanded="false">' +
-            '<span class="dash-ins-toggle-label">See more</span>' +
-            '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span>' +
-            '</button>' +
-            '</section>';
+        var open = !!state.more;
+        return {
+            bands: bands,
+            html: '<section class="dash-ins-main"><div class="dash-ins-head"><h3>' + esc(heading) + '</h3>' +
+                (hint ? '<span class="dash-ins-hint">' + esc(hint) + '</span>' : '') + '</div>' +
+                '<p class="dash-ins-lead">' + lead + '</p>' +
+                (rows ? '<ul class="dash-rank">' + rows + '</ul>' : '') + '</section>' +
+                '<div class="dash-ins-more" id="dashInsMore" aria-expanded="' + open + '"><dl class="dash-facts">' + facts + '</dl></div>' +
+                '<div class="dash-ins-foot"><button type="button" class="dash-ins-toggle" aria-expanded="' + open + '" aria-controls="dashInsMore">' +
+                '<span class="dash-ins-toggle-label">' + (open ? 'See less' : 'See more') + '</span>' +
+                '<span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button></div>'
+        };
     }
 
     /* ── chart ───────────────────────────────────────────────── */
@@ -4673,14 +4692,13 @@ function psSelectFmt(btn) {
             return;
         }
 
-        if (insEl) {
-            insEl.innerHTML = insightsHtml({ data: data, set: set, n: n, N: N, labels: labels, totals: totals, grand: grand });
-        }
+        var ins = insightsHtml({ data: data, set: set, n: n, N: N, labels: labels, totals: totals, grand: grand });
+        if (insEl) insEl.innerHTML = ins.html;
 
         /* geometry */
         var W = Math.max(240, chartEl.clientWidth || 600);
         var H = Math.max(200, chartEl.clientHeight || 230);
-        var m = { l: 4, r: 4, t: 8, b: 24 };
+        var m = { l: 4, r: 4, t: ins.bands.length ? 26 : 8, b: 24 };   // extra room on top for the band labels
         var pw = W - m.l - m.r, ph = H - m.t - m.b;
         var step = Math.max(1, Math.ceil(peak / 4));
         var top = step * 4;
@@ -4692,6 +4710,20 @@ function psSelectFmt(btn) {
 
         /* just a baseline: bar heights are relative, exact counts show on hover */
         out += '<line class="dash-baseline" x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + (m.t + ph) + '" y2="' + (m.t + ph) + '"/>';
+
+        /* context bands: the busiest day(s), or the four weeks with the busiest one highlighted */
+        ins.bands.forEach(function (bd) {
+            var bx = m.l + slot * bd.from, bwid = slot * (bd.to - bd.from);
+            out += '<g class="dash-band' + (bd.top ? ' is-top' : '') + '">';
+            if (bd.top) out += '<rect class="dash-band-fill" x="' + (bx + 1) + '" y="2" width="' + (bwid - 2) + '" height="' + (m.t + ph - 2) + '" rx="8"/>';
+            if (bd.sep) out += '<line class="dash-band-sep" x1="' + bx + '" x2="' + bx + '" y1="6" y2="' + (m.t + ph) + '"/>';
+            var lab = '';                                   // longest label that fits the band's width
+            for (var li = 0; li < bd.labels.length; li++) {
+                if (bd.labels[li].length * 6.4 <= bwid - 4) { lab = bd.labels[li]; break; }
+            }
+            if (lab) out += '<text class="dash-band-label" x="' + (bx + bwid / 2) + '" y="16" text-anchor="middle">' + esc(lab) + '</text>';
+            out += '</g>';
+        });
 
         labels.forEach(function (lab, i) {
             var gx = m.l + slot * i;
@@ -4761,15 +4793,16 @@ function psSelectFmt(btn) {
         });
     }
 
-    /* toggle "See more" in the insights panel */
+    /* toggle "See more" in the insights panel (remembered, so redraws / live refreshes keep it open) */
     root.addEventListener('click', function (e) {
         var btn = e.target.closest('.dash-ins-toggle');
         if (!btn) return;
-        var expanded = btn.getAttribute('aria-expanded') === 'true';
-        var more = btn.previousElementSibling;
-        btn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        if (more) more.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-        btn.querySelector('.dash-ins-toggle-label').textContent = expanded ? 'See more' : 'See less';
+        state.more = btn.getAttribute('aria-expanded') !== 'true';
+        var box = btn.closest('.dash-insights');
+        var more = box && box.querySelector('.dash-ins-more');
+        btn.setAttribute('aria-expanded', state.more ? 'true' : 'false');
+        if (more) more.setAttribute('aria-expanded', state.more ? 'true' : 'false');
+        btn.querySelector('.dash-ins-toggle-label').textContent = state.more ? 'See less' : 'See more';
     });
 
     /* redraw when the card's width changes (sidebar collapse, rotate, resize) */
@@ -4886,7 +4919,6 @@ function psSelectFmt(btn) {
         var search = document.getElementById('roomSearchInput');
         var pillsEl = document.getElementById('rmBuildingPills');
         var floorsEl = document.getElementById('rmFloorChips');
-        var showingEl = document.getElementById('rmShowing');
         if (!tb || !table || !bld || !flr || !st || !search || !pillsEl || !floorsEl) return;
 
         var lastPillSig = '';
@@ -4949,10 +4981,26 @@ function psSelectFmt(btn) {
             tb.classList.toggle('rm-searching', searching);
             /* one building on screen -> its name is dropped from every floor heading */
             table.classList.toggle('rm-one-bld', bld.value !== 'all' && !searching);
-            if (showingEl) showingEl.textContent = shown === rows.length
-                ? rows.length + (rows.length === 1 ? ' room' : ' rooms')
-                : shown + ' of ' + rows.length + ' rooms';
+            updateFloorCounts();
             tb.classList.add('rm-enhanced');
+        }
+
+        /* "6 rooms" / "2 of 6 rooms" after each floor name, counted from the rows the filters left visible */
+        function updateFloorCounts() {
+            var cur = null, shown = 0, total = 0;
+            function flush() {
+                if (!cur) return;
+                var c = cur.querySelector('.pr-floor-count');
+                if (!c) return;
+                var noun = total === 1 ? ' facility' : ' facilities';
+                c.textContent = shown === total ? total + noun : shown + ' of ' + total + noun;
+            }
+            table.querySelectorAll('tbody tr.pr-floor-divider, tbody tr.pr-room-row').forEach(function (r) {
+                if (r.classList.contains('pr-floor-divider')) { flush(); cur = r; shown = 0; total = 0; return; }
+                total++;
+                if (r.style.display !== 'none') shown++;
+            });
+            flush();
         }
 
         /* pills / chips -> write to the real selects */
@@ -5377,19 +5425,19 @@ function psSelectFmt(btn) {
 (function () {
     'use strict';
 
-    var header      = document.getElementById('fac-registry-header');
-    var body        = document.getElementById('fac-registry-body');
-    var chevron     = document.getElementById('fac-registry-chevron');
-    var fileInput   = document.getElementById('fac-reg-file-input');
-    var fileLabel   = document.getElementById('fac-reg-file-label');
-    var fileNameEl  = document.getElementById('fac-reg-file-name');
-    var importBtn   = document.getElementById('fac-reg-import-btn');
-    var replaceChk  = document.getElementById('fac-reg-replace-all');
-    var alertEl     = document.getElementById('fac-reg-alert');
+    var header = document.getElementById('fac-registry-header');
+    var body = document.getElementById('fac-registry-body');
+    var chevron = document.getElementById('fac-registry-chevron');
+    var fileInput = document.getElementById('fac-reg-file-input');
+    var fileLabel = document.getElementById('fac-reg-file-label');
+    var fileNameEl = document.getElementById('fac-reg-file-name');
+    var importBtn = document.getElementById('fac-reg-import-btn');
+    var replaceChk = document.getElementById('fac-reg-replace-all');
+    var alertEl = document.getElementById('fac-reg-alert');
     var previewWrap = document.getElementById('fac-reg-preview');
     var previewTbody = document.getElementById('fac-reg-preview-tbody');
     var previewCount = document.getElementById('fac-reg-preview-count');
-    var clearBtn    = document.getElementById('fac-reg-clear-btn');
+    var clearBtn = document.getElementById('fac-reg-clear-btn');
 
     if (!header) return; // Faculty tab not rendered for this admin role
 
@@ -5566,7 +5614,7 @@ function psSelectFmt(btn) {
 
                                 allRows.push({
                                     faculty_id: isNewlyHired ? 'NEWLY HIRED' : col0.replace(/\s/g, '').toUpperCase(),
-                                    full_name:  name,
+                                    full_name: name,
                                     department: col2
                                 });
                             });
@@ -5677,49 +5725,49 @@ function psSelectFmt(btn) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    csrf_token:  csrfToken,
-                    rows:        _parsedRows,
+                    csrf_token: csrfToken,
+                    rows: _parsedRows,
                     replace_all: replaceChk ? replaceChk.checked : false
                 })
             })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.status === 'success') {
-                    var msg = 'Import complete: ' + data.inserted + ' added, ' + data.updated + ' updated';
-                    if (data.skipped > 0) msg += ', ' + data.skipped + ' skipped';
-                    if (data.errors && data.errors.length > 0) msg += '. Some rows had errors — check the page.';
-                    showRegAlert(msg, false);
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status === 'success') {
+                        var msg = 'Import complete: ' + data.inserted + ' added, ' + data.updated + ' updated';
+                        if (data.skipped > 0) msg += ', ' + data.skipped + ' skipped';
+                        if (data.errors && data.errors.length > 0) msg += '. Some rows had errors — check the page.';
+                        showRegAlert(msg, false);
 
-                    // Show row-level errors if any
-                    if (data.errors && data.errors.length > 0) {
-                        var errHtml = data.errors.map(function (e) { return '<li>' + _esc(e) + '</li>'; }).join('');
-                        alertEl.innerHTML = alertEl.textContent + '<ul style="margin:.5rem 0 0;padding-left:1.2rem;font-size:11px">' + errHtml + '</ul>';
+                        // Show row-level errors if any
+                        if (data.errors && data.errors.length > 0) {
+                            var errHtml = data.errors.map(function (e) { return '<li>' + _esc(e) + '</li>'; }).join('');
+                            alertEl.innerHTML = alertEl.textContent + '<ul style="margin:.5rem 0 0;padding-left:1.2rem;font-size:11px">' + errHtml + '</ul>';
+                        }
+
+                        // Reset file picker; keep the preview visible so Super Admin can see what was imported
+                        if (fileInput) fileInput.value = '';
+                        if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
+                        _parsedRows = [];
+                        if (importBtn) importBtn.disabled = true;
+
+                        // Update the badge count without a full page reload
+                        var badge = document.querySelector('#fac-registry-card .fac-reg-badge');
+                        if (badge && typeof data.total_after !== 'undefined') {
+                            badge.textContent = data.total_after + ' entries';
+                            badge.className = 'fac-reg-badge fac-reg-badge--active';
+                        }
+                    } else {
+                        showRegAlert(data.error || 'Import failed. Please try again.', true);
+                        if (importBtn) importBtn.disabled = false;
                     }
-
-                    // Reset file picker; keep the preview visible so Super Admin can see what was imported
-                    if (fileInput) fileInput.value = '';
-                    if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-                    _parsedRows = [];
-                    if (importBtn) importBtn.disabled = true;
-
-                    // Update the badge count without a full page reload
-                    var badge = document.querySelector('#fac-registry-card .fac-reg-badge');
-                    if (badge && typeof data.total_after !== 'undefined') {
-                        badge.textContent = data.total_after + ' entries';
-                        badge.className = 'fac-reg-badge fac-reg-badge--active';
-                    }
-                } else {
-                    showRegAlert(data.error || 'Import failed. Please try again.', true);
+                })
+                .catch(function () {
+                    showRegAlert('Network error. Please try again.', true);
                     if (importBtn) importBtn.disabled = false;
-                }
-            })
-            .catch(function () {
-                showRegAlert('Network error. Please try again.', true);
-                if (importBtn) importBtn.disabled = false;
-            })
-            .finally(function () {
-                importBtn.innerHTML = '<span class="material-symbols-outlined">cloud_upload</span> Import';
-            });
+                })
+                .finally(function () {
+                    importBtn.innerHTML = '<span class="material-symbols-outlined">cloud_upload</span> Import';
+                });
         });
     }
 
@@ -5731,4 +5779,3 @@ function psSelectFmt(btn) {
     }
 
 })();
-

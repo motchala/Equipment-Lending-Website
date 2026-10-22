@@ -1168,7 +1168,7 @@ class ArbitrationEngine
                     (string)$reservation['faculty_name'],
                     'Declined',
                     self::RULE_ARCHIVED,
-                    'This room is currently under maintenance and cannot be reserved.'
+                    'This facility is currently under maintenance and cannot be reserved.'
                 );
                 return;
             }
@@ -1182,7 +1182,7 @@ class ArbitrationEngine
                     (string)$reservation['faculty_name'],
                     'Declined',
                     self::RULE_ARCHIVED,
-                    'This room is not available for reservation.'
+                    'This facility is not available for reservation.'
                 );
                 return;
             }
@@ -1274,7 +1274,7 @@ class ArbitrationEngine
                     (string)$reservation['faculty_name'],
                     'Approved',
                     self::RULE_1_FIFO,
-                    'Room reservation approved — no time conflict.'
+                    'Facility reservation approved — no time conflict.'
                 );
                 return;
             }
@@ -1363,7 +1363,7 @@ class ArbitrationEngine
                     (string)$reservation['faculty_name'],
                     'Approved',
                     $applied_rule,
-                    'Room reservation approved via priority scoring.'
+                    'Facility reservation approved via priority scoring.'
                 );
             } else {
                 // A higher-priority reservation already holds this slot.
@@ -1440,7 +1440,7 @@ class ArbitrationEngine
         if (!$row || (string)$row['status'] !== 'Declined') return null;
 
         $reason = trim((string)($row['reason'] ?? ''));
-        if ($reason === '') $reason = 'This room could not be reserved for that time.';
+        if ($reason === '') $reason = 'This facility could not be reserved for that time.';
 
         foreach (
             [

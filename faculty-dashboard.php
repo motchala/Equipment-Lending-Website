@@ -677,9 +677,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
          snapshot of this same stylesheet (predating several redesigns) that
          was silently overriding current styles because it loaded last. -->
 
-    <!-- Responsive System -->
-    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
-
     <!-- Dashboard Redesign v3 — Google Font -->
 
     <!-- facilities tab portal -->
@@ -2728,6 +2725,10 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             color: var(--color-on-surface-variant) !important;
         }
     </style>
+
+    <!-- Responsive System. Loaded LAST on purpose: the inline <style> block above uses !important
+         and sets the desktop layout, so these mobile/tablet overrides only win if they come after it. -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
     <?php role_splash_head(); ?>
 </head>
 
@@ -3797,14 +3798,16 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                 data-action="ai-fab-toggle" title="Ask about rooms">
                 <span class="material-symbols-outlined">smart_toy</span>
                 <span class="act-ai-fab-tooltip">Ask about rooms</span>
-                <div class="act-ai-fab-popover" id="actAiFabPopover">
-                    <span class="material-symbols-outlined" style="font-size:16px;flex-shrink:0;">smart_toy</span>
-                    <span>Need help finding or booking a room? Ask the AI assistant!</span>
-                    <button class="act-ai-fab-popover-close" id="actAiFabPopoverClose" title="Dismiss">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
             </button>
+
+            <!-- AI popover is a SIBLING of the FAB (a <button> may not contain another <button>) -->
+            <div class="act-ai-fab-popover" id="actAiFabPopover">
+                <span class="material-symbols-outlined" style="font-size:16px;flex-shrink:0;">smart_toy</span>
+                <span>Need help finding or booking a room? Ask the AI assistant!</span>
+                <button class="act-ai-fab-popover-close" id="actAiFabPopoverClose" title="Dismiss">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
 
         </main><!-- /app-main -->
     </div><!-- /main-wrapper -->
@@ -5224,6 +5227,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
+    <script src="equipment-booking/assets/js/faculty-dashboard-responsive.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard-responsive.js'); ?>" defer></script>
 </body>
 
 </html>

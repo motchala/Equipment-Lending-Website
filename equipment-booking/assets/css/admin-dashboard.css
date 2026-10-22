@@ -10449,10 +10449,7 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 }
 
 .dash-insights {
-    display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-    gap: 1.5rem;
-    margin-top: 1.1rem;
+    margin-top: 1rem;
     padding-top: 1.1rem;
     border-top: 1px solid var(--dash-line);
 }
@@ -10461,8 +10458,16 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     display: none;
 }
 
-.dash-ins-col h3 {
-    margin: 0 0 0.45rem;
+.dash-ins-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.7rem;
+    margin-bottom: 0.4rem;
+}
+
+.dash-ins-head h3 {
+    margin: 0;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.07em;
@@ -10470,9 +10475,14 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     color: var(--dash-muted);
 }
 
+.dash-ins-hint {
+    font-size: 11px;
+    color: var(--dash-muted);
+}
+
 .dash-ins-lead {
-    margin: 0 0 0.8rem;
-    font-size: 12.5px;
+    margin: 0 0 0.75rem;
+    font-size: 13px;
     line-height: 1.55;
     color: var(--dash-ink);
 }
@@ -10487,16 +10497,16 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.55rem;
 }
 
 .dash-rank li {
     display: grid;
-    grid-template-columns: 8.4rem minmax(0, 1fr) 3.9rem;
+    grid-template-columns: 9rem minmax(0, 1fr) 4rem;
     /* fixed columns so every bar starts at the same x */
     align-items: center;
-    gap: 0.75rem;
-    font-size: 12px;
+    gap: 0.85rem;
+    font-size: 12.5px;
     color: var(--dash-ink);
 }
 
@@ -10520,15 +10530,18 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     overflow: hidden;
 }
 
-.dash-rank-bar i {
+.dash-rank-bar svg {
     display: block;
+    width: 100%;
     height: 100%;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--dash-accent) 28%, var(--dash-line));
 }
 
-.dash-rank li.is-top .dash-rank-bar i {
-    background: var(--dash-accent);
+.dash-rank-bar rect {
+    fill: color-mix(in srgb, var(--dash-accent) 28%, var(--dash-line));
+}
+
+.dash-rank li.is-top .dash-rank-bar rect {
+    fill: var(--dash-accent);
 }
 
 .dash-rank-val {
@@ -10548,68 +10561,133 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     color: var(--dash-muted);
 }
 
-.dash-ins-note {
-    margin: 0.75rem 0 0;
-    font-size: 11px;
-    color: var(--dash-muted);
+/* "See more": two fact tiles, side by side */
+.dash-ins-foot {
+    margin-top: 0.9rem;
+}
+
+.dash-ins-more {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    visibility: hidden;
+    margin-top: 0;
+    transition: max-height 0.28s ease, opacity 0.2s ease, margin-top 0.28s ease, visibility 0s linear 0.28s;
+}
+
+.dash-ins-more[aria-expanded="true"] {
+    max-height: 320px;
+    opacity: 1;
+    visibility: visible;
+    margin-top: 0.9rem;
+    transition: max-height 0.28s ease, opacity 0.2s ease 0.05s, margin-top 0.28s ease, visibility 0s;
 }
 
 .dash-facts {
     margin: 0;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
 }
 
 .dash-fact {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.8rem;
-    padding: 0.55rem 0;
-    border-top: 1px solid var(--dash-line);
-}
-
-.dash-fact:first-child {
-    border-top: none;
-    padding-top: 0.1rem;
+    min-width: 0;
+    padding: 0.75rem 0.95rem;
+    border-radius: 12px;
+    background: var(--dash-soft);
 }
 
 .dash-fact dt {
-    padding-top: 2px;
-    font-size: 12px;
+    margin: 0 0 0.3rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--dash-muted);
 }
 
 .dash-fact dd {
     margin: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    text-align: right;
-    font-size: 11px;
-    color: var(--dash-muted);
 }
 
-.dash-fact dd b {
-    font-size: 14px;
+.dash-fact-val {
+    display: block;
+    font-size: 1.4rem;
     font-weight: 700;
+    line-height: 1.15;
     color: var(--dash-ink);
     font-variant-numeric: tabular-nums;
 }
 
-.dash-fact dd b.is-text {
-    font-size: 12.5px;
+.dash-fact-val.is-text {
+    font-size: 1.02rem;
+    line-height: 1.3;
 }
 
-.dash-of {
-    font-size: 11px;
-    font-weight: 500;
+.dash-fact-sub {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 11.5px;
     color: var(--dash-muted);
 }
 
-.dash-fact .dash-delta {
-    margin: 3px 0 0;
+.dash-ins-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 30px;
+    padding: 0 10px 0 14px;
+    border: 1px solid var(--dash-line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--dash-accent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.dash-ins-toggle:hover {
+    background: var(--accent-light, #f3e5e6);
+    border-color: var(--dash-accent);
+}
+
+.dash-ins-toggle:focus-visible {
+    outline: 2px solid var(--dash-accent);
+    outline-offset: 2px;
+}
+
+.dash-ins-toggle .material-symbols-outlined {
+    font-size: 18px;
+    transition: transform 0.22s ease;
+}
+
+.dash-ins-toggle[aria-expanded="true"] .material-symbols-outlined {
+    transform: rotate(180deg);
+}
+
+/* chart context: highlight band + labels (busiest day(s), or Weeks 1–4) */
+.dash-band-fill {
+    fill: color-mix(in srgb, var(--dash-accent) 9%, transparent);
+}
+
+.dash-band-label {
+    fill: var(--dash-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    font-family: inherit;
+}
+
+.dash-band.is-top .dash-band-label {
+    fill: var(--dash-accent);
+    font-weight: 700;
+}
+
+.dash-band-sep {
+    stroke: var(--dash-line);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
 }
 
 
@@ -11192,14 +11270,13 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
         font-size: 1.7rem;
     }
 
-    .dash-insights {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 1.2rem;
+    .dash-rank li {
+        grid-template-columns: 6.6rem minmax(0, 1fr) 3.6rem;
+        gap: 0.6rem;
     }
 
-    .dash-rank li {
-        grid-template-columns: 7.2rem minmax(0, 1fr) 3.6rem;
-        gap: 0.6rem;
+    .dash-facts {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .dash-delta {
@@ -12175,46 +12252,6 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 }
 
-/* ── Insights "See more" toggle ─────────────────────────────────── */
-.dash-ins-more {
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.28s ease;
-}
-
-.dash-ins-more[aria-expanded="true"] {
-    max-height: 400px;
-}
-
-.dash-ins-toggle {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    margin-top: 0.55rem;
-    padding: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--accent-maroon);
-    line-height: 1;
-}
-
-.dash-ins-toggle .material-symbols-outlined {
-    font-size: 16px;
-    transition: transform 0.22s ease;
-}
-
-.dash-ins-toggle[aria-expanded="true"] .material-symbols-outlined {
-    transform: rotate(180deg);
-}
-
-.dash-ins-toggle:hover {
-    opacity: 0.8;
-}
-
-
 /* ═══════════════════════════════════════════════════════════════
    EQUIPMENT › ON LOAN TAB  (additive — Equipment sub-tabs)
    Reuses .rq-filter-chip / .ps-card / .ps-table / .ps-badge.
@@ -12482,19 +12519,23 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     margin-left: 8px;
     vertical-align: middle;
 }
+
 .fac-reg-badge--active {
     background: #e8f5e9;
     color: #2e7d32;
 }
+
 .fac-reg-badge--empty {
     background: #fff3e0;
     color: #e65100;
 }
+
 .fac-reg-upload-row {
     display: flex;
     gap: 8px;
     align-items: center;
 }
+
 .fac-reg-file-label {
     flex: 1;
     display: flex;
@@ -12511,14 +12552,17 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     white-space: nowrap;
     text-overflow: ellipsis;
 }
+
 .fac-reg-file-label:hover {
     border-color: var(--accent-maroon);
     color: var(--accent-maroon);
 }
+
 .fac-reg-file-label .material-symbols-outlined {
     font-size: 18px;
     flex-shrink: 0;
 }
+
 .fac-reg-replace-row {
     display: flex;
     align-items: center;
@@ -12528,12 +12572,273 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 /* Animated ellipsis for the registry parsing message */
 @keyframes fac-reg-ellipsis {
-    0%   { content: '.'; }
-    33%  { content: '..'; }
-    66%  { content: '...'; }
+    0% {
+        content: '.';
+    }
+
+    33% {
+        content: '..';
+    }
+
+    66% {
+        content: '...';
+    }
 }
+
 .fac-reg-parsing::after {
     content: '.';
     animation: fac-reg-ellipsis 1.2s steps(1) infinite;
 }
 
+
+/* ════════════════════════════════════════════════════════════════════
+   FACULTY TAB — Create Faculty Account card refinement
+   (additive block — every rule is scoped to .faculty-form-card, so the
+   Edit modal, Registry upload card and Faculty list are not affected)
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Section headings: label + hairline rule so the groups read clearly */
+.faculty-form-card .fac-edit-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 1.6rem 0 0.8rem;
+}
+
+.faculty-form-card .fac-edit-section::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--khaki-border);
+}
+
+.faculty-form-card .fac-edit-section span {
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* "Look up in Faculty Registry" — a real, clearly clickable button */
+.faculty-form-card .fac-lookup-btn {
+    width: 100%;
+    justify-content: center;
+    margin: 0.2rem 0 0.6rem;
+    padding: 0.62rem 1rem;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+    border: 1.5px solid var(--accent-maroon);
+    box-shadow: 0 1px 2px rgba(96, 3, 2, 0.14);
+}
+
+.faculty-form-card .fac-lookup-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.faculty-form-card .fac-lookup-btn:hover:not(:disabled) {
+    background: var(--accent-maroon);
+    color: #ffffff;
+}
+
+.faculty-form-card .fac-lookup-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+.faculty-form-card .fac-lookup-btn:focus-visible,
+.faculty-form-card .fac-submit-btn:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+/* Auto-filled (read-only) fields — clearly "filled for you", not editable */
+.faculty-form-card .form-control-custom[readonly] {
+    background: var(--secondary-cream);
+    color: var(--text-dark);
+    font-weight: 500;
+    cursor: default;
+}
+
+.faculty-form-card .form-control-custom[readonly]:focus {
+    border-color: var(--khaki-border);
+    box-shadow: none;
+}
+
+.faculty-form-card .fac-field-hint {
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+/* Organization adviser — a soft maroon tint so the switch stands out
+   a tiny bit from the rest of the form (and responds when switched on) */
+.faculty-form-card .fac-opt-card {
+    margin-top: 1.4rem;
+    padding: 0 1rem;
+    background: rgba(96, 3, 2, 0.035);
+    background: color-mix(in srgb, var(--accent-maroon) 4%, var(--card-bg));
+    border: 1px solid color-mix(in srgb, var(--accent-maroon) 22%, var(--khaki-border));
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.faculty-form-card .fac-opt-card:has(.faculty-toggle-input:checked) {
+    background: color-mix(in srgb, var(--accent-maroon) 7%, var(--card-bg));
+    border-color: color-mix(in srgb, var(--accent-maroon) 45%, var(--khaki-border));
+}
+
+.faculty-form-card .fac-opt-row {
+    padding: 0.8rem 0;
+}
+
+/* Off-state track a touch darker so the switch itself is easier to spot */
+.faculty-form-card .fac-opt-card .faculty-toggle-input:not(:checked)+.faculty-toggle-track {
+    background: color-mix(in srgb, var(--text-light) 40%, var(--khaki-border));
+}
+
+/* Create Account — full-width, centred, a little more presence */
+.faculty-form-card .fac-submit-btn {
+    width: 100%;
+    justify-content: center;
+    margin-top: 1.4rem;
+    padding: 0.7rem 1rem;
+    font-size: 13px;
+}
+
+.faculty-form-card .fac-submit-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+.faculty-form-card .fac-form-hint {
+    margin-top: 0.75rem;
+    line-height: 1.45;
+}
+
+/* =====================================================================
+   Facilities screen: equal card-header heights + a clearer visual hierarchy
+
+   Level 1  page title                    (Facilities Management)
+   Level 2  main tabs                     (solid maroon pills)
+   Level 3  card header                   (white: title + search)
+   Level 4  filter band                   (cream strip: sub-tabs, floor tabs, selects)
+   Level 5  content                       (white: floor headings + tiles / table rows)
+
+   Sub-tabs (buildings, reservation statuses) are rounded squares with a soft
+   tint, so they no longer read as a second row of main tabs.
+   ===================================================================== */
+
+/* Same header height on every Facilities card. The 36px search box is what sets the
+   height on Reservations, so the other cards (no search) are held to the same size. */
+#panel-rooms .rooms-sub-panel .pr-card-header {
+    min-height: calc(36px + 1.9rem + 1px);
+}
+
+#panel-rooms .rooms-sub-panel .pr-card-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* All Facilities: the search box sits at the right end of the card header */
+#panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap {
+    flex: 0 1 280px;
+    min-width: 170px;
+    margin-left: auto;
+}
+
+/* Level 2 -> 3: a little more air under the page title and the main tabs */
+#panel-rooms .pr-page-header-row {
+    margin-bottom: 1.25rem;
+}
+
+#panel-rooms .rm-tabbar {
+    margin-bottom: 1.25rem;
+}
+
+/* Level 4: the filter band is a cream strip between the white header and the white content */
+#panel-rooms .rm-toolbar,
+#panel-rooms .rr-status-bar {
+    background: var(--secondary-cream);
+    border-bottom: 1px solid var(--khaki-border);
+}
+
+#panel-rooms .rm-toolbar {
+    gap: 8px;
+}
+
+/* Sub-tabs (buildings, reservation statuses): rounded squares, soft tint when selected */
+#panel-rooms .rm-bld,
+#panel-rooms .rr-tab {
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-weight: 500;
+    color: var(--text-light);
+    background: var(--card-bg);
+}
+
+#panel-rooms .rm-bld:hover,
+#panel-rooms .rr-tab:hover {
+    color: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+}
+
+#panel-rooms .rm-bld[aria-pressed="true"],
+#panel-rooms .rr-tab[aria-pressed="true"] {
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 var(--accent-maroon);
+}
+
+/* Floor tabs sit one level below the sub-tabs: smaller, borderless until hovered / selected */
+#panel-rooms .rm-chip--sm {
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border-color: transparent;
+    background: transparent;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+#panel-rooms .rm-chip--sm:hover {
+    background: var(--card-bg);
+    border-color: var(--khaki-border);
+    color: var(--text-dark);
+}
+
+#panel-rooms .rm-chip--sm[aria-pressed="true"] {
+    background: var(--card-bg);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    font-weight: 700;
+}
+
+/* Level 5: content starts clearly below the filter band, floor groups are spaced apart */
+#panel-rooms .rm-grid tbody {
+    padding-top: 16px;
+}
+
+#panel-rooms .pr-rooms-table.rm-grid tr.pr-floor-divider {
+    margin-top: 18px;
+}
+
+#panel-rooms .pr-rooms-table.rm-grid tbody>tr.pr-floor-divider:first-child {
+    margin-top: 0;
+}
+
+#panel-rooms .pr-rooms-table.rm-grid tr.pr-floor-divider td {
+    font-size: 13px;
+}
+
+/* the count that used to live in the card header: "6 rooms" right after the floor name */
+#panel-rooms .rm-grid .pr-floor-count {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+@media (max-width: 700px) {
+    #panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+}
