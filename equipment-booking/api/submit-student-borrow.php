@@ -12,6 +12,7 @@ $faculty_name  = trim($body['faculty_name']    ?? '');
 $student_name  = trim($body['student_name']    ?? '');
 $student_id    = trim($body['student_id']      ?? '');
 $equipment     = trim($body['equipment_name']  ?? '');
+$quantity      = max(1, (int)($body['quantity'] ?? 1));
 $room          = trim($body['room']            ?? '');
 $borrow_date   = trim($body['borrow_date']     ?? '');
 $return_date   = trim($body['return_date']     ?? '');
@@ -60,9 +61,9 @@ $stock->execute();
 $stock_row = $stock->get_result()->fetch_assoc();
 $stock->close();
 
-if (!$stock_row || $stock_row['quantity'] < 1) {
+if (!$stock_row || $stock_row['quantity'] < $quantity) {
     $conn->close();
-    echo json_encode(['error' => 'Sorry, that item just went out of stock. Please go back and choose another.']);
+    echo json_encode(['error' => 'Sorry, ' . htmlspecialchars($equipment) . ' only has ' . (int)($stock_row['quantity'] ?? 0) . ' unit(s) available.']);
     exit();
 }
 
@@ -102,22 +103,28 @@ $ins->close();
 
 // ── Decrement inventory quantity ──────────────────────────────────────────
 $dec = $conn->prepare(
-    "UPDATE tbl_inventory SET quantity = quantity - 1
-      WHERE item_name = ? AND is_archived = 0 AND quantity > 0"
+    "UPDATE tbl_inventory SET quantity = quantity - ?
+      WHERE item_name = ? AND is_archived = 0 AND quantity >= ?"
 );
-$dec->bind_param('s', $equipment);
+$dec->bind_param('isi', $quantity, $equipment, $quantity);
 $dec->execute();
 $dec->close();
 
-// ── Mark code as used ─────────────────────────────────────────────────────
-$upd = $conn->prepare(
-    "UPDATE tbl_faculty_codes
-        SET is_used = 1, used_by_name = ?, used_by_id = ?, used_at = NOW()
-      WHERE id = ?"
-);
-$upd->bind_param('ssi', $student_name, $student_id, $code_db_id);
-$upd->execute();
-$upd->close();
+// ── Mark code as used — only on the last item of a multi-item submission ──────
+// JS sends is_last_item=true on the final request. For intermediate items the
+// code stays available so the next item in the sequence can still be verified.
+$is_last_item = !empty($body['is_last_item']);
+if ($is_last_item) {
+    $upd = $conn->prepare(
+        "UPDATE tbl_faculty_codes
+            SET is_used = 1, used_by_name = ?, used_by_id = ?, used_at = NOW()
+          WHERE id = ?"
+    );
+    $upd->bind_param('ssi', $student_name, $student_id, $code_db_id);
+    $upd->execute();
+    $upd->close();
+}
+
 
 // ── Email 2: Notify faculty that borrowing was successfully completed ──────
 $fac_mail_stmt2 = $conn->prepare("SELECT email, fullname FROM tbl_users WHERE faculty_id = ? LIMIT 1");
