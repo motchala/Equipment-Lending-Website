@@ -109,11 +109,11 @@ function initPortal() {
                     <span class="input-group-text" style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-primary);">
                         <span class="material-symbols-outlined" style="font-size:20px;">key</span>
                     </span>
-                    <input type="text" class="form-control form-control-lg" id="facultyCode" placeholder="abc-123-xy4"
+                    <input type="text" class="form-control form-control-lg" id="facultyCode" placeholder="Enter code"
                         style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);font-size:1rem;padding:12px 16px;letter-spacing:2px;font-family:monospace;"
                         autocomplete="off" autocapitalize="none">
                 </div>
-                <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:8px;">Ask your faculty for their one-time access code.</div>
+                <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:8px;">Ask your faculty for their code (faculty code or item code).</div>
             </div>
             <div class="mb-3">
                 <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Your Name</label>
@@ -277,7 +277,7 @@ function initPortal() {
         const id = (document.getElementById('studentId')?.value || '').trim();
         const actionType = (document.getElementById('actionType')?.value || 'borrow').trim();
 
-        if (!code) { showPortalError('Please enter the faculty code.'); return; }
+        if (!code) { showPortalError('Please enter the code.'); return; }
         if (!name) { showPortalError('Please enter your name.'); return; }
         if (!id) { showPortalError('Please enter your Student ID.'); return; }
 
@@ -285,9 +285,16 @@ function initPortal() {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Verifying…';
 
+        // Detect code type:
+        // Faculty text code: 11 chars with hyphens pattern (abc-123-xy4)
+        // Item code: 12 alphanumeric chars, no hyphens
+        // Room code: handled by actionType === 'room'
+        const isItemCode = actionType !== 'room' && /^[A-Za-z0-9]{12}$/.test(code);
         const verifyUrl = actionType === 'room'
             ? 'room-reservation/api/verify-room-code.php'
-            : 'equipment-booking/api/verify-faculty-code.php';
+            : isItemCode
+                ? 'equipment-booking/api/verify-item-code.php'
+                : 'equipment-booking/api/verify-faculty-code.php';
 
         fetch(verifyUrl, {
             method: 'POST',
@@ -305,13 +312,15 @@ function initPortal() {
                 _verified = { ...data, student_name: name, student_id: id };
                 if (actionType === 'room') {
                     showStep2Room(_verified);
+                } else if (isItemCode) {
+                    showStep2Item(_verified);
                 } else {
                     showStep2(_verified);
                 }
             })
             .catch(() => {
                 btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">verified</span>Verify &amp; Continue';
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">verified</span>Verify & Continue';
                 showPortalError('Network error. Please try again.');
             });
     }
@@ -377,7 +386,142 @@ function initPortal() {
     }
 
 
-    /* ── STEP 2 (Room): reservation form ───────────────────────── */
+    /* ── STEP 2 (Item Code): item-locked borrow form ────────────── */
+    function showStep2Item(data) {
+        clearPortalError();
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+
+        // Return time options: end of class (~2h), end of day (17:00), custom
+        const twoHoursLater = new Date(now.getTime() + 2 * 3600000);
+        const twoHoursStr = pad(twoHoursLater.getHours()) + ':' + pad(twoHoursLater.getMinutes());
+        const eodStr = '17:00';
+
+        document.querySelector('.modal-header').innerHTML = `
+            <div>
+                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Borrow Equipment</h5>
+                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Authorized by: <strong>${escHTML(data.faculty_name)}</strong></p>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
+
+        document.querySelector('.modal-body').innerHTML = `
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Equipment</label>
+                <div style="padding:10px 14px;background:var(--color-surface-container);border-radius:8px;border:1px solid var(--color-outline-variant);font-weight:700;color:var(--color-on-surface);">
+                    ${escHTML(data.item_name)}
+                    <span style="font-weight:400;color:var(--color-secondary);font-size:.85rem;margin-left:8px;">(${data.quantity} available)</span>
+                </div>
+                <div style="font-size:.78rem;color:var(--color-secondary);margin-top:4px;">Pre-selected — set by your faculty.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Quantity <span style="color:#c62828;">*</span></label>
+                <input type="number" class="form-control" id="itemQty" min="1" max="${data.quantity}" value="1"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                <div style="font-size:.78rem;color:var(--color-secondary);margin-top:4px;">Maximum: ${data.quantity}</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Return By <span style="color:#c62828;">*</span></label>
+                <select class="form-select" id="itemReturnTime"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                    <option value="${twoHoursStr}">End of class (~2 hours · ${twoHoursStr})</option>
+                    <option value="${eodStr}">End of day (5:00 PM)</option>
+                    <option value="custom">Custom time…</option>
+                </select>
+                <input type="time" class="form-control mt-2" id="itemReturnCustom" min="00:01"
+                    style="display:none;background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;font-size:.875rem;">Room / Location <span style="color:#c62828;">*</span></label>
+                <input type="text" class="form-control" id="itemRoom" placeholder="e.g. B-205"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+            </div>`;
+
+        // Show/hide custom time input
+        document.getElementById('itemReturnTime').addEventListener('change', function () {
+            const custom = document.getElementById('itemReturnCustom');
+            custom.style.display = this.value === 'custom' ? '' : 'none';
+        });
+
+        document.querySelector('.modal-footer').innerHTML = `
+            <button type="button" class="btn" id="btnItemBack"
+                style="padding:10px 24px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;">
+                Back
+            </button>
+            <button type="button" class="btn" id="btnSubmitItem"
+                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;">
+                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>
+                Submit Request
+            </button>`;
+
+        document.getElementById('btnItemBack').addEventListener('click', () => showStep1('borrow'));
+        document.getElementById('btnSubmitItem').addEventListener('click', () => handleSubmitItem(data));
+    }
+
+    function handleSubmitItem(data) {
+        clearPortalError();
+        const qty = parseInt(document.getElementById('itemQty')?.value || '1', 10);
+        const retSel = document.getElementById('itemReturnTime')?.value || '';
+        const retCustom = (document.getElementById('itemReturnCustom')?.value || '').trim();
+        const room = (document.getElementById('itemRoom')?.value || '').trim();
+
+        if (!qty || qty < 1) { showPortalError('Please enter a valid quantity.'); return; }
+        if (qty > data.quantity) { showPortalError('Quantity exceeds available stock (' + data.quantity + ').'); return; }
+
+        const returnTime = retSel === 'custom' ? retCustom : retSel;
+        if (!returnTime || !/^\d{2}:\d{2}$/.test(returnTime)) {
+            showPortalError('Please select or enter a valid return time.'); return;
+        }
+        if (!room) { showPortalError('Please enter the room or location.'); return; }
+
+        const btn = document.getElementById('btnSubmitItem');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…';
+
+        fetch('equipment-booking/api/submit-item-borrow.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code_db_id:   data.code_db_id,
+                faculty_id:   data.faculty_id,
+                faculty_name: data.faculty_name,
+                student_name: data.student_name,
+                student_id:   data.student_id,
+                item_name:    data.item_name,
+                item_id:      data.item_id,
+                quantity:     qty,
+                room:         room,
+                return_time:  returnTime,
+            }),
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
+                showPortalError(d.error);
+                return;
+            }
+            const today = new Date().toISOString().split('T')[0];
+            const receipt = {
+                student_name: data.student_name, student_id: data.student_id,
+                faculty_name: data.faculty_name, equipment: data.item_name,
+                room: room, borrow_date: today, return_date: today + ' ' + returnTime,
+                request_id: d.request_id, return_token: d.return_token,
+            };
+            _lastReceipt = receipt;
+            try { sessionStorage.setItem('pup_last_receipt', JSON.stringify(receipt)); } catch (e) {}
+            _verified = null;
+            showReceiptBanner(receipt);
+            showStep3(receipt);
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
+            showPortalError('Network error. Please try again.');
+        });
+    }
+
+    /* ── STEP 2 (Room): room reservation form ───────────────────── */
     function showStep2Room(data) {
         clearPortalError();
         const today = new Date().toISOString().split('T')[0];

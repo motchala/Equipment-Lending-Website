@@ -284,6 +284,29 @@ CREATE TABLE `tbl_faculty_registry` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_faculty_item_codes`
+--
+
+CREATE TABLE `tbl_faculty_item_codes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `faculty_id` varchar(255) NOT NULL,
+  `faculty_name` varchar(255) NOT NULL,
+  `item_name` varchar(255) NOT NULL,
+  `item_id` int(11) NOT NULL,
+  `code` varchar(16) NOT NULL,
+  `is_used` tinyint(1) NOT NULL DEFAULT 0,
+  `used_by_name` varchar(255) DEFAULT NULL,
+  `used_by_id` varchar(50) DEFAULT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_code` (`code`),
+  UNIQUE KEY `uq_faculty_item` (`faculty_id`, `item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_faculty_codes`
 --
 

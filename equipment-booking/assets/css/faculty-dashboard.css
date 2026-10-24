@@ -12502,3 +12502,125 @@ body .side-nav .side-nav-user .side-nav-user-name {
     box-shadow: none;
     transform: none;
 }
+
+/* ── Item Code chevron and panel ──────────────────────────────────── */
+.eq-ic-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: var(--color-surface-container, #f5f5f5);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-secondary, #5a5a5a);
+    transition: background .15s, color .15s;
+    z-index: 2;
+}
+.eq-ic-btn:hover:not(:disabled) {
+    background: rgba(128, 0, 0, 0.1);
+    color: var(--color-primary, #800000);
+}
+.eq-ic-btn--disabled,
+.eq-ic-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.eq-ic-chevron {
+    font-size: 18px;
+    transition: transform .2s;
+}
+.eq-ic-panel {
+    margin: 6px 0 4px;
+    padding: 8px 10px;
+    background: var(--color-surface-container, #f9f5f5);
+    border-radius: 8px;
+    border: 1px solid var(--color-outline-variant, #e0e0e0);
+    font-size: 12px;
+}
+.eq-ic-loading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-secondary, #5a5a5a);
+    font-size: 12px;
+}
+.eq-ic-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--color-secondary, #777);
+    margin-bottom: 4px;
+}
+.eq-ic-code-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.eq-ic-code {
+    flex: 1;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--color-on-surface, #1a1a1a);
+    background: none;
+    border: none;
+    padding: 0;
+}
+.eq-ic-reveal-btn,
+.eq-ic-copy-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--color-secondary, #777);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 0;
+    transition: color .15s;
+}
+.eq-ic-reveal-btn:hover,
+.eq-ic-copy-btn:hover {
+    color: var(--accent-maroon, #800000);
+}
+.eq-ic-reveal-btn .material-symbols-outlined,
+.eq-ic-copy-btn .material-symbols-outlined {
+    font-size: 15px;
+}
+.eq-ic-regen-btn {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    color: var(--accent-maroon, #800000);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 0;
+    margin-top: 2px;
+}
+.eq-ic-regen-btn:hover { text-decoration: underline; }
+.eq-ic-regen-btn .material-symbols-outlined { font-size: 13px; }
+.eq-ic-used-notice {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    color: var(--color-warning, #e08000);
+    margin-bottom: 4px;
+}
+/* Make eq-item-card position relative so the chevron can be absolute */
+.eq-item-card {
+    position: relative;
+}
