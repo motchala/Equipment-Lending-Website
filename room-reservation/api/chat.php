@@ -205,12 +205,17 @@ $quota_max  = 2;
 $ctx_reservations = $quota_used === 0
     ? 'None — no active or upcoming reservations.'
     : implode("\n", array_map(fn($r) =>
-        '- ' . $r['room_name'] . ' (' . $r['building_name'] . ')'
+        '- [ID:' . $r['id'] . '] ' . $r['room_name'] . ' (' . $r['building_name'] . ')'
         . ' on ' . $r['reservation_date']
         . ' from ' . substr($r['start_time'], 0, 5)
         . ' to '   . substr($r['end_time'],   0, 5)
         . ' — Purpose: ' . $r['purpose'],
         $res_rows));
+
+// Build a lookup map of valid reservation IDs this faculty owns.
+// Used below to validate cancel signals — the AI must never emit an ID
+// that isn't in this faculty's own reservation list.
+$valid_reservation_ids = array_map(fn($r) => (int)$r['id'], $res_rows);
 
 $ctx_waitlist = empty($wl_rows)
     ? 'None.'
@@ -439,7 +444,7 @@ Go to the Facilities tab → choose a building → browse by floor → click a r
 ## HOW TO RESERVE VIA AI ASSISTANT
 If a faculty asks YOU to reserve a room for them, respond naturally and then include the exact text INTENT:reserve at the end of your message. The system will show them a reservation form automatically. Do not include any other special codes or signals.
 
-## HOW TO CANCEL
+## HOW TO CANCEL (manual)
 My Activity → Room reservations → Cancel (only if more than 1 hour before start time).
 
 ## FACULTY CONTEXT
@@ -451,6 +456,32 @@ Active/upcoming reservations:
 {$ctx_reservations}
 Waitlist:
 {$ctx_waitlist}
+
+## HOW TO CANCEL VIA AI ASSISTANT
+⚠️ MANDATORY: When a faculty member asks you to cancel any reservation, you MUST append a signal at the end of your message. Do NOT cancel anything yourself. Do NOT just say "Sure, I'll cancel it." Instead, respond naturally AND then add the signal so the system can show confirmation buttons.
+
+The reservation IDs are shown as [ID:12] in the FACULTY CONTEXT above — use those exact integers.
+
+Follow these rules in order:
+1. No active reservations → tell them there is nothing to cancel. No signal needed.
+2. Reservation starts within 1 hour of now → tell them cancellation is blocked by the 1-hour cutoff rule. No signal.
+3. "cancel my reservation" or "cancel all" with exactly 1 reservation → ask to confirm, then ADD the exact text: INTENT:cancel_confirm:{id}
+4. "cancel all" with 2 reservations → ask to confirm cancelling both, then ADD: INTENT:cancel_confirm_multi:{id1},{id2}
+5. "cancel my reservation" with 2 reservations and no room specified → ask which one, then ADD: INTENT:cancel_pick
+6. Faculty names specific room(s):
+   - All match → use rule 3 or 4 signal depending on count
+   - Some don't match → tell them which ones you couldn't find, use signal only for matched ones
+   - None match → tell them they have no reservation for those rooms, list what they have. No signal unless you offer.
+
+SIGNAL FORMATS — append these at the very end of your message, exactly as written:
+  INTENT:cancel_confirm:{id}              (replace {id} with the integer ID from FACULTY CONTEXT)
+  INTENT:cancel_confirm_multi:{id1},{id2} (replace with comma-separated IDs)
+  INTENT:cancel_pick                      (when faculty must choose)
+
+Example correct response for 1 reservation:
+"You have a reservation for Room 308 on Oct 26, 10:00–12:00. Would you like me to cancel it? INTENT:cancel_confirm:12"
+
+NEVER cancel without the signal. NEVER emit a signal with an ID not listed in FACULTY CONTEXT.
 
 ## LIVE AVAILABILITY DATA
 {$avail_section}
@@ -482,26 +513,35 @@ $provider    = 'gemini'; // tracks which provider ultimately answered
 
 foreach ($api_keys as $current_key) {
     for ($attempt = 1; $attempt <= 2; $attempt++) {
-        $ch = curl_init($gemini_url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $gemini_request_body,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'x-goog-api-key: ' . $current_key],
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_CONNECTTIMEOUT => 8,
+        $context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Content-Type: application/json\r\nx-goog-api-key: " . $current_key,
+                'content'       => $gemini_request_body,
+                'timeout'       => 15,
+                'ignore_errors' => true, // get response body even on 4xx/5xx
+            ],
         ]);
-        $response    = curl_exec($ch);
-        $curl_error  = curl_error($ch);
-        $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+
+        $response    = @file_get_contents($gemini_url, false, $context);
+        $curl_error  = ($response === false) ? 'file_get_contents failed' : '';
+        $http_status = 0;
+
+        // Parse HTTP status from response headers
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $h) {
+                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                    $http_status = (int)$m[1];
+                    break;
+                }
+            }
+        }
 
         if ($curl_error || $response === false) {
-            error_log('[PUPSync AI] Gemini key curl error: ' . $curl_error);
+            error_log('[PUPSync AI] Gemini key request failed.');
             break; // try next key
         }
         if ($http_status === 200) {
-            // Verify reply is not empty before accepting
             $decoded_check = json_decode((string)$response, true);
             $reply_check   = trim((string)($decoded_check['candidates'][0]['content']['parts'][0]['text'] ?? ''));
             if ($reply_check !== '') break 2; // success — exit both loops
@@ -544,22 +584,28 @@ if ($response === false || $http_status !== 200) {
             'temperature' => 0.7,
         ]);
 
-        $ch = curl_init($groq_url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $groq_request_body,
-            CURLOPT_HTTPHEADER     => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $groq_key,
+        $groq_context = stream_context_create([
+            'http' => [
+                'method'        => 'POST',
+                'header'        => "Content-Type: application/json\r\nAuthorization: Bearer " . $groq_key,
+                'content'       => $groq_request_body,
+                'timeout'       => 15,
+                'ignore_errors' => true,
             ],
-            CURLOPT_TIMEOUT        => 15,
-            CURLOPT_CONNECTTIMEOUT => 8,
         ]);
-        $response    = curl_exec($ch);
-        $curl_error  = curl_error($ch);
-        $http_status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+
+        $response    = @file_get_contents($groq_url, false, $groq_context);
+        $curl_error  = ($response === false) ? 'file_get_contents failed' : '';
+        $http_status = 0;
+
+        if (isset($http_response_header) && is_array($http_response_header)) {
+            foreach ($http_response_header as $h) {
+                if (preg_match('#^HTTP/\S+\s+(\d+)#', $h, $m)) {
+                    $http_status = (int)$m[1];
+                    break;
+                }
+            }
+        }
 
         if ($http_status === 200) {
             $provider = 'groq';
@@ -607,21 +653,85 @@ if ($reply === '') {
     chat_respond(503, 'error', 'The AI assistant did not return a response. Please try again.');
 }
 
-// ── 17. Extract INTENT:reserve signal ─────────────────────────────────────────
-// If Gemini included INTENT:reserve, strip it from the visible reply and
-// return it as a structured flag. JS will show the reservation mini-form.
+// ── 17. Extract intent signals ────────────────────────────────────────────────
+// INTENT:reserve — show reservation mini-form (existing)
 $intent_reserve = str_contains($reply, 'INTENT:reserve');
 $reply          = trim(str_replace('INTENT:reserve', '', $reply));
+
+// INTENT:cancel_confirm:{id} — confirm cancelling one reservation
+$intent_cancel_confirm = null;
+if (preg_match('/INTENT:cancel_confirm:(\d+)/', $reply, $m)) {
+    $cid = (int)$m[1];
+    // Security: only honour IDs that belong to this faculty
+    if (in_array($cid, $valid_reservation_ids, true)) {
+        // Find the matching reservation row to send display data to JS
+        foreach ($res_rows as $r) {
+            if ((int)$r['id'] === $cid) {
+                $intent_cancel_confirm = [
+                    'id'   => $cid,
+                    'room' => $r['room_name'] . ' · ' . $r['building_name'],
+                    'date' => date('M j, Y', strtotime($r['reservation_date'])),
+                    'time' => substr($r['start_time'], 0, 5) . ' – ' . substr($r['end_time'], 0, 5),
+                ];
+                break;
+            }
+        }
+    }
+    $reply = trim(preg_replace('/INTENT:cancel_confirm:\d+/', '', $reply));
+}
+
+// INTENT:cancel_confirm_multi:{id1},{id2} — confirm cancelling multiple reservations
+$intent_cancel_confirm_multi = null;
+if (preg_match('/INTENT:cancel_confirm_multi:([\d,]+)/', $reply, $m)) {
+    $raw_ids  = array_map('intval', explode(',', $m[1]));
+    $safe_ids = array_filter($raw_ids, fn($id) => in_array($id, $valid_reservation_ids, true));
+    if (count($safe_ids) >= 2) {
+        $multi_rows = [];
+        foreach ($res_rows as $r) {
+            if (in_array((int)$r['id'], $safe_ids, true)) {
+                $multi_rows[] = [
+                    'id'   => (int)$r['id'],
+                    'room' => $r['room_name'] . ' · ' . $r['building_name'],
+                    'date' => date('M j, Y', strtotime($r['reservation_date'])),
+                    'time' => substr($r['start_time'], 0, 5) . ' – ' . substr($r['end_time'], 0, 5),
+                ];
+            }
+        }
+        if (count($multi_rows) >= 2) {
+            $intent_cancel_confirm_multi = $multi_rows;
+        }
+    }
+    $reply = trim(preg_replace('/INTENT:cancel_confirm_multi:[\d,]+/', '', $reply));
+}
+
+// INTENT:cancel_pick — faculty needs to choose from their reservations
+$intent_cancel_pick = false;
+if (str_contains($reply, 'INTENT:cancel_pick')) {
+    $intent_cancel_pick = true;
+    $reply = trim(str_replace('INTENT:cancel_pick', '', $reply));
+}
 
 // ── 18. Return ────────────────────────────────────────────────────────────────
 $new_remaining = max(0, $RATE_LIMIT - ($rl_count + 1));
 
+// Build pick options from the faculty's own reservations (used when intent_cancel_pick is true)
+$cancel_pick_options = array_map(fn($r) => [
+    'id'   => (int)$r['id'],
+    'room' => $r['room_name'] . ' · ' . $r['building_name'],
+    'date' => date('M j, Y', strtotime($r['reservation_date'])),
+    'time' => substr($r['start_time'], 0, 5) . ' – ' . substr($r['end_time'], 0, 5),
+], $res_rows);
+
 ob_end_clean();
 http_response_code(200);
 echo json_encode([
-    'status'         => 'success',
-    'reply'          => $reply,
-    'remaining'      => $new_remaining,
-    'ask_campus'     => $ask_campus,
-    'intent_reserve' => $intent_reserve,
+    'status'                      => 'success',
+    'reply'                       => $reply,
+    'remaining'                   => $new_remaining,
+    'ask_campus'                  => $ask_campus,
+    'intent_reserve'              => $intent_reserve,
+    'intent_cancel_confirm'       => $intent_cancel_confirm,
+    'intent_cancel_confirm_multi' => $intent_cancel_confirm_multi,
+    'intent_cancel_pick'          => $intent_cancel_pick,
+    'cancel_pick_options'         => $cancel_pick_options,
 ]);

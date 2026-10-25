@@ -3501,12 +3501,59 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                        <div class="eq-item-body">
-                                            <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                            <div class="eq-item-cat">
-                                                <span class="material-symbols-outlined">label</span>
-                                                <?php echo htmlspecialchars($item['category']); ?>
+                                                                            <div class="eq-item-body">
+                                        <!-- Item Code chevron — top right of card body -->
+                                        <button type="button"
+                                            class="eq-ic-btn<?php echo ((int)$item['quantity'] <= 0) ? ' eq-ic-btn--disabled' : ''; ?>"
+                                            data-action="toggle-item-code"
+                                            data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                            data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                            <?php if ((int)$item['quantity'] <= 0): ?>
+                                                disabled
+                                                title="No stock available — code cannot be used"
+                                            <?php else: ?>
+                                                title="Show item code for students"
+                                            <?php endif; ?>
+                                            aria-label="Show item code"
+                                            aria-expanded="false">
+                                            <span class="material-symbols-outlined eq-ic-chevron">expand_more</span>
+                                        </button>
+
+                                        <!-- Item code reveal panel (hidden by default) -->
+                                        <div class="eq-ic-panel" id="eq-ic-panel-<?php echo (int)$item['item_id']; ?>" style="display:none">
+                                            <div class="eq-ic-loading" style="display:none">
+                                                <span class="material-symbols-outlined" style="animation:spin .8s linear infinite;font-size:16px">progress_activity</span>
+                                                Loading…
                                             </div>
+                                            <div class="eq-ic-content" style="display:none">
+                                                <span class="eq-ic-label">Item Code</span>
+                                                <div class="eq-ic-code-row">
+                                                    <code class="eq-ic-code">••••••••••••</code>
+                                                    <button type="button" class="eq-ic-reveal-btn" data-action="reveal-item-code" title="Show code">
+                                                        <span class="material-symbols-outlined">visibility</span>
+                                                    </button>
+                                                    <button type="button" class="eq-ic-copy-btn" data-action="copy-item-code" title="Copy code">
+                                                        <span class="material-symbols-outlined">content_copy</span>
+                                                    </button>
+                                                </div>
+                                                <div class="eq-ic-used-notice" style="display:none">
+                                                    <span class="material-symbols-outlined" style="font-size:13px;color:var(--color-warning,#e08000)">info</span>
+                                                    Used — a new code is ready above
+                                                </div>
+                                                <button type="button" class="eq-ic-regen-btn" data-action="regen-item-code"
+                                                    data-item-id="<?php echo (int)$item['item_id']; ?>">
+                                                    <span class="material-symbols-outlined">refresh</span> New code
+                                                </button>
+                                            </div>
+                                            <div class="eq-ic-error" style="display:none;color:var(--color-error,#c62828);font-size:11px;padding:4px 0"></div>
+                                        </div>
+
+                                        <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                        <div class="eq-item-cat">
+                                            <span class="material-symbols-outlined">label</span>
+                                            <?php echo htmlspecialchars($item['category']); ?>
+                                        </div>
+
                                             <?php if ($has_overdue_block): ?>
                                                 <button class="btn-borrow btn-borrow-blocked" disabled
                                                     title="You have an overdue item. Return it before borrowing again.">

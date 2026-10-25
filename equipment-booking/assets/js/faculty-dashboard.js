@@ -5311,6 +5311,25 @@
                     return;
                 }
 
+                // Cancel intent — single reservation confirmation
+                if (data.intent_cancel_confirm) {
+                    var c = data.intent_cancel_confirm;
+                    showCancelConfirmChips(lastRow, [c], false);
+                    return;
+                }
+
+                // Cancel intent — multi-reservation confirmation
+                if (data.intent_cancel_confirm_multi && data.intent_cancel_confirm_multi.length >= 2) {
+                    showCancelConfirmChips(lastRow, data.intent_cancel_confirm_multi, true);
+                    return;
+                }
+
+                // Cancel intent — faculty needs to pick which reservation
+                if (data.intent_cancel_pick && data.cancel_pick_options && data.cancel_pick_options.length > 0) {
+                    showCancelPickChips(lastRow, data.cancel_pick_options);
+                    return;
+                }
+
                 setSending(false);
             })
             .catch(function () {
@@ -5318,6 +5337,132 @@
                 appendAiBubble(body, 'Network error. Please check your connection and try again.');
                 setSending(false);
             });
+    }
+
+    // ── Cancel chips: confirm cancelling specific reservations ────────────────
+    // items = array of { id, room, date, time }
+    // isMulti = true means "cancel all" wording, false means single
+    function showCancelConfirmChips(lastRow, items, isMulti) {
+        var col = lastRow && lastRow.querySelector('.act-chat-col');
+        if (!col) { setSending(false); return; }
+
+        var chips = document.createElement('div');
+        chips.className = 'act-chat-chips act-cancel-chips';
+
+        var confirmLabel = isMulti
+            ? 'Yes, cancel all (' + items.length + ')'
+            : 'Yes, cancel it';
+
+        var confirmBtn = document.createElement('button');
+        confirmBtn.className = 'act-chat-chip act-cancel-confirm-btn';
+        confirmBtn.textContent = confirmLabel;
+        chips.appendChild(confirmBtn);
+
+        var neverMindBtn = document.createElement('button');
+        neverMindBtn.className = 'act-chat-chip act-cancel-nevermind-btn';
+        neverMindBtn.textContent = 'Never mind';
+        chips.appendChild(neverMindBtn);
+
+        col.appendChild(chips);
+
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+
+        confirmBtn.addEventListener('click', function () {
+            chips.remove();
+            var body = document.getElementById('actAiChatBody');
+
+            // Submit cancellations sequentially
+            var ids = items.map(function (i) { return i.id; });
+            var cancelled = [];
+            var failed = [];
+
+            function cancelNext(idx) {
+                if (idx >= ids.length) {
+                    // All done — show result bubble
+                    var resultMsg = '';
+                    if (cancelled.length > 0 && failed.length === 0) {
+                        resultMsg = cancelled.length === 1
+                            ? 'Done! Your reservation for ' + items[0].room + ' on ' + items[0].date + ' has been cancelled.'
+                            : 'Done! All ' + cancelled.length + ' reservations have been cancelled.';
+                    } else if (cancelled.length > 0 && failed.length > 0) {
+                        resultMsg = cancelled.length + ' reservation(s) cancelled. ' + failed.length + ' could not be cancelled: ' + failed.join(', ') + '.';
+                    } else {
+                        resultMsg = 'Could not cancel the reservation(s). ' + failed.join(' ');
+                    }
+                    appendAiBubble(body, resultMsg);
+                    setSending(false);
+                    return;
+                }
+
+                fetch('room-reservation/api/cancel-reservation.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reservation_id: ids[idx],
+                        csrf_token: csrfMeta ? csrfMeta.getAttribute('content') : '',
+                    }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.success) {
+                        cancelled.push(items[idx].room);
+                    } else {
+                        failed.push(items[idx].room + ': ' + (d.error || 'error'));
+                    }
+                    cancelNext(idx + 1);
+                })
+                .catch(function () {
+                    failed.push(items[idx].room + ': network error');
+                    cancelNext(idx + 1);
+                });
+            }
+
+            setSending(true);
+            cancelNext(0);
+        });
+
+        neverMindBtn.addEventListener('click', function () {
+            chips.remove();
+            appendAiBubble(body, 'No problem! Your reservation(s) are unchanged.');
+            setSending(false);
+        });
+    }
+
+    // ── Cancel chips: faculty picks which reservation to cancel ──────────────
+    // options = array of { id, room, date, time }
+    function showCancelPickChips(lastRow, options) {
+        var col = lastRow && lastRow.querySelector('.act-chat-col');
+        if (!col) { setSending(false); return; }
+
+        var chips = document.createElement('div');
+        chips.className = 'act-chat-chips act-cancel-chips';
+
+        options.forEach(function (opt) {
+            var btn = document.createElement('button');
+            btn.className = 'act-chat-chip';
+            btn.textContent = opt.room + ' · ' + opt.date;
+            btn.addEventListener('click', function () {
+                chips.remove();
+                // Show confirm step for the chosen one
+                var body = document.getElementById('actAiChatBody');
+                var confirmRow = appendAiBubble(body, 'Got it. Cancel your reservation for ' + opt.room + ' on ' + opt.date + ' (' + opt.time + ')?');
+                showCancelConfirmChips(confirmRow, [opt], false);
+            });
+            chips.appendChild(btn);
+        });
+
+        var neverMindBtn = document.createElement('button');
+        neverMindBtn.className = 'act-chat-chip act-cancel-nevermind-btn';
+        neverMindBtn.textContent = 'Never mind';
+        neverMindBtn.addEventListener('click', function () {
+            chips.remove();
+            var body = document.getElementById('actAiChatBody');
+            appendAiBubble(body, 'No problem! Your reservations are unchanged.');
+            setSending(false);
+        });
+        chips.appendChild(neverMindBtn);
+
+        col.appendChild(chips);
     }
 
     window.actAiSend = actAiSend;
@@ -5659,4 +5804,180 @@
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startMyActivity);
     else startMyActivity();
+})();
+
+/* ================================================================
+   ITEM CODE — chevron reveal, copy, regenerate
+   Self-contained IIFE. No changes to any existing code above.
+================================================================ */
+(function () {
+    'use strict';
+
+    var CSRF = function () {
+        var el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    };
+
+    // Per-panel state: { loaded, code, revealed }
+    var _state = {};
+
+    function getPanel(itemId) {
+        return document.getElementById('eq-ic-panel-' + itemId);
+    }
+
+    function setState(itemId, patch) {
+        _state[itemId] = Object.assign(_state[itemId] || {}, patch);
+    }
+
+    function getState(itemId) {
+        return _state[itemId] || {};
+    }
+
+    function showLoading(panel) {
+        panel.querySelector('.eq-ic-loading').style.display = '';
+        panel.querySelector('.eq-ic-content').style.display = 'none';
+        panel.querySelector('.eq-ic-error').style.display = 'none';
+    }
+
+    function showContent(panel, code, isUsed, revealed) {
+        panel.querySelector('.eq-ic-loading').style.display = 'none';
+        panel.querySelector('.eq-ic-content').style.display = '';
+        panel.querySelector('.eq-ic-error').style.display = 'none';
+        var codeEl = panel.querySelector('.eq-ic-code');
+        codeEl.textContent = revealed ? code : '••••••••••••';
+        codeEl.dataset.code = code;
+        var revealBtn = panel.querySelector('.eq-ic-reveal-btn');
+        var revealIcon = revealBtn.querySelector('.material-symbols-outlined');
+        revealIcon.textContent = revealed ? 'visibility_off' : 'visibility';
+        var usedNotice = panel.querySelector('.eq-ic-used-notice');
+        if (usedNotice) usedNotice.style.display = isUsed ? '' : 'none';
+    }
+
+    function showError(panel, msg) {
+        panel.querySelector('.eq-ic-loading').style.display = 'none';
+        panel.querySelector('.eq-ic-content').style.display = 'none';
+        var errEl = panel.querySelector('.eq-ic-error');
+        errEl.textContent = msg;
+        errEl.style.display = '';
+    }
+
+    function loadCode(itemId, panel) {
+        showLoading(panel);
+        var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
+        fetch('equipment-booking/api/get-item-code.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.status !== 'success') {
+                showError(panel, data.error || 'Could not load code.');
+                return;
+            }
+            setState(itemId, { loaded: true, code: data.code, isUsed: data.is_used, revealed: false });
+            showContent(panel, data.code, data.is_used, false);
+        })
+        .catch(function () {
+            showError(panel, 'Network error. Please try again.');
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        // ── Toggle chevron ──────────────────────────────────────────
+        var toggleBtn = e.target.closest('[data-action="toggle-item-code"]');
+        if (toggleBtn && !toggleBtn.disabled) {
+            var itemId = toggleBtn.dataset.itemId;
+            var panel  = getPanel(itemId);
+            if (!panel) return;
+
+            var isOpen = panel.style.display !== 'none';
+            if (isOpen) {
+                panel.style.display = 'none';
+                toggleBtn.setAttribute('aria-expanded', 'false');
+                toggleBtn.querySelector('.eq-ic-chevron').style.transform = '';
+            } else {
+                panel.style.display = '';
+                toggleBtn.setAttribute('aria-expanded', 'true');
+                toggleBtn.querySelector('.eq-ic-chevron').style.transform = 'rotate(180deg)';
+                // Load code on first open, or if not loaded yet
+                if (!getState(itemId).loaded) {
+                    loadCode(itemId, panel);
+                } else {
+                    var s = getState(itemId);
+                    showContent(panel, s.code, s.isUsed, s.revealed);
+                }
+            }
+            return;
+        }
+
+        // ── Reveal / hide code ──────────────────────────────────────
+        var revealBtn = e.target.closest('[data-action="reveal-item-code"]');
+        if (revealBtn) {
+            var panel = revealBtn.closest('.eq-ic-panel');
+            if (!panel) return;
+            var itemId = panel.id.replace('eq-ic-panel-', '');
+            var s = getState(itemId);
+            if (!s.code) return;
+            s.revealed = !s.revealed;
+            setState(itemId, { revealed: s.revealed });
+            showContent(panel, s.code, s.isUsed, s.revealed);
+            return;
+        }
+
+        // ── Copy code ───────────────────────────────────────────────
+        var copyBtn = e.target.closest('[data-action="copy-item-code"]');
+        if (copyBtn) {
+            var panel = copyBtn.closest('.eq-ic-panel');
+            if (!panel) return;
+            var itemId = panel.id.replace('eq-ic-panel-', '');
+            var code = getState(itemId).code;
+            if (!code) return;
+            navigator.clipboard.writeText(code).then(function () {
+                var icon = copyBtn.querySelector('.material-symbols-outlined');
+                icon.textContent = 'check';
+                setTimeout(function () { icon.textContent = 'content_copy'; }, 1500);
+            }).catch(function () {
+                // Fallback for older browsers
+                var ta = document.createElement('textarea');
+                ta.value = code;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            });
+            return;
+        }
+
+        // ── Regenerate code ─────────────────────────────────────────
+        var regenBtn = e.target.closest('[data-action="regen-item-code"]');
+        if (regenBtn) {
+            if (!confirm('This will invalidate the current code. Any student who has it can no longer use it. Generate a new code?')) return;
+            var itemId = regenBtn.dataset.itemId;
+            var panel  = getPanel(itemId);
+            if (!panel) return;
+            showLoading(panel);
+
+            var body = new URLSearchParams({ csrf_token: CSRF(), item_id: itemId });
+            fetch('equipment-booking/api/regenerate-item-code.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.status !== 'success') {
+                    showError(panel, data.error || 'Could not regenerate code.');
+                    return;
+                }
+                setState(itemId, { loaded: true, code: data.code, isUsed: false, revealed: true });
+                showContent(panel, data.code, false, true);
+            })
+            .catch(function () {
+                showError(panel, 'Network error. Please try again.');
+            });
+        }
+    });
 })();

@@ -206,12 +206,12 @@ require_once __DIR__ . '/config/role-splash.php';
                                     <span class="material-symbols-outlined" style="font-size:20px;">key</span>
                                 </span>
                                 <input type="text" class="form-control form-control-lg" id="facultyCode"
-                                    placeholder="Enter faculty code"
+                                    placeholder="Enter code"
                                     style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);font-size:1rem;padding:12px 16px;"
                                     autocomplete="off">
                             </div>
                             <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:8px;">
-                                Ask your faculty adviser or instructor for their code.
+                                Ask your faculty for their code (faculty code or item code).
                             </div>
                         </div>
                         <div class="mb-3">
