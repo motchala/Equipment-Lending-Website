@@ -2341,7 +2341,6 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
         #panel-lending .eq-item-card::after,
         #panel-lending .item-node::after,
-        #panel-lending .feat-hero::after,
         #panel-lending .feat-secondary::after {
             /* accent: the same curved gold band as every other card and table, always shown */
             content: '';
@@ -2362,6 +2361,22 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             -webkit-mask-composite: xor;
             mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
             mask-composite: exclude;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Big "Most Borrowed" card: the gold accent runs down the LEFT edge instead of across the top.
+           The card clips its corners (overflow:hidden + radius), so the straight strip curves with them. */
+        #panel-lending .feat-hero::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            background:
+                linear-gradient(180deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) left / 4px 100% no-repeat,
+                linear-gradient(90deg, rgba(184, 145, 58, .16) 0%, transparent 100%);
             pointer-events: none;
             z-index: 2;
         }

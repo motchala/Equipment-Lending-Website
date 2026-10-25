@@ -5030,8 +5030,13 @@ function psSelectFmt(btn) {
 
         function buildFloors() {
             floorsEl.textContent = '';
+            var floorRow = document.getElementById('rmFloorRow');
             /* only worth showing when a building is picked and it has 2+ floors */
-            if (flr.disabled || flr.options.length < 3) return;
+            if (flr.disabled || flr.options.length < 3) {
+                if (floorRow) floorRow.hidden = true;
+                return;
+            }
+            if (floorRow) floorRow.hidden = false;
             Array.prototype.forEach.call(flr.options, function (o) {
                 floorsEl.appendChild(pill('rm-chip rm-chip--sm', o.value,
                     o.value === 'all' ? 'All floors' : o.textContent.trim(), flr.value === o.value));

@@ -406,6 +406,32 @@ function ps_send_rooms_ajax_error(string $message): void
     exit();
 }
 
+/**
+ * How many floors a building has (tbl_buildings.floor_count); 0 when the building does not exist.
+ * A facility's floor must be between 1 and this number.
+ */
+function ps_building_floor_limit(mysqli $conn, int $building_id): int
+{
+    $st = $conn->prepare('SELECT floor_count FROM tbl_buildings WHERE building_id = ?');
+    if (!$st) return 0;
+    $st->bind_param('i', $building_id);
+    $st->execute();
+    $row = $st->get_result()->fetch_assoc();
+    $st->close();
+    return $row ? (int)$row['floor_count'] : 0;
+}
+
+/** Error text when $floor is outside the building's floors, or null when it is fine. */
+function ps_floor_limit_error(mysqli $conn, int $building_id, int $floor): ?string
+{
+    $max = ps_building_floor_limit($conn, $building_id);
+    if ($max < 1) return 'Please choose a valid building.';
+    if ($floor < 1 || $floor > $max) {
+        return 'This building only has ' . ($max === 1 ? 'floor 1' : 'floors 1 to ' . $max) . '. Please choose a floor within that range.';
+    }
+    return null;
+}
+
 
 // ════════════════════════════════════════════════════════════════
 // ADD ROOM
@@ -439,6 +465,16 @@ if (isset($_POST['add_room'])) {
     if ($building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] add_room: missing required fields');
         if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a facility name.');
+        $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+        header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
+        exit();
+    }
+
+    // The floor has to exist in the chosen building (e.g. a 4-floor building takes floors 1-4)
+    $floor_err = ps_floor_limit_error($conn, $building_id, $floor_number);
+    if ($floor_err !== null) {
+        error_log('[PUPSync] add_room: floor out of range');
+        if ($is_ajax) ps_send_rooms_ajax_error($floor_err);
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -508,6 +544,15 @@ if (isset($_POST['update_room'])) {
     if ($room_id <= 0 || $building_id <= 0 || $room_name === '') {
         error_log('[PUPSync] update_room: missing required fields');
         if ($is_ajax) ps_send_rooms_ajax_error('Please choose a building and enter a facility name.');
+        $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+        header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
+        exit();
+    }
+
+    $floor_err = ps_floor_limit_error($conn, $building_id, $floor_number);
+    if ($floor_err !== null) {
+        error_log('[PUPSync] update_room: floor out of range');
+        if ($is_ajax) ps_send_rooms_ajax_error($floor_err);
         $base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
         header("Location: {$base}/admin-dashboard.php?tab=rooms&room_error=1");
         exit();
@@ -699,18 +744,8 @@ if (isset($_POST['delete_room_permanently'])) {
         $st->close();
         if ($deleted !== 1) throw new RuntimeException('Facility row was not deleted.');
 
-        // A building's floor count follows its highest remaining floor with rooms.
-        $st = $conn->prepare(
-            "UPDATE tbl_buildings b
-                SET b.floor_count = COALESCE(
-                      (SELECT MAX(r.floor_number) FROM tbl_rooms r
-                        WHERE r.building_id = b.building_id AND r.is_archived = 0),
-                      b.floor_count)
-              WHERE b.building_id = ?"
-        );
-        $st->bind_param('i', $building_id);
-        $st->execute();
-        $st->close();
+        // A building's floor count is its real number of floors (it caps which floors a facility
+        // can be added to), so deleting the top-floor facility must not lower it.
 
         $conn->commit();
     } catch (Throwable $e) {
