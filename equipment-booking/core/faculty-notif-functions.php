@@ -579,7 +579,12 @@ if (!function_exists('fnotif_build_list')) {
                         $retTs = !empty($r['returned_at']) ? strtotime($r['returned_at'])
                             : (!empty($r['log_at']) ? strtotime($r['log_at']) : strtotime($r['return_date']));
                         if ($retTs < $windowTs) break;
-                        $onTime = $retTs <= strtotime($r['return_date'] . ' 23:59:59');
+                        // Judged against when it was ORIGINALLY due: an extension never makes a late return look on time
+                        $hasOrig   = !empty($r['original_return_date']);
+                        $dueDateOn = $hasOrig ? $r['original_return_date'] : $r['return_date'];
+                        $dueTimeOn = $hasOrig ? ($r['original_return_time'] ?? '') : '';
+                        $onTime = $retTs <= strtotime($dueDateOn . ' ' . ($dueTimeOn !== '' && $dueTimeOn !== null ? $dueTimeOn : '23:59:59'));
+                        $extN   = (int)($r['extension_count'] ?? 0);
                         $add([
                             'key' => 'returned-' . $id,
                             'cat' => 'borrow',
@@ -591,7 +596,8 @@ if (!function_exists('fnotif_build_list')) {
                             'detail' => [
                                 $d('Equipment', $equip),
                                 $d('Borrow Date', $borrowStr),
-                                $d('Due Date', $returnStr),
+                                $d('Due Date', $hasOrig ? date('M j, Y', strtotime($dueDateOn)) . ' (original)' : $returnStr),
+                                $d('Extensions', $extN > 0 ? ($extN === 1 ? 'Extended once, until ' : 'Extended ' . $extN . ' times, until ') . $returnStr : ''),
                                 $d('Returned On', date('M j, Y g:i A', $retTs)),
                                 $d('Timeliness', $onTime ? 'Returned on time' : 'Returned after the due date', !$onTime),
                             ],

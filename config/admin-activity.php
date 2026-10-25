@@ -68,6 +68,24 @@ if (!function_exists('admin_activity_bootstrap')) {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
             );
 
+            // Extensions of borrowed equipment (written by equipment-booking/core/borrow-extension.php, read by the
+            // Activity feed). Same definition as BorrowExtension::ensureSchema(), so either side can create it first.
+            @$conn->query(
+                "CREATE TABLE IF NOT EXISTS `tbl_request_events` (
+                    `id`             int(11) NOT NULL AUTO_INCREMENT,
+                    `request_id`     int(11) NOT NULL,
+                    `borrower_id`    varchar(50) NOT NULL,
+                    `borrower_name`  varchar(100) NOT NULL DEFAULT '',
+                    `equipment_name` varchar(100) NOT NULL DEFAULT '',
+                    `event`          varchar(30) NOT NULL,
+                    `detail`         varchar(255) NOT NULL DEFAULT '',
+                    `created_at`     datetime NOT NULL DEFAULT current_timestamp(),
+                    PRIMARY KEY (`id`),
+                    KEY `idx_request` (`request_id`),
+                    KEY `idx_time` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+            );
+
             // Older installs (the first version of this table had fewer columns).
             $added_ref = false;
             $alters = [

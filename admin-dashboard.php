@@ -4470,6 +4470,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                     <td style="<?php echo $lst === 'overdue' ? 'color:var(--danger);font-weight:600' : ''; ?>">
                                                         <?php echo date('M d', strtotime($r['return_date'])); ?>
                                                         <?php if ($lrt !== ''): ?><div class="ps-appr-sub" style="font-weight:400"><?php echo $lrt; ?></div><?php endif; ?>
+                                                        <?php if ((int)($r['extension_count'] ?? 0) > 0):
+                                                            // Extended by the faculty member after it was due (equipment-booking/core/borrow-extension.php)
+                                                            $lext  = (int)$r['extension_count'];
+                                                            $lorig = !empty($r['original_return_date'])
+                                                                ? date('M d, Y', strtotime($r['original_return_date'])) . (!empty($r['original_return_time']) ? ' · ' . date('g:i A', strtotime($r['original_return_time'])) : '')
+                                                                : '';
+                                                        ?>
+                                                            <div class="ps-appr-sub" style="font-weight:400" title="<?php echo htmlspecialchars('Extended ' . $lext . ' time' . ($lext === 1 ? '' : 's') . ($lorig !== '' ? '. Originally due ' . $lorig : '')); ?>">Extended &times;<?php echo $lext; ?><?php if (!empty($r['original_return_date'])): ?> &middot; was <?php echo htmlspecialchars(date('M d', strtotime($r['original_return_date']))); ?><?php endif; ?></div>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <?php if ($lst === 'waiting'): ?>
