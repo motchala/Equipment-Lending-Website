@@ -235,7 +235,11 @@ if ($doc_tmp !== null) {
 
 // ── Insert reservation ────────────────────────────────────────────────────
 $notes_val = $notes !== '' ? $notes : null;
-$initial_status = $document_path !== null ? 'Waiting' : 'Approved';
+// A reservation for a LATER DATE always waits for an admin's decision (same-day ones keep the instant flow);
+// an attached adviser letter also waits, for the Super Admin. See core/room-expiry.php for the 12:01 AM rule.
+$is_future_day   = ps_room_is_future_date($res_date);
+$hold_for_review = ($document_path === null && $is_future_day);   // validated by the engine, never auto-approved
+$initial_status  = ($document_path !== null || $is_future_day) ? 'Waiting' : 'Approved';
 
 // The legacy schema used an ENUM without Waiting even though the application
 // already recognises pending room reservations. Add the value once when a
@@ -284,14 +288,15 @@ $reservation_id = $conn->insert_id;
 $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
-if ($initial_status !== 'Waiting') {
+$run_engine = ($initial_status !== 'Waiting') || $hold_for_review;
+if ($run_engine) {
     require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-    ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+    ArbitrationEngine::processRoomReservation($conn, $reservation_id, $hold_for_review);
 }
 
 // ── A declined reservation is never kept: tell the user on the spot ───────
 $declined_reason = null;
-if ($initial_status !== 'Waiting') {
+if ($run_engine) {
     $declined_reason = ArbitrationEngine::discardRoomIfDeclined($conn, $reservation_id);
 }
 if ($declined_reason !== null) {
@@ -321,6 +326,6 @@ echo json_encode([
     'room_name'      => $room_name,
     'attached'       => $document_path !== null,
     'submitted_as'   => $submitted_as,
-    'active'         => count($active_now) + ($final_status === 'Approved' ? 1 : 0),
+    'active'         => count($active_now) + (in_array($final_status, ['Approved', 'Waiting'], true) ? 1 : 0),
     'max'            => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
 ]);

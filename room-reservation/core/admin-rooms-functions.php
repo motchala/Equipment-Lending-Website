@@ -894,6 +894,9 @@ $ps_rooms_can_view_sensitive_adviser_requests = admin_is_super_admin($conn);
 $ps_rooms_sensitive_reservation_sql = "(rr.submitted_as = 'adviser' AND COALESCE(rr.document_path, '') <> '')";
 
 // ── All room reservations (admin read-only view) ──────────────────────────
+require_once __DIR__ . '/room-expiry.php';
+ps_room_expire_unreviewed($conn);   // undecided Waiting reservations past 12:01 AM of their day become Declined
+
 $admin_room_reservations_result = $conn->query(
     "SELECT rr.id, rr.room_id, rr.reservation_date,
             rr.start_time, rr.end_time,

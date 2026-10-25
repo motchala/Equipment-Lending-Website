@@ -152,17 +152,23 @@ if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
 $submitted_as = fcty_is_org_adviser($conn, $faculty_id) ? 'adviser' : 'personal';
 
 // ── Insert reservation ────────────────────────────────────────────────────────
+// Same-day: Approved at once. A LATER DATE waits for an admin's decision.
+$is_future_day  = ps_room_is_future_date($res_date);
+$initial_status = $is_future_day ? 'Waiting' : 'Approved';
+if ($is_future_day) {
+    ps_room_ensure_waiting_status($conn);
+}
 $ins = $conn->prepare(
     "INSERT INTO tbl_room_reservations
         (room_id, faculty_id, faculty_name, submitted_as,
          purpose, attendees, reservation_date, start_time, end_time,
          status, request_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW())"
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
 );
 $ins->bind_param(
-    'issssisss',
+    'issssissss',
     $room_id, $faculty_id, $faculty_name, $submitted_as,
-    $purpose, $attendees, $res_date, $start_time, $end_time
+    $purpose, $attendees, $res_date, $start_time, $end_time, $initial_status
 );
 
 if (!$ins->execute()) {
@@ -175,7 +181,7 @@ $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+ArbitrationEngine::processRoomReservation($conn, $reservation_id, $is_future_day);
 
 // ── Check final status ────────────────────────────────────────────────────────
 $sel = $conn->prepare(
@@ -206,7 +212,7 @@ ob_end_clean();
 http_response_code(200);
 echo json_encode([
     'status'         => 'success',
-    'message'        => 'Reservation confirmed.',
+    'message'        => $final_status === 'Waiting' ? 'Reservation request sent – waiting for admin approval.' : 'Reservation confirmed.',
     'reservation_id' => $reservation_id,
     'room_name'      => $room_name,
     'final_status'   => $final_status,

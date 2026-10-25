@@ -103,7 +103,14 @@ if (!$room_row) {
 }
 $room_name = $room_row['room_name'];
 
-// ── Insert reservation (defaults to Approved; engine may flip to Declined) ─
+// ── Insert reservation ────────────────────────────────────────────────────
+// Same-day: Approved at once (the engine may flip it to Declined). A LATER DATE waits for an admin.
+require_once __DIR__ . '/../core/room-expiry.php';
+$is_future_day  = ps_room_is_future_date($res_date);
+$initial_status = $is_future_day ? 'Waiting' : 'Approved';
+if ($is_future_day) {
+    ps_room_ensure_waiting_status($conn);
+}
 $notes_val = $notes !== '' ? $notes : null;
 $ins = $conn->prepare(
     "INSERT INTO tbl_room_reservations
@@ -111,10 +118,10 @@ $ins = $conn->prepare(
          submitted_as, submitted_by_name, submitted_by_id,
          purpose, attendees, reservation_date, start_time, end_time,
          notes, status, request_date)
-     VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW())"
+     VALUES (?, ?, ?, 'student', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
 );
 $ins->bind_param(
-    'isssssissss',
+    'isssssisssss',
     $room_id,
     $faculty_id,
     $faculty_name,
@@ -125,7 +132,8 @@ $ins->bind_param(
     $res_date,
     $start_time,
     $end_time,
-    $notes_val
+    $notes_val,
+    $initial_status
 );
 
 if (!$ins->execute()) {
@@ -139,7 +147,7 @@ $ins->close();
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';
-ArbitrationEngine::processRoomReservation($conn, $reservation_id);
+ArbitrationEngine::processRoomReservation($conn, $reservation_id, $is_future_day);
 
 // ── A declined reservation is never kept: tell the student on the spot ────
 // (the code is NOT marked used, so they can pick another slot with the same code)
@@ -179,9 +187,10 @@ $fac_stmt->close();
 
 if ($fac_row && !empty($fac_row['email'])) {
     require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
-    $status_color = $final_status === 'Approved' ? '#2e7d32' : '#c62828';
-    $status_icon  = $final_status === 'Approved' ? '&#10003; Approved' : '&#10007; Declined';
-    $subject = 'PUPSync: Room Reservation ' . $final_status . ' — ' . $room_name;
+    $is_pending   = ($final_status === 'Waiting');
+    $status_color = $final_status === 'Approved' ? '#2e7d32' : ($is_pending ? '#b26a00' : '#c62828');
+    $status_icon  = $final_status === 'Approved' ? '&#10003; Approved' : ($is_pending ? '&#9203; Pending admin review' : '&#10007; Declined');
+    $subject = 'PUPSync: Room Reservation ' . ($is_pending ? 'Request Received' : $final_status) . ' — ' . $room_name;
     $body_html = '
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
         <div style="background:#800000;padding:24px 28px;">
@@ -192,7 +201,7 @@ if ($fac_row && !empty($fac_row['email'])) {
                 Hello <strong>' . htmlspecialchars($fac_row['fullname']) . '</strong>,
             </p>
             <p style="margin:0 0 20px;color:#333;font-size:.95rem;">
-                The room reservation you authorized has been processed by the system.
+                ' . ($is_pending ? 'The room reservation you authorized is for a later date, so it is waiting for an admin to approve it. If no decision is made, it is automatically declined at 12:01 AM on the reservation date.' : 'The room reservation you authorized has been processed by the system.') . '
             </p>
             <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
                 <tr style="background:#f9f5f5;">

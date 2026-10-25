@@ -46,8 +46,11 @@ class RoomCancellation
     if (!$row) {
       return ['success' => false, 'error' => 'Reservation not found.'];
     }
-    if ($row['status'] !== 'Approved') {
-      return ['success' => false, 'error' => 'Only Approved reservations can be cancelled.'];
+    // A Waiting request (later date / letter review) holds no slot yet, so it can be withdrawn at any
+    // time: no 1-hour cutoff and nobody on the waitlist to tell.
+    $isWaiting = ($row['status'] === 'Waiting');
+    if ($row['status'] !== 'Approved' && !$isWaiting) {
+      return ['success' => false, 'error' => 'Only Approved or Waiting reservations can be cancelled.'];
     }
 
     // ── 1-hour cutoff enforcement ───────────────────────────────────
@@ -58,7 +61,7 @@ class RoomCancellation
     $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
     $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
 
-    if ($diffSecs <= 3600) {
+    if (!$isWaiting && $diffSecs <= 3600) {
       return [
         'success' => false,
         'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',
@@ -69,7 +72,7 @@ class RoomCancellation
     $upd = $conn->prepare(
       "UPDATE tbl_room_reservations
                 SET status = 'Cancelled', cancelled_at = NOW()
-              WHERE id = ? AND status = 'Approved'"
+              WHERE id = ? AND status IN ('Approved', 'Waiting')"
     );
     $upd->bind_param('i', $reservationId);
     $upd->execute();
@@ -90,8 +93,8 @@ class RoomCancellation
       self::logFacultyCancel($conn, $row);
     }
 
-    // ── Notify all waitlisted faculty for this slot ──────────────────
-    self::notifyWaitlist(
+    // ── Notify all waitlisted faculty for this slot (only if it actually held the slot) ─
+    if (!$isWaiting) self::notifyWaitlist(
       $conn,
       (int) $row['room_id'],
       $row['reservation_date'],

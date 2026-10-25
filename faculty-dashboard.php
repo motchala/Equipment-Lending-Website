@@ -2008,14 +2008,16 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             display: flex;
             flex-direction: row;
             overflow: hidden;
-            box-shadow: 0 4px 20px -4px rgba(87, 0, 0, .10);
+            isolation: isolate;
+            /* second shadow = soft gold glow spilling out past the left edge, next to the accent */
+            box-shadow: 0 4px 20px -4px rgba(87, 0, 0, .10), -8px 0 24px -10px rgba(184, 145, 58, .55);
             transition: box-shadow .25s, transform .25s;
             min-height: 200px;
         }
 
         #panel-lending .feat-hero:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 32px -6px rgba(87, 0, 0, .14);
+            box-shadow: 0 12px 32px -6px rgba(87, 0, 0, .14), -10px 0 28px -10px rgba(184, 145, 58, .65);
         }
 
         #panel-lending .feat-hero-body {
@@ -2365,8 +2367,9 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             z-index: 2;
         }
 
-        /* Big "Most Borrowed" card: the gold accent runs down the LEFT edge instead of across the top.
-           The card clips its corners (overflow:hidden + radius), so the straight strip curves with them. */
+        /* Big "Most Borrowed" card: the same curved gold band as the other cards, turned onto the LEFT edge.
+           A solid 3px line runs down the left side and bends round the top-left / bottom-left corners,
+           fading out as it goes (the top-band rule above, rotated a quarter turn). */
         #panel-lending .feat-hero::after {
             content: '';
             position: absolute;
@@ -2374,11 +2377,36 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
             bottom: 0;
             left: 0;
             width: 40px;
+            /* 6px wide down the side; the stretches that wrap the corners stay 3px so they taper off */
+            border: solid transparent;
+            border-width: 4px 0 4px 8px;
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
             background:
-                linear-gradient(180deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) left / 4px 100% no-repeat,
-                linear-gradient(90deg, rgba(184, 145, 58, .16) 0%, transparent 100%);
+                linear-gradient(180deg, var(--accent-gold-deep) 0%, var(--accent-gold-light) 50%, var(--accent-gold-deep) 100%) left / 12px 100% no-repeat,
+                linear-gradient(90deg, var(--accent-gold-deep) 0%, transparent 100%);
+            background-origin: border-box;
+            -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            /* the arc itself glows a little */
+            filter: drop-shadow(2px 0 5px rgba(184, 145, 58, .6));
             pointer-events: none;
             z-index: 2;
+        }
+
+        /* gold bleeding from the accent into the card; sits behind the text (card is isolated) */
+        #panel-lending .feat-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 120px;
+            background: linear-gradient(90deg, rgba(184, 145, 58, .24) 0%, rgba(184, 145, 58, .09) 45%, transparent 100%);
+            pointer-events: none;
+            z-index: -1;
         }
 
         #panel-lending .eq-item-card:hover,

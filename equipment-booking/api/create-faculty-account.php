@@ -68,11 +68,14 @@ if ($registry_active) {
     $matches = faculty_registry_lookup($conn, $first_name, $last_name);
 
     if (empty($matches)) {
-        send_json(422, 'error',
+        send_json(
+            422,
+            'error',
             htmlspecialchars($first_name . ' ' . $last_name, ENT_QUOTES, 'UTF-8') .
-            ' was not found in the official faculty registry. ' .
-            'Make sure the name matches the Faculty Identification Records document exactly, ' .
-            'or upload an updated registry file.');
+                ' was not found in the official faculty registry. ' .
+                'Make sure the name matches the Faculty Identification Records document exactly, ' .
+                'or upload an updated registry file.'
+        );
     }
 
     if (count($matches) > 1) {
@@ -94,11 +97,14 @@ if ($registry_active) {
     $reg_row = $matches[0];
 
     if (!empty($reg_row['is_newly_hired'])) {
-        send_json(422, 'error',
+        send_json(
+            422,
+            'error',
             htmlspecialchars($first_name . ' ' . $last_name, ENT_QUOTES, 'UTF-8') .
-            ' is listed as newly hired and does not have a Faculty ID yet. ' .
-            'They can be registered once their ID is assigned. ' .
-            'Upload an updated faculty registry to proceed.');
+                ' is listed as newly hired and does not have a Faculty ID yet. ' .
+                'They can be registered once their ID is assigned. ' .
+                'Upload an updated faculty registry to proceed.'
+        );
     }
 
     // Derive faculty_id from registry (already validated format when uploaded)
@@ -174,6 +180,10 @@ if ($is_org_adviser === 1) {
 // If is_org_adviser is 0, organization_id remains NULL.
 
 // -- Full name (first + last) ---------------------------------------------------
+// Stored with a capital first letter on every word ("juan dela cruz" -> "Juan Dela Cruz").
+// Done after the registry lookup, which ignores letter case, so matching is unaffected.
+$first_name = faculty_name_capitalize($first_name);
+$last_name  = faculty_name_capitalize($last_name);
 $fullname = $first_name . ' ' . $last_name;
 
 // -- Password & role --------------------------------------------------------------

@@ -114,6 +114,11 @@
             const overdueLabel = overdue ? '<br><small style="font-size:0.68rem;">(Overdue)</small>' : '';
             const pillClass = overdue ? 'pill-overdue' : 'pill-approved';
             const pillText = overdue ? 'Overdue' : 'Out on Loan';
+            // Extended by the faculty member after it was due: keep that visible next to the new date
+            const extN = Number(r.extension_count || 0);
+            const extLabel = extN > 0
+                ? `<br><small style="font-size:0.68rem;font-weight:400;" title="${esc('Originally due ' + (r.original_return_date ? fmtDate(r.original_return_date) : ''))}">Extended \u00d7${extN}</small>`
+                : '';
             const confirmMsg = `Confirm that ${r.faculty_name.replace(/'/g, "\\'")} has returned the ${r.equipment_name.replace(/'/g, "\\'")}?`;
 
             return `
@@ -122,7 +127,7 @@
                 <td class="fw-bold">${esc(r.faculty_name)}</td>
                 <td>${esc(r.equipment_name)}</td>
                 <td>${fmtDate(r.borrow_date)}</td>
-                <td style="${dueDateStyle}">${fmtDate(r.return_date)}${overdueLabel}</td>
+                <td style="${dueDateStyle}">${fmtDate(r.return_date)}${overdueLabel}${extLabel}</td>
                 <td><span class="status-pill ${pillClass}">${pillText}</span></td>
                 <td class="action-cell">
                     <div class="action-btns">

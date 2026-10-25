@@ -109,6 +109,7 @@ if (!function_exists('adm_act_categories')) {
             'rule_duplicate_block'   => 'Duplicate request',
             'rule_archived'          => 'Item archived',
             'rule_past_datetime'     => 'Date already passed',
+            'rule_expired_unreviewed' => 'Not reviewed in time',
             'faculty_cancelled'      => 'Cancelled by the faculty member',
         ];
         if (isset($known[$rule])) {
@@ -293,6 +294,44 @@ if (!function_exists('adm_act_specs')) {
                 },
             ];
         }
+
+        // ── Source 4: extensions of borrowed equipment (tbl_request_events) ──────
+        // One row per extension granted to a faculty member (equipment-booking/core/borrow-extension.php).
+        // Shown amber because every extension happens after the loan was already due.
+        if ($actor_mode !== 'admin' && in_array($filter, ['all', 'requests', 'decisions'], true)) {
+            $where  = ["`event` = 'extended'"];
+            $types  = '';
+            $params = [];
+            if ($since !== null) {
+                $where[]  = 'created_at >= FROM_UNIXTIME(?)';
+                $types   .= 'i';
+                $params[] = $since;
+            }
+            $specs[] = [
+                'from'       => 'tbl_request_events',
+                'count_from' => 'tbl_request_events',
+                'where'      => implode(' AND ', $where),
+                'types'      => $types,
+                'params'     => $params,
+                'cols'       => 'request_id, borrower_name, equipment_name, detail, UNIX_TIMESTAMP(created_at) AS ts',
+                'order'      => 'created_at DESC, id DESC',
+                'map'        => static function (array $r): array {
+                    $who = trim((string)$r['borrower_name']);
+                    return [
+                        'ts'         => (int)$r['ts'],
+                        'actor_type' => 'auto',
+                        'actor_id'   => 0,
+                        'actor_name' => $who !== '' ? $who : 'Faculty',
+                        'category'   => 'requests',
+                        'icon'       => 'update',
+                        'tone'       => 'warn',
+                        'text'       => 'Extended request #' . (int)$r['request_id'] . ': ' . trim((string)$r['equipment_name']) . ($who !== '' ? ' for ' . $who : ''),
+                        'meta'       => (string)$r['detail'],
+                        'tab'        => 'requests',
+                    ];
+                },
+            ];
+        }
         return $specs;
     }
 }
@@ -304,7 +343,7 @@ if (!function_exists('admin_activity_count')) {
         admin_activity_bootstrap($conn);
         $total = 0;
         foreach (adm_act_specs($q) as $spec) {
-            if ($spec['from'] === 'tbl_room_arbitration_log' && !admin_activity_table_exists($conn, 'tbl_room_arbitration_log')) {
+            if (in_array($spec['from'], ['tbl_room_arbitration_log', 'tbl_request_events'], true) && !admin_activity_table_exists($conn, $spec['from'])) {
                 continue;
             }
             $rows = adm_act_rows($conn, 'SELECT COUNT(*) AS c FROM ' . $spec['count_from'] . ' WHERE ' . $spec['where'], $spec['types'], $spec['params']);
@@ -340,7 +379,7 @@ if (!function_exists('admin_activity_feed')) {
         $items  = [];
 
         foreach (adm_act_specs($q) as $spec) {
-            if ($spec['from'] === 'tbl_room_arbitration_log' && !admin_activity_table_exists($conn, 'tbl_room_arbitration_log')) {
+            if (in_array($spec['from'], ['tbl_room_arbitration_log', 'tbl_request_events'], true) && !admin_activity_table_exists($conn, $spec['from'])) {
                 continue;
             }
             $sql = 'SELECT ' . $spec['cols'] . ' FROM ' . $spec['from'] . ' WHERE ' . $spec['where']

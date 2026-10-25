@@ -1,9 +1,16 @@
 <?php
 
 /**
- * Super-Admin-only decision endpoint for Organization Adviser reservations
- * that have a supporting document. Ordinary admins are intentionally denied
- * even if they call this endpoint directly.
+ * Decision endpoint for room reservations that are Waiting.
+ *
+ *   - Reservations for a LATER DATE wait for ANY admin (Super Admin or Admin).
+ *   - Organization Adviser reservations with a supporting document stay
+ *     Super-Admin-only: ordinary admins are denied even if they call this
+ *     endpoint directly.
+ *
+ * Anything undecided past its deadline (12:01 AM on the reservation date, see
+ * core/room-expiry.php) is declined automatically before a decision is taken,
+ * so an expired request can no longer be approved.
  */
 
 declare(strict_types=1);
@@ -23,6 +30,7 @@ require_once __DIR__ . '/../../config/security-headers.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../core/room-expiry.php';
 
 if (($_SESSION['admin'] ?? false) !== true) {
     adviser_review_reply(401, 'Admin access is required.');
@@ -44,9 +52,8 @@ if (mb_strlen($reason) < 5) {
 }
 
 $conn = getDB();
-if (!admin_is_super_admin($conn)) {
-    adviser_review_reply(403, 'Only a Super Admin can review an Organization Adviser reservation with a supporting document.');
-}
+$is_super = admin_is_super_admin($conn);
+ps_room_expire_unreviewed($conn);   // an overdue request is declined first, so it can't be approved late
 
 $conn->begin_transaction();
 try {
@@ -65,13 +72,15 @@ try {
     $reservation = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    $is_sensitive = $reservation
-        && (string)$reservation['status'] === 'Waiting'
-        && (string)$reservation['submitted_as'] === 'adviser'
-        && trim((string)$reservation['document_path']) !== '';
-    if (!$is_sensitive) {
+    if (!$reservation || (string)$reservation['status'] !== 'Waiting') {
         $conn->rollback();
-        adviser_review_reply(409, 'This reservation is no longer waiting for Super Admin review.');
+        adviser_review_reply(409, 'This reservation is no longer waiting for review.');
+    }
+    $is_sensitive = (string)$reservation['submitted_as'] === 'adviser'
+        && trim((string)$reservation['document_path']) !== '';
+    if ($is_sensitive && !$is_super) {
+        $conn->rollback();
+        adviser_review_reply(403, 'Only a Super Admin can review an Organization Adviser reservation with a supporting document.');
     }
 
     if ($decision === 'Approved') {
@@ -126,7 +135,7 @@ try {
     admin_log_activity(
         $conn,
         'room',
-        $decision . ' adviser reservation #' . $reservation_id . ': ' . $reservation['room_name'],
+        $decision . ($is_sensitive ? ' adviser reservation #' : ' reservation #') . $reservation_id . ': ' . $reservation['room_name'],
         $reason,
         ['action' => $decision === 'Approved' ? 'room_approved' : 'room_declined', 'ref_type' => 'reservation', 'ref_id' => $reservation_id]
     );

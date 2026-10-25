@@ -883,9 +883,10 @@ function initPortal() {
     /* ── STEP 3 (Room): result ──────────────────────────────────── */
     function showStep3Room(result, formData) {
         const isApproved = result.status === 'Approved';
-        const iconColor = isApproved ? '#2e7d32' : '#c62828';
-        const iconName = isApproved ? 'check_circle' : 'cancel';
-        const statusText = isApproved ? 'Reservation Approved!' : 'Reservation Declined';
+        const isPending = result.status === 'Waiting';   // a later date waits for an admin's decision
+        const iconColor = isApproved ? '#2e7d32' : (isPending ? '#b26a00' : '#c62828');
+        const iconName = isApproved ? 'check_circle' : (isPending ? 'hourglass_top' : 'cancel');
+        const statusText = isApproved ? 'Reservation Approved!' : (isPending ? 'Request Sent – Pending Admin Review' : 'Reservation Declined');
 
         document.querySelector('.modal-header').innerHTML = `
             <div>
@@ -898,7 +899,7 @@ function initPortal() {
             <div style="text-align:center;padding:12px 0 16px;">
                 <span class="material-symbols-outlined" style="font-size:44px;color:${iconColor};display:block;margin-bottom:8px;">${iconName}</span>
                 <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">${escHTML(statusText)}</p>
-                ${result.reason ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">${escHTML(result.reason)}</p>` : ''}
+                ${isPending ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.</p>` : (result.reason ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">${escHTML(result.reason)}</p>` : '')}
             </div>
             <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;line-height:2;">
                 <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Student</span><strong>${escHTML(formData.student_name)} · ${escHTML(formData.student_id)}</strong></div>

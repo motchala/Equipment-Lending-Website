@@ -29,14 +29,34 @@ declare(strict_types=1);
  *   If the loan is going to a room, another faculty's reservation of that room during the period
  *   also blocks the extension (same rule as the Borrow form: BookingSchedule::roomConflictMessage()).
  *
+ * LIMIT
+ *   At most MAX_EXTENSIONS extensions per loan. After that the item has to be returned.
+ *   (Without a limit, availability would be the only brake and a loan nobody else wants could be
+ *   extended forever.)
+ *
  * WHEN IT IS ALLOWED
  *   The request row keeps its stock (nothing is returned or re-taken), gets the new return moment,
  *   goes back to Approved (so an Overdue item stops blocking new borrow requests), and
  *   extension_count goes up by one. The decision is made inside a transaction that locks the item's
  *   inventory row, like every other stock decision, so two people can never be given the same units.
  *
- * New tbl_requests column (added automatically by ensureSchema()):
- *   extension_count  INT NOT NULL DEFAULT 0
+ * LATENESS IS KEPT, NOT ERASED
+ *   An extension can only be granted after the return moment has passed, so the loan WAS late. Moving the
+ *   return date must not make it look on time, so the first extension stores the original return moment
+ *   and every extension adds how long the loan had already been overdue. "Returned late" (My Activity,
+ *   notifications) is judged against the ORIGINAL return moment, and the admin sees "Extended xN".
+ *
+ * ADMIN TRAIL
+ *   Every granted extension writes one row to tbl_request_events (who, what, until when, how overdue it
+ *   already was). The admin Activity feed reads that table. (tbl_arbitration_log keeps one row per request,
+ *   so it cannot hold a history of several extensions without losing the approval record.)
+ *
+ * New tbl_requests columns and table (added automatically by ensureSchema()):
+ *   extension_count         INT NOT NULL DEFAULT 0
+ *   original_return_date    DATE NULL      return date before the first extension
+ *   original_return_time    TIME NULL      return time before the first extension
+ *   extension_late_seconds  INT UNSIGNED NOT NULL DEFAULT 0   overdue time accumulated across extensions
+ *   tbl_request_events      one row per granted extension
  */
 
 require_once __DIR__ . '/booking-schedule.php';
@@ -44,28 +64,102 @@ require_once __DIR__ . '/../../room-reservation/core/faculty-room-quota.php';   
 
 final class BorrowExtension
 {
+    /** Extensions allowed per loan. */
+    public const MAX_EXTENSIONS = 2;
+
     private static ?bool $ready = null;
 
-    /** Adds extension_count if it is missing. Call it BEFORE opening a transaction (ALTER ends one). */
+    /**
+     * Adds the extension columns and the events table if they are missing.
+     * Call it BEFORE opening a transaction (ALTER ends one).
+     */
     public static function ensureSchema(mysqli $conn): bool
     {
         if (self::$ready !== null) {
             return self::$ready;
         }
+        $defs = [
+            'extension_count'        => 'INT NOT NULL DEFAULT 0',
+            'original_return_date'   => 'DATE NULL DEFAULT NULL',
+            'original_return_time'   => 'TIME NULL DEFAULT NULL',
+            'extension_late_seconds' => 'INT UNSIGNED NOT NULL DEFAULT 0',
+        ];
         try {
-            $res = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'extension_count'");
-            $has = $res && $res->num_rows > 0;
-            if (!$has) {
-                $conn->query('ALTER TABLE tbl_requests ADD COLUMN `extension_count` INT NOT NULL DEFAULT 0');
-                $res = $conn->query("SHOW COLUMNS FROM tbl_requests LIKE 'extension_count'");
-                $has = $res && $res->num_rows > 0;
+            $columns = static function () use ($conn): array {
+                $have = [];
+                $res  = $conn->query('SHOW COLUMNS FROM tbl_requests');
+                while ($res && ($row = $res->fetch_assoc())) {
+                    $have[$row['Field']] = true;
+                }
+                return $have;
+            };
+            $have = $columns();
+            $adds = [];
+            foreach ($defs as $col => $def) {
+                if (!isset($have[$col])) {
+                    $adds[] = "ADD COLUMN `{$col}` {$def}";
+                }
             }
-            self::$ready = $has;
+            if ($adds) {
+                $conn->query('ALTER TABLE tbl_requests ' . implode(', ', $adds));
+                $have = $columns();
+            }
+
+            // Same table the admin Activity feed creates (config/admin-activity.php), so either side can be first
+            $conn->query(
+                "CREATE TABLE IF NOT EXISTS `tbl_request_events` (
+                    `id`             int(11) NOT NULL AUTO_INCREMENT,
+                    `request_id`     int(11) NOT NULL,
+                    `borrower_id`    varchar(50) NOT NULL,
+                    `borrower_name`  varchar(100) NOT NULL DEFAULT '',
+                    `equipment_name` varchar(100) NOT NULL DEFAULT '',
+                    `event`          varchar(30) NOT NULL,
+                    `detail`         varchar(255) NOT NULL DEFAULT '',
+                    `created_at`     datetime NOT NULL DEFAULT current_timestamp(),
+                    PRIMARY KEY (`id`),
+                    KEY `idx_request` (`request_id`),
+                    KEY `idx_time` (`created_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+            );
+
+            self::$ready = true;
+            foreach ($defs as $col => $_) {
+                if (!isset($have[$col])) {
+                    self::$ready = false;
+                }
+            }
         } catch (\Throwable $e) {
             error_log('BorrowExtension::ensureSchema — ' . $e->getMessage());
             self::$ready = false;
         }
         return self::$ready;
+    }
+
+    /** True when this loan has used up its extensions. */
+    public static function atLimit(array $row): bool
+    {
+        return (int)($row['extension_count'] ?? 0) >= self::MAX_EXTENSIONS;
+    }
+
+    private static function limitMessage(): string
+    {
+        return 'This item has already been extended ' . self::MAX_EXTENSIONS . ' times, which is the limit. Please return it to the Admin Office.';
+    }
+
+    /** "3 hours" / "1 day" — how long a loan had been overdue. */
+    private static function duration(int $seconds): string
+    {
+        $minutes = intdiv(max(0, $seconds), 60);
+        if ($minutes < 60) {
+            $n = max(1, $minutes);
+            return $n . ($n === 1 ? ' minute' : ' minutes');
+        }
+        $hours = intdiv($minutes, 60);
+        if ($hours < 24) {
+            return $hours . ($hours === 1 ? ' hour' : ' hours');
+        }
+        $days = intdiv($hours, 24);
+        return $days . ($days === 1 ? ' day' : ' days');
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -211,8 +305,9 @@ final class BorrowExtension
     private static function fetch(mysqli $conn, int $requestId, string $facultyId, bool $lock): ?array
     {
         $stmt = $conn->prepare(
-            'SELECT id, faculty_id, equipment_name, borrow_qty, room, room_id, booking_mode, status,
-                    borrow_date, borrow_time, return_date, return_time, extension_count
+            'SELECT id, faculty_id, faculty_name, equipment_name, borrow_qty, room, room_id, booking_mode, status,
+                    borrow_date, borrow_time, return_date, return_time,
+                    extension_count, original_return_date, original_return_time, extension_late_seconds
                FROM tbl_requests WHERE id = ? AND faculty_id = ? LIMIT 1' . ($lock ? ' FOR UPDATE' : '')
         );
         if (!$stmt) {
@@ -250,6 +345,9 @@ final class BorrowExtension
         if (!self::isDue($row, $now)) {
             return ['ok' => false, 'error' => self::notDueMessage($row)];
         }
+        if (self::atLimit($row)) {
+            return ['ok' => false, 'error' => self::limitMessage()];
+        }
 
         $due     = self::dueAt($row);
         $options = [];
@@ -272,6 +370,8 @@ final class BorrowExtension
             'due'       => fact_day_label($now, $due, false)
                 . (trim((string)($row['return_time'] ?? '')) !== '' ? ', ' . fact_time((string)$row['return_time']) : ''),
             'extended'  => (int)($row['extension_count'] ?? 0),
+            'used'      => (int)($row['extension_count'] ?? 0),
+            'max'       => self::MAX_EXTENSIONS,
             'options'   => $options,
         ];
         if (!$options) {
@@ -319,6 +419,10 @@ final class BorrowExtension
                 $conn->rollback();
                 return ['ok' => false, 'error' => self::notDueMessage($row)];
             }
+            if (self::atLimit($row)) {
+                $conn->rollback();
+                return ['ok' => false, 'error' => self::limitMessage()];
+            }
 
             $chosen = null;
             foreach (self::options($row, $adviser, $now) as $o) {
@@ -342,22 +446,53 @@ final class BorrowExtension
             $note    = 'Borrowing extended until ' . $chosen['due']->format('M j, g:i A') . '.';
             $newDate = $chosen['due']->format('Y-m-d');
             $newTime = $chosen['due']->format('H:i:s');
+
+            // The first extension remembers when the loan was really due; later ones keep it
+            $hadOriginal = (string)($row['original_return_date'] ?? '') !== '';
+            $origDate    = $hadOriginal ? (string)$row['original_return_date'] : (string)$row['return_date'];
+            $origTime    = $hadOriginal
+                ? ((string)($row['original_return_time'] ?? '') !== '' ? (string)$row['original_return_time'] : null)
+                : ((string)($row['return_time'] ?? '') !== '' ? (string)$row['return_time'] : null);
+            // How long the loan had already been overdue when this extension was granted
+            $lateNow = max(0, $now->getTimestamp() - self::dueAt($row)->getTimestamp());
+            $nth     = (int)($row['extension_count'] ?? 0) + 1;
+
             $upd = $conn->prepare(
                 "UPDATE tbl_requests
                     SET return_date = ?, return_time = ?, status = 'Approved',
-                        extension_count = extension_count + 1, reason = ?
+                        extension_count = extension_count + 1, reason = ?,
+                        original_return_date = ?, original_return_time = ?,
+                        extension_late_seconds = extension_late_seconds + ?
                   WHERE id = ? AND faculty_id = ? AND status IN ('Overdue','Approved')"
             );
             if (!$upd) {
                 throw new \RuntimeException('prepare update failed: ' . $conn->error);
             }
-            $upd->bind_param('sssis', $newDate, $newTime, $note, $requestId, $facultyId);
+            $upd->bind_param('sssssiis', $newDate, $newTime, $note, $origDate, $origTime, $lateNow, $requestId, $facultyId);
             $upd->execute();
             $changed = $upd->affected_rows > 0;
             $upd->close();
             if (!$changed) {
                 $conn->rollback();
                 return ['ok' => false, 'error' => 'This item changed while you were extending it. Please check My Activity and try again.'];
+            }
+
+            // Admin trail (same transaction: it exists if and only if the extension does)
+            $origLabel = (new DateTimeImmutable($origDate . ' ' . ($origTime ?? '23:59:59'), self::tz()))->format($origTime !== null ? 'M j, g:i A' : 'M j');
+            $detail = 'Until ' . $chosen['due']->format('M j, g:i A') . ' (' . $chosen['label'] . ', extension ' . $nth . ' of ' . self::MAX_EXTENSIONS . '). '
+                . 'Was overdue by ' . self::duration($lateNow) . '; originally due ' . $origLabel . '.';
+            $ev = $conn->prepare(
+                "INSERT INTO tbl_request_events (request_id, borrower_id, borrower_name, equipment_name, `event`, detail, created_at)
+                 VALUES (?, ?, ?, ?, 'extended', ?, NOW())"
+            );
+            if ($ev) {
+                $bid    = (string)$row['faculty_id'];
+                $bname  = (string)($row['faculty_name'] ?? '');
+                $item   = (string)$row['equipment_name'];
+                $detail = function_exists('mb_substr') ? mb_substr($detail, 0, 250) : substr($detail, 0, 250);
+                $ev->bind_param('issss', $requestId, $bid, $bname, $item, $detail);
+                $ev->execute();
+                $ev->close();
             }
 
             $conn->commit();

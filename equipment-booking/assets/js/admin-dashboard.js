@@ -1740,6 +1740,23 @@
     const facDisambig = document.getElementById('fac-disambiguation');
     const facDisambigSel = document.getElementById('fac-disambig-select');
 
+    /* "juan  dela cruz" -> "Juan Dela Cruz": every space- or hyphen-separated word starts with a capital
+       (the server applies the same rule when the account is saved). */
+    function _facCapitalizeName(v) {
+        return String(v || '').replace(/\s+/g, ' ').trim()
+            .replace(/(^|[\s-])(\p{L})/gu, function (m, sep, ch) { return sep + ch.toLocaleUpperCase(); });
+    }
+    // Reads both name fields, shows them capitalised in the form, and returns them.
+    function _facReadNames() {
+        var fEl = document.getElementById('fac-first');
+        var lEl = document.getElementById('fac-last');
+        var first = _facCapitalizeName(fEl ? fEl.value : '');
+        var last = _facCapitalizeName(lEl ? lEl.value : '');
+        if (fEl) fEl.value = first;
+        if (lEl) lEl.value = last;
+        return { first: first, last: last };
+    }
+
     // Stores the currently confirmed registry match {faculty_id, email_preview, full_name}
     // null means no successful lookup yet — submit is blocked until set.
     let _facRegistryMatch = null;
@@ -1778,7 +1795,9 @@
     // Clear the preview whenever name fields change
     ['fac-first', 'fac-last'].forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.addEventListener('input', _clearRegistryPreview);
+        if (!el) return;
+        el.addEventListener('input', _clearRegistryPreview);
+        el.addEventListener('blur', _facReadNames); // tidy the capitals as soon as the admin leaves the field
     });
 
     // Disambiguation select → apply the chosen match
@@ -1794,8 +1813,9 @@
     if (facLookupBtn) {
         facLookupBtn.addEventListener('click', function () {
             _clearRegistryPreview();
-            const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const lastName = (document.getElementById('fac-last')?.value || '').trim();
+            const _nm = _facReadNames();
+            const firstName = _nm.first;
+            const lastName = _nm.last;
             if (!firstName || !lastName) {
                 _showLookupAlert('Enter both first name and last name before looking up.', true);
                 return;
@@ -1960,8 +1980,9 @@
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
             const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
-            const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const lastName = (document.getElementById('fac-last')?.value || '').trim();
+            const _nm = _facReadNames();
+            const firstName = _nm.first;
+            const lastName = _nm.last;
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
             const isAdviser = facAdviserChk?.checked ? '1' : '0';
@@ -4224,9 +4245,10 @@ function psSelectFmt(btn) {
    ROOMS — reservation details drawer (Rooms > Reservations table)
    Additive block. "Cancel reservation" in the drawer clicks the row's
    own Cancel button, so the existing cancel modal + API are reused.
-   Waiting requests (Org Adviser + attached letter) show a reason box and
-   Approve / Decline buttons for the Super Admin; the decision goes to
-   room-reservation/api/review-adviser-reservation.php (Super Admin only).
+   Waiting requests (later-date reservations, and Org Adviser requests with an
+   attached letter) show a reason box and Approve / Decline buttons; the
+   decision goes to room-reservation/api/review-adviser-reservation.php (any
+   admin for later-date requests, Super Admin only for the adviser letters).
    ═══════════════════════════════════════════════════════════════ */
 (function () {
     var drawer = document.getElementById('ps-room-drawer');
@@ -4304,7 +4326,7 @@ function psSelectFmt(btn) {
         // Cancel is only offered for Approved reservations that haven't ended yet (same rule as the table).
         el('ps-rr-cancel-btn').hidden = row.dataset.cancellable !== '1';
 
-        // Review controls: Waiting requests, Super Admin only (the table only flags those rows).
+        // Review controls: Waiting requests (the table only flags the rows this admin may decide).
         setReviewUI(d.status === 'Waiting' && d.canReview === '1');
 
         // Decision context. The room arbitration log records the rule used for
@@ -4324,6 +4346,7 @@ function psSelectFmt(btn) {
                 'rule_archived': 'Facility availability policy',
                 'rule_missing_doc_hold': 'Supporting-document policy',
                 'rule_schedule_conflict': 'Schedule conflict',
+                'rule_expired_unreviewed': 'Not reviewed in time (12:01 AM on the day)',
                 'override': 'Admin override',
                 'manual': 'Manual admin decision'
             };
@@ -4336,7 +4359,7 @@ function psSelectFmt(btn) {
             if (isManual) {
                 methodLabel = 'Manual (admin decision)';
             } else if (isAuto) {
-                methodLabel = arbRule === 'rule_1_fifo' ? 'Automatic (FIFO)' : 'Automatic (priority rules)';
+                methodLabel = arbRule === 'rule_1_fifo' ? 'Automatic (FIFO)' : (arbRule === 'rule_expired_unreviewed' ? 'Automatic (not reviewed in time)' : 'Automatic (priority rules)');
             } else {
                 methodLabel = 'Not recorded';
             }
@@ -4359,7 +4382,7 @@ function psSelectFmt(btn) {
             }
             // Waiting: nothing has been decided yet
             if (d.status === 'Waiting') {
-                if (methodEl) methodEl.textContent = 'Awaiting Super Admin review';
+                if (methodEl) methodEl.textContent = hasDoc ? 'Awaiting Super Admin review' : 'Awaiting admin review';
                 if (ruleRow) ruleRow.hidden = true;
                 if (reasonRow) reasonRow.hidden = true;
             }
@@ -5497,6 +5520,218 @@ function psSelectFmt(btn) {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
     else install();
+})();
+
+/* ================================================================
+   EQUIPMENT › ON LOAN › "Delete All"  (Super Admin only)
+   1) the button opens a dialog; the server counts what is in the list
+      (equipment-booking/api/delete-all-loans.php, dry_run=1) and the dialog
+      lists exactly that
+   2) the Super Admin types their own password and confirms
+   3) the same endpoint re-checks role + password, puts back the stock of
+      loans still out, deletes every record, then the page reloads on the
+      On Loan tab. The password is wiped from the field as soon as it is sent
+      or the dialog closes.
+   ================================================================ */
+(function () {
+    'use strict';
+
+    function $(id) { return document.getElementById(id); }
+    function csrfToken() {
+        var el = document.querySelector('input[name="csrf_token"]');
+        return el ? el.value : '';
+    }
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+    function init() {
+        var btn = $('eq-loan-wipe-btn');
+        var modal = $('eq-loan-wipe-modal');
+        if (!btn || !modal) return;   // not a Super Admin
+
+        var summary = $('eq-loan-wipe-summary');
+        var note = $('eq-loan-wipe-note');
+        var pw = $('eq-loan-wipe-pw');
+        var toggle = $('eq-loan-wipe-pw-toggle');
+        var errBox = $('eq-loan-wipe-error');
+        var okBtn = $('eq-loan-wipe-confirm');
+        var okHtml = okBtn.innerHTML;
+
+        var counted = false;      // the server has told us there is something to delete
+        var busy = false;
+        var leaving = false;      // success: the page is about to reload
+        var loadSeq = 0;          // ignores a late "count" reply after the dialog was closed/reopened
+
+        function isOpen() { return modal.classList.contains('ps-modal-open'); }
+        function closeModal() { modal.classList.remove('ps-modal-open'); }
+        function setError(msg) { errBox.textContent = msg; errBox.classList.remove('hidden'); }
+        function clearError() { errBox.textContent = ''; errBox.classList.add('hidden'); }
+
+        function resetForm() {
+            pw.value = '';
+            pw.type = 'password';
+            toggle.querySelector('.material-symbols-outlined').textContent = 'visibility';
+            clearError();
+            note.textContent = '';
+            note.classList.add('hidden');
+            counted = false;
+            busy = false;
+            okBtn.disabled = true;
+            okBtn.innerHTML = okHtml;
+        }
+
+        function line(text, num, cls) {
+            var li = document.createElement('li');
+            if (cls) li.className = cls;
+            var a = document.createElement('span');
+            a.textContent = text;
+            var b = document.createElement('span');
+            b.className = 'eq-wipe-num';
+            b.textContent = String(num);
+            li.appendChild(a);
+            li.appendChild(b);
+            return li;
+        }
+
+        function renderCounts(c) {
+            summary.textContent = '';
+            if (!c || !c.total) {
+                var li = document.createElement('li');
+                li.className = 'eq-wipe-loading';
+                li.textContent = 'The loan list is already empty — there is nothing to delete.';
+                summary.appendChild(li);
+                counted = false;
+                okBtn.disabled = true;
+                return;
+            }
+            if (c.waiting) summary.appendChild(line('Pending requests (waiting for review)', c.waiting));
+            if (c.scheduled) summary.appendChild(line('Scheduled (later-date) bookings', c.scheduled));
+            if (c.out) summary.appendChild(line('Loans currently out (active or overdue)', c.out));
+            if (c.returned) summary.appendChild(line('Returned loans (history)', c.returned));
+            summary.appendChild(line('Total records to delete', c.total, 'is-total'));
+
+            if (c.restore_units > 0) {
+                note.textContent = plural(c.restore_units, 'unit', 'units') +
+                    ' of equipment that are still out will be added back to the Catalog stock.';
+                note.classList.remove('hidden');
+            }
+            counted = true;
+            okBtn.disabled = false;
+        }
+
+        function open() {
+            resetForm();
+            summary.textContent = '';
+            var loading = document.createElement('li');
+            loading.className = 'eq-wipe-loading';
+            loading.textContent = 'Counting records…';
+            summary.appendChild(loading);
+            modal.classList.add('ps-modal-open');
+
+            var seq = ++loadSeq;
+            fetch('equipment-booking/api/delete-all-loans.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ csrf_token: csrfToken(), dry_run: '1' }).toString()
+            })
+                .then(function (res) {
+                    return res.json().catch(function () { return { status: 'error', message: 'Unexpected response from the server.' }; });
+                })
+                .then(function (data) {
+                    if (seq !== loadSeq || !isOpen()) return;
+                    if (data && data.status === 'success' && data.counts) {
+                        renderCounts(data.counts);
+                    } else {
+                        summary.textContent = '';
+                        setError((data && data.message) || 'Could not count the loan records. Please try again.');
+                    }
+                })
+                .catch(function () {
+                    if (seq !== loadSeq || !isOpen()) return;
+                    summary.textContent = '';
+                    setError('Network error. Please try again.');
+                });
+
+            setTimeout(function () { pw.focus(); }, 50);
+        }
+
+        function confirm() {
+            if (busy || !counted) return;
+            var pass = pw.value;
+            if (pass === '') { setError('Enter your password to continue.'); pw.focus(); return; }
+
+            busy = true;
+            okBtn.disabled = true;
+            okBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Deleting…';
+            clearError();
+
+            fetch('equipment-booking/api/delete-all-loans.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ csrf_token: csrfToken(), current_password: pass }).toString()
+            })
+                .then(function (res) {
+                    return res.json().catch(function () { return { status: 'error', message: 'Unexpected response from the server. Please try again.' }; });
+                })
+                .then(function (data) {
+                    if (data && data.status === 'success') {
+                        leaving = true;
+                        pw.value = '';                // wipe the password straight away
+                        closeModal();
+                        try { sessionStorage.setItem('openLoanListTab', '1'); } catch (_) { }
+                        // Reload so the table, tab counts, stock and dashboard figures all come from the server.
+                        window.location.href = window.location.pathname + '?view=inventory&loans_cleared=1#tab-inventory';
+                        return;
+                    }
+                    setError((data && data.message) || 'Could not delete the loan list. Please try again.');
+                    if (data && data.code === 'bad_password') { pw.value = ''; pw.focus(); }
+                })
+                .catch(function () {
+                    setError('Network error. Nothing was deleted. Please try again.');
+                })
+                .finally(function () {
+                    if (leaving) return;
+                    busy = false;
+                    okBtn.innerHTML = okHtml;
+                    okBtn.disabled = !counted;
+                });
+        }
+
+        btn.addEventListener('click', open);
+        okBtn.addEventListener('click', confirm);
+        [$('eq-loan-wipe-close'), $('eq-loan-wipe-cancel')].forEach(function (el) {
+            if (el) el.addEventListener('click', closeModal);
+        });
+        pw.addEventListener('input', clearError);
+        pw.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
+        });
+        toggle.addEventListener('click', function () {
+            var hidden = pw.type === 'password';
+            pw.type = hidden ? 'text' : 'password';
+            toggle.querySelector('.material-symbols-outlined').textContent = hidden ? 'visibility_off' : 'visibility';
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && isOpen() && !busy) closeModal();
+        });
+
+        // However the dialog gets closed (buttons, Esc, backdrop click) nothing stays in the field.
+        new MutationObserver(function () {
+            if (!isOpen()) { loadSeq++; pw.value = ''; pw.type = 'password'; }
+        }).observe(modal, { attributes: true, attributeFilter: ['class'] });
+
+        // After the reload, land back on the On Loan tab.
+        try {
+            if (sessionStorage.getItem('openLoanListTab') === '1') {
+                sessionStorage.removeItem('openLoanListTab');
+                setTimeout(function () {
+                    if (typeof window.psOpenEquipmentTab === 'function') window.psOpenEquipmentTab('eq-onloan');
+                }, 0);
+            }
+        } catch (_) { }
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 })();
 
 /* ================================================================

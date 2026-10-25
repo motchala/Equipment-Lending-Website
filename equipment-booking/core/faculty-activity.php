@@ -29,9 +29,11 @@
  *                      1 hour before the start). Rules and side effects: core/borrow-cancellation.php.
  *                      A cancelled request moves to History as "Cancelled".
  *   Extend             offered on loans whose return moment has been reached (Overdue, or Approved and
- *                      due). Rules and availability check: core/borrow-extension.php. A granted
- *                      extension moves the return moment, puts an Overdue loan back to Approved and
- *                      shows as "Extended once / N times" on the row.
+ *                      due), up to BorrowExtension::MAX_EXTENSIONS times per loan. Rules and availability
+ *                      check: core/borrow-extension.php. A granted extension moves the return moment, puts an
+ *                      Overdue loan back to Approved and shows as "Extended once / N times, originally due ..."
+ *                      on the row. Lateness is judged against the ORIGINAL return moment, so extending never
+ *                      makes a late loan look on time (history says "Returned late").
  *   Student requests   requests a student filed with this faculty member's code are the
  *                      faculty member's responsibility, so they are listed here (and count)
  *                      like everywhere else, and are marked with the student's name.
@@ -146,7 +148,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 
     try {
         BookingSchedule::ensureSchema($conn);
-        $extCol = BorrowExtension::ensureSchema($conn) ? 'r.extension_count' : '0 AS extension_count';
+        $extCol = BorrowExtension::ensureSchema($conn)
+            ? 'r.extension_count, r.original_return_date, r.original_return_time'
+            : '0 AS extension_count, NULL AS original_return_date, NULL AS original_return_time';
         $images = fact_eq_image_map($conn);
 
         $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.borrow_date, r.borrow_time, $extCol,
@@ -207,9 +211,23 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'due_ts'      => $due->getTimestamp(),
                     'returned_ts' => $returnedAt !== '' ? (int)strtotime($returnedAt) : 0,
                     'extensions'  => max(0, fact_i($row, 'extension_count')),
-                    // Return moment reached while the item is still out: it can be extended
-                    'can_extend'  => BorrowExtension::isDue($row, $now),
+                    // Return moment reached while the item is still out: it can be extended, until the limit
+                    'can_extend'  => BorrowExtension::isDue($row, $now) && !BorrowExtension::atLimit($row),
+                    'extend_limit' => BorrowExtension::isDue($row, $now) && BorrowExtension::atLimit($row),
+                    // When it was really due, before any extension moved it (0 / '' when never extended)
+                    'late_base_ts'   => $due->getTimestamp(),
+                    'orig_due_label' => '',
                 ];
+                if (fact_s($row, 'original_return_date') !== '') {
+                    try {
+                        $origTime = fact_s($row, 'original_return_time');
+                        $orig     = new DateTimeImmutable(fact_s($row, 'original_return_date') . ' ' . ($origTime !== '' ? $origTime : '23:59:59'), $tz);
+                        $item['late_base_ts']   = $orig->getTimestamp();
+                        $item['orig_due_label'] = fact_day_label($now, $orig, false) . ($origTime !== '' ? ', ' . fact_time($origTime) : '');
+                    } catch (Throwable $e) {
+                        // an unreadable original date just means we fall back to the current one
+                    }
+                }
                 // Upcoming requests can be cancelled until 1 hour before they start (Pending: until they start).
                 // 'cancel_note' says why not, only for the "too late" case (same wording as room reservations).
                 $cancelWhy = in_array($status, ['Waiting', 'Approved'], true) ? BorrowCancellation::blocker($row, $now) : 'n/a';
@@ -289,14 +307,18 @@ function fact_eq_late_label(int $seconds): string
     return 'Overdue by ' . $days . ' ' . ($days === 1 ? 'day' : 'days');
 }
 
-/** "Extended once" / "Extended 2 times" (empty when the loan was never extended). */
+/**
+ * "Extended once, originally due Oct 22, 5:00 PM" (empty when the loan was never extended).
+ * The original date stays visible so an extension never hides that the loan was late.
+ */
 function fact_eq_extended_label(array $it): string
 {
     $n = fact_i($it, 'extensions');
     if ($n <= 0) {
         return '';
     }
-    return $n === 1 ? 'Extended once' : 'Extended ' . $n . ' times';
+    $label = $n === 1 ? 'Extended once' : 'Extended ' . $n . ' times';
+    return fact_s($it, 'orig_due_label') !== '' ? $label . ', originally due ' . fact_s($it, 'orig_due_label') : $label;
 }
 
 /** Item name, plus "×2" when more than one unit was requested (same as the Home tab). */
@@ -392,6 +414,9 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
             $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="extend-borrow"'
                 . ' data-request-id="' . fact_i($it, 'id') . '"'
                 . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Extend</button>';
+        } elseif (!empty($it['extend_limit'])) {
+            $buttons .= '<span class="fact-note" title="This loan has been extended the most times allowed">'
+                . fact_icon('block') . 'Extension limit reached (' . BorrowExtension::MAX_EXTENSIONS . ' of ' . BorrowExtension::MAX_EXTENSIONS . ')</span>';
         }
         if ($buttons !== '') {
             $html .= '<div class="fact-item-actions">' . $buttons . '</div>';
@@ -465,7 +490,8 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
         if ($status === 'Returned' && fact_i($it, 'returned_ts') > 0) {
             $ret   = (new DateTimeImmutable('@' . fact_i($it, 'returned_ts')))->setTimezone($tz);
             $when2 = 'Returned ' . fact_day_label($now, $ret, false) . ', ' . $ret->format('g:i A');
-            if (fact_i($it, 'returned_ts') > fact_i($it, 'due_ts')) {
+            // Judged against when it was ORIGINALLY due: an extension never makes a late return look on time
+            if (fact_i($it, 'returned_ts') > fact_i($it, 'late_base_ts')) {
                 $note = 'Returned late';
             }
         } elseif ($status === 'Cancelled') {

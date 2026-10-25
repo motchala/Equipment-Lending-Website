@@ -5858,8 +5858,9 @@
             }
 
             var late = data.status === 'Overdue' ? '<span class="fact-ext-late">Overdue</span> \u00b7 ' : '';
+            var which = data.max ? ' \u00b7 Extension ' + (Number(data.used || 0) + 1) + ' of ' + data.max : '';
             html += '<div class="fact-ext-item"><strong>' + esc(data.item) + (data.qty > 1 ? ' <span class="fact-qty">\u00d7' + data.qty + '</span>' : '') + '</strong>'
-                + '<span>' + late + 'Due ' + esc(data.due) + '</span></div>';
+                + '<span>' + late + 'Due ' + esc(data.due) + esc(which) + '</span></div>';
 
             if (!data.options || !data.options.length) {
                 html += '<div class="fact-ext-banner is-error" role="alert">' + esc(data.error || 'No extension is available for this item.') + '</div>';
