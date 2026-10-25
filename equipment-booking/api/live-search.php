@@ -124,6 +124,7 @@ switch ($section) {
                 FROM tbl_requests 
                 WHERE (faculty_id LIKE ? OR faculty_name LIKE ? OR equipment_name LIKE ?)
                   AND NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')
+                  AND status <> 'Cancelled'
                 ORDER BY request_date DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sss", $search, $search, $search);

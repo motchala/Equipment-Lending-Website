@@ -19,12 +19,19 @@
  *                      (a booking for later today is NOT "in progress" until it starts,
  *                      exactly when BookingSchedule::activateDue() takes its stock)
  *   Upcoming           Waiting, or Approved that has not started yet
- *   History            Returned or Declined
+ *   History            Returned, Declined or Cancelled
  *   Due moment         return_date + return_time (end of that day when no time was set)
  *   Counts             Active loans = Approved, Overdue = Overdue, Pending = Waiting.
  *                      These are the same three numbers the Home tab shows.
  *   Overdue            blocks new BORROW requests (arbitration "overdue borrower" rule),
  *                      never room reservations.
+ *   Cancel             offered on Upcoming requests that have not started (Pending, or Approved more than
+ *                      1 hour before the start). Rules and side effects: core/borrow-cancellation.php.
+ *                      A cancelled request moves to History as "Cancelled".
+ *   Extend             offered on loans whose return moment has been reached (Overdue, or Approved and
+ *                      due). Rules and availability check: core/borrow-extension.php. A granted
+ *                      extension moves the return moment, puts an Overdue loan back to Approved and
+ *                      shows as "Extended once / N times" on the row.
  *   Student requests   requests a student filed with this faculty member's code are the
  *                      faculty member's responsibility, so they are listed here (and count)
  *                      like everywhere else, and are marked with the student's name.
@@ -33,6 +40,8 @@
 
 require_once __DIR__ . '/booking-schedule.php';
 require_once __DIR__ . '/faculty-notif-functions.php';
+require_once __DIR__ . '/borrow-extension.php';
+require_once __DIR__ . '/borrow-cancellation.php';
 require_once __DIR__ . '/../../room-reservation/core/faculty-room-quota.php';
 
 if (!defined('FACT_EQ_REASON_EXPIRED')) {
@@ -137,9 +146,10 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 
     try {
         BookingSchedule::ensureSchema($conn);
+        $extCol = BorrowExtension::ensureSchema($conn) ? 'r.extension_count' : '0 AS extension_count';
         $images = fact_eq_image_map($conn);
 
-        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.borrow_date, r.borrow_time,
+        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.borrow_date, r.borrow_time, $extCol,
                  r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule,
                  r.request_date, r.return_token, r.submitted_as, r.submitted_by_name,
                  rm.room_name, b.building_key, b.name AS building_name,
@@ -196,7 +206,16 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'start_ts'    => $start->getTimestamp(),
                     'due_ts'      => $due->getTimestamp(),
                     'returned_ts' => $returnedAt !== '' ? (int)strtotime($returnedAt) : 0,
+                    'extensions'  => max(0, fact_i($row, 'extension_count')),
+                    // Return moment reached while the item is still out: it can be extended
+                    'can_extend'  => BorrowExtension::isDue($row, $now),
                 ];
+                // Upcoming requests can be cancelled until 1 hour before they start (Pending: until they start).
+                // 'cancel_note' says why not, only for the "too late" case (same wording as room reservations).
+                $cancelWhy = in_array($status, ['Waiting', 'Approved'], true) ? BorrowCancellation::blocker($row, $now) : 'n/a';
+                $item['can_cancel']  = $cancelWhy === null;
+                $item['cancel_note'] = $cancelWhy !== null && str_contains($cancelWhy, 'within 1 hour')
+                    ? 'Can\'t be cancelled within 1 hour of the start' : '';
 
                 switch ($status) {
                     case 'Overdue':
@@ -270,6 +289,16 @@ function fact_eq_late_label(int $seconds): string
     return 'Overdue by ' . $days . ' ' . ($days === 1 ? 'day' : 'days');
 }
 
+/** "Extended once" / "Extended 2 times" (empty when the loan was never extended). */
+function fact_eq_extended_label(array $it): string
+{
+    $n = fact_i($it, 'extensions');
+    if ($n <= 0) {
+        return '';
+    }
+    return $n === 1 ? 'Extended once' : 'Extended ' . $n . ' times';
+}
+
 /** Item name, plus "×2" when more than one unit was requested (same as the Home tab). */
 function fact_eq_title(array $it): string
 {
@@ -321,6 +350,9 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     if (fact_s($it, 'student') !== '') {
         $sub[] = 'Student: ' . fact_h(fact_s($it, 'student'));
     }
+    if (fact_eq_extended_label($it) !== '') {
+        $sub[] = fact_h(fact_eq_extended_label($it));
+    }
     if ($status === 'Waiting' && fact_s($it, 'reason') !== '') {
         $sub[] = fact_h(fact_s($it, 'reason'));
     }
@@ -332,13 +364,38 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     $html .= '<p class="fact-item-meta">' . $when . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
 
-    // Return QR is the only action: the admin scans it to confirm the return.
-    // (The old "Report issue" button is gone: the AI chat is now the Room Assistant on the
-    // Facilities tab and has no equipment flow. Damaged or lost items go to the Admin Office.)
-    if ($kind === 'live' && fact_s($it, 'token') !== '') {
-        $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"'
-            . ' data-token="' . fact_h(fact_s($it, 'token')) . '"'
-            . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Return QR</button></div>';
+    // Upcoming: Cancel, or a quiet note when it is too late to cancel
+    if ($kind === 'upcoming') {
+        if (!empty($it['can_cancel'])) {
+            $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-borrow"'
+                . ' data-request-id="' . fact_i($it, 'id') . '"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '"'
+                . ' title="Cancel this request">Cancel</button></div>';
+        } elseif (fact_s($it, 'cancel_note') !== '') {
+            $html .= '<div class="fact-item-actions"><span class="fact-note" title="Requests can\'t be cancelled within 1 hour of the start time">'
+                . fact_icon('lock') . fact_h(fact_s($it, 'cancel_note')) . '</span></div>';
+        }
+    }
+
+    // Actions on a loan: Return QR (the admin scans it to confirm the return) and, once the
+    // return time has been reached, Extend. (The old "Report issue" button is gone: the AI chat is
+    // now the Room Assistant on the Facilities tab and has no equipment flow. Damaged or lost
+    // items go to the Admin Office.)
+    if ($kind === 'live') {
+        $buttons = '';
+        if (fact_s($it, 'token') !== '') {
+            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"'
+                . ' data-token="' . fact_h(fact_s($it, 'token')) . '"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Return QR</button>';
+        }
+        if (!empty($it['can_extend'])) {
+            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="extend-borrow"'
+                . ' data-request-id="' . fact_i($it, 'id') . '"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Extend</button>';
+        }
+        if ($buttons !== '') {
+            $html .= '<div class="fact-item-actions">' . $buttons . '</div>';
+        }
     }
     return $html . '</div></article>';
 }
@@ -411,6 +468,8 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
             if (fact_i($it, 'returned_ts') > fact_i($it, 'due_ts')) {
                 $note = 'Returned late';
             }
+        } elseif ($status === 'Cancelled') {
+            $note = fact_s($it, 'reason') !== '' ? fact_s($it, 'reason') : 'Cancelled';
         } elseif ($status === 'Declined') {
             $note = fact_s($it, 'reason');
             if ($note === '' && function_exists('fnotif_rule_label')) {
@@ -421,6 +480,9 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
         $sub = ['Equipment · ' . fact_h(fact_s($it, 'where'))];
         if (fact_s($it, 'student') !== '') {
             $sub[0] .= ' · Student: ' . fact_h(fact_s($it, 'student'));
+        }
+        if (fact_eq_extended_label($it) !== '') {
+            $sub[0] .= ' · ' . fact_h(fact_eq_extended_label($it));
         }
 
         $html .= '<tr class="fact-row" data-kind="equipment" data-status="' . fact_h(strtolower($status)) . '" data-ts="' . fact_i($it, 'start_ts') . '">'

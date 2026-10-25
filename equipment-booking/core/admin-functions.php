@@ -544,7 +544,7 @@ $archive_sql = "
 $archive_result = mysqli_query($conn, $archive_sql);
 
 
-$raw_data_sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')";
+$raw_data_sql = "SELECT faculty_id, faculty_name, equipment_name, instructor, room, borrow_date, return_date, request_date FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') AND status <> 'Cancelled'";
 
 if (!empty($_GET['raw_search'])) {
     $search = "%" . $_GET['raw_search'] . "%";
@@ -567,7 +567,7 @@ $stat_declined  = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM
 $stat_overdue   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'"))['c'];
 $stat_inv_total = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0"))['c'];
 $stat_inv_low   = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0"))['c'];
-$stat_total_req = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')"))['c'];
+$stat_total_req = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') AND status <> 'Cancelled'"))['c'];
 
 
 // ================= EDIT ITEM FETCH =================

@@ -196,7 +196,7 @@ try {
         "SELECT id, equipment_name, borrow_qty, request_date, borrow_date, borrow_time, return_date,
                 return_time, returned_at, status, instructor, room, submitted_as, submitted_by_name, reason
            FROM tbl_requests
-          WHERE faculty_id = ? AND status IN ('Returned','Declined')
+          WHERE faculty_id = ? AND status IN ('Returned','Declined','Cancelled')
           ORDER BY request_date DESC, id DESC
           LIMIT " . EXPORT_ROW_LIMIT,
         's',

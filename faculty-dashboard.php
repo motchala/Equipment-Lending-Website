@@ -3057,6 +3057,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     'Approved' => ['Active', 'ok'],
                     'Overdue' => ['Overdue', 'danger'],
                     'Returned' => ['Returned', 'muted'],
+                    'Cancelled' => ['Cancelled', 'muted'],
                     'Declined' => ['Declined', 'danger']
                 ];
                 foreach ($requests_js as $fdb_v_r) {
@@ -3501,58 +3502,58 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                                                            <div class="eq-item-body">
-                                        <!-- Item Code chevron — top right of card body -->
-                                        <button type="button"
-                                            class="eq-ic-btn<?php echo ((int)$item['quantity'] <= 0) ? ' eq-ic-btn--disabled' : ''; ?>"
-                                            data-action="toggle-item-code"
-                                            data-item-id="<?php echo (int)$item['item_id']; ?>"
-                                            data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
-                                            <?php if ((int)$item['quantity'] <= 0): ?>
+                                        <div class="eq-item-body">
+                                            <!-- Item Code chevron — top right of card body -->
+                                            <button type="button"
+                                                class="eq-ic-btn<?php echo ((int)$item['quantity'] <= 0) ? ' eq-ic-btn--disabled' : ''; ?>"
+                                                data-action="toggle-item-code"
+                                                data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                                <?php if ((int)$item['quantity'] <= 0): ?>
                                                 disabled
                                                 title="No stock available — code cannot be used"
-                                            <?php else: ?>
+                                                <?php else: ?>
                                                 title="Show item code for students"
-                                            <?php endif; ?>
-                                            aria-label="Show item code"
-                                            aria-expanded="false">
-                                            <span class="material-symbols-outlined eq-ic-chevron">expand_more</span>
-                                        </button>
+                                                <?php endif; ?>
+                                                aria-label="Show item code"
+                                                aria-expanded="false">
+                                                <span class="material-symbols-outlined eq-ic-chevron">expand_more</span>
+                                            </button>
 
-                                        <!-- Item code reveal panel (hidden by default) -->
-                                        <div class="eq-ic-panel" id="eq-ic-panel-<?php echo (int)$item['item_id']; ?>" style="display:none">
-                                            <div class="eq-ic-loading" style="display:none">
-                                                <span class="material-symbols-outlined" style="animation:spin .8s linear infinite;font-size:16px">progress_activity</span>
-                                                Loading…
-                                            </div>
-                                            <div class="eq-ic-content" style="display:none">
-                                                <span class="eq-ic-label">Item Code</span>
-                                                <div class="eq-ic-code-row">
-                                                    <code class="eq-ic-code">••••••••••••</code>
-                                                    <button type="button" class="eq-ic-reveal-btn" data-action="reveal-item-code" title="Show code">
-                                                        <span class="material-symbols-outlined">visibility</span>
-                                                    </button>
-                                                    <button type="button" class="eq-ic-copy-btn" data-action="copy-item-code" title="Copy code">
-                                                        <span class="material-symbols-outlined">content_copy</span>
+                                            <!-- Item code reveal panel (hidden by default) -->
+                                            <div class="eq-ic-panel" id="eq-ic-panel-<?php echo (int)$item['item_id']; ?>" style="display:none">
+                                                <div class="eq-ic-loading" style="display:none">
+                                                    <span class="material-symbols-outlined" style="animation:spin .8s linear infinite;font-size:16px">progress_activity</span>
+                                                    Loading…
+                                                </div>
+                                                <div class="eq-ic-content" style="display:none">
+                                                    <span class="eq-ic-label">Item Code</span>
+                                                    <div class="eq-ic-code-row">
+                                                        <code class="eq-ic-code">••••••••••••</code>
+                                                        <button type="button" class="eq-ic-reveal-btn" data-action="reveal-item-code" title="Show code">
+                                                            <span class="material-symbols-outlined">visibility</span>
+                                                        </button>
+                                                        <button type="button" class="eq-ic-copy-btn" data-action="copy-item-code" title="Copy code">
+                                                            <span class="material-symbols-outlined">content_copy</span>
+                                                        </button>
+                                                    </div>
+                                                    <div class="eq-ic-used-notice" style="display:none">
+                                                        <span class="material-symbols-outlined" style="font-size:13px;color:var(--color-warning,#e08000)">info</span>
+                                                        Used — a new code is ready above
+                                                    </div>
+                                                    <button type="button" class="eq-ic-regen-btn" data-action="regen-item-code"
+                                                        data-item-id="<?php echo (int)$item['item_id']; ?>">
+                                                        <span class="material-symbols-outlined">refresh</span> New code
                                                     </button>
                                                 </div>
-                                                <div class="eq-ic-used-notice" style="display:none">
-                                                    <span class="material-symbols-outlined" style="font-size:13px;color:var(--color-warning,#e08000)">info</span>
-                                                    Used — a new code is ready above
-                                                </div>
-                                                <button type="button" class="eq-ic-regen-btn" data-action="regen-item-code"
-                                                    data-item-id="<?php echo (int)$item['item_id']; ?>">
-                                                    <span class="material-symbols-outlined">refresh</span> New code
-                                                </button>
+                                                <div class="eq-ic-error" style="display:none;color:var(--color-error,#c62828);font-size:11px;padding:4px 0"></div>
                                             </div>
-                                            <div class="eq-ic-error" style="display:none;color:var(--color-error,#c62828);font-size:11px;padding:4px 0"></div>
-                                        </div>
 
-                                        <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                        <div class="eq-item-cat">
-                                            <span class="material-symbols-outlined">label</span>
-                                            <?php echo htmlspecialchars($item['category']); ?>
-                                        </div>
+                                            <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                            <div class="eq-item-cat">
+                                                <span class="material-symbols-outlined">label</span>
+                                                <?php echo htmlspecialchars($item['category']); ?>
+                                            </div>
 
                                             <?php if ($has_overdue_block): ?>
                                                 <button class="btn-borrow btn-borrow-blocked" disabled
@@ -3766,6 +3767,24 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
                     </div>
 
                 </section><!-- /factHistory -->
+
+
+                <!-- ── Extend dialog (opened by the Extend button on a due loan; moved to <body> by the script) ── -->
+                <div class="fact-modal" id="factExtendModal" hidden>
+                    <div class="fact-modal-card" role="dialog" aria-modal="true" aria-labelledby="factExtendTitle">
+                        <header class="fact-modal-head">
+                            <h3 class="fact-modal-title" id="factExtendTitle">Extend borrowing</h3>
+                            <button type="button" class="fact-modal-close" data-fact-extend-close aria-label="Close">
+                                <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                            </button>
+                        </header>
+                        <div class="fact-modal-body" id="factExtendBody"></div>
+                        <footer class="fact-modal-foot">
+                            <button type="button" class="fact-modal-btn" data-fact-extend-close>Cancel</button>
+                            <button type="button" class="fact-modal-btn is-primary" id="factExtendSubmit" disabled>Extend</button>
+                        </footer>
+                    </div>
+                </div>
 
             </div><!-- /panel-activity -->
 

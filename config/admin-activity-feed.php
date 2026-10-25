@@ -109,6 +109,7 @@ if (!function_exists('adm_act_categories')) {
             'rule_duplicate_block'   => 'Duplicate request',
             'rule_archived'          => 'Item archived',
             'rule_past_datetime'     => 'Date already passed',
+            'faculty_cancelled'      => 'Cancelled by the faculty member',
         ];
         if (isset($known[$rule])) {
             return $known[$rule];
@@ -234,12 +235,14 @@ if (!function_exists('adm_act_specs')) {
                     $d    = (string)$r['decision'];
                     $who  = trim((string)$r['borrower_name']);
                     $text = $d . ' request #' . (int)$r['request_id'] . ': ' . trim((string)$r['equipment_name']) . ($who !== '' ? ' for ' . $who : '');
-                    [$icon, $tone] = $d === 'Approved' ? ['check_circle', 'ok'] : ($d === 'Declined' ? ['cancel', 'bad'] : ['assignment', 'neutral']);
+                    [$icon, $tone] = $d === 'Approved' ? ['check_circle', 'ok'] : ($d === 'Declined' ? ['cancel', 'bad'] : ($d === 'Cancelled' ? ['event_busy', 'neutral'] : ['assignment', 'neutral']));
+                    // A cancellation is the faculty member's own action, so it is shown as theirs
+                    $byFaculty = (string)$r['rule_applied'] === 'faculty_cancelled' && $who !== '';
                     return [
                         'ts'         => (int)$r['ts'],
                         'actor_type' => 'auto',
                         'actor_id'   => 0,
-                        'actor_name' => 'Automatic',
+                        'actor_name' => $byFaculty ? $who : 'Automatic',
                         'category'   => 'requests',
                         'icon'       => $icon,
                         'tone'       => $tone,
@@ -273,12 +276,13 @@ if (!function_exists('adm_act_specs')) {
                     $d    = (string)$r['decision'];
                     $who  = trim((string)$r['borrower_name']);
                     $text = $d . ' reservation #' . (int)$r['reservation_id'] . ': ' . trim((string)$r['room_name']) . ($who !== '' ? ' for ' . $who : '');
-                    [$icon, $tone] = $d === 'Approved' ? ['event_available', 'ok'] : ($d === 'Declined' ? ['event_busy', 'bad'] : ['meeting_room', 'neutral']);
+                    [$icon, $tone] = $d === 'Approved' ? ['event_available', 'ok'] : ($d === 'Declined' ? ['event_busy', 'bad'] : ($d === 'Cancelled' ? ['event_busy', 'neutral'] : ['meeting_room', 'neutral']));
+                    $byFaculty = (string)$r['rule_applied'] === 'faculty_cancelled' && $who !== '';
                     return [
                         'ts'         => (int)$r['ts'],
                         'actor_type' => 'auto',
                         'actor_id'   => 0,
-                        'actor_name' => 'Automatic',
+                        'actor_name' => $byFaculty ? $who : 'Automatic',
                         'category'   => 'rooms',
                         'icon'       => $icon,
                         'tone'       => $tone,

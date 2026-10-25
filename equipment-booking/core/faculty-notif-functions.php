@@ -518,6 +518,37 @@ if (!function_exists('fnotif_build_list')) {
                         ]);
                         break;
 
+                    case 'Cancelled':
+                        // The faculty member cancelled this request themselves (core/borrow-cancellation.php).
+                        // A short record in the feed, aging out like the other one-off events.
+                        $cancelTs = (!empty($r['log_at']) && ($r['log_decision'] ?? '') === 'Cancelled')
+                            ? (strtotime($r['log_at']) ?: $reqTs) : $reqTs;
+                        if ($cancelTs < $windowTs) break;
+                        $kQty   = max(1, (int)($r['borrow_qty'] ?? 1));
+                        $kStart = strtotime($r['borrow_date'] . ' ' . (!empty($r['borrow_time']) ? $r['borrow_time'] : '00:00:00'));
+                        $add([
+                            'key' => 'reqselfcancelled-' . $id,
+                            'cat' => 'borrow',
+                            'icon' => 'event_busy',
+                            'icon_class' => 'ni-alert',
+                            'title' => 'Request Cancelled: ' . $equip,
+                            'body'  => 'You cancelled your request for <strong>' . $e($equip) . '</strong>' . ($kQty > 1 ? ' (×' . $kQty . ')' : '')
+                                . ' scheduled for <strong>' . $e(date('M j', $kStart)) . '</strong>. The equipment is available to others again.',
+                            'ts'    => $cancelTs,
+                            'detail' => [
+                                $d('Status', 'Cancelled by you'),
+                                $d('Equipment', $equip),
+                                $d('Quantity', $kQty > 1 ? (string)$kQty : ''),
+                                $d('Was Scheduled For', !empty($r['borrow_time']) ? date('M j, Y g:i A', $kStart) : $borrowStr),
+                                $d('Return By', !empty($r['return_time'])
+                                    ? date('M j, Y g:i A', strtotime($r['return_date'] . ' ' . $r['return_time'])) : $returnStr),
+                                $d('Cancelled On', date('M j, Y g:i A', $cancelTs)),
+                                $d('Requested On', date('M j, Y g:i A', $reqTs)),
+                            ],
+                            'link' => $lendingLink,
+                        ]);
+                        break;
+
                     case 'Overdue':
                         $dueTs    = strtotime($r['return_date']);
                         $daysLate = max(0, (int)floor(($now - $dueTs) / 86400));

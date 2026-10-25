@@ -168,7 +168,7 @@ function dash_collect(mysqli $conn): array
     }
     $idx   = array_flip($labels);
     $zeros = array_fill(0, 60, 0);
-    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros];
+    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros, 'cancelled' => $zeros];
     $rm    = ['approved' => $zeros, 'declined' => $zeros, 'cancelled' => $zeros];
     $from  = $labels[0] . ' 00:00:00';
     $from30 = $labels[30] . ' 00:00:00';   // the 30-day panels below (Most requested) keep a 30-day window
@@ -177,7 +177,7 @@ function dash_collect(mysqli $conn): array
         if (!isset($idx[$r['d']])) continue;
         // Approved / Overdue / Returned all started life as an approval.
         $k = in_array($r['status'], ['Approved', 'Overdue', 'Returned'], true) ? 'approved'
-            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : null));
+            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : ($r['status'] === 'Cancelled' ? 'cancelled' : null)));
         if ($k) $eq[$k][$idx[$r['d']]] += (int)$r['c'];
     }
     foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_room_reservations WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
@@ -222,6 +222,7 @@ function dash_collect(mysqli $conn): array
                 ['key' => 'approved', 'label' => 'Approved', 'values' => $eq['approved']],
                 ['key' => 'declined', 'label' => 'Declined', 'values' => $eq['declined']],
                 ['key' => 'waiting',  'label' => 'Waiting',  'values' => $eq['waiting']],
+                ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $eq['cancelled']],
             ]],
             'rooms' => ['title' => 'Facility bookings', 'unit' => 'booking', 'series' => [
                 ['key' => 'approved',  'label' => 'Approved',  'values' => $rm['approved']],
@@ -241,7 +242,7 @@ function dash_collect(mysqli $conn): array
         "SELECT equipment_name, COUNT(*) AS total,
                 SUM(status IN ('Approved','Overdue','Returned')) AS ok
            FROM tbl_requests
-          WHERE request_date >= ?
+          WHERE request_date >= ? AND status <> 'Cancelled'
        GROUP BY equipment_name
        ORDER BY total DESC, equipment_name ASC
           LIMIT 5",

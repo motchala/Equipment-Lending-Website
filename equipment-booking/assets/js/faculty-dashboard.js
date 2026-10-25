@@ -176,6 +176,7 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
     }
+    window.showToast = window.showToast || showToast;   // also used by the My Activity block
 
     /* ── Browser Back/Forward Navigation ───────────────────────────────── */
     // We use a lightweight pushState approach: each tab switch or overlay open
@@ -5402,19 +5403,19 @@
                         csrf_token: csrfMeta ? csrfMeta.getAttribute('content') : '',
                     }),
                 })
-                .then(function (r) { return r.json(); })
-                .then(function (d) {
-                    if (d.success) {
-                        cancelled.push(items[idx].room);
-                    } else {
-                        failed.push(items[idx].room + ': ' + (d.error || 'error'));
-                    }
-                    cancelNext(idx + 1);
-                })
-                .catch(function () {
-                    failed.push(items[idx].room + ': network error');
-                    cancelNext(idx + 1);
-                });
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.success) {
+                            cancelled.push(items[idx].room);
+                        } else {
+                            failed.push(items[idx].room + ': ' + (d.error || 'error'));
+                        }
+                        cancelNext(idx + 1);
+                    })
+                    .catch(function () {
+                        failed.push(items[idx].room + ': network error');
+                        cancelNext(idx + 1);
+                    });
             }
 
             setSending(true);
@@ -5503,6 +5504,15 @@
                       Runs when the tab is opened, after a booking / cancellation,
                       the moment the 5 s requests poll sees a status change (e.g. admin
                       confirms a return), and every 30 s while the tab is visible.
+   5. Extend          the Extend button on a loan whose return time has been reached opens
+                      a dialog (equipment-booking/api/extend-borrow.php): it lists each
+                      extension length with live availability, and the server denies it when
+                      other bookings (today or later) need the units. See core/borrow-extension.php.
+
+   6. Cancel / leave  Cancel on an Upcoming equipment request (equipment-booking/api/cancel-borrow.php,
+                      rules in core/borrow-cancellation.php) and Leave waitlist on a room waitlist entry
+                      (room-reservation/api/leave-waitlist.php). Cancelling a room reservation keeps its own
+                      handler near the room code. All of them refresh this screen and the Home key figures.
 
    Cancel / Join waitlist / Report issue / go-tab buttons are handled by the
    delegated handlers above (data-action="..."). No inline event handlers are
@@ -5797,6 +5807,249 @@
         setInterval(function () { if (panelIsOpen()) refreshAll(); }, REFRESH_MS);
         document.addEventListener('visibilitychange', function () { if (panelIsOpen()) refreshAll(); });
 
+        /* ── 5. Extend borrowing ─────────────────────────────────── */
+        var API_EXTEND = 'equipment-booking/api/extend-borrow.php';
+        var extModal = $('factExtendModal');
+        var extBody = $('factExtendBody');
+        var extSubmit = $('factExtendSubmit');
+        var ext = { id: 0, equipment: '', busy: false, lastFocus: null };
+
+        /* Moved to <body> so no tab container can clip it or sit above it */
+        if (extModal && extModal.parentNode !== document.body) document.body.appendChild(extModal);
+
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        function csrfToken() {
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta && meta.content) return meta.content;
+            var input = document.querySelector('input[name="csrf_token"]');
+            return input ? input.value : '';
+        }
+
+        function toast(msg, type) {
+            if (typeof window.showToast === 'function') window.showToast(esc(msg), type);
+        }
+
+        function closeExtend() {
+            if (!extModal || ext.busy) return;
+            extModal.hidden = true;
+            extSubmit.disabled = true;
+            if (ext.lastFocus && ext.lastFocus.focus) ext.lastFocus.focus();
+        }
+
+        function selectedLength() {
+            var picked = extBody.querySelector('input[name="factExtLen"]:checked');
+            return picked ? picked.value : '';
+        }
+
+        function renderExtend(data, banner) {
+            var html = '';
+            if (banner) html += '<div class="fact-ext-banner is-error" role="alert">' + esc(banner) + '</div>';
+
+            if (!data || !data.ok) {
+                html += '<div class="fact-ext-banner is-error" role="alert">' + esc((data && data.error) || 'We could not check this item. Please try again.') + '</div>';
+                extBody.innerHTML = html;
+                extSubmit.disabled = true;
+                return;
+            }
+
+            var late = data.status === 'Overdue' ? '<span class="fact-ext-late">Overdue</span> \u00b7 ' : '';
+            html += '<div class="fact-ext-item"><strong>' + esc(data.item) + (data.qty > 1 ? ' <span class="fact-qty">\u00d7' + data.qty + '</span>' : '') + '</strong>'
+                + '<span>' + late + 'Due ' + esc(data.due) + '</span></div>';
+
+            if (!data.options || !data.options.length) {
+                html += '<div class="fact-ext-banner is-error" role="alert">' + esc(data.error || 'No extension is available for this item.') + '</div>';
+                extBody.innerHTML = html;
+                extSubmit.disabled = true;
+                return;
+            }
+
+            var anyAvailable = data.options.some(function (o) { return o.available; });
+            html += '<p class="fact-ext-lead">Extend until</p><div class="fact-ext-opts" role="radiogroup" aria-label="Extension length">';
+            var firstFree = true;
+            data.options.forEach(function (o) {
+                var checked = o.available && firstFree;
+                if (checked) firstFree = false;
+                html += '<label class="fact-ext-opt' + (o.available ? '' : ' is-disabled') + '">'
+                    + '<input type="radio" name="factExtLen" value="' + o.length + '"' + (o.available ? '' : ' disabled') + (checked ? ' checked' : '') + '>'
+                    + '<span class="fact-ext-opt-main"><span class="fact-ext-opt-label">' + esc(o.label) + '</span>'
+                    + '<span class="fact-ext-opt-until">' + esc(o.until) + '</span></span>'
+                    + (o.available ? '' : '<span class="fact-ext-opt-why">' + esc(o.reason) + '</span>')
+                    + '</label>';
+            });
+            html += '</div>';
+            if (!anyAvailable) {
+                html += '<p class="fact-ext-hint">Other bookings need this equipment, so it cannot be extended right now. Please return it to the Admin Office.</p>';
+            } else {
+                html += '<p class="fact-ext-hint">Counted from now. Your request is checked against other bookings, today and later, before it is approved.</p>';
+            }
+            extBody.innerHTML = html;
+            extSubmit.disabled = !anyAvailable;
+        }
+
+        function loadExtend(banner) {
+            extBody.innerHTML = '<p class="fact-ext-loading">Checking availability\u2026</p>';
+            extSubmit.disabled = true;
+            fetch(API_EXTEND + '?id=' + encodeURIComponent(ext.id), { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) { renderExtend(data, banner); })
+                .catch(function () { renderExtend({ ok: false, error: 'We could not reach the server. Please try again.' }, banner); });
+        }
+
+        function openExtend(id, equipment, trigger) {
+            if (!extModal) return;
+            ext.id = id;
+            ext.equipment = equipment;
+            ext.lastFocus = trigger || null;
+            extModal.hidden = false;
+            loadExtend('');
+            var close = extModal.querySelector('.fact-modal-close');
+            if (close) close.focus();
+        }
+
+        function submitExtend() {
+            var length = selectedLength();
+            if (!length || ext.busy) return;
+            ext.busy = true;
+            extSubmit.disabled = true;
+            extSubmit.textContent = 'Extending\u2026';
+
+            var fd = new FormData();
+            fd.append('id', ext.id);
+            fd.append('length', length);
+            fd.append('csrf_token', csrfToken());
+
+            fetch(API_EXTEND, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    ext.busy = false;
+                    extSubmit.textContent = 'Extend';
+                    if (data && data.ok) {
+                        closeExtend();
+                        toast(data.message || 'Borrowing extended.', 'success');
+                        refreshAll();
+                        /* Home key figures and the overdue banner follow on the next 5 s poll */
+                        document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
+                    } else {
+                        /* Denied: say why, and re-check what is still possible */
+                        loadExtend((data && data.error) || 'The extension could not be approved.');
+                        refreshAll();
+                    }
+                })
+                .catch(function () {
+                    ext.busy = false;
+                    extSubmit.textContent = 'Extend';
+                    loadExtend('We could not reach the server. Please try again.');
+                });
+        }
+
+        panel.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-action="extend-borrow"]');
+            if (!btn) return;
+            e.preventDefault();
+            openExtend(parseInt(btn.dataset.requestId, 10) || 0, btn.dataset.equipment || '', btn);
+        });
+
+        if (extModal) {
+            extModal.addEventListener('click', function (e) {
+                if (e.target === extModal || e.target.closest('[data-fact-extend-close]')) closeExtend();
+            });
+            extBody.addEventListener('change', function () { extSubmit.disabled = !selectedLength(); });
+            extSubmit.addEventListener('click', submitExtend);
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !extModal.hidden) closeExtend();
+            });
+        }
+
+        /* ── 6. Cancel an upcoming request / leave a waitlist ─────── */
+        var API_CANCEL = 'equipment-booking/api/cancel-borrow.php';
+        var API_LEAVE = 'room-reservation/api/leave-waitlist.php';
+
+        function changed() {
+            refreshAll();
+            /* Home key figures and the overdue banner follow on the next 5 s poll */
+            document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
+        }
+
+        panel.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-action="cancel-borrow"]');
+            if (!btn) return;
+            e.preventDefault();
+            var name = btn.dataset.equipment || 'this request';
+            if (!confirm('Cancel your request for ' + name + '?\n\nThis cannot be undone.')) return;
+
+            var label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Cancelling\u2026';
+
+            var fd = new FormData();
+            fd.append('id', btn.dataset.requestId);
+            fd.append('csrf_token', csrfToken());
+
+            fetch(API_CANCEL, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.ok) {
+                        toast(data.message || 'Request cancelled.', 'success');
+                    } else {
+                        toast((data && data.error) || 'This request could not be cancelled.', 'error');
+                        btn.disabled = false;
+                        btn.textContent = label;
+                    }
+                    changed();
+                })
+                .catch(function () {
+                    toast('Network error. Please try again.', 'error');
+                    btn.disabled = false;
+                    btn.textContent = label;
+                });
+        });
+
+        panel.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-action="leave-waitlist"]');
+            if (!btn) return;
+            e.preventDefault();
+            var room = btn.dataset.roomName || 'this room';
+            if (!confirm('Leave the waitlist for ' + room + '?\n\nYou will no longer be emailed if this slot opens up.')) return;
+
+            var label = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Leaving\u2026';
+
+            fetch(API_LEAVE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    room_id: parseInt(btn.dataset.roomId, 10),
+                    reservation_date: btn.dataset.resDate,
+                    start_time: btn.dataset.startTime,
+                    end_time: btn.dataset.endTime,
+                    csrf_token: csrfToken(),
+                }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data && data.success) {
+                        toast('You left the waitlist.', 'success');
+                    } else {
+                        toast((data && data.error) || 'Could not leave the waitlist.', 'error');
+                        btn.disabled = false;
+                        btn.textContent = label;
+                    }
+                    refreshRooms();
+                })
+                .catch(function () {
+                    toast('Network error. Please try again.', 'error');
+                    btn.disabled = false;
+                    btn.textContent = label;
+                });
+        });
+
         /* ── Start ───────────────────────────────────────────────── */
         sortRows();
         apply();
@@ -5869,18 +6122,18 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString()
         })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (data.status !== 'success') {
-                showError(panel, data.error || 'Could not load code.');
-                return;
-            }
-            setState(itemId, { loaded: true, code: data.code, isUsed: data.is_used, revealed: false });
-            showContent(panel, data.code, data.is_used, false);
-        })
-        .catch(function () {
-            showError(panel, 'Network error. Please try again.');
-        });
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.status !== 'success') {
+                    showError(panel, data.error || 'Could not load code.');
+                    return;
+                }
+                setState(itemId, { loaded: true, code: data.code, isUsed: data.is_used, revealed: false });
+                showContent(panel, data.code, data.is_used, false);
+            })
+            .catch(function () {
+                showError(panel, 'Network error. Please try again.');
+            });
     }
 
     document.addEventListener('click', function (e) {
@@ -5888,7 +6141,7 @@
         var toggleBtn = e.target.closest('[data-action="toggle-item-code"]');
         if (toggleBtn && !toggleBtn.disabled) {
             var itemId = toggleBtn.dataset.itemId;
-            var panel  = getPanel(itemId);
+            var panel = getPanel(itemId);
             if (!panel) return;
 
             var isOpen = panel.style.display !== 'none';
@@ -5956,7 +6209,7 @@
         if (regenBtn) {
             if (!confirm('This will invalidate the current code. Any student who has it can no longer use it. Generate a new code?')) return;
             var itemId = regenBtn.dataset.itemId;
-            var panel  = getPanel(itemId);
+            var panel = getPanel(itemId);
             if (!panel) return;
             showLoading(panel);
 
@@ -5966,18 +6219,18 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString()
             })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (data.status !== 'success') {
-                    showError(panel, data.error || 'Could not regenerate code.');
-                    return;
-                }
-                setState(itemId, { loaded: true, code: data.code, isUsed: false, revealed: true });
-                showContent(panel, data.code, false, true);
-            })
-            .catch(function () {
-                showError(panel, 'Network error. Please try again.');
-            });
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.status !== 'success') {
+                        showError(panel, data.error || 'Could not regenerate code.');
+                        return;
+                    }
+                    setState(itemId, { loaded: true, code: data.code, isUsed: false, revealed: true });
+                    showContent(panel, data.code, false, true);
+                })
+                .catch(function () {
+                    showError(panel, 'Network error. Please try again.');
+                });
         }
     });
 })();

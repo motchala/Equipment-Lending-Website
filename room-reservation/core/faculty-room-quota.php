@@ -496,6 +496,15 @@ function fact_render_room_item(array $it, string $kind): string
     $html .= '<p class="fact-item-meta">' . fact_h($when) . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
 
+    // A waitlist entry can be dropped at any time
+    if ($kind === 'waitlist') {
+        $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost" data-action="leave-waitlist"'
+            . ' data-room-id="' . fact_i($it, 'room_id') . '" data-room-name="' . fact_h($room) . '"'
+            . ' data-res-date="' . fact_h(fact_s($it, 'date')) . '"'
+            . ' data-start-time="' . fact_h(fact_s($it, 'start')) . '" data-end-time="' . fact_h(fact_s($it, 'end')) . '"'
+            . ' title="Stop waiting for this slot">Leave waitlist</button></div>';
+    }
+
     // Only upcoming reservations can be cancelled, and not within 1 hour of the start
     if ($kind === 'upcoming') {
         $html .= '<div class="fact-item-actions">';
