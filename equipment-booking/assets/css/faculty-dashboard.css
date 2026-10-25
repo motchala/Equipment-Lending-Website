@@ -12624,3 +12624,25 @@ body .side-nav .side-nav-user .side-nav-user-name {
 .eq-item-card {
     position: relative;
 }
+
+/* Cancel confirmation chips */
+.act-cancel-chips {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.act-cancel-confirm-btn {
+    background: var(--color-error, #c0392b) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+.act-cancel-confirm-btn:hover {
+    background: #a93226 !important;
+}
+.act-cancel-nevermind-btn {
+    background: transparent !important;
+    color: var(--color-secondary, #666) !important;
+    border-color: var(--color-outline-variant, #ccc) !important;
+}
+

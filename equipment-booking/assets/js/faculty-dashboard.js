@@ -5311,6 +5311,25 @@
                     return;
                 }
 
+                // Cancel intent — single reservation confirmation
+                if (data.intent_cancel_confirm) {
+                    var c = data.intent_cancel_confirm;
+                    showCancelConfirmChips(lastRow, [c], false);
+                    return;
+                }
+
+                // Cancel intent — multi-reservation confirmation
+                if (data.intent_cancel_confirm_multi && data.intent_cancel_confirm_multi.length >= 2) {
+                    showCancelConfirmChips(lastRow, data.intent_cancel_confirm_multi, true);
+                    return;
+                }
+
+                // Cancel intent — faculty needs to pick which reservation
+                if (data.intent_cancel_pick && data.cancel_pick_options && data.cancel_pick_options.length > 0) {
+                    showCancelPickChips(lastRow, data.cancel_pick_options);
+                    return;
+                }
+
                 setSending(false);
             })
             .catch(function () {
@@ -5318,6 +5337,132 @@
                 appendAiBubble(body, 'Network error. Please check your connection and try again.');
                 setSending(false);
             });
+    }
+
+    // ── Cancel chips: confirm cancelling specific reservations ────────────────
+    // items = array of { id, room, date, time }
+    // isMulti = true means "cancel all" wording, false means single
+    function showCancelConfirmChips(lastRow, items, isMulti) {
+        var col = lastRow && lastRow.querySelector('.act-chat-col');
+        if (!col) { setSending(false); return; }
+
+        var chips = document.createElement('div');
+        chips.className = 'act-chat-chips act-cancel-chips';
+
+        var confirmLabel = isMulti
+            ? 'Yes, cancel all (' + items.length + ')'
+            : 'Yes, cancel it';
+
+        var confirmBtn = document.createElement('button');
+        confirmBtn.className = 'act-chat-chip act-cancel-confirm-btn';
+        confirmBtn.textContent = confirmLabel;
+        chips.appendChild(confirmBtn);
+
+        var neverMindBtn = document.createElement('button');
+        neverMindBtn.className = 'act-chat-chip act-cancel-nevermind-btn';
+        neverMindBtn.textContent = 'Never mind';
+        chips.appendChild(neverMindBtn);
+
+        col.appendChild(chips);
+
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+
+        confirmBtn.addEventListener('click', function () {
+            chips.remove();
+            var body = document.getElementById('actAiChatBody');
+
+            // Submit cancellations sequentially
+            var ids = items.map(function (i) { return i.id; });
+            var cancelled = [];
+            var failed = [];
+
+            function cancelNext(idx) {
+                if (idx >= ids.length) {
+                    // All done — show result bubble
+                    var resultMsg = '';
+                    if (cancelled.length > 0 && failed.length === 0) {
+                        resultMsg = cancelled.length === 1
+                            ? 'Done! Your reservation for ' + items[0].room + ' on ' + items[0].date + ' has been cancelled.'
+                            : 'Done! All ' + cancelled.length + ' reservations have been cancelled.';
+                    } else if (cancelled.length > 0 && failed.length > 0) {
+                        resultMsg = cancelled.length + ' reservation(s) cancelled. ' + failed.length + ' could not be cancelled: ' + failed.join(', ') + '.';
+                    } else {
+                        resultMsg = 'Could not cancel the reservation(s). ' + failed.join(' ');
+                    }
+                    appendAiBubble(body, resultMsg);
+                    setSending(false);
+                    return;
+                }
+
+                fetch('room-reservation/api/cancel-reservation.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reservation_id: ids[idx],
+                        csrf_token: csrfMeta ? csrfMeta.getAttribute('content') : '',
+                    }),
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.success) {
+                        cancelled.push(items[idx].room);
+                    } else {
+                        failed.push(items[idx].room + ': ' + (d.error || 'error'));
+                    }
+                    cancelNext(idx + 1);
+                })
+                .catch(function () {
+                    failed.push(items[idx].room + ': network error');
+                    cancelNext(idx + 1);
+                });
+            }
+
+            setSending(true);
+            cancelNext(0);
+        });
+
+        neverMindBtn.addEventListener('click', function () {
+            chips.remove();
+            appendAiBubble(body, 'No problem! Your reservation(s) are unchanged.');
+            setSending(false);
+        });
+    }
+
+    // ── Cancel chips: faculty picks which reservation to cancel ──────────────
+    // options = array of { id, room, date, time }
+    function showCancelPickChips(lastRow, options) {
+        var col = lastRow && lastRow.querySelector('.act-chat-col');
+        if (!col) { setSending(false); return; }
+
+        var chips = document.createElement('div');
+        chips.className = 'act-chat-chips act-cancel-chips';
+
+        options.forEach(function (opt) {
+            var btn = document.createElement('button');
+            btn.className = 'act-chat-chip';
+            btn.textContent = opt.room + ' · ' + opt.date;
+            btn.addEventListener('click', function () {
+                chips.remove();
+                // Show confirm step for the chosen one
+                var body = document.getElementById('actAiChatBody');
+                var confirmRow = appendAiBubble(body, 'Got it. Cancel your reservation for ' + opt.room + ' on ' + opt.date + ' (' + opt.time + ')?');
+                showCancelConfirmChips(confirmRow, [opt], false);
+            });
+            chips.appendChild(btn);
+        });
+
+        var neverMindBtn = document.createElement('button');
+        neverMindBtn.className = 'act-chat-chip act-cancel-nevermind-btn';
+        neverMindBtn.textContent = 'Never mind';
+        neverMindBtn.addEventListener('click', function () {
+            chips.remove();
+            var body = document.getElementById('actAiChatBody');
+            appendAiBubble(body, 'No problem! Your reservations are unchanged.');
+            setSending(false);
+        });
+        chips.appendChild(neverMindBtn);
+
+        col.appendChild(chips);
     }
 
     window.actAiSend = actAiSend;
