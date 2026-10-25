@@ -3509,7 +3509,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <input type="password" id="fac-password" name="password"
                                                 class="form-control-custom" maxlength="128" required
                                                 placeholder="Min. 8 characters">
-                                            <button type="button" class="fac-pw-toggle"
+                                            <button type="button" class="fac-pw-toggle" tabindex="-1"
                                                 data-target="fac-password" aria-label="Toggle password">
                                                 <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                                             </button>
@@ -3521,7 +3521,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <input type="password" id="fac-confirm" name="confirm_password"
                                                 class="form-control-custom" maxlength="128" required
                                                 placeholder="Re-enter password">
-                                            <button type="button" class="fac-pw-toggle"
+                                            <button type="button" class="fac-pw-toggle" tabindex="-1"
                                                 data-target="fac-confirm" aria-label="Toggle password">
                                                 <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                                             </button>

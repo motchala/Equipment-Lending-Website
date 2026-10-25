@@ -95,6 +95,25 @@ function faculty_name_normalize(string $name): string
 }
 
 /**
+ * Capitalise a person's name the way it should be stored: the first letter of every
+ * space- (or hyphen-) separated word is upper-case, so "juan  dela cruz" -> "Juan Dela Cruz"
+ * and a two-part first name such as "aleli joy" -> "Aleli Joy". Extra spaces are collapsed;
+ * the other letters are left exactly as typed (so "McDonald" stays "McDonald").
+ */
+function faculty_name_capitalize(string $name): string
+{
+    $name = trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
+    if ($name === '') return '';
+    return preg_replace_callback(
+        '/(^|[\s\-])(\p{L})/u',
+        static function (array $m): string {
+            return $m[1] . (function_exists('mb_strtoupper') ? mb_strtoupper($m[2], 'UTF-8') : strtoupper($m[2]));
+        },
+        $name
+    ) ?? $name;
+}
+
+/**
  * Build the local part of a PUPSync email from a full name.
  * "Aleli Joy A. Prestado" → "alelijah.prestado" would be wrong.
  * We use only the FIRST token of the first-name portion and the last token
@@ -158,9 +177,9 @@ function faculty_email_resolve_conflict(
         $dot_pos = strpos($local, '.');
         if ($dot_pos !== false) {
             $with_initial = substr($local, 0, $dot_pos + 1)
-                          . strtolower($middle_initial) . '.'
-                          . substr($local, $dot_pos + 1)
-                          . $domain;
+                . strtolower($middle_initial) . '.'
+                . substr($local, $dot_pos + 1)
+                . $domain;
             if (!$check($with_initial)) return $with_initial;
         }
     }
@@ -230,7 +249,8 @@ function faculty_registry_lookup(mysqli $conn, string $first_name, string $last_
         $reg_first_primary = strtolower(preg_replace('/[^a-zA-Z]/', '', $first_tokens_clean[array_key_first($first_tokens_clean)] ?? '') ?? '');
 
         // Match on first word of first name (primary) OR full first name
-        if ($reg_first_primary === $typed_first_primary ||
+        if (
+            $reg_first_primary === $typed_first_primary ||
             $reg_first_full === $typed_first_full ||
             str_starts_with($reg_first_full, $typed_first_full)
         ) {

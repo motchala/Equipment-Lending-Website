@@ -1740,6 +1740,23 @@
     const facDisambig = document.getElementById('fac-disambiguation');
     const facDisambigSel = document.getElementById('fac-disambig-select');
 
+    /* "juan  dela cruz" -> "Juan Dela Cruz": every space- or hyphen-separated word starts with a capital
+       (the server applies the same rule when the account is saved). */
+    function _facCapitalizeName(v) {
+        return String(v || '').replace(/\s+/g, ' ').trim()
+            .replace(/(^|[\s-])(\p{L})/gu, function (m, sep, ch) { return sep + ch.toLocaleUpperCase(); });
+    }
+    // Reads both name fields, shows them capitalised in the form, and returns them.
+    function _facReadNames() {
+        var fEl = document.getElementById('fac-first');
+        var lEl = document.getElementById('fac-last');
+        var first = _facCapitalizeName(fEl ? fEl.value : '');
+        var last = _facCapitalizeName(lEl ? lEl.value : '');
+        if (fEl) fEl.value = first;
+        if (lEl) lEl.value = last;
+        return { first: first, last: last };
+    }
+
     // Stores the currently confirmed registry match {faculty_id, email_preview, full_name}
     // null means no successful lookup yet — submit is blocked until set.
     let _facRegistryMatch = null;
@@ -1778,7 +1795,9 @@
     // Clear the preview whenever name fields change
     ['fac-first', 'fac-last'].forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.addEventListener('input', _clearRegistryPreview);
+        if (!el) return;
+        el.addEventListener('input', _clearRegistryPreview);
+        el.addEventListener('blur', _facReadNames); // tidy the capitals as soon as the admin leaves the field
     });
 
     // Disambiguation select → apply the chosen match
@@ -1794,8 +1813,9 @@
     if (facLookupBtn) {
         facLookupBtn.addEventListener('click', function () {
             _clearRegistryPreview();
-            const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const lastName = (document.getElementById('fac-last')?.value || '').trim();
+            const _nm = _facReadNames();
+            const firstName = _nm.first;
+            const lastName = _nm.last;
             if (!firstName || !lastName) {
                 _showLookupAlert('Enter both first name and last name before looking up.', true);
                 return;
@@ -1960,8 +1980,9 @@
 
             const email = (document.getElementById('fac-email')?.value || '').trim();
             const facultyId = (document.getElementById('fac-faculty-id')?.value || '').trim();
-            const firstName = (document.getElementById('fac-first')?.value || '').trim();
-            const lastName = (document.getElementById('fac-last')?.value || '').trim();
+            const _nm = _facReadNames();
+            const firstName = _nm.first;
+            const lastName = _nm.last;
             const password = document.getElementById('fac-password')?.value || '';
             const confirm = document.getElementById('fac-confirm')?.value || '';
             const isAdviser = facAdviserChk?.checked ? '1' : '0';
