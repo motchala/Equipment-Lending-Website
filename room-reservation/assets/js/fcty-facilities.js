@@ -1208,17 +1208,20 @@
         });
 
         function showDone(data) {
-            /* Every reservation is accepted immediately -- no "waiting" state. */
+            /* Same-day reservations are accepted immediately. A reservation for a later date (or one with an
+               adviser letter) is "Waiting" until an admin decides it. */
+            var pending = data.status === 'Waiting';
             $('fcty-tl-pick').classList.remove('is-clash');
             $('fcty-tl-note').className = 'fcty-tl-note';
-            $('fcty-tl-note').innerHTML = icon('check_circle') + 'Booked for you.';
+            $('fcty-tl-note').innerHTML = pending ? icon('hourglass_top') + 'Request sent.' : icon('check_circle') + 'Booked for you.';
             $('fcty-res-main').innerHTML =
                 '<div class="fcty-done">' +
-                '<div class="fcty-done-badge">' + icon('check_circle') + '</div>' +
-                '<h4>You\u2019re all set</h4>' +
+                '<div class="fcty-done-badge' + (pending ? ' is-wait' : '') + '">' + icon(pending ? 'hourglass_top' : 'check_circle') + '</div>' +
+                '<h4>' + (pending ? 'Request sent' : 'You\u2019re all set') + '</h4>' +
                 '<p>' + esc(data.room_name || room.name) + ' \u00b7 ' + longDate(parseYmd(st.date)) + '<br>' +
                 minToLabel(st.start) + ' \u2013 ' + minToLabel(st.end) + '</p>' +
-                (data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
+                (pending ? '<p>An admin will review this reservation. You\u2019ll see the decision in My Activity. If it isn\u2019t reviewed in time, it is automatically declined at 12:01 AM on the reservation day.</p>' : '') +
+                (!pending && data.reason ? '<p>' + esc(data.reason) + '</p>' : '') +
                 (data.attached ? '<p class="fcty-done-note">' + icon('attach_file') + 'Supporting letter attached</p>' : '') +
                 (data.max ? '<p class="fcty-done-note">' + icon('meeting_room') + data.active + ' of ' + data.max + ' rooms reserved</p>' : '') +
                 '<div class="fcty-done-actions">' +
@@ -1383,9 +1386,9 @@
 
                             // Pre-fill the form fields after they're created
                             setTimeout(function () {
-                                var elDate  = document.getElementById('fcty-res-date');
+                                var elDate = document.getElementById('fcty-res-date');
                                 var elStart = document.getElementById('fcty-res-start');
-                                var elEnd   = document.getElementById('fcty-res-end');
+                                var elEnd = document.getElementById('fcty-res-end');
 
                                 if (elDate) {
                                     elDate.value = date;

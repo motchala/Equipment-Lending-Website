@@ -13096,3 +13096,77 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     background: var(--danger);
     color: #fff;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   EQUIPMENT › ON LOAN › "Delete All"  (additive — Super Admin only)
+   Button in the All Loans header + its confirmation dialog.
+═══════════════════════════════════════════════════════════════ */
+#eq-loan-wipe-btn {
+    white-space: nowrap;
+}
+
+#eq-loan-wipe-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.eq-wipe-summary {
+    list-style: none;
+    margin: 0 0 0.9rem;
+    padding: 0.7rem 0.85rem;
+    background: var(--hover-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: var(--text-dark);
+}
+
+.eq-wipe-summary li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+}
+
+.eq-wipe-summary li.is-total {
+    margin-top: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--khaki-border);
+    font-weight: 700;
+}
+
+.eq-wipe-summary li.eq-wipe-loading {
+    color: var(--text-light);
+}
+
+.eq-wipe-summary .eq-wipe-num {
+    font-weight: 700;
+    color: var(--danger);
+}
+
+.eq-wipe-note {
+    margin: 0 0 0.9rem;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-light);
+}
+
+/* show / hide password eye, same look as .fac-pw-toggle */
+.eq-wipe-pw-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 0.2s;
+}
+
+.eq-wipe-pw-toggle:hover {
+    color: var(--accent-maroon);
+}

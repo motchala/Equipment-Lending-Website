@@ -25,6 +25,8 @@
  *      arbitration engine already reads for priority.
  */
 
+require_once __DIR__ . '/room-expiry.php';   // 12:01 AM auto-decline of undecided Waiting reservations
+
 if (!defined('FCTY_MAX_ACTIVE_ROOM_RESERVATIONS')) {
     define('FCTY_MAX_ACTIVE_ROOM_RESERVATIONS', 2);
 }
@@ -39,16 +41,21 @@ if (!defined('FCTY_ROOM_DOC_MAX_BYTES')) {
  */
 function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
 {
+    // An undecided request that has run out of time must stop counting before we count.
+    ps_room_expire_unreviewed($conn);
+
     $now   = new DateTime('now', new DateTimeZone('Asia/Manila'));
     $today = $now->format('Y-m-d');
     $time  = $now->format('H:i:s');
 
+    // Approved AND Waiting both count: a request waiting for an admin is still a booking the
+    // member has asked for, otherwise the limit could be dodged by filing many future requests.
     $stmt = $conn->prepare(
         "SELECT rr.id, r.room_name, rr.reservation_date, rr.start_time, rr.end_time
            FROM tbl_room_reservations rr
            JOIN tbl_rooms r ON r.room_id = rr.room_id
           WHERE rr.faculty_id   = ?
-            AND rr.status       = 'Approved'
+            AND rr.status       IN ('Approved', 'Waiting')
             AND rr.submitted_as <> 'student'
             AND (rr.reservation_date > ?
                  OR (rr.reservation_date = ? AND rr.end_time > ?))
@@ -211,6 +218,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
 {
     $out = [
         'live' => [],
+        'pending' => [],
         'upcoming' => [],
         'waitlist' => [],
         'history' => [],
@@ -221,6 +229,8 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
     $now = new DateTimeImmutable('now', $tz);
 
     try {
+        ps_room_expire_unreviewed($conn);   // so an overdue request shows as Declined, not Pending
+
         $stmt = $conn->prepare(
             "SELECT rr.id, rr.room_id, rr.reservation_date, rr.start_time, rr.end_time,
                     rr.purpose, rr.submitted_as, rr.document_path, rr.status, rr.reason,
@@ -271,6 +281,12 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
                     } else {
                         $out['upcoming'][] = $item;
                     }
+                } elseif ($status === 'Waiting') {
+                    // Waiting for an admin (later date, or an adviser letter). Holds no slot yet, so it can be
+                    // withdrawn at any time; it is never shown as Declined.
+                    $item['state']      = 'pending';
+                    $item['can_cancel'] = true;
+                    $out['pending'][]   = $item;
                 } else {
                     $item['state'] = $status === 'Cancelled' ? 'cancelled' : 'declined';
                     $out['history'][] = $item;
@@ -321,7 +337,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
         error_log('[PUPSync] fact_load_rooms failed: ' . $e->getMessage());
     }
 
-    $out['active'] = count($out['live']) + count($out['upcoming']);
+    $out['active'] = count($out['live']) + count($out['upcoming']) + count($out['pending']);
     return $out;
 }
 
@@ -487,12 +503,15 @@ function fact_render_room_item(array $it, string $kind): string
         if (!empty($it['letter'])) {
             $sub[] = '<span class="fact-attach" title="A supporting letter is attached">' . fact_icon('attach_file') . 'Letter</span>';
         }
+        if ($kind === 'pending') {
+            $sub[] = 'Waiting for admin approval';
+        }
     }
 
     $html  = '<article class="fact-item fact-room" data-rr-id="' . fact_i($it, 'id') . '">';
     $html .= '<span class="fact-tile">' . fact_icon('meeting_room') . '</span>';
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_h($room) . '</h4>';
-    $html .= fact_status_chip($kind === 'waitlist' ? 'Waitlisted' : 'Approved') . '</div>';
+    $html .= fact_status_chip($kind === 'waitlist' ? 'Waitlisted' : ($kind === 'pending' ? 'Waiting' : 'Approved')) . '</div>';
     $html .= '<p class="fact-item-meta">' . fact_h($when) . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
 
@@ -518,6 +537,12 @@ function fact_render_room_item(array $it, string $kind): string
         }
         $html .= '</div>';
     }
+    // A request that is still waiting holds no slot, so it can be withdrawn at any time
+    if ($kind === 'pending') {
+        $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-reservation"'
+            . ' data-rr-id="' . fact_i($it, 'id') . '" data-room-name="' . fact_h($room) . '"'
+            . ' title="Withdraw this request">Withdraw</button></div>';
+    }
     return $html . '</div></article>';
 }
 
@@ -529,6 +554,7 @@ function fact_render_room_item(array $it, string $kind): string
 function fact_render_rooms_body(array $d): string
 {
     $live     = is_array($d['live'] ?? null) ? $d['live'] : [];
+    $pending  = is_array($d['pending'] ?? null) ? $d['pending'] : [];
     $upcoming = is_array($d['upcoming'] ?? null) ? $d['upcoming'] : [];
     $waitlist = is_array($d['waitlist'] ?? null) ? $d['waitlist'] : [];
     $active   = fact_i($d, 'active');
@@ -539,12 +565,13 @@ function fact_render_rooms_body(array $d): string
     $html = '<p class="fact-limit' . ($full ? ' is-full' : '') . '"><strong>' . $active . ' of ' . $max . '</strong> active reservations'
         . ($full ? ' &middot; Limit reached. Cancel one or wait until it ends to reserve another.' : '') . '</p>';
 
-    if (!$live && !$upcoming && !$waitlist) {
+    if (!$live && !$pending && !$upcoming && !$waitlist) {
         return $html . fact_render_empty('event_available', 'No room reservations', 'Reserve a room for your class, lab session or meeting.');
     }
 
     $groups = [
         ['In progress', 'live', $live],
+        ['Waiting for approval', 'pending', $pending],
         ['Upcoming', 'upcoming', $upcoming],
         ['Waitlist', 'waitlist', $waitlist],
     ];

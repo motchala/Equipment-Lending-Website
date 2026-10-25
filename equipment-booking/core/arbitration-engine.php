@@ -1091,7 +1091,7 @@ class ArbitrationEngine
      * @param mysqli $conn           Active DB connection
      * @param int    $reservation_id PK of the tbl_room_reservations row
      */
-    public static function processRoomReservation(mysqli $conn, int $reservation_id): void
+    public static function processRoomReservation(mysqli $conn, int $reservation_id, bool $hold_for_review = false): void
     {
         try {
             // ── Step 1: Load config ──────────────────────────────────────────
@@ -1262,6 +1262,26 @@ class ArbitrationEngine
                 $conflicts[] = $row;
             }
             $conflict_stmt->close();
+
+            // Hold-for-review (a reservation for a LATER DATE): every check above still applies, but the
+            // engine never approves it and never bumps an existing booking. A clash with an Approved
+            // reservation is refused on the spot; otherwise the row simply stays Waiting for an admin.
+            if ($hold_for_review) {
+                if (!empty($conflicts)) {
+                    self::writeRoomDecision(
+                        $conn,
+                        $reservation_id,
+                        $room_id,
+                        $room_name,
+                        $faculty_id,
+                        (string)$reservation['faculty_name'],
+                        'Declined',
+                        self::RULE_SCHEDULE_CONFLICT,
+                        'This facility is already reserved for that time. Please choose another time.'
+                    );
+                }
+                return;
+            }
 
             if (empty($conflicts)) {
                 // No conflict — approve immediately.

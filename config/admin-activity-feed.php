@@ -109,6 +109,7 @@ if (!function_exists('adm_act_categories')) {
             'rule_duplicate_block'   => 'Duplicate request',
             'rule_archived'          => 'Item archived',
             'rule_past_datetime'     => 'Date already passed',
+            'rule_expired_unreviewed' => 'Not reviewed in time',
             'faculty_cancelled'      => 'Cancelled by the faculty member',
         ];
         if (isset($known[$rule])) {

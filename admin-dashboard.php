@@ -102,6 +102,7 @@ if (!function_exists('dash_decline_label')) {
             'rule_duplicate_block_enabled' => 'Duplicate request',
             'rule_missing_doc_hold'      => 'Supporting document missing',
             'rule_past_datetime'         => 'Date/time already passed',
+            'rule_expired_unreviewed'    => 'Not reviewed in time',
             'rule_schedule_conflict'     => 'Schedule conflict',
             'override'                   => 'Declined manually by an admin',
         ];
@@ -2030,7 +2031,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         $tb = !empty($b['request_date']) ? (int)strtotime($b['request_date']) : 0;
                         return ($tb <=> $ta) ?: ((int)$b['id'] <=> (int)$a['id']);
                     });
-                    // Waiting (adviser requests with an attached letter) is a Super Admin-only queue.
+                    // Waiting = reservations for a later date (any admin decides them) plus adviser requests with an
+                    // attached letter (Super Admin only - the query above never sends those to other admins).
                     $rr_is_super = !empty($ps_rooms_can_view_sensitive_adviser_requests);
                     ?>
                     <div class="pr-card">
@@ -2049,11 +2051,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
                                     <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active <span class="rr-tab-count"></span>
                                 </button>
-                                <?php if ($rr_is_super): ?>
-                                    <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
-                                        Waiting <span class="rr-tab-count"></span>
-                                    </button>
-                                <?php endif; ?>
+                                <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
+                                    Waiting <span class="rr-tab-count"></span>
+                                </button>
                                 <button type="button" class="rm-chip rr-tab" data-rr-tab="Approved" aria-pressed="false">
                                     Approved <span class="rr-tab-count"></span>
                                 </button>
@@ -2097,8 +2097,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             if ($ar['status'] === 'Declined')  $ar_badge = 'ps-badge--overdue';
                                             if ($ar['status'] === 'Cancelled') $ar_badge = 'ps-badge--returned';
                                             if ($ar['status'] === 'Waiting')   $ar_badge = 'ps-badge--waiting';
-                                            // Only a Super Admin can decide a Waiting request (the API enforces this too).
-                                            $ar_reviewable = $ar['status'] === 'Waiting' && $rr_is_super;
+                                            // Every Waiting row this admin can see is theirs to decide: letter-based adviser
+                                            // requests are only ever loaded for a Super Admin, and the API enforces the same rule.
+                                            $ar_reviewable = $ar['status'] === 'Waiting';
 
                                             $ar_type    = ps_submitted_as_label($ar['submitted_as']);
                                             $ar_is_stud = $ar['submitted_as'] === 'student' && !empty($ar['submitted_by_name']);
@@ -4378,6 +4379,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                 </div>
                                 <div class="eq-loan-tools">
                                     <input class="ps-form-control" style="width:230px" placeholder="Search borrower or item..." id="eq-loan-search" autocomplete="off">
+                                    <?php if ($is_super_admin): ?>
+                                        <!-- Super Admin only: deletes the whole list after a password check (see the modal near the bottom of this file) -->
+                                        <button type="button" class="ps-btn ps-btn--danger" id="eq-loan-wipe-btn"
+                                            title="Permanently delete every record in this list" <?php echo $eq_view_total === 0 ? ' disabled' : ''; ?>>
+                                            <span class="material-symbols-outlined">delete_forever</span> Delete All
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="ps-table-wrap">
@@ -6146,6 +6154,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     $flash_toasts = [
         'notice_sent'   => 'Overdue notice sent to the borrower.',
+        'loans_cleared' => 'The On Loan list was cleared. All loan records were deleted.',
         'room_added'    => 'Facility added to the registry.',
         'room_updated'  => 'Facility updated. Changes saved.',
         'room_archived' => 'Facility archived. It has been removed from the active registry.',
@@ -6720,6 +6729,50 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <?php endif; ?>
 
 
+
+    <?php if ($is_super_admin): ?>
+        <!-- ================================================================
+         MODAL: DELETE THE WHOLE ON LOAN LIST  (Super Admin only)
+         Shows exactly what will go (counted by the server), then asks for the
+         Super Admin's own password. Driven by the "Delete All" block in
+         admin-dashboard.js -> equipment-booking/api/delete-all-loans.php
+        ================================================================ -->
+        <div class="ps-modal-backdrop" id="eq-loan-wipe-modal">
+            <div class="ps-modal ps-modal--sm">
+                <div class="ps-modal-head">
+                    <div class="ps-modal-head-icon ps-mhi--danger">
+                        <span class="material-symbols-outlined">delete_forever</span>
+                    </div>
+                    <h3>Delete the entire loan list?</h3>
+                    <button type="button" class="ps-modal-close" id="eq-loan-wipe-close" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="ps-modal-body">
+                    <p class="fac-reg-auth-lead">Every record in <strong>All Loans</strong> will be permanently deleted. This cannot be undone.</p>
+                    <ul class="eq-wipe-summary" id="eq-loan-wipe-summary" aria-live="polite">
+                        <li class="eq-wipe-loading">Counting records…</li>
+                    </ul>
+                    <p class="eq-wipe-note hidden" id="eq-loan-wipe-note"></p>
+                    <label class="fac-del-pw-label" for="eq-loan-wipe-pw">Your password</label>
+                    <div class="fac-pw-wrap">
+                        <input type="password" id="eq-loan-wipe-pw" class="form-control-custom"
+                            maxlength="128" autocomplete="current-password" placeholder="Enter your password to confirm">
+                        <button type="button" class="eq-wipe-pw-toggle" id="eq-loan-wipe-pw-toggle" aria-label="Show or hide password">
+                            <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
+                        </button>
+                    </div>
+                    <p class="fac-del-error hidden" id="eq-loan-wipe-error" role="alert"></p>
+                </div>
+                <div class="ps-modal-foot">
+                    <button type="button" class="ps-btn ps-btn--ghost" id="eq-loan-wipe-cancel">Cancel</button>
+                    <button type="button" class="ps-btn ps-btn--danger" id="eq-loan-wipe-confirm" disabled>
+                        <span class="material-symbols-outlined">delete_forever</span> Delete everything
+                    </button>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <!-- ================================================================
      MODAL: EDIT FACULTY ACCOUNT
