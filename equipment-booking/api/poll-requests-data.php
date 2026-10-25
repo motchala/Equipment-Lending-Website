@@ -44,7 +44,7 @@ foreach (
         'overdue'   => "SELECT COUNT(*) c FROM tbl_requests WHERE status='Overdue'",
         'inv_total' => "SELECT COUNT(*) c FROM tbl_inventory WHERE is_archived=0",
         'inv_low'   => "SELECT COUNT(*) c FROM tbl_inventory WHERE quantity<=2 AND is_archived=0",
-        'total_req' => "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override')",
+        'total_req' => "SELECT COUNT(*) c FROM tbl_requests WHERE NOT (status='Declined' AND COALESCE(arbitration_rule,'')<>'override') AND status <> 'Cancelled'",
     ] as $key => $sql
 ) {
     $stats[$key] = (int) mysqli_fetch_assoc(mysqli_query($conn, $sql))['c'];

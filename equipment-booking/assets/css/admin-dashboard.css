@@ -12816,7 +12816,26 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 #panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap {
     flex: 0 1 280px;
     min-width: 170px;
+}
+
+/* All Facilities header: [ status filter ][ search ] pushed to the right end */
+#panel-rooms .rm-head-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-left: auto;
+    min-width: 0;
+}
+
+#panel-rooms .rm-head-tools .pr-filter-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 150px;
+}
+
+/* the floor row only exists while the selected building has 2+ floors */
+#panel-rooms .rm-tb-row[hidden] {
+    display: none;
 }
 
 /* Level 2 -> 3: a little more air under the page title and the main tabs */
@@ -12915,9 +12934,15 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 }
 
 @media (max-width: 700px) {
-    #panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap {
+    #panel-rooms .rm-head-tools {
         flex: 1 1 100%;
+        flex-wrap: wrap;
         margin-left: 0;
+    }
+
+    #panel-rooms .rm-rooms-card .pr-card-header .pr-search-wrap {
+        flex: 1 1 160px;
+        min-width: 0;
     }
 }
 
@@ -13018,4 +13043,56 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 .fac-reg-list-meta {
     font-size: 11.5px;
     color: var(--text-light);
+}
+
+/* =====================================================================
+   Equipment > Loans: status tabs (All / Waiting / Active / Overdue / Returned)
+   Same tab style as the Facilities building tabs (All / Building A / B / C):
+   rounded square, soft maroon tint + bottom bar when selected, pill counts.
+   ===================================================================== */
+#eqLoanFilter .eq-loan-tab {
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1.5px solid var(--khaki-border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-light);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+#eqLoanFilter .eq-loan-tab:hover {
+    color: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+}
+
+#eqLoanFilter .eq-loan-tab.active {
+    background: var(--accent-light);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    font-weight: 700;
+    box-shadow: inset 0 -2px 0 var(--accent-maroon);
+}
+
+#eqLoanFilter .eq-loan-tab:focus-visible {
+    outline: 2px solid var(--accent-maroon);
+    outline-offset: 2px;
+}
+
+#eqLoanFilter .eq-loan-tab-count {
+    min-width: 19px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    line-height: 1.5;
+}
+
+#eqLoanFilter .eq-loan-tab.active .eq-loan-tab-count {
+    background: rgba(128, 0, 0, 0.12);
+}
+
+#eqLoanFilter .eq-loan-tab-count.has,
+#eqLoanFilter .eq-loan-tab.active .eq-loan-tab-count.has {
+    background: var(--danger);
+    color: #fff;
 }

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * room-reservation/core/room-cancellation.php
  * RoomCancellation — shared cancellation + waitlist-notification logic.
@@ -14,21 +15,21 @@
 
 class RoomCancellation
 {
-    /**
-     * Cancel an Approved reservation and blast waitlist notifications.
-     *
-     * @param mysqli $conn        Active DB connection
-     * @param int    $reservationId
-     * @param string $actor       'faculty' | 'admin'
-     * @return array  ['success'=>bool, 'error'=>string|null]
-     */
-    public static function cancel(mysqli $conn, int $reservationId, string $actor): array
-    {
-        date_default_timezone_set('Asia/Manila');
+  /**
+   * Cancel an Approved reservation and blast waitlist notifications.
+   *
+   * @param mysqli $conn        Active DB connection
+   * @param int    $reservationId
+   * @param string $actor       'faculty' | 'admin'
+   * @return array  ['success'=>bool, 'error'=>string|null]
+   */
+  public static function cancel(mysqli $conn, int $reservationId, string $actor): array
+  {
+    date_default_timezone_set('Asia/Manila');
 
-        // ── Fetch the reservation ────────────────────────────────────────
-        $stmt = $conn->prepare(
-            "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name,
+    // ── Fetch the reservation ────────────────────────────────────────
+    $stmt = $conn->prepare(
+      "SELECT rr.id, rr.room_id, rr.faculty_id, rr.faculty_name,
                     rr.reservation_date, rr.start_time, rr.end_time,
                     rr.status,
                     r.room_name
@@ -36,94 +37,126 @@ class RoomCancellation
                JOIN tbl_rooms r ON r.room_id = rr.room_id
               WHERE rr.id = ?
               LIMIT 1"
-        );
-        $stmt->bind_param('i', $reservationId);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+    );
+    $stmt->bind_param('i', $reservationId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-        if (!$row) {
-            return ['success' => false, 'error' => 'Reservation not found.'];
-        }
-        if ($row['status'] !== 'Approved') {
-            return ['success' => false, 'error' => 'Only Approved reservations can be cancelled.'];
-        }
-
-        // ── 1-hour cutoff enforcement ───────────────────────────────────
-        $resStart = new DateTime(
-            $row['reservation_date'] . ' ' . $row['start_time'],
-            new DateTimeZone('Asia/Manila')
-        );
-        $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
-        $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
-
-        if ($diffSecs <= 3600) {
-            return [
-                'success' => false,
-                'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',
-            ];
-        }
-
-        // ── Mark Cancelled ───────────────────────────────────────────────
-        $upd = $conn->prepare(
-            "UPDATE tbl_room_reservations
-                SET status = 'Cancelled', cancelled_at = NOW()
-              WHERE id = ? AND status = 'Approved'"
-        );
-        $upd->bind_param('i', $reservationId);
-        $upd->execute();
-        $affected = $upd->affected_rows;
-        $upd->close();
-
-        if ($affected === 0) {
-            // Race condition: already cancelled by another request
-            return ['success' => false, 'error' => 'Reservation could not be cancelled. It may have already been processed.'];
-        }
-
-        // ── If admin cancelled, notify the reservation owner ─────────────
-        if ($actor === 'admin') {
-            self::notifyOwner($conn, $row);
-        }
-
-        // ── Notify all waitlisted faculty for this slot ──────────────────
-        self::notifyWaitlist(
-            $conn,
-            (int) $row['room_id'],
-            $row['reservation_date'],
-            $row['start_time'],
-            $row['end_time'],
-            $row['room_name']
-        );
-
-        return ['success' => true, 'error' => null];
+    if (!$row) {
+      return ['success' => false, 'error' => 'Reservation not found.'];
+    }
+    if ($row['status'] !== 'Approved') {
+      return ['success' => false, 'error' => 'Only Approved reservations can be cancelled.'];
     }
 
-    /**
-     * Email the original reservation owner that admin cancelled their booking.
-     * Only called when $actor === 'admin'.
-     */
-    private static function notifyOwner(mysqli $conn, array $row): void
-    {
-        $fac = $conn->prepare(
-            "SELECT email FROM tbl_users WHERE faculty_id = ? LIMIT 1"
-        );
-        $fac->bind_param('s', $row['faculty_id']);
-        $fac->execute();
-        $facRow = $fac->get_result()->fetch_assoc();
-        $fac->close();
+    // ── 1-hour cutoff enforcement ───────────────────────────────────
+    $resStart = new DateTime(
+      $row['reservation_date'] . ' ' . $row['start_time'],
+      new DateTimeZone('Asia/Manila')
+    );
+    $now      = new DateTime('now', new DateTimeZone('Asia/Manila'));
+    $diffSecs = $resStart->getTimestamp() - $now->getTimestamp();
 
-        if (!$facRow || empty($facRow['email'])) return;
+    if ($diffSecs <= 3600) {
+      return [
+        'success' => false,
+        'error'   => 'Cancellations are not allowed within 1 hour of the reservation start time.',
+      ];
+    }
 
-        require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+    // ── Mark Cancelled ───────────────────────────────────────────────
+    $upd = $conn->prepare(
+      "UPDATE tbl_room_reservations
+                SET status = 'Cancelled', cancelled_at = NOW()
+              WHERE id = ? AND status = 'Approved'"
+    );
+    $upd->bind_param('i', $reservationId);
+    $upd->execute();
+    $affected = $upd->affected_rows;
+    $upd->close();
 
-        $dateDisplay  = date('F j, Y', strtotime($row['reservation_date']));
-        $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $row['start_time']));
-        $endDisplay   = date('g:i A',  strtotime('1970-01-01 ' . $row['end_time']));
-        $roomName     = htmlspecialchars($row['room_name']);
-        $facultyName  = htmlspecialchars($row['faculty_name']);
+    if ($affected === 0) {
+      // Race condition: already cancelled by another request
+      return ['success' => false, 'error' => 'Reservation could not be cancelled. It may have already been processed.'];
+    }
 
-        $subject  = 'PUPSync: Your Room Reservation Was Cancelled — ' . $row['room_name'];
-        $bodyHtml = '
+    // ── If admin cancelled, notify the reservation owner ─────────────
+    if ($actor === 'admin') {
+      self::notifyOwner($conn, $row);
+    } else {
+      // A faculty member cancelling their own booking: record it in the room decision log so the
+      // admin Activity feed shows it (an admin's own cancellation is already logged as admin activity).
+      self::logFacultyCancel($conn, $row);
+    }
+
+    // ── Notify all waitlisted faculty for this slot ──────────────────
+    self::notifyWaitlist(
+      $conn,
+      (int) $row['room_id'],
+      $row['reservation_date'],
+      $row['start_time'],
+      $row['end_time'],
+      $row['room_name']
+    );
+
+    return ['success' => true, 'error' => null];
+  }
+
+  /** One row in tbl_room_arbitration_log (decision 'Cancelled', rule 'faculty_cancelled'). Never blocks the cancel. */
+  private static function logFacultyCancel(mysqli $conn, array $row): void
+  {
+    try {
+      $t = $conn->query("SHOW TABLES LIKE 'tbl_room_arbitration_log'");
+      if (!$t || $t->num_rows === 0) {
+        return;
+      }
+      $log = $conn->prepare(
+        "INSERT INTO tbl_room_arbitration_log
+                    (reservation_id, room_id, room_name, borrower_id, borrower_name, decision, rule_applied, reason, created_at)
+                 VALUES (?, ?, ?, ?, ?, 'Cancelled', 'faculty_cancelled', 'Cancelled by the faculty member before it started.', NOW())"
+      );
+      if ($log) {
+        $rid   = (int)$row['id'];
+        $room  = (int)$row['room_id'];
+        $rname = (string)$row['room_name'];
+        $fid   = (string)$row['faculty_id'];
+        $fname = (string)$row['faculty_name'];
+        $log->bind_param('iisss', $rid, $room, $rname, $fid, $fname);
+        $log->execute();
+        $log->close();
+      }
+    } catch (\Throwable $e) {
+      error_log('RoomCancellation::logFacultyCancel — ' . $e->getMessage());
+    }
+  }
+
+  /**
+   * Email the original reservation owner that admin cancelled their booking.
+   * Only called when $actor === 'admin'.
+   */
+  private static function notifyOwner(mysqli $conn, array $row): void
+  {
+    $fac = $conn->prepare(
+      "SELECT email FROM tbl_users WHERE faculty_id = ? LIMIT 1"
+    );
+    $fac->bind_param('s', $row['faculty_id']);
+    $fac->execute();
+    $facRow = $fac->get_result()->fetch_assoc();
+    $fac->close();
+
+    if (!$facRow || empty($facRow['email'])) return;
+
+    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+
+    $dateDisplay  = date('F j, Y', strtotime($row['reservation_date']));
+    $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $row['start_time']));
+    $endDisplay   = date('g:i A',  strtotime('1970-01-01 ' . $row['end_time']));
+    $roomName     = htmlspecialchars($row['room_name']);
+    $facultyName  = htmlspecialchars($row['faculty_name']);
+
+    $subject  = 'PUPSync: Your Room Reservation Was Cancelled — ' . $row['room_name'];
+    $bodyHtml = '
 <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
   <div style="background:#800000;padding:24px 28px;">
     <h2 style="color:#fff;margin:0;font-size:1.2rem;">PUPSync &middot; Reservation Cancelled by Admin</h2>
@@ -157,52 +190,52 @@ class RoomCancellation
   </div>
 </div>';
 
-        sendPupSyncEmail($facRow['email'], $row['faculty_name'], $subject, $bodyHtml);
-    }
+    sendPupSyncEmail($facRow['email'], $row['faculty_name'], $subject, $bodyHtml);
+  }
 
-    /**
-     * Query tbl_room_waitlist for the exact slot and email every entry.
-     * Waitlist rows are NOT deleted — they remain as an audit trail.
-     */
-    public static function notifyWaitlist(
-        mysqli $conn,
-        int    $roomId,
-        string $resDate,
-        string $startTime,
-        string $endTime,
-        string $roomName
-    ): void {
-        $stmt = $conn->prepare(
-            "SELECT faculty_id, faculty_name, faculty_email
+  /**
+   * Query tbl_room_waitlist for the exact slot and email every entry.
+   * Waitlist rows are NOT deleted — they remain as an audit trail.
+   */
+  public static function notifyWaitlist(
+    mysqli $conn,
+    int    $roomId,
+    string $resDate,
+    string $startTime,
+    string $endTime,
+    string $roomName
+  ): void {
+    $stmt = $conn->prepare(
+      "SELECT faculty_id, faculty_name, faculty_email
                FROM tbl_room_waitlist
               WHERE room_id          = ?
                 AND reservation_date = ?
                 AND start_time       = ?
                 AND end_time         = ?
               ORDER BY created_at ASC"
-        );
-        $stmt->bind_param('isss', $roomId, $resDate, $startTime, $endTime);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $entries = [];
-        while ($r = $result->fetch_assoc()) {
-            $entries[] = $r;
-        }
-        $stmt->close();
+    );
+    $stmt->bind_param('isss', $roomId, $resDate, $startTime, $endTime);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $entries = [];
+    while ($r = $result->fetch_assoc()) {
+      $entries[] = $r;
+    }
+    $stmt->close();
 
-        if (empty($entries)) return;
+    if (empty($entries)) return;
 
-        require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
 
-        $dateDisplay  = date('F j, Y', strtotime($resDate));
-        $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $startTime));
-        $endDisplay   = date('g:i A',  strtotime('1970-01-01 ' . $endTime));
-        $roomNameEsc  = htmlspecialchars($roomName);
+    $dateDisplay  = date('F j, Y', strtotime($resDate));
+    $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $startTime));
+    $endDisplay   = date('g:i A',  strtotime('1970-01-01 ' . $endTime));
+    $roomNameEsc  = htmlspecialchars($roomName);
 
-        foreach ($entries as $entry) {
-            $recipientName = htmlspecialchars($entry['faculty_name']);
-            $subject       = 'PUPSync: ' . $roomName . ' is Now Available — ' . $dateDisplay;
-            $bodyHtml      = '
+    foreach ($entries as $entry) {
+      $recipientName = htmlspecialchars($entry['faculty_name']);
+      $subject       = 'PUPSync: ' . $roomName . ' is Now Available — ' . $dateDisplay;
+      $bodyHtml      = '
 <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">
   <div style="background:#800000;padding:24px 28px;">
     <h2 style="color:#fff;margin:0;font-size:1.2rem;">PUPSync &middot; Room Slot Available</h2>
@@ -235,7 +268,7 @@ class RoomCancellation
   </div>
 </div>';
 
-            sendPupSyncEmail($entry['faculty_email'], $entry['faculty_name'], $subject, $bodyHtml);
-        }
+      sendPupSyncEmail($entry['faculty_email'], $entry['faculty_name'], $subject, $bodyHtml);
     }
+  }
 }

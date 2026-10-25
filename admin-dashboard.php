@@ -168,7 +168,7 @@ function dash_collect(mysqli $conn): array
     }
     $idx   = array_flip($labels);
     $zeros = array_fill(0, 60, 0);
-    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros];
+    $eq    = ['approved' => $zeros, 'declined' => $zeros, 'waiting' => $zeros, 'cancelled' => $zeros];
     $rm    = ['approved' => $zeros, 'declined' => $zeros, 'cancelled' => $zeros];
     $from  = $labels[0] . ' 00:00:00';
     $from30 = $labels[30] . ' 00:00:00';   // the 30-day panels below (Most requested) keep a 30-day window
@@ -177,7 +177,7 @@ function dash_collect(mysqli $conn): array
         if (!isset($idx[$r['d']])) continue;
         // Approved / Overdue / Returned all started life as an approval.
         $k = in_array($r['status'], ['Approved', 'Overdue', 'Returned'], true) ? 'approved'
-            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : null));
+            : ($r['status'] === 'Declined' ? 'declined' : ($r['status'] === 'Waiting' ? 'waiting' : ($r['status'] === 'Cancelled' ? 'cancelled' : null)));
         if ($k) $eq[$k][$idx[$r['d']]] += (int)$r['c'];
     }
     foreach (dash_rows($conn, "SELECT DATE(request_date) AS d, status, COUNT(*) AS c FROM tbl_room_reservations WHERE request_date >= ? GROUP BY DATE(request_date), status", 's', [$from]) as $r) {
@@ -222,6 +222,7 @@ function dash_collect(mysqli $conn): array
                 ['key' => 'approved', 'label' => 'Approved', 'values' => $eq['approved']],
                 ['key' => 'declined', 'label' => 'Declined', 'values' => $eq['declined']],
                 ['key' => 'waiting',  'label' => 'Waiting',  'values' => $eq['waiting']],
+                ['key' => 'cancelled', 'label' => 'Cancelled', 'values' => $eq['cancelled']],
             ]],
             'rooms' => ['title' => 'Facility bookings', 'unit' => 'booking', 'series' => [
                 ['key' => 'approved',  'label' => 'Approved',  'values' => $rm['approved']],
@@ -241,7 +242,7 @@ function dash_collect(mysqli $conn): array
         "SELECT equipment_name, COUNT(*) AS total,
                 SUM(status IN ('Approved','Overdue','Returned')) AS ok
            FROM tbl_requests
-          WHERE request_date >= ?
+          WHERE request_date >= ? AND status <> 'Cancelled'
        GROUP BY equipment_name
        ORDER BY total DESC, equipment_name ASC
           LIMIT 5",
@@ -1331,6 +1332,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             <option value="">Select building</option>
                                             <?php foreach ($rooms_buildings as $bid => $b): ?>
                                                 <option value="<?php echo (int)$bid; ?>"
+                                                    data-floors="<?php echo max(1, (int)$b['floor_count']); ?>"
                                                     <?php echo ($edit_room && (int)$edit_room['building_id'] === $bid) ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($b['name']); ?>
                                                 </option>
@@ -1351,6 +1353,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <label for="rf-floor">Floor <span class="req-star" aria-label="required">*</span></label>
                                         <input type="number" name="floor_number" id="rf-floor" class="form-control-custom" min="1" max="20"
                                             value="<?php echo $edit_room ? (int)$edit_room['floor_number'] : 1; ?>" required>
+                                        <!-- Filled by psSyncRoomFloorLimit(): the max follows the selected building's floor count -->
+                                        <p class="rf-hint rf-floor-hint" id="rf-floor-hint" aria-live="polite">Select a building to see how many floors it has.</p>
                                     </div>
                                     <div class="form-group">
                                         <label for="rf-status">Status</label>
@@ -1509,26 +1513,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         <div class="pr-card rm-rooms-card">
                             <div class="pr-card-header">
                                 <h3><span class="material-symbols-outlined">meeting_room</span> All Facilities</h3>
-                                <div class="pr-search-wrap">
-                                    <span class="material-symbols-outlined">search</span>
-                                    <input type="text" id="roomSearchInput" placeholder="Search facilities" autocomplete="off" aria-label="Search facilities">
+                                <div class="rm-head-tools">
+                                    <select id="roomStatusSelect" class="pr-filter-select" aria-label="Status">
+                                        <option value="all">All statuses</option>
+                                        <option value="Available">Available</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Not Bookable">Not bookable</option>
+                                    </select>
+                                    <div class="pr-search-wrap">
+                                        <span class="material-symbols-outlined">search</span>
+                                        <input type="text" id="roomSearchInput" placeholder="Search facilities" autocomplete="off" aria-label="Search facilities">
+                                    </div>
                                 </div>
                             </div>
-                            <!-- Filters: building + floor pills, status (search lives in the header) -->
+                            <!-- Filters: building + floor pills (status and search live in the header) -->
                             <div class="rm-toolbar" id="rmToolbar">
                                 <div class="rm-tb-row">
                                     <div class="rm-bld-pills" id="rmBuildingPills" role="group" aria-label="Building"></div>
                                 </div>
-                                <div class="rm-tb-row">
+                                <div class="rm-tb-row" id="rmFloorRow">
                                     <div class="rm-floor-chips" id="rmFloorChips" role="group" aria-label="Floor"></div>
-                                    <div class="rm-tb-end">
-                                        <select id="roomStatusSelect" class="pr-filter-select" aria-label="Status">
-                                            <option value="all">All statuses</option>
-                                            <option value="Available">Available</option>
-                                            <option value="Maintenance">Maintenance</option>
-                                            <option value="Not Bookable">Not bookable</option>
-                                        </select>
-                                    </div>
                                 </div>
                                 <!-- Plain dropdowns: the pills above read and write these. Hidden once JS runs. -->
                                 <div class="rm-native-filters">
@@ -2043,7 +2047,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     All <span class="rr-tab-count"></span>
                                 </button>
                                 <button type="button" class="rm-chip rr-tab rr-active-chip" data-rr-tab="active" aria-pressed="false">
-                                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active today <span class="rr-tab-count"></span>
+                                    <span class="material-symbols-outlined" aria-hidden="true">schedule</span> Active <span class="rr-tab-count"></span>
                                 </button>
                                 <?php if ($rr_is_super): ?>
                                     <button type="button" class="rm-chip rr-tab" data-rr-tab="Waiting" aria-pressed="false">
@@ -3172,6 +3176,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
                             el = form.querySelector('input[name="floor_number"]');
                             if (el) el.value = d.roomFloorNum || '1';
+                            if (window.psSyncRoomFloorLimit) window.psSyncRoomFloorLimit(false);
 
                             el = form.querySelector('input[name="floor_label"]');
                             if (el) el.value = d.roomFloorLabel || '';
@@ -3258,6 +3263,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             if (el) el.value = '';
                             el = form.querySelector('input[name="floor_number"]');
                             if (el) el.value = '1';
+                            if (window.psSyncRoomFloorLimit) window.psSyncRoomFloorLimit(false);
                             el = form.querySelector('input[name="floor_label"]');
                             if (el) el.value = '';
                             el = form.querySelector('select[name="status"]');
@@ -3270,6 +3276,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             el = document.getElementById('room-more-opts');
                             if (el) el.open = false;
                         };
+
+                        /* Floor can't go past the selected building's number of floors (tbl_buildings.floor_count).
+                           clamp = true only when the admin switches building, so editing never rewrites saved data. */
+                        window.psSyncRoomFloorLimit = function(clamp) {
+                            var sel = document.getElementById('rf-building');
+                            var fl = document.getElementById('rf-floor');
+                            var hint = document.getElementById('rf-floor-hint');
+                            if (!sel || !fl) return;
+                            var opt = sel.options[sel.selectedIndex];
+                            var max = opt ? parseInt(opt.getAttribute('data-floors'), 10) : NaN;
+                            if (!max || max < 1) {
+                                fl.max = '20';
+                                if (hint) hint.textContent = 'Select a building to see how many floors it has.';
+                                return;
+                            }
+                            fl.max = String(max);
+                            if (clamp && parseInt(fl.value, 10) > max) fl.value = String(max);
+                            var name = (opt.textContent || '').replace(/\s+/g, ' ').trim();
+                            if (hint) hint.textContent = name + ' has ' + max + (max === 1 ? ' floor' : ' floors') + ' (1\u2013' + max + ').';
+                        };
+                        document.addEventListener('change', function(e) {
+                            if (e.target && e.target.id === 'rf-building') window.psSyncRoomFloorLimit(true);
+                        });
+                        window.psSyncRoomFloorLimit(false);
 
                         document.addEventListener('click', function(e) {
                             if (e.target.closest('[data-action="hide-room-form"]') ||
@@ -3999,7 +4029,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">inventory_2</span> Catalog
                         </button>
                         <button type="button" class="rq-filter-chip" data-eq-panel="eq-onloan">
-                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">assignment_return</span> On Loan
+                            <span class="material-symbols-outlined eq-tab-ico" aria-hidden="true">assignment_return</span> Loans
                             <?php if ($eq_loan_total > 0): ?>
                                 <span class="rq-chip-count<?php echo $eq_loan_overdue > 0 ? '' : ' rq-chip-count--ok'; ?>" id="eqLoanChipCount"><?php echo $eq_loan_total; ?></span>
                             <?php endif; ?>
@@ -4973,7 +5003,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                                 <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
                                             </summary>
                                             <div class="hc-faq-a">
-                                                Go to <strong>Equipment → On Loan</strong> and select <strong>Waiting</strong>. Review the request, then approve or decline it. The faculty member will see the updated status on their portal.
+                                                Go to <strong>Equipment → Loans</strong> and select <strong>Waiting</strong>. Review the request, then approve or decline it. The faculty member will see the updated status on their portal.
                                             </div>
                                         </details>
 

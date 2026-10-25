@@ -11642,6 +11642,247 @@ body .side-nav .side-nav-user .side-nav-user-name {
 }
 
 
+/* ── Extend dialog (My Activity) ─────────────────────────────────
+   Opened by the Extend button on a loan whose return time has been reached. Lives on <body> (the
+   script moves it there), so its rules are not scoped to #panel-activity. Theme tokens only. */
+.fact-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.fact-modal[hidden] {
+    display: none;
+}
+
+.fact-modal-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 440px;
+    max-height: calc(100vh - 32px);
+    overflow: hidden;
+    background: var(--color-surface-lowest);
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.fact-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--color-outline-variant);
+}
+
+.fact-modal-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: var(--color-on-surface);
+}
+
+.fact-modal-close {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-on-surface-variant);
+    cursor: pointer;
+}
+
+.fact-modal-close:hover {
+    background: var(--color-surface-container);
+}
+
+.fact-modal-close .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.fact-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 20px;
+    overflow-y: auto;
+}
+
+.fact-modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+.fact-modal-btn {
+    height: 34px;
+    padding: 0 16px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 10px;
+    background: var(--color-surface-lowest);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fact-modal-btn:hover:not(:disabled) {
+    background: var(--color-surface-container);
+    border-color: var(--color-outline);
+}
+
+.fact-modal-btn.is-primary {
+    color: var(--color-on-primary);
+    background: var(--color-primary-container);
+    border-color: var(--color-primary-container);
+}
+
+.fact-modal-btn.is-primary:hover:not(:disabled) {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.fact-modal-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fact-modal-btn:focus-visible,
+.fact-modal-close:focus-visible,
+.fact-ext-opt:focus-within {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.fact-ext-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fact-ext-item strong {
+    font-size: 0.9375rem;
+    color: var(--color-on-surface);
+}
+
+.fact-ext-item>span {
+    font-size: 0.8125rem;
+    color: var(--color-secondary);
+}
+
+.fact-ext-late {
+    font-weight: 600;
+    color: var(--color-error);
+}
+
+.fact-ext-lead {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-secondary);
+}
+
+.fact-ext-opts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fact-ext-opt {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-outline-variant);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.fact-ext-opt:hover:not(.is-disabled) {
+    background: var(--color-surface-container);
+}
+
+.fact-ext-opt:has(input:checked) {
+    border-color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 7%, transparent);
+}
+
+.fact-ext-opt.is-disabled {
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+
+.fact-ext-opt input {
+    margin: 3px 0 0;
+    accent-color: var(--color-primary);
+}
+
+.fact-ext-opt-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 10px;
+}
+
+.fact-ext-opt-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-on-surface);
+}
+
+.fact-ext-opt-until {
+    font-size: 0.8125rem;
+    color: var(--color-secondary);
+}
+
+.fact-ext-opt-why {
+    grid-column: 2;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-error);
+}
+
+.fact-ext-hint,
+.fact-ext-loading {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--color-secondary);
+}
+
+.fact-ext-banner {
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--color-on-surface);
+}
+
+.fact-ext-banner.is-error {
+    border: 1px solid color-mix(in srgb, var(--color-error) 30%, var(--color-outline-variant));
+    background: color-mix(in srgb, var(--color-error) 7%, transparent);
+}
+
+
 /* ================================================================
    ROOM FIELD + "CHOOSE A ROOM" MODAL  (Borrow Request modal)
    The Room field is a button that opens its own modal. The modal
@@ -12521,19 +12762,23 @@ body .side-nav .side-nav-user .side-nav-user-name {
     transition: background .15s, color .15s;
     z-index: 2;
 }
+
 .eq-ic-btn:hover:not(:disabled) {
     background: rgba(128, 0, 0, 0.1);
     color: var(--color-primary, #800000);
 }
+
 .eq-ic-btn--disabled,
 .eq-ic-btn:disabled {
     opacity: 0.35;
     cursor: not-allowed;
 }
+
 .eq-ic-chevron {
     font-size: 18px;
     transition: transform .2s;
 }
+
 .eq-ic-panel {
     margin: 6px 0 4px;
     padding: 8px 10px;
@@ -12542,6 +12787,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     border: 1px solid var(--color-outline-variant, #e0e0e0);
     font-size: 12px;
 }
+
 .eq-ic-loading {
     display: flex;
     align-items: center;
@@ -12549,6 +12795,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-secondary, #5a5a5a);
     font-size: 12px;
 }
+
 .eq-ic-label {
     display: block;
     font-size: 10px;
@@ -12558,12 +12805,14 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-secondary, #777);
     margin-bottom: 4px;
 }
+
 .eq-ic-code-row {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-bottom: 4px;
 }
+
 .eq-ic-code {
     flex: 1;
     font-family: monospace;
@@ -12575,6 +12824,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     border: none;
     padding: 0;
 }
+
 .eq-ic-reveal-btn,
 .eq-ic-copy-btn {
     width: 24px;
@@ -12590,14 +12840,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
     padding: 0;
     transition: color .15s;
 }
+
 .eq-ic-reveal-btn:hover,
 .eq-ic-copy-btn:hover {
     color: var(--accent-maroon, #800000);
 }
+
 .eq-ic-reveal-btn .material-symbols-outlined,
 .eq-ic-copy-btn .material-symbols-outlined {
     font-size: 15px;
 }
+
 .eq-ic-regen-btn {
     display: flex;
     align-items: center;
@@ -12610,8 +12863,15 @@ body .side-nav .side-nav-user .side-nav-user-name {
     padding: 2px 0;
     margin-top: 2px;
 }
-.eq-ic-regen-btn:hover { text-decoration: underline; }
-.eq-ic-regen-btn .material-symbols-outlined { font-size: 13px; }
+
+.eq-ic-regen-btn:hover {
+    text-decoration: underline;
+}
+
+.eq-ic-regen-btn .material-symbols-outlined {
+    font-size: 13px;
+}
+
 .eq-ic-used-notice {
     display: flex;
     align-items: center;
@@ -12620,6 +12880,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-warning, #e08000);
     margin-bottom: 4px;
 }
+
 /* Make eq-item-card position relative so the chevron can be absolute */
 .eq-item-card {
     position: relative;
@@ -12632,17 +12893,19 @@ body .side-nav .side-nav-user .side-nav-user-name {
     flex-wrap: wrap;
     gap: 6px;
 }
+
 .act-cancel-confirm-btn {
     background: var(--color-error, #c0392b) !important;
     color: #fff !important;
     border-color: transparent !important;
 }
+
 .act-cancel-confirm-btn:hover {
     background: #a93226 !important;
 }
+
 .act-cancel-nevermind-btn {
     background: transparent !important;
     color: var(--color-secondary, #666) !important;
     border-color: var(--color-outline-variant, #ccc) !important;
 }
-
