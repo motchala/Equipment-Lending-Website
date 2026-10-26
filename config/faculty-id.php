@@ -114,13 +114,14 @@ function faculty_name_capitalize(string $name): string
 }
 
 /**
- * Build the local part of a PUPSync email from a full name.
- * "Aleli Joy A. Prestado" → "alelijah.prestado" would be wrong.
- * We use only the FIRST token of the first-name portion and the last token
- * (last name). Middle initial and second given name are stripped.
- * "Aleli Joy" + "Prestado" → "alelijah" is wrong; we use the first word only.
- * "Aleli" → local = "aleli.prestado"
- * "Aleli Joy" → local = "aleli.prestado"  (first word of first name only)
+ * Build a PUPSync email from a first name and a last name (the whole surname).
+ *   - first part  = the FIRST word of the first name only ("Aleli Joy" -> "aleli")
+ *   - second part = the WHOLE surname, spaces/punctuation dropped
+ *       "Prestado"   -> aleli.prestado@pupsync.edu
+ *       "Dela Cruz"  -> edmundo.delacruz@pupsync.edu   (both words are the surname)
+ * The middle initial is never part of it. Pass the surname as given by
+ * faculty_registry_name_parts(): everything after the middle initial, or the last word
+ * when the registry name has no initial.
  */
 function faculty_email_generate(string $first_name, string $last_name): string
 {
@@ -198,15 +199,111 @@ function faculty_email_resolve_conflict(
 }
 
 /**
+ * Split a registry name into given name(s), middle initial and surname.
+ *
+ *  - WITH a middle initial ("Edmundo B. Dela Cruz"): everything AFTER the initial is the
+ *    surname ("Dela Cruz"), everything before it is the given name(s) ("Edmundo"). This is how
+ *    a surname written as several words is recognised.
+ *  - WITHOUT one ("Maria Santos", "Maria Dela Cruz"): the literal LAST word is the surname,
+ *    so "Maria Dela Cruz" reads as given name "Maria Dela" + surname "Cruz". The admin can
+ *    still correct the generated email for such names.
+ *
+ * Returns ['first' => 'Edmundo', 'middle' => 'B' (or ''), 'last' => 'Dela Cruz', 'has_middle' => bool].
+ */
+function faculty_registry_name_parts(string $full_name): array
+{
+    $tokens = preg_split('/\s+/', trim($full_name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $n = count($tokens);
+    $is_initial = static function (string $t): bool {
+        return (bool)preg_match('/^[A-Za-z]\.$/', $t);
+    };
+    $clean_first = static function (array $toks) use ($is_initial): string {
+        // extra initials ("Maria A. B. Santos") are not part of the given name
+        return implode(' ', array_values(array_filter($toks, static function ($t) use ($is_initial) {
+            return !$is_initial($t);
+        })));
+    };
+
+    if ($n < 2) {
+        return ['first' => trim($full_name), 'middle' => '', 'last' => '', 'has_middle' => false];
+    }
+
+    // The LAST single-letter-plus-dot token that has a name before AND after it is the middle initial.
+    $k = -1;
+    for ($i = $n - 2; $i >= 1; $i--) {
+        if ($is_initial($tokens[$i])) {
+            $k = $i;
+            break;
+        }
+    }
+    if ($k >= 1) {
+        return [
+            'first'      => $clean_first(array_slice($tokens, 0, $k)),
+            'middle'     => strtoupper($tokens[$k][0]),
+            'last'       => implode(' ', array_slice($tokens, $k + 1)),
+            'has_middle' => true,
+        ];
+    }
+
+    return [
+        'first'      => $clean_first(array_slice($tokens, 0, $n - 1)),
+        'middle'     => '',
+        'last'       => $tokens[$n - 1],
+        'has_middle' => false,
+    ];
+}
+
+/** Letters only, lower-case: "Dela Cruz" / "dela-cruz" / "DelaCruz" all become "delacruz". */
+function faculty_name_letters(string $s): string
+{
+    return strtolower(preg_replace('/[^a-zA-Z]/', '', $s) ?? '');
+}
+
+/** Does a typed first name match a registry given name (first word, whole name, or the start of it)? */
+function faculty_first_name_matches(string $typed_first, string $reg_first): bool
+{
+    $typed_tokens = preg_split('/\s+/', trim($typed_first), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $reg_tokens   = preg_split('/\s+/', trim($reg_first), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $typed_primary = faculty_name_letters($typed_tokens[0] ?? '');
+    $reg_primary   = faculty_name_letters($reg_tokens[0] ?? '');
+    $typed_full = strtolower(trim(preg_replace('/[^a-zA-Z\s]/', '', $typed_first) ?? $typed_first));
+    $reg_full   = strtolower(trim(preg_replace('/[^a-zA-Z\s]/', '', $reg_first) ?? $reg_first));
+    if ($typed_primary === '' || $reg_primary === '') return false;
+    return $reg_primary === $typed_primary
+        || $reg_full === $typed_full
+        || ($typed_full !== '' && str_starts_with($reg_full, $typed_full));
+}
+
+/**
  * Lookup a faculty member in tbl_faculty_registry by first + last name.
- * Handles:
- *  - Middle initial stripped from registry name
- *  - Compound first names: "Aleli Joy" matches "Aleli" typed as first name
+ *
+ * The surname comes from faculty_registry_name_parts(): everything after the middle initial
+ * ("Edmundo B. Dela Cruz" -> "Dela Cruz"), or the literal last word when there is no initial.
+ * The typed last name must equal that whole surname (spaces, case and punctuation are ignored,
+ * so "Dela Cruz", "dela  cruz" and "DelaCruz" all match; "Cruz" alone does not).
+ * Compound first names work: "Aleli Joy" and "Aleli" both match "Aleli Joy A. Prestado".
  *
  * Returns an array of matching rows (may be >1 for disambiguation), or [].
  * Each row: ['id', 'faculty_id', 'full_name', 'department', 'is_newly_hired']
  */
 function faculty_registry_lookup(mysqli $conn, string $first_name, string $last_name): array
+{
+    $typed_last = faculty_name_letters($last_name);
+    if ($typed_last === '') return [];
+
+    $matches = [];
+    foreach (faculty_registry_rows($conn) as $row) {
+        $parts = faculty_registry_name_parts((string)$row['full_name']);
+        if ($parts['last'] === '') continue;
+        if (faculty_name_letters($parts['last']) !== $typed_last) continue;
+        if (!faculty_first_name_matches($first_name, $parts['first'])) continue;
+        $matches[] = $row;
+    }
+    return $matches;
+}
+
+/** All registry rows, ordered by name. */
+function faculty_registry_rows(mysqli $conn): array
 {
     $stmt = $conn->prepare(
         "SELECT id, faculty_id, full_name, department, is_newly_hired
@@ -217,46 +314,45 @@ function faculty_registry_lookup(mysqli $conn, string $first_name, string $last_
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
+    return $rows;
+}
 
-    // Normalize the typed input
-    // Last name: remove all non-alpha
-    $typed_last  = strtolower(trim(preg_replace('/[^a-zA-Z\s]/', '', $last_name) ?? $last_name));
-    // First name: first word only (handles "Aleli Joy" → "aleli")
-    $fname_tokens = preg_split('/\s+/', trim($first_name));
-    $typed_first_primary = strtolower(preg_replace('/[^a-zA-Z]/', '', $fname_tokens[0] ?? '') ?? '');
-    // Full first name for secondary match (e.g. "Aleli Joy")
-    $typed_first_full = strtolower(preg_replace('/[^a-zA-Z\s]/', '', $first_name) ?? $first_name);
+/**
+ * "Did you mean...?" help for a lookup that found nothing. Returns up to 3 of
+ * ['full_name', 'first', 'last']: the registry entry plus how to type it so it matches.
+ *   - typed "Edmundo" + "Cruz" for "Edmundo B. Dela Cruz"  -> last name should be "Dela Cruz"
+ *   - typed "Maria" + "Dela Cruz" for "Maria Dela Cruz" (no initial) -> "Maria Dela" + "Cruz"
+ */
+function faculty_registry_hints(mysqli $conn, string $first_name, string $last_name): array
+{
+    $typed_last = faculty_name_letters($last_name);
+    $typed_all  = faculty_name_letters($first_name . $last_name);
+    if ($typed_last === '') return [];
 
-    $matches = [];
-    foreach ($rows as $row) {
-        // Parse registry full name: "Aaron A. Atienza" or "Aleli Joy A. Prestado"
-        $parts = preg_split('/\s+/', trim($row['full_name']));
-        if (count($parts) < 2) continue;
-
-        // Last token is the last name
-        $reg_last = strtolower(preg_replace('/[^a-zA-Z]/', '', end($parts)) ?? '');
-
-        // Last name must match
-        if ($reg_last !== $typed_last) continue;
-
-        // Build the registry first name (everything before the last name,
-        // stripping any single-letter-dot middle initial tokens)
-        $first_tokens = array_slice($parts, 0, -1);
-        $first_tokens_clean = array_filter($first_tokens, function ($t) {
-            return !preg_match('/^[A-Za-z]\.$/', $t);
-        });
-        $reg_first_full = strtolower(implode(' ', array_values($first_tokens_clean)));
-        $reg_first_primary = strtolower(preg_replace('/[^a-zA-Z]/', '', $first_tokens_clean[array_key_first($first_tokens_clean)] ?? '') ?? '');
-
-        // Match on first word of first name (primary) OR full first name
+    $hints = [];
+    foreach (faculty_registry_rows($conn) as $row) {
+        $parts = faculty_registry_name_parts((string)$row['full_name']);
+        if ($parts['last'] === '' || $parts['first'] === '') continue;
+        // an entry the lookup itself would match is not a "did you mean"
         if (
-            $reg_first_primary === $typed_first_primary ||
-            $reg_first_full === $typed_first_full ||
-            str_starts_with($reg_first_full, $typed_first_full)
-        ) {
-            $matches[] = $row;
+            faculty_name_letters($parts['last']) === $typed_last
+            && faculty_first_name_matches($first_name, $parts['first'])
+        ) continue;
+
+        $last_words = preg_split('/\s+/', trim($parts['last']), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $same_name_ignoring_spaces = faculty_name_letters($parts['first'] . $parts['last']) === $typed_all;
+        $typed_is_end_of_surname = count($last_words) > 1
+            && faculty_name_letters((string)end($last_words)) === $typed_last
+            && faculty_first_name_matches($first_name, $parts['first']);
+
+        if ($same_name_ignoring_spaces || $typed_is_end_of_surname) {
+            $hints[] = [
+                'full_name' => (string)$row['full_name'],
+                'first'     => $parts['first'],
+                'last'      => $parts['last'],
+            ];
+            if (count($hints) >= 3) break;
         }
     }
-
-    return $matches;
+    return $hints;
 }

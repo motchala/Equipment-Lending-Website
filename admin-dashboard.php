@@ -3468,6 +3468,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
                                 </div>
+                                <small class="fac-field-hint" style="display:block;margin:-0.35rem 0 0.75rem">
+                                    Type the whole surname under Last name, e.g. <strong>Dela Cruz</strong>. In the registry, everything after the middle initial
+                                    (Edmundo B. <strong>Dela Cruz</strong>) is the surname; with no initial, the last word is.
+                                </small>
                                 <button type="button" id="fac-lookup-btn"
                                     class="ps-btn ps-btn--outline fac-lookup-btn">
                                     <span class="material-symbols-outlined">manage_search</span>
@@ -3488,9 +3492,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <label for="fac-email">PUPSync email</label>
                                     <input type="email" id="fac-email"
                                         class="form-control-custom" maxlength="254"
-                                        autocomplete="off" placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1">
-                                    <small class="fac-field-hint">Generated automatically. Not submitted — the server re-derives this.</small>
+                                        autocomplete="off" spellcheck="false" placeholder="Auto-filled after lookup">
+                                    <small class="fac-field-hint">Suggested from the registry name. You can edit it, for example when a surname has two words but no middle initial. It must end with @pupsync.edu.</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="fac-faculty-id">Faculty ID</label>
@@ -3498,8 +3501,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         class="form-control-custom" maxlength="30"
                                         autocomplete="off" spellcheck="false"
                                         placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1">
-                                    <small class="fac-field-hint">From the Faculty Identification Records. Permanent after account creation.</small>
+                                        readonly aria-readonly="true" tabindex="-1">
+                                    <small class="fac-field-hint">From the Faculty Identification Records. Cannot be edited, and is permanent after account creation.</small>
                                 </div>
 
                                 <div class="fac-edit-section">Password</div>

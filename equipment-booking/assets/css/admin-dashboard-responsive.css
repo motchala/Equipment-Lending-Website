@@ -56,7 +56,7 @@ table {
     }
 
     nav.sidebar {
-        width: var(--sidebar-w-collapsed);
+        width: var(--sidebar-w-rail);
     }
 
     /* Brand row: just the logo, centred */

@@ -152,8 +152,12 @@ main#app-main,
 
 /* ── Layout variables ─────────────────────────────────────────── */
 :root {
-    --sidebar-w: 240px;
+    /* Sidebar widths match the faculty portal exactly (faculty-dashboard.css): 260px expanded,
+       76px when collapsed by hand, 72px for the automatic icon rail on tablets, and the same
+       260px for the phone drawer. */
+    --sidebar-w: 260px;
     --sidebar-w-collapsed: 76px;
+    --sidebar-w-rail: 72px;
     /* The top bar was removed (the sidebar is the only app chrome), so nothing
        is reserved above the page any more. Kept as a variable because
        .app-body and the mobile drawer still do their maths with it. */
@@ -5253,7 +5257,7 @@ input[type="range"] {
         top: var(--header-h);
         left: 0;
         bottom: 0;
-        width: min(280px, 86vw);
+        width: min(var(--sidebar-w), 86vw);
         z-index: 400;
         transform: translateX(-100%);
         transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -9553,40 +9557,42 @@ a.ps-doc-chip:hover {
     and the collapse / drawer behaviour are untouched.)
    ════════════════════════════════════════════════════════════════════ */
 
+/* SIZE AND SPACING MATCH THE FACULTY SIDEBAR (faculty-dashboard.css, .side-nav), number for number:
+   48px tabs, 3px between tabs, 16px above the first group, 14px between groups, 14/12/16px footer,
+   18px icons, 14px between icon and label, 10px corners, 15.2px label. Only the number of tabs differs. */
 nav.sidebar {
     --nav-item-h: 48px;
     /* comfortable click / tap height */
-    --nav-item-gap: 6px;
-    /* breathing room between tabs   */
+    --nav-item-gap: 3px;
+    /* gap between tabs (same as faculty) */
 }
 
-/* Tab list + footer: more air above, between and below */
 nav.sidebar .sidebar-links {
     gap: var(--nav-item-gap);
-    padding: 20px 12px 12px;
+    padding: 16px 12px 0;
 }
 
 nav.sidebar .sidebar-footer {
     gap: var(--nav-item-gap);
-    padding: 12px 12px 16px;
+    padding: 14px 12px 16px;
 }
 
 /* Every tab: one fixed height, the whole row is the click target */
 nav.sidebar .nav-item {
     min-height: var(--nav-item-h);
-    padding: 0 14px;
+    padding: 0 18px;
     gap: 14px;
-    font-size: 14px;
+    font-size: 0.95rem;
     line-height: 1.25;
-    border-radius: 12px;
+    border-radius: 10px;
 }
 
-/* Icons sit in a fixed box so every label starts at exactly the same x */
+/* Icons sit in a fixed box so every label starts at exactly the same x (same x as the faculty tabs) */
 nav.sidebar .nav-item>.material-symbols-outlined {
-    font-size: 22px;
-    width: 24px;
-    height: 24px;
-    flex: 0 0 24px;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -9618,9 +9624,9 @@ nav.sidebar .nav-item .nav-badge {
     flex-shrink: 0;
 }
 
-/* Log Out: a little extra distance from Settings so it is not hit by accident */
+/* Log Out is spaced exactly like every other tab (the faculty footer has no extra gap either) */
 nav.sidebar .nav-item.nav-signout {
-    margin-top: 6px;
+    margin-top: 0;
 }
 
 /* Icon rail (collapsed, desktop): square-ish centred targets */
@@ -9641,36 +9647,9 @@ nav.sidebar .nav-item.nav-signout {
     }
 }
 
-/* Phone drawer: bigger again for thumbs */
-@media (max-width: 768px) {
-    nav.sidebar {
-        --nav-item-h: 52px;
-    }
-
-    nav.sidebar .nav-item {
-        font-size: 15px;
-    }
-
-    nav.sidebar .sidebar-links {
-        padding-top: 16px;
-    }
-}
-
-/* Short laptop screens: tighten a little so nothing needs scrolling */
-@media (min-width: 769px) and (max-height: 600px) {
-    nav.sidebar {
-        --nav-item-h: 42px;
-        --nav-item-gap: 3px;
-    }
-
-    nav.sidebar .sidebar-links {
-        padding-top: 12px;
-    }
-
-    nav.sidebar .sidebar-footer {
-        padding-bottom: 10px;
-    }
-}
+/* Phone drawer and short windows: the tabs keep the same 48px size and 3px gap as on a big screen,
+   exactly like the faculty sidebar. When a window is too short the tab list scrolls instead of the
+   tabs shrinking (the old per-screen-size tweaks that made admin tabs 42px or 52px were removed). */
 
 /* ── Sidebar groups: small titles with a trailing separator line ──────────── */
 nav.sidebar .sidebar-links {
@@ -9694,6 +9673,7 @@ nav.sidebar .nav-group-title {
     gap: 10px;
     padding: 0 14px 2px;
     font-size: 10.5px;
+    line-height: 12px;
     font-weight: 600;
     letter-spacing: 0.9px;
     text-transform: uppercase;
@@ -9732,28 +9712,16 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
     }
 }
 
-/* Short laptop screens: slightly smaller tabs and tighter groups so the list doesn't need to scroll */
-@media (min-width: 769px) and (max-height: 700px) {
-    nav.sidebar {
-        --nav-item-h: 42px;
-        --nav-item-gap: 3px;
-    }
-
-    nav.sidebar .nav-group+.nav-group {
-        margin-top: 8px;
-        padding-top: 8px;
-        border-top: 1px solid var(--nav-line);
-    }
-
-    nav.sidebar .nav-group-title {
-        padding-bottom: 0;
-    }
-}
-
-/* Very short screens: drop the titles, keep the separating lines */
+/* Very short screens: drop the titles, keep the separating lines (same breakpoint and values as faculty) */
 @media (min-width: 769px) and (max-height: 560px) {
     nav.sidebar .nav-group-title {
         display: none;
+    }
+
+    nav.sidebar .nav-group+.nav-group {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid var(--nav-line);
     }
 }
 

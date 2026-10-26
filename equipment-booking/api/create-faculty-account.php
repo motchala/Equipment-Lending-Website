@@ -36,8 +36,9 @@ if (!admin_is_super_admin($conn)) {
 }
 
 // -- Input collection --------------------------------------------------------
-// NOTE: pupsync_email and faculty_id are NOT read from POST — they are
-// re-derived server-side from the registry to prevent client-side tampering.
+// NOTE: faculty_id is NEVER read from POST — it is taken from the registry row to prevent
+// client-side tampering. The PUPSync email is derived server-side too; POST may only carry an
+// optional `pupsync_email` that the admin corrected by hand (validated further down).
 $first_name          = trim($_POST['first_name'] ?? '');
 $last_name           = trim($_POST['last_name'] ?? '');
 $password_raw        = $_POST['password'] ?? '';
@@ -110,22 +111,32 @@ if ($registry_active) {
     // Derive faculty_id from registry (already validated format when uploaded)
     $faculty_id = strtoupper(trim((string)$reg_row['faculty_id']));
 
-    // Derive email server-side — NEVER trust the client-submitted value
-    $parts  = preg_split('/\s+/', trim($reg_row['full_name']));
-    $middle = '';
-    foreach ($parts as $p) {
-        if (preg_match('/^[A-Za-z]\.$/', $p)) {
-            $middle = strtoupper(substr($p, 0, 1));
-            break;
-        }
-    }
-    $base_email    = faculty_email_generate($first_name, $last_name);
+    // Suggested email, derived server-side from the registry name: the surname is everything
+    // after the middle initial ("Edmundo B. Dela Cruz" -> edmundo.delacruz@...), or the last word
+    // when there is no initial. (The admin may still correct it, see below.)
+    $parts         = faculty_registry_name_parts((string)$reg_row['full_name']);
+    $middle        = $parts['middle'];
+    $base_email    = faculty_email_generate($parts['first'], $parts['last']);
     $pupsync_email = faculty_email_resolve_conflict($conn, $base_email, $middle);
 } else {
     // Registry not yet active: use placeholder ID and generate email normally
     $faculty_id    = faculty_id_make_placeholder();
     $base_email    = faculty_email_generate($first_name, $last_name);
     $pupsync_email = faculty_email_resolve_conflict($conn, $base_email, '');
+}
+
+// -- Email corrected by the admin (optional) ----------------------------------
+// The suggestion comes from the name, which cannot tell every surname apart (a registry name
+// without a middle initial, "Maria Dela Cruz", reads as surname "Cruz"), so the admin may fix it.
+// Whatever is sent must be a valid @pupsync.edu address, and the duplicate check below still
+// applies. The Faculty ID is NOT editable: it only ever comes from the registry row above.
+$custom_email_raw = trim((string)($_POST['pupsync_email'] ?? ''));
+if ($custom_email_raw !== '') {
+    $custom_email = faculty_email_normalize($custom_email_raw);
+    if ($custom_email === null) {
+        send_json(422, 'error', 'Enter a valid PUPSync email address ending in @' . FACULTY_EMAIL_DOMAIN . '.');
+    }
+    $pupsync_email = $custom_email;
 }
 
 // -- Validation: password -----------------------------------------------------

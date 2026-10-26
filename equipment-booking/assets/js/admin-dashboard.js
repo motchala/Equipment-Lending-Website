@@ -1773,16 +1773,27 @@
         facLookupAlert.textContent = '';
     }
 
+    // True once the admin has typed in the email field themselves. Only then is the email sent
+    // to the server (otherwise the server derives it, exactly as before). The Faculty ID is
+    // read-only and is never sent: the server always takes it from the registry.
+    let _facEmailEdited = false;
+    (function () {
+        const emailEl = document.getElementById('fac-email');
+        if (emailEl) emailEl.addEventListener('input', function () { _facEmailEdited = true; });
+    })();
+
     function _applyRegistryMatch(match) {
         _facRegistryMatch = match;
         const emailEl = document.getElementById('fac-email');
         const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = match.email_preview || '';
         if (idEl) idEl.value = match.faculty_id || '';
+        _facEmailEdited = false; // a fresh suggestion replaces whatever was typed before
     }
 
     function _clearRegistryPreview() {
         _facRegistryMatch = null;
+        _facEmailEdited = false;
         const emailEl = document.getElementById('fac-email');
         const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = '';
@@ -1848,11 +1859,19 @@
                         return;
                     }
                     if (data.status === 'not_found') {
-                        _showLookupAlert(
-                            firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
-                            'Check the spelling or upload an updated registry file.',
-                            true
-                        );
+                        let msg = firstName + ' ' + lastName + ' was not found in the faculty registry. ';
+                        const hints = Array.isArray(data.hints) ? data.hints : [];
+                        if (hints.length) {
+                            // e.g. "Cruz" typed for "Edmundo B. Dela Cruz": show how to enter it so it matches
+                            msg += 'Did you mean ' + hints.map(function (h) {
+                                return '\u201C' + h.full_name + '\u201D (First name \u201C' + h.first + '\u201D, Last name \u201C' + h.last + '\u201D)';
+                            }).join(' or ') + '?';
+                        } else {
+                            msg += 'Check the spelling or upload an updated registry file. ' +
+                                'A surname of more than one word (like Dela Cruz) must be typed in full under Last name; ' +
+                                'if the registry shows no middle initial, only its last word counts as the last name.';
+                        }
+                        _showLookupAlert(msg, true);
                         return;
                     }
                     if (data.status === 'found' && data.matches && data.matches.length === 1) {
@@ -2011,6 +2030,10 @@
                 _showFacAlert('An organization must be selected for an adviser.', true);
                 return;
             }
+            if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
+                _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
+                return;
+            }
 
             facSubmitBtn.disabled = true;
             facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;animation:spin 0.8s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Creating...';
@@ -2024,6 +2047,8 @@
                 is_org_adviser: isAdviser,
                 organization_id: orgId
             });
+            // Only an email the admin changed by hand is sent; otherwise the server derives it.
+            if (_facEmailEdited && email) body.append('pupsync_email', email);
 
             fetch('equipment-booking/api/create-faculty-account.php', {
                 method: 'POST',
