@@ -650,7 +650,32 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#800000">
+    <!-- Phone detection. Runs BEFORE first paint so a phone never flashes the desktop layout.
+         Sets class "rx-mobile" on <html> when the device is a phone (or the window is <= 600px wide).
+         Tablets/desktops do not get it and keep the responsive layout. -->
+    <script nonce="<?php echo $csp_nonce; ?>">
+        (function() {
+            var d = document.documentElement;
+
+            function phoneUA() {
+                var u = navigator.userAgentData;
+                if (u && typeof u.mobile === "boolean") return u.mobile;
+                return /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|BlackBerry|Opera Mini|Mobile.+Firefox/i.test(navigator.userAgent || "");
+            }
+
+            function apply() {
+                var narrow = (window.innerWidth || 0) <= 600;
+                var shortSide = Math.min(screen.width || 9999, screen.height || 9999);
+                var phone = phoneUA() && shortSide <= 540; // phones stay in phone mode in landscape too
+                d.classList.toggle("rx-mobile", narrow || phone);
+            }
+            apply();
+            window.addEventListener("resize", apply);
+            window.addEventListener("orientationchange", apply);
+        })();
+    </script>
     <meta name="csrf-token" content="<?php echo htmlspecialchars(csrf_token()); ?>">
     <title>PUPSync | Faculty Dashboard</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
@@ -2772,6 +2797,8 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <!-- Responsive System. Loaded LAST on purpose: the inline <style> block above uses !important
          and sets the desktop layout, so these mobile/tablet overrides only win if they come after it. -->
     <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-responsive.css'); ?>">
+    <!-- Phone app layout (only active when <html class="rx-mobile">) -->
+    <link rel="stylesheet" href="equipment-booking/assets/css/faculty-dashboard-mobile.css?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/css/faculty-dashboard-mobile.css'); ?>">
     <?php role_splash_head(); ?>
 </head>
 
@@ -5337,6 +5364,7 @@ $profile_pic_url  = ($profile_pic_file !== '' && is_file($profile_pic_path))
     <script src="equipment-booking/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
     <script src="equipment-booking/assets/js/faculty-dashboard-responsive.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard-responsive.js'); ?>" defer></script>
+    <script src="equipment-booking/assets/js/faculty-dashboard-mobile.js?v=<?php echo @filemtime(__DIR__ . '/equipment-booking/assets/js/faculty-dashboard-mobile.js'); ?>" defer></script>
 </body>
 
 </html>
