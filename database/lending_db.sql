@@ -361,6 +361,30 @@ CREATE TABLE `tbl_faculty_registry` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_faculty_registry_files`
+--
+
+CREATE TABLE `tbl_faculty_registry_files` (
+  `id` int(11) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `stored_name` varchar(64) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `file_size` int(10) UNSIGNED NOT NULL,
+  `sha256` char(64) NOT NULL,
+  `import_mode` enum('merge','replace') NOT NULL DEFAULT 'merge',
+  `row_count` int(11) DEFAULT NULL,
+  `inserted_count` int(11) DEFAULT NULL,
+  `updated_count` int(11) DEFAULT NULL,
+  `skipped_count` int(11) DEFAULT NULL,
+  `status` enum('uploaded','imported') NOT NULL DEFAULT 'uploaded',
+  `uploaded_by` varchar(255) NOT NULL,
+  `uploaded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `imported_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_inventory`
 --
 
@@ -952,6 +976,14 @@ ALTER TABLE `tbl_faculty_registry`
   ADD UNIQUE KEY `uq_registry_faculty_id` (`faculty_id`);
 
 --
+-- Indexes for table `tbl_faculty_registry_files`
+--
+ALTER TABLE `tbl_faculty_registry_files`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_registry_file_stored` (`stored_name`),
+  ADD KEY `idx_registry_file_uploaded` (`uploaded_at`);
+
+--
 -- Indexes for table `tbl_inventory`
 --
 ALTER TABLE `tbl_inventory`
@@ -1123,6 +1155,12 @@ ALTER TABLE `tbl_faculty_notif_state`
 --
 ALTER TABLE `tbl_faculty_registry`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=558;
+
+--
+-- AUTO_INCREMENT for table `tbl_faculty_registry_files`
+--
+ALTER TABLE `tbl_faculty_registry_files`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbl_inventory`

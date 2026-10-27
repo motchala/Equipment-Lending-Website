@@ -8385,6 +8385,28 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     font-size: 12px;
 }
 
+.fac-nomatch {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-light);
+}
+
+.fac-nomatch[hidden] {
+    display: none;
+}
+
+.fac-nomatch .material-symbols-outlined {
+    display: block;
+    margin: 0 auto 10px;
+    font-size: 40px;
+    opacity: 0.3;
+}
+
+/* the last row on a page sits right above the pager's own top rule */
+.fac-table tbody tr.fac-row-last td {
+    border-bottom: none;
+}
+
 .fac-table td {
     vertical-align: middle;
 }
@@ -12929,6 +12951,166 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 
 .fac-reg-view-row[hidden] {
     display: none;
+}
+
+/* a hidden button inside the row (e.g. "View registry list" while the registry is empty) */
+.fac-reg-view-row [hidden] {
+    display: none !important;
+}
+
+.fac-reg-files-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    background: var(--accent-maroon);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ── Imported files modal ── */
+.fac-reg-files-body {
+    max-height: min(64vh, 560px);
+    overflow-y: auto;
+}
+
+.fac-reg-files-note {
+    margin: 0 0 0.9rem;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-light);
+}
+
+.fac-files-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.fac-file {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--khaki-border);
+    border-radius: 12px;
+    background: var(--card-bg);
+}
+
+.fac-file.is-missing {
+    border-style: dashed;
+}
+
+.fac-file-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-light);
+    color: var(--accent-maroon);
+}
+
+.fac-file-icon.is-xlsx {
+    background: rgba(30, 158, 74, 0.12);
+    color: #1e9e4a;
+}
+
+.fac-file-icon .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.fac-file-main {
+    min-width: 0;
+}
+
+.fac-file-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-dark);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fac-file-meta {
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.fac-file-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.fac-file-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid var(--khaki-border);
+    background: var(--secondary-cream);
+    color: var(--text-light);
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.fac-file-chip.is-latest {
+    background: var(--accent-maroon);
+    border-color: var(--accent-maroon);
+    color: #fff;
+}
+
+.fac-file-chip.is-warn {
+    background: rgba(217, 119, 6, 0.12);
+    border-color: rgba(217, 119, 6, 0.45);
+    color: #b45309;
+}
+
+.fac-file-chip.is-bad {
+    background: rgba(217, 48, 37, 0.1);
+    border-color: rgba(217, 48, 37, 0.4);
+    color: #c0392b;
+}
+
+.fac-file-result {
+    font-size: 11.5px;
+    color: var(--text-light);
+}
+
+.fac-file-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+    .fac-file {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .fac-file-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
 }
 
 .fac-reg-view-row .ps-btn .material-symbols-outlined {

@@ -16,3 +16,7 @@ Thumbs.db
 # Fred local stuff
 .amazonq/
 importing.md
+
+# Faculty Registry originals (private; only the folder's .htaccess is tracked)
+/uploads/faculty_registry/*
+!/uploads/faculty_registry/.htaccess

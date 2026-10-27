@@ -1,0 +1,11 @@
+# Faculty Registry originals are never served directly.
+# They are only available through equipment-booking/api/get-faculty-registry-file.php
+# (Super Admin + password).
+Options -Indexes
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

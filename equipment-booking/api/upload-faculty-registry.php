@@ -10,6 +10,8 @@ declare(strict_types=1);
  *   csrf_token  string
  *   rows        array of { faculty_id: string|"NEWLY HIRED", full_name: string, department?: string }
  *   replace_all bool  — if true, clears the table first (full re-import)
+ *   file_id     int   — the ORIGINAL file, already stored by upload-faculty-registry-file.php;
+ *                       required, so every import is backed by the exact file it came from
  *
  * Returns: { status, inserted, updated, skipped, errors: string[] }
  */
@@ -67,6 +69,26 @@ if (!is_array($rows_input) || empty($rows_input)) {
 }
 if (count($rows_input) > 5000) {
     ur_respond(422, ['status' => 'error', 'error' => 'Too many rows. Maximum is 5,000 per upload.']);
+}
+
+// The original file must have been stored first (upload-faculty-registry-file.php) so the
+// import is recorded together with the exact file it came from. Checked BEFORE anything
+// is changed, so a missing file never leaves a half-recorded import behind.
+require_once __DIR__ . '/../core/faculty-registry-files.php';
+frf_ensure_table($conn);
+$file_id   = (int)($body['file_id'] ?? 0);
+$file_name = '';
+if ($file_id > 0 && ($fst = $conn->prepare("SELECT original_name FROM tbl_faculty_registry_files WHERE id = ? AND status = 'uploaded' LIMIT 1"))) {
+    $fst->bind_param('i', $file_id);
+    $fst->execute();
+    $fres = $fst->get_result();
+    if ($fres && $fres->num_rows === 1) {
+        $file_name = (string)$fres->fetch_assoc()['original_name'];
+    }
+    $fst->close();
+}
+if ($file_name === '') {
+    ur_respond(422, ['status' => 'error', 'error' => 'The original file was not saved with this import. Please refresh the page and choose the file again.']);
 }
 
 // Ensure table exists (self-healing)
@@ -180,11 +202,26 @@ foreach ($rows_input as $i => $row) {
 $stmt_id->close();
 $stmt_name->close();
 
+// Record the outcome against the stored original file
+$mode  = $replace_all ? 'replace' : 'merge';
+$total = count($rows_input);
+if ($ust = $conn->prepare(
+    "UPDATE tbl_faculty_registry_files
+        SET status = 'imported', import_mode = ?, row_count = ?, inserted_count = ?,
+            updated_count = ?, skipped_count = ?, imported_at = NOW()
+      WHERE id = ?"
+)) {
+    $ust->bind_param('siiiii', $mode, $total, $inserted, $updated, $skipped, $file_id);
+    $ust->execute();
+    $ust->close();
+}
+
 require_once __DIR__ . '/../../config/admin-activity.php';
 admin_log_activity(
     $conn,
     'faculty',
     'Uploaded faculty registry: ' . $inserted . ' inserted, ' . $updated . ' updated, ' . $skipped . ' skipped'
+        . ' (file: ' . mb_strimwidth($file_name, 0, 80, '…') . ($replace_all ? ', replaced the whole registry' : '') . ')'
 );
 
 // Count total entries now in the registry for the badge update
