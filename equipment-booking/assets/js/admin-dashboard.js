@@ -1471,6 +1471,143 @@
         render();
     }
 
+    /* ── Faculty list: client-side search + pagination (10 per page) ──
+       Mirrors setupInventoryList(): every <tr[data-faculty-id]> is rendered by
+       PHP (or swapped in by adminRefreshFacultyList, or removed by the delete
+       flow) and this only shows/hides them: filter by the search box, then show
+       10 rows per page. A MutationObserver re-renders whenever rows are added or
+       removed, so none of that other code needs to know the list is paged. */
+    function setupFacultyList() {
+        const PAGE_SIZE = 10;
+        const body = document.getElementById('faculty-list-tbody');
+        if (!body) return;
+
+        const input = document.getElementById('fac-search-input');
+        const noMatch = document.getElementById('fac-nomatch');
+        const pager = document.getElementById('fac-pager');
+        const info = document.getElementById('fac-pager-info');
+        const ctl = document.getElementById('fac-pager-ctl');
+        const nums = document.getElementById('fac-pg-nums');
+        const prevBtn = document.getElementById('fac-pg-prev');
+        const nextBtn = document.getElementById('fac-pg-next');
+        let query = '';
+        let page = 1;
+
+        // Rows are looked up on every render: the tbody's contents get replaced after
+        // an account is created and removed after one is deleted.
+        function getRows() {
+            return Array.from(body.querySelectorAll('tr[data-faculty-id]'));
+        }
+
+        function matches(row) {
+            return !query || row.textContent.toLowerCase().includes(query);
+        }
+
+        // 1 … 4 5 6 … 12 — always first, last and the current page ±1.
+        function pageList(total, current) {
+            const keep = new Set([1, total, current - 1, current, current + 1]);
+            const list = [];
+            let last = 0;
+            Array.from(keep).filter(function (n) { return n >= 1 && n <= total; })
+                .sort(function (x, y) { return x - y; })
+                .forEach(function (n) {
+                    if (n - last > 1) list.push('gap');
+                    list.push(n);
+                    last = n;
+                });
+            return list;
+        }
+
+        function render() {
+            const rows = getRows();
+            const hits = rows.filter(matches);
+            const total = hits.length;
+            const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+            page = Math.min(Math.max(page, 1), pages);
+            const start = (page - 1) * PAGE_SIZE;
+            const end = Math.min(start + PAGE_SIZE, total);
+            const visible = new Set(hits.slice(start, end));
+
+            rows.forEach(function (row) {
+                row.classList.toggle('inv-row-hidden', !visible.has(row));
+                row.classList.remove('fac-row-last');
+            });
+            if (visible.size) hits[end - 1].classList.add('fac-row-last');   // last row on the page: no bottom rule above the footer
+            if (noMatch) noMatch.hidden = !(rows.length > 0 && total === 0);
+
+            if (!pager) return;
+            pager.hidden = rows.length === 0;
+            if (info) {
+                info.textContent = total
+                    ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
+                    : 'No results';
+            }
+            if (ctl) ctl.hidden = pages <= 1;
+            if (prevBtn) prevBtn.disabled = page <= 1;
+            if (nextBtn) nextBtn.disabled = page >= pages;
+            if (nums) {
+                nums.textContent = '';
+                pageList(pages, page).forEach(function (n) {
+                    if (n === 'gap') {
+                        const gap = document.createElement('span');
+                        gap.className = 'inv-pager-gap';
+                        gap.textContent = '\u2026';
+                        nums.appendChild(gap);
+                        return;
+                    }
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'inv-pager-btn' + (n === page ? ' is-active' : '');
+                    btn.dataset.page = String(n);
+                    btn.textContent = String(n);
+                    btn.setAttribute('aria-label', 'Page ' + n);
+                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    nums.appendChild(btn);
+                });
+            }
+        }
+
+        if (input) {
+            input.addEventListener('input', function () {
+                query = this.value.trim().toLowerCase();
+                page = 1;
+                render();
+            });
+        }
+        if (prevBtn) prevBtn.addEventListener('click', function () { page--; render(); });
+        if (nextBtn) nextBtn.addEventListener('click', function () { page++; render(); });
+        if (nums) {
+            nums.addEventListener('click', function (e) {
+                const btn = e.target.closest('[data-page]');
+                if (!btn) return;
+                page = parseInt(btn.dataset.page, 10) || 1;
+                render();
+            });
+        }
+
+        // Rows added / removed (account created, account deleted, list refreshed):
+        // re-page. Only class changes happen while rendering, so this can't loop.
+        if (window.MutationObserver) {
+            new MutationObserver(render).observe(body, { childList: true });
+        }
+
+        // After a refresh, show the page that holds the account(s) that weren't there
+        // before (a new account is sorted by name, so it may sit on any page). Clears
+        // any search so the new row is guaranteed to be listed.
+        window.psFacultyListRevealNew = function (previousEmails) {
+            const before = new Set((previousEmails || []).map(function (e) { return String(e || '').toLowerCase(); }));
+            const pos = getRows().findIndex(function (r) { return !before.has(String(r.dataset.email || '').toLowerCase()); });
+            if (pos >= 0) {
+                query = '';
+                if (input) input.value = '';
+                page = Math.floor(pos / PAGE_SIZE) + 1;
+            }
+            render();
+        };
+
+        render();
+    }
+
     /* ── Master event delegation ─────────────────────────────── */
     document.addEventListener('click', function (e) {
         const el = e.target.closest('[data-action]');
@@ -1773,16 +1910,27 @@
         facLookupAlert.textContent = '';
     }
 
+    // True once the admin has typed in the email field themselves. Only then is the email sent
+    // to the server (otherwise the server derives it, exactly as before). The Faculty ID is
+    // read-only and is never sent: the server always takes it from the registry.
+    let _facEmailEdited = false;
+    (function () {
+        const emailEl = document.getElementById('fac-email');
+        if (emailEl) emailEl.addEventListener('input', function () { _facEmailEdited = true; });
+    })();
+
     function _applyRegistryMatch(match) {
         _facRegistryMatch = match;
         const emailEl = document.getElementById('fac-email');
         const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = match.email_preview || '';
         if (idEl) idEl.value = match.faculty_id || '';
+        _facEmailEdited = false; // a fresh suggestion replaces whatever was typed before
     }
 
     function _clearRegistryPreview() {
         _facRegistryMatch = null;
+        _facEmailEdited = false;
         const emailEl = document.getElementById('fac-email');
         const idEl = document.getElementById('fac-faculty-id');
         if (emailEl) emailEl.value = '';
@@ -1848,11 +1996,19 @@
                         return;
                     }
                     if (data.status === 'not_found') {
-                        _showLookupAlert(
-                            firstName + ' ' + lastName + ' was not found in the faculty registry. ' +
-                            'Check the spelling or upload an updated registry file.',
-                            true
-                        );
+                        let msg = firstName + ' ' + lastName + ' was not found in the faculty registry. ';
+                        const hints = Array.isArray(data.hints) ? data.hints : [];
+                        if (hints.length) {
+                            // e.g. "Cruz" typed for "Edmundo B. Dela Cruz": show how to enter it so it matches
+                            msg += 'Did you mean ' + hints.map(function (h) {
+                                return '\u201C' + h.full_name + '\u201D (First name \u201C' + h.first + '\u201D, Last name \u201C' + h.last + '\u201D)';
+                            }).join(' or ') + '?';
+                        } else {
+                            msg += 'Check the spelling or upload an updated registry file. ' +
+                                'A surname of more than one word (like Dela Cruz) must be typed in full under Last name; ' +
+                                'if the registry shows no middle initial, only its last word counts as the last name.';
+                        }
+                        _showLookupAlert(msg, true);
                         return;
                     }
                     if (data.status === 'found' && data.matches && data.matches.length === 1) {
@@ -2011,6 +2167,10 @@
                 _showFacAlert('An organization must be selected for an adviser.', true);
                 return;
             }
+            if (_facEmailEdited && email && !/^[^\s@]+@pupsync\.edu$/i.test(email)) {
+                _showFacAlert('The PUPSync email must be a valid address ending in @pupsync.edu.', true);
+                return;
+            }
 
             facSubmitBtn.disabled = true;
             facSubmitBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:middle;margin-right:6px;animation:spin 0.8s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Creating...';
@@ -2024,6 +2184,8 @@
                 is_org_adviser: isAdviser,
                 organization_id: orgId
             });
+            // Only an email the admin changed by hand is sent; otherwise the server derives it.
+            if (_facEmailEdited && email) body.append('pupsync_email', email);
 
             fetch('equipment-booking/api/create-faculty-account.php', {
                 method: 'POST',
@@ -3499,6 +3661,7 @@
         setupLiveSearch('approvedSearch', 'approved-list', 'approved');
         setupLiveSearch('declinedSearch', 'declined-list', 'declined');
         setupInventoryList(); // client-side search + 10-per-page pagination — see note near its definition
+        setupFacultyList(); // same for the Faculty list
         setupLiveSearch('rawSearch', 'raw-data-body', 'raw');
 
         // ── Arbitration log search (client-side filter) ──────────────────
@@ -6037,18 +6200,39 @@ function psSelectFmt(btn) {
                 return;
             }
 
+            var originalFile = fileInput && fileInput.files && fileInput.files[0];
+            if (!originalFile) {
+                showRegAlert('Please choose the file again, so the original can be saved with the import.', true);
+                return;
+            }
+
             importBtn.disabled = true;
             importBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Importing\u2026';
 
-            fetch('equipment-booking/api/upload-faculty-registry.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    csrf_token: csrfToken,
-                    rows: _parsedRows,
-                    replace_all: replaceChk ? replaceChk.checked : false
+            // 1) keep the ORIGINAL file (recorded with who / when), then 2) import the rows read from it.
+            //    If the original can't be saved, nothing is imported, so every import has its file on record.
+            var fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fd.append('file', originalFile);
+            fetch('equipment-booking/api/upload-faculty-registry-file.php', { method: 'POST', body: fd })
+                .then(function (r) { return r.json().catch(function () { return null; }); })
+                .then(function (stored) {
+                    if (!stored || stored.status !== 'success') {
+                        var saveErr = new Error('original file not saved');
+                        saveErr.saveError = (stored && stored.error) || 'The original file could not be saved, so nothing was imported.';
+                        throw saveErr;
+                    }
+                    return fetch('equipment-booking/api/upload-faculty-registry.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            csrf_token: csrfToken,
+                            rows: _parsedRows,
+                            replace_all: replaceChk ? replaceChk.checked : false,
+                            file_id: stored.file_id
+                        })
+                    });
                 })
-            })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.status === 'success') {
@@ -6077,15 +6261,22 @@ function psSelectFmt(btn) {
                         }
 
                         // Show the "View registry list" button once the registry has entries
-                        var viewRow = document.getElementById('fac-reg-view-row');
-                        if (viewRow && typeof data.total_after !== 'undefined') viewRow.hidden = !(data.total_after > 0);
+                        var viewBtnEl = document.getElementById('fac-reg-view-btn');
+                        if (viewBtnEl && typeof data.total_after !== 'undefined') viewBtnEl.hidden = !(data.total_after > 0);
+
+                        // One more file in the "Imported files" history
+                        var filesCountEl = document.getElementById('fac-reg-files-count');
+                        if (filesCountEl) {
+                            filesCountEl.textContent = String((parseInt(filesCountEl.textContent, 10) || 0) + 1);
+                            filesCountEl.hidden = false;
+                        }
                     } else {
                         showRegAlert(data.error || 'Import failed. Please try again.', true);
                         if (importBtn) importBtn.disabled = false;
                     }
                 })
-                .catch(function () {
-                    showRegAlert('Network error. Please try again.', true);
+                .catch(function (err) {
+                    showRegAlert(err && err.saveError ? err.saveError : 'Network error. Please try again.', true);
                     if (importBtn) importBtn.disabled = false;
                 })
                 .finally(function () {
@@ -6118,6 +6309,8 @@ function psSelectFmt(btn) {
 
     var RENDER_LIMIT = 200;   // rows drawn at once; the search box narrows the rest
     var _rows = [];           // entries held in memory only while the list modal is open
+    var _files = [];          // imported-files history, likewise only while its modal is open
+    var _fileToken = '';      // short-lived (10 min) key for View / Download; the password itself is never kept
 
     function $(id) { return document.getElementById(id); }
     function csrfToken() {
@@ -6142,6 +6335,28 @@ function psSelectFmt(btn) {
 
         var okBtnHtml = okBtn.innerHTML;
 
+        /* The same password step guards two things: the registry list, and the original files that were imported. */
+        var filesBtn = $('fac-reg-files-btn');
+        var authMode = 'registry';
+        var AUTH = {
+            registry: {
+                title: 'View Faculty Registry',
+                lead: 'The registry holds every faculty ID and name. Enter your password to open it.',
+                url: 'equipment-booking/api/view-faculty-registry.php'
+            },
+            files: {
+                title: 'Imported Files',
+                lead: 'The original files contain every faculty ID and name. Enter your password to open them.',
+                url: 'equipment-booking/api/list-faculty-registry-files.php'
+            }
+        };
+        function setAuthMode(mode) {
+            authMode = mode;
+            var t = $('fac-reg-auth-title'), l = $('fac-reg-auth-lead');
+            if (t) t.textContent = AUTH[mode].title;
+            if (l) l.textContent = AUTH[mode].lead;
+        }
+
         function showAuthError(msg) {
             errBox.textContent = msg;
             errBox.classList.remove('hidden');
@@ -6160,10 +6375,19 @@ function psSelectFmt(btn) {
 
         /* ── Step 1: password prompt ───────────────────────────── */
         viewBtn.addEventListener('click', function () {
+            setAuthMode('registry');
             resetAuth();
             openModal('fac-reg-auth-modal');
             setTimeout(function () { pwInput.focus(); }, 50);
         });
+        if (filesBtn) {
+            filesBtn.addEventListener('click', function () {
+                setAuthMode('files');
+                resetAuth();
+                openModal('fac-reg-auth-modal');
+                setTimeout(function () { pwInput.focus(); }, 50);
+            });
+        }
 
         ['fac-reg-auth-close', 'fac-reg-auth-cancel'].forEach(function (id) {
             var el = $(id);
@@ -6184,7 +6408,7 @@ function psSelectFmt(btn) {
             okBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Checking\u2026';
             clearAuthError();
 
-            fetch('equipment-booking/api/view-faculty-registry.php', {
+            fetch(AUTH[authMode].url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
@@ -6198,13 +6422,21 @@ function psSelectFmt(btn) {
                     });
                 })
                 .then(function (data) {
-                    if (data && data.status === 'success' && Array.isArray(data.entries)) {
+                    if (authMode === 'files' && data && data.status === 'success' && Array.isArray(data.files)) {
+                        _files = data.files;
+                        _fileToken = data.access_token || '';
+                        resetAuth();                       // wipe the password straight away
+                        closeModal('fac-reg-auth-modal');
+                        openFiles();
+                    } else if (authMode === 'registry' && data && data.status === 'success' && Array.isArray(data.entries)) {
                         _rows = data.entries;
                         resetAuth();                       // wipe the password straight away
                         closeModal('fac-reg-auth-modal');
                         openList();
                     } else {
-                        showAuthError((data && data.error) || 'Could not open the registry. Please try again.');
+                        showAuthError((data && data.error) || (authMode === 'files'
+                            ? 'Could not open the files. Please try again.'
+                            : 'Could not open the registry. Please try again.'));
                         if (data && data.code === 'bad_password') { pwInput.value = ''; pwInput.focus(); }
                     }
                 })
@@ -6272,6 +6504,192 @@ function psSelectFmt(btn) {
             if (el) el.addEventListener('click', function () { closeModal('fac-reg-list-modal'); });
         });
 
+
+        /* ── Imported files: history of every original file, with View / Download ── */
+        var filesList = $('fac-reg-files-list');
+        var filesEmpty = $('fac-reg-files-empty');
+        var filesAlert = $('fac-reg-files-alert');
+        var filesTotal = $('fac-reg-files-total');
+        var filesMeta = $('fac-reg-files-meta');
+        var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        function node(tag, cls, text) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (text != null) n.textContent = text;
+            return n;
+        }
+        function fmtSize(n) {
+            if (n < 1024) return n + ' B';
+            if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+            return (n / 1048576).toFixed(1) + ' MB';
+        }
+        // "2026-10-22 15:10:05" (as stored) -> "Oct 22, 2026 3:10 PM"
+        function fmtWhen(str) {
+            var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(str || '');
+            if (!m) return str || '';
+            var h = parseInt(m[4], 10), ap = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return MONTHS[parseInt(m[2], 10) - 1] + ' ' + parseInt(m[3], 10) + ', ' + m[1] + ' ' + h + ':' + m[5] + ' ' + ap;
+        }
+        function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
+        function showFilesAlert(msg) {
+            if (!filesAlert) return;
+            filesAlert.textContent = msg;
+            filesAlert.classList.remove('hidden');
+        }
+        function clearFilesAlert() {
+            if (!filesAlert) return;
+            filesAlert.textContent = '';
+            filesAlert.classList.add('hidden');
+        }
+
+        function actionBtn(label, icon, cls, disabled, onClick) {
+            var b = node('button', 'ps-btn ps-btn--sm ' + cls);
+            b.type = 'button';
+            b.disabled = !!disabled;
+            b.appendChild(node('span', 'material-symbols-outlined', icon));
+            b.appendChild(document.createTextNode(' ' + label));
+            b.addEventListener('click', function () { onClick(b); });
+            return b;
+        }
+
+        function renderFiles() {
+            filesList.textContent = '';
+            var latestId = null;                         // newest file that was actually imported
+            _files.some(function (f) { if (f.status === 'imported') { latestId = f.id; return true; } return false; });
+
+            _files.forEach(function (f) {
+                var isPdf = f.mime === 'application/pdf';
+                var li = node('li', 'fac-file' + (f.available ? '' : ' is-missing'));
+
+                var icon = node('span', 'fac-file-icon ' + (isPdf ? 'is-pdf' : 'is-xlsx'));
+                icon.appendChild(node('span', 'material-symbols-outlined', isPdf ? 'picture_as_pdf' : 'table_view'));
+
+                var main = node('div', 'fac-file-main');
+                var name = node('div', 'fac-file-name', f.name);
+                name.title = f.name;
+                main.appendChild(name);
+                main.appendChild(node('div', 'fac-file-meta',
+                    fmtSize(f.size) + ' \u00b7 Uploaded by ' + f.uploaded_by + ' \u00b7 ' + fmtWhen(f.uploaded_at)));
+
+                var chips = node('div', 'fac-file-chips');
+                if (f.status === 'imported') {
+                    if (f.id === latestId) chips.appendChild(node('span', 'fac-file-chip is-latest', 'Latest import'));
+                    chips.appendChild(node('span', 'fac-file-chip' + (f.import_mode === 'replace' ? ' is-warn' : ''),
+                        f.import_mode === 'replace' ? 'Replaced the whole registry' : 'Added to the registry'));
+                    chips.appendChild(node('span', 'fac-file-result',
+                        (f.inserted || 0) + ' added \u00b7 ' + (f.updated || 0) + ' updated \u00b7 ' + (f.skipped || 0) + ' skipped' +
+                        (f.rows != null ? ' (of ' + plural(f.rows, 'row', 'rows') + ')' : '')));
+                } else {
+                    var nc = node('span', 'fac-file-chip is-bad', 'Not imported');
+                    nc.title = 'This file was saved, but the import did not finish.';
+                    chips.appendChild(nc);
+                }
+                if (!f.available) chips.appendChild(node('span', 'fac-file-chip is-bad', 'File missing on the server'));
+                main.appendChild(chips);
+
+                var actions = node('div', 'fac-file-actions');
+                if (isPdf) actions.appendChild(actionBtn('View', 'visibility', 'ps-btn--outline', !f.available, function (b) { viewFile(f, b); }));
+                actions.appendChild(actionBtn('Download', 'download', 'ps-btn--ghost', !f.available, function (b) { downloadFile(f, b); }));
+
+                li.appendChild(icon);
+                li.appendChild(main);
+                li.appendChild(actions);
+                filesList.appendChild(li);
+            });
+
+            if (filesEmpty) filesEmpty.classList.toggle('hidden', _files.length > 0);
+            if (filesTotal) filesTotal.textContent = _files.length ? '(' + _files.length + ')' : '';
+            if (filesMeta) filesMeta.textContent = _files.length ? plural(_files.length, 'file', 'files') : '';
+            var cnt = $('fac-reg-files-count');           // keep the button's badge in step with the real count
+            if (cnt) { cnt.textContent = String(_files.length); cnt.hidden = _files.length === 0; }
+        }
+
+        function openFiles() {
+            clearFilesAlert();
+            renderFiles();
+            openModal('fac-reg-files-modal');
+        }
+
+        // The file comes back as a download-style response; failures come back as JSON.
+        function fetchFile(f, disposition) {
+            return fetch('equipment-booking/api/get-faculty-registry-file.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    csrf_token: csrfToken(),
+                    access_token: _fileToken,
+                    file_id: String(f.id),
+                    disposition: disposition
+                }).toString()
+            }).then(function (res) {
+                var ct = res.headers.get('Content-Type') || '';
+                if (!res.ok || ct.indexOf('application/json') === 0) {
+                    return res.json().catch(function () {
+                        return { error: 'Unexpected response from the server. Please try again.' };
+                    }).then(function (d) { throw d; });
+                }
+                return res.blob();
+            });
+        }
+
+        function fileFailed(d) {
+            if (d && d.code === 'token') {               // the 10-minute unlock ran out: ask for the password again
+                closeModal('fac-reg-files-modal');
+                setAuthMode('files');
+                resetAuth();
+                openModal('fac-reg-auth-modal');
+                showAuthError('Your access expired. Enter your password again.');
+                return;
+            }
+            showFilesAlert((d && d.error) || 'Could not open the file. Please try again.');
+        }
+
+        function saveBlob(blob, filename) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        }
+
+        function viewFile(f, btn) {
+            clearFilesAlert();
+            // Opened right inside the click, so the browser doesn't treat it as a blocked pop-up.
+            var w = window.open('', '_blank');
+            if (w) {
+                try { w.opener = null; w.document.title = f.name; w.document.body.textContent = 'Opening file\u2026'; } catch (e) { /* ignore */ }
+            }
+            btn.disabled = true;
+            fetchFile(f, 'inline').then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                if (w && !w.closed) w.location.href = url;   // the browser's own PDF viewer
+                else saveBlob(blob, f.name);                 // pop-ups blocked: download it instead
+                setTimeout(function () { URL.revokeObjectURL(url); }, 10 * 60 * 1000);
+            }).catch(function (d) {
+                if (w && !w.closed) w.close();
+                fileFailed(d);
+            }).finally(function () { btn.disabled = false; });
+        }
+
+        function downloadFile(f, btn) {
+            clearFilesAlert();
+            btn.disabled = true;
+            fetchFile(f, 'attachment').then(function (blob) {
+                saveBlob(blob, f.name);
+            }).catch(fileFailed).finally(function () { btn.disabled = false; });
+        }
+
+        ['fac-reg-files-close', 'fac-reg-files-done'].forEach(function (id) {
+            var el = $(id);
+            if (el) el.addEventListener('click', function () { closeModal('fac-reg-files-modal'); });
+        });
+
         /* ── Clean-up: however a modal gets closed (buttons, backdrop click,
               Esc), drop the registry data / password from the page ── */
         function watch(id, onClosed) {
@@ -6288,10 +6706,18 @@ function psSelectFmt(btn) {
             if (searchEl) searchEl.value = '';
             if (viewBtn) viewBtn.focus();
         });
+        watch('fac-reg-files-modal', function () {           // forget the file list and the access token
+            _files = [];
+            _fileToken = '';
+            if (filesList) filesList.textContent = '';
+            clearFilesAlert();
+            if (filesBtn) filesBtn.focus();
+        });
 
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (isOpen('fac-reg-list-modal')) closeModal('fac-reg-list-modal');
+            else if (isOpen('fac-reg-files-modal')) closeModal('fac-reg-files-modal');
             else if (isOpen('fac-reg-auth-modal')) closeModal('fac-reg-auth-modal');
         });
     }

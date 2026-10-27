@@ -3360,6 +3360,19 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                             $reg_status['last_by']   = (string)($rrow['last_by'] ?? '');
                         }
                     }
+
+                    // Original files kept for every import (equipment-booking/core/faculty-registry-files.php)
+                    $reg_files = ['count' => 0, 'last_name' => ''];
+                    if ($conn->query("SHOW TABLES LIKE 'tbl_faculty_registry_files'")->num_rows > 0) {
+                        $frs = $conn->query("SELECT COUNT(*) AS cnt FROM tbl_faculty_registry_files");
+                        if ($frs) {
+                            $reg_files['count'] = (int)($frs->fetch_assoc()['cnt'] ?? 0);
+                        }
+                        $frs = $conn->query("SELECT original_name FROM tbl_faculty_registry_files WHERE status = 'imported' ORDER BY imported_at DESC, id DESC LIMIT 1");
+                        if ($frs && ($frow = $frs->fetch_assoc())) {
+                            $reg_files['last_name'] = (string)$frow['original_name'];
+                        }
+                    }
                     ?>
 
                     <div class="faculty-layout">
@@ -3386,15 +3399,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <p style="font-size:12px;color:var(--text-light);margin:0 0 1rem">
                                             Last imported:
                                             <strong style="color:var(--text-dark)"><?= htmlspecialchars(date('M j, Y g:i A', strtotime($reg_status['last_date']))) ?></strong>
-                                            by <?= htmlspecialchars($reg_status['last_by']) ?> &mdash;
-                                            <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
+                                            by <?= htmlspecialchars($reg_status['last_by']) ?><?php if ($reg_files['last_name'] !== ''): ?> from <strong style="color:var(--text-dark)"><?= htmlspecialchars($reg_files['last_name']) ?></strong><?php endif; ?> &mdash;
+                                        <?= $reg_status['count'] ?> total <?= $reg_status['count'] === 1 ? 'entry' : 'entries' ?>
                                         </p>
                                     <?php endif; ?>
 
-                                    <!-- View the imported list (asks for the Super Admin password first) -->
-                                    <div class="fac-reg-view-row" id="fac-reg-view-row" <?= $reg_status['count'] > 0 ? '' : 'hidden' ?>>
-                                        <button type="button" id="fac-reg-view-btn" class="ps-btn ps-btn--outline ps-btn--sm">
+                                    <!-- View the imported list, and the original files that were imported
+                                         (both ask for the Super Admin password first) -->
+                                    <div class="fac-reg-view-row" id="fac-reg-view-row">
+                                        <button type="button" id="fac-reg-view-btn" class="ps-btn ps-btn--outline ps-btn--sm" <?= $reg_status['count'] > 0 ? '' : 'hidden' ?>>
                                             <span class="material-symbols-outlined">lock</span> View registry list
+                                        </button>
+                                        <button type="button" id="fac-reg-files-btn" class="ps-btn ps-btn--outline ps-btn--sm">
+                                            <span class="material-symbols-outlined">folder_open</span> Imported files
+                                            <span class="fac-reg-files-count" id="fac-reg-files-count" <?= $reg_files['count'] > 0 ? '' : 'hidden' ?>><?= (int)$reg_files['count'] ?></span>
                                         </button>
                                         <span class="fac-reg-view-hint">Asks for your password</span>
                                     </div>
@@ -3468,6 +3486,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
                                 </div>
+                                <small class="fac-field-hint" style="display:block;margin:-0.35rem 0 0.75rem">
+                                    Type the whole surname under Last name, e.g. <strong>Dela Cruz</strong>. In the registry, everything after the middle initial
+                                    (Edmundo B. <strong>Dela Cruz</strong>) is the surname; with no initial, the last word is.
+                                </small>
                                 <button type="button" id="fac-lookup-btn"
                                     class="ps-btn ps-btn--outline fac-lookup-btn">
                                     <span class="material-symbols-outlined">manage_search</span>
@@ -3488,9 +3510,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                     <label for="fac-email">PUPSync email</label>
                                     <input type="email" id="fac-email"
                                         class="form-control-custom" maxlength="254"
-                                        autocomplete="off" placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1">
-                                    <small class="fac-field-hint">Generated automatically. Not submitted — the server re-derives this.</small>
+                                        autocomplete="off" spellcheck="false" placeholder="Auto-filled after lookup">
+                                    <small class="fac-field-hint">Suggested from the registry name. You can edit it, for example when a surname has two words but no middle initial. It must end with @pupsync.edu.</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="fac-faculty-id">Faculty ID</label>
@@ -3498,8 +3519,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         class="form-control-custom" maxlength="30"
                                         autocomplete="off" spellcheck="false"
                                         placeholder="Auto-filled after lookup"
-                                        readonly tabindex="-1">
-                                    <small class="fac-field-hint">From the Faculty Identification Records. Permanent after account creation.</small>
+                                        readonly aria-readonly="true" tabindex="-1">
+                                    <small class="fac-field-hint">From the Faculty Identification Records. Cannot be edited, and is permanent after account creation.</small>
                                 </div>
 
                                 <div class="fac-edit-section">Password</div>
@@ -3681,6 +3702,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                                         <?php endif; ?>
                                     </tbody>
                                 </table>
+                                <div class="fac-nomatch" id="fac-nomatch" hidden>
+                                    <span class="material-symbols-outlined">search_off</span>
+                                    No faculty match your search.
+                                </div>
+                            </div>
+
+                            <!-- Pagination (10 per page, client-side; works together with the search box) -->
+                            <div class="inv-pager" id="fac-pager" hidden>
+                                <span class="inv-pager-info" id="fac-pager-info"></span>
+                                <div class="inv-pager-ctl" id="fac-pager-ctl" role="navigation" aria-label="Faculty list pages">
+                                    <button type="button" class="inv-pager-btn" id="fac-pg-prev" aria-label="Previous page">
+                                        <span class="material-symbols-outlined">chevron_left</span>
+                                    </button>
+                                    <div class="inv-pager-nums" id="fac-pg-nums"></div>
+                                    <button type="button" class="inv-pager-btn" id="fac-pg-next" aria-label="Next page">
+                                        <span class="material-symbols-outlined">chevron_right</span>
+                                    </button>
+                                </div>
                             </div>
                         </div><!-- /faculty-list-card -->
 
@@ -6940,13 +6979,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 <div class="ps-modal-head-icon ps-mhi--maroon">
                     <span class="material-symbols-outlined">lock</span>
                 </div>
-                <h3>View Faculty Registry</h3>
+                <h3 id="fac-reg-auth-title">View Faculty Registry</h3>
                 <button class="ps-modal-close" id="fac-reg-auth-close" aria-label="Close">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
             <div class="ps-modal-body">
-                <p class="fac-reg-auth-lead">The registry holds every faculty ID and name. Enter your password to open it.</p>
+                <p class="fac-reg-auth-lead" id="fac-reg-auth-lead">The registry holds every faculty ID and name. Enter your password to open it.</p>
                 <label class="fac-del-pw-label" for="fac-reg-auth-password">Your password</label>
                 <div class="fac-pw-wrap">
                     <input type="password" id="fac-reg-auth-password" class="form-control-custom"
@@ -7006,6 +7045,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
         </div>
     </div>
 
+    <!-- ================================================================
+     MODAL: IMPORTED FILES
+     Opened after the password step above. Lists every file imported into the
+     Faculty Registry (newest first) with View (PDF, in the browser) and Download.
+     The files themselves come from get-faculty-registry-file.php.
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="fac-reg-files-modal">
+        <div class="ps-modal ps-modal--lg fac-reg-files-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">folder_open</span>
+                </div>
+                <h3>Imported Files <span class="fac-count-badge" id="fac-reg-files-total"></span></h3>
+                <button class="ps-modal-close" id="fac-reg-files-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body fac-reg-files-body">
+                <p class="fac-reg-files-note">Every file imported into the registry is kept here exactly as it was uploaded. Files imported before this list existed were not kept.</p>
+                <p class="fac-del-error hidden" id="fac-reg-files-alert" role="alert"></p>
+                <ul class="fac-files-list" id="fac-reg-files-list"></ul>
+                <p class="fac-reg-list-empty hidden" id="fac-reg-files-empty">No files recorded yet. Files you import from now on will appear here.</p>
+            </div>
+            <div class="ps-modal-foot fac-reg-list-foot">
+                <span class="fac-reg-list-meta" id="fac-reg-files-meta"></span>
+                <button class="ps-btn ps-btn--ghost" id="fac-reg-files-done">Close</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Faculty Panel JS -->
     <script nonce="<?php echo $csp_nonce; ?>">
@@ -7028,18 +7097,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                 }
             }
 
-            /* Search filter */
-            var facSearch = document.getElementById('fac-search-input');
-            if (facSearch) {
-                facSearch.addEventListener('input', function() {
-                    var q = facSearch.value.toLowerCase();
-                    var table = document.getElementById('fac-list-table');
-                    if (!table) return;
-                    table.querySelectorAll('tbody tr').forEach(function(row) {
-                        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
-                    });
-                });
-            }
+            /* Search + 10-per-page pagination for this list live in admin-dashboard.js
+               (setupFacultyList), together, so the two never fight over which rows show. */
 
             /* Edit modal: keep a reference to the row currently being edited,
                so Save Changes can identify + update it after a successful save. */
@@ -7332,10 +7391,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     })
                     .then(function(json) {
                         if (json.status !== 'success') return;
+                        var before = _facTbody ? Array.prototype.map.call(_facTbody.querySelectorAll('tr[data-faculty-id]'), function(r) {
+                            return r.dataset.email;
+                        }) : [];
                         if (_facTbody) _facTbody.innerHTML = json.faculty_html;
                         // Edit buttons are wired via delegated listener on #fac-list-table,
                         // so no per-row re-binding is needed after the innerHTML swap.
                         _facRefreshCount();
+                        // The list is paged: show the page that holds the new account.
+                        if (typeof window.psFacultyListRevealNew === 'function') window.psFacultyListRevealNew(before);
                     })
                     .catch(function() {
                         if (typeof showToast === 'function') showToast('Could not refresh the faculty list. Please reload the page.');

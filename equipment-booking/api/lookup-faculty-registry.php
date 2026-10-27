@@ -64,22 +64,22 @@ if (!$count_res || (int)$count_res->fetch_assoc()['cnt'] === 0) {
 $matches = faculty_registry_lookup($conn, $first_name, $last_name);
 
 if (empty($matches)) {
-    lr_respond(200, ['status' => 'not_found', 'matches' => []]);
+    // 'hints' = "did you mean...?" entries (e.g. typed "Cruz" for "Edmundo B. Dela Cruz")
+    lr_respond(200, [
+        'status'  => 'not_found',
+        'matches' => [],
+        'hints'   => faculty_registry_hints($conn, $first_name, $last_name),
+    ]);
 }
 
 // For each match, generate the email preview
 $result = [];
 foreach ($matches as $row) {
-    // Extract middle initial from full_name for email conflict resolution
-    $parts   = preg_split('/\s+/', trim($row['full_name']));
-    $middle  = '';
-    foreach ($parts as $p) {
-        if (preg_match('/^[A-Za-z]\.$/', $p)) {
-            $middle = strtoupper(substr($p, 0, 1));
-            break;
-        }
-    }
-    $base_email = faculty_email_generate($first_name, $last_name);
+    // Name parts as the registry reads them: the surname is everything after the middle
+    // initial ("Edmundo B. Dela Cruz" -> "Dela Cruz"), or the last word when there is none.
+    $parts      = faculty_registry_name_parts((string)$row['full_name']);
+    $middle     = $parts['middle'];            // used to resolve email conflicts
+    $base_email = faculty_email_generate($parts['first'], $parts['last']);
     $email      = faculty_email_resolve_conflict($conn, $base_email, $middle);
     $result[] = [
         'registry_id'    => (int)$row['id'],
