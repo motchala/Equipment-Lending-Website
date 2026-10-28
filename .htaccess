@@ -1,5 +1,30 @@
 DirectoryIndex landing-page.php
 
+# ── Performance: GZIP compression ────────────────────────────────────────────
+# Compresses HTML, CSS, JS, JSON before sending over the network.
+# Reduces transfer size by ~70% — biggest single improvement on slow connections.
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript text/javascript text/plain text/xml application/json
+</IfModule>
+
+# ── Performance: Browser caching ──────────────────────────────────────────────
+# Tells the browser to reuse downloaded files instead of re-downloading every visit.
+# CSS/JS cached for 7 days; images/fonts cached for 30–90 days.
+# Cache is automatically busted by the ?v= version query strings already on JS/CSS tags.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css                       "access plus 7 days"
+    ExpiresByType application/javascript         "access plus 7 days"
+    ExpiresByType text/javascript                "access plus 7 days"
+    ExpiresByType image/jpeg                     "access plus 30 days"
+    ExpiresByType image/png                      "access plus 30 days"
+    ExpiresByType image/webp                     "access plus 30 days"
+    ExpiresByType image/svg+xml                  "access plus 30 days"
+    ExpiresByType image/x-icon                   "access plus 90 days"
+    ExpiresByType font/woff2                     "access plus 90 days"
+    ExpiresByType application/font-woff2         "access plus 90 days"
+</IfModule>
+
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"
 
