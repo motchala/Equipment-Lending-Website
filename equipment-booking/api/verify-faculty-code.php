@@ -39,6 +39,21 @@ if ($row['is_used']) {
     exit();
 }
 
+// ── Student must be on the official student list (Settings → Student List) ──
+// Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
+require_once __DIR__ . '/../../config/student-registry.php';
+$student_course = trim((string)($body['student_course'] ?? ''));
+if (!student_registry_valid_course($student_course)) {
+    echo json_encode(['error' => 'Please select your course.']);
+    exit();
+}
+$sv = student_registry_validate($conn, $student_id);
+if (!$sv['ok']) {
+    echo json_encode(['error' => $sv['error']]);
+    exit();
+}
+$student_id = $sv['student_no'];
+
 // ── Block if faculty has any overdue item ─────────────────────────────────
 $overdue_chk = $conn->prepare(
     "SELECT id FROM tbl_requests
@@ -93,6 +108,10 @@ if ($fac_mail_row && !empty($fac_mail_row['email'])) {
                     <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_id) . '</td>
                 </tr>
                 <tr style="background:#f9f5f5;">
+                    <td style="padding:10px 14px;color:#666;">Course</td>
+                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_course) . '</td>
+                </tr>
+                <tr>
                     <td style="padding:10px 14px;color:#666;">Status</td>
                     <td style="padding:10px 14px;color:#e65100;font-weight:700;">Form opened — not yet submitted</td>
                 </tr>

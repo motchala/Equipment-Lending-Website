@@ -74,6 +74,15 @@ if ($start_time < '07:00' || $end_time > '20:00') {
 require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
+// ── Student must be on the official student list (re-checked here, never trusted from the form) ──
+require_once __DIR__ . '/../../config/student-registry.php';
+$sv = student_registry_validate($conn, $student_id, $student_name);
+if (!$sv['ok']) {
+    echo json_encode(['error' => $sv['error']]);
+    exit();
+}
+$student_id = $sv['student_no'];
+
 // ── Re-verify code still unused (race-condition guard) ────────────────────
 $chk = $conn->prepare("SELECT id FROM tbl_faculty_codes WHERE id = ? AND is_used = 0 LIMIT 1");
 $chk->bind_param('i', $code_db_id);

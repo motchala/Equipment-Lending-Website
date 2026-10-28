@@ -1,0 +1,104 @@
+/* ================================================================
+   admin-student-registry.css
+   Settings -> Student List (Super Admin). Loaded after admin-dashboard.css;
+   reuses its card / button / badge / table classes, only the extras live here.
+   No inline styles are used anywhere in the markup (CSP).
+================================================================ */
+
+.stu-reg-lead {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-light);
+    margin: 0 0 .85rem;
+}
+
+.stu-reg-enforce {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #e65100;
+    margin: 0 0 .2rem;
+}
+
+.stu-reg-enforce--on {
+    color: #2e7d32;
+}
+
+.stu-reg-status {
+    font-size: 12px;
+    color: var(--text-light);
+    margin: 0 0 1rem;
+}
+
+.stu-reg-file-input {
+    display: none;
+}
+
+.stu-reg-replace {
+    margin-top: .55rem;
+    font-size: 12.5px;
+    color: var(--text-light);
+}
+
+.stu-reg-card .alert-banner {
+    display: block;
+    margin: .75rem 0 0;
+}
+
+.stu-reg-card .alert-banner.hidden {
+    display: none;
+}
+
+.stu-reg-card .alert-info {
+    background: #eef4ff;
+    border: 1px solid #c9dafc;
+    color: #1d4ed8;
+}
+
+.stu-reg-alert-list {
+    margin: .45rem 0 0;
+    padding-left: 1.2rem;
+    font-size: 11.5px;
+    font-weight: 400;
+}
+
+.stu-reg-preview {
+    margin-top: 1rem;
+}
+
+.stu-reg-preview.hidden {
+    display: none;
+}
+
+.stu-reg-preview-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: .5rem;
+}
+
+.stu-reg-preview-count {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.stu-reg-tbl-wrap {
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.stu-reg-table {
+    font-size: 12px;
+}
+
+.stu-reg-spin {
+    animation: stu-reg-spin .8s linear infinite;
+}
+
+@keyframes stu-reg-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

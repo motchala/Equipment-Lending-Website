@@ -62,6 +62,16 @@ if ($row['is_used']) {
     exit();
 }
 
+// ── Student must be on the official student list (Settings → Student List) ──
+// Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
+require_once __DIR__ . '/../../config/student-registry.php';
+$sv = student_registry_validate($conn, $student_id, $student_name);
+if (!$sv['ok']) {
+    echo json_encode(['error' => $sv['error']]);
+    exit();
+}
+$student_id = $sv['student_no'];
+
 // ── Overdue block (equipment overdue blocks room reservations too) ─────────
 $overdue = $conn->prepare(
     "SELECT id FROM tbl_requests

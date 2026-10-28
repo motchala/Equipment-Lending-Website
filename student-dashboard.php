@@ -223,8 +223,26 @@ require_once __DIR__ . '/config/role-splash.php';
                         <div class="mb-3">
                             <label for="studentId" class="form-label"
                                 style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Student ID</label>
-                            <input type="text" class="form-control" id="studentId" placeholder="20XX-XXXXX-BN-X"
-                                style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                            <input type="text" class="form-control" id="studentId" value="20**-*****-BN-*"
+                                inputmode="numeric" autocomplete="off" spellcheck="false"
+                                style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;font-family:monospace;letter-spacing:2px;">
+                            <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:6px;">Type only the numbers that replace the asterisks.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="studentCourse" class="form-label"
+                                style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Course</label>
+                            <select class="form-select" id="studentCourse" style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                                <option value="" selected disabled>Select your course</option>
+                                <option value="BSIT">BSIT</option>
+                                <option value="BSCpE">BSCpE</option>
+                                <option value="BSIE">BSIE</option>
+                                <option value="BSBA">BSBA</option>
+                                <option value="BSEEd">BSEEd</option>
+                                <option value="BSEd">BSEd</option>
+                                <option value="BSPSY">BSPSY</option>
+                                <option value="DIT">DIT</option>
+                                <option value="DCET">DCET</option>
+                            </select>
                         </div>
                         <input type="hidden" id="actionType" value="">
                     </div>

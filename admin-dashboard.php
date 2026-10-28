@@ -1045,6 +1045,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard.css?v=<?php echo filemtime('equipment-booking/assets/css/admin-dashboard.css'); ?>">
     <!-- Mobile/tablet adaptations; must load after admin-dashboard.css -->
     <link rel="stylesheet" href="equipment-booking/assets/css/admin-dashboard-responsive.css?v=<?php echo @filemtime('equipment-booking/assets/css/admin-dashboard-responsive.css'); ?>">
+    <link rel="stylesheet" href="equipment-booking/assets/css/admin-student-registry.css?v=<?php echo @filemtime('equipment-booking/assets/css/admin-student-registry.css'); ?>">
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="assets/css/logout-modal.css?v=<?php echo @filemtime('assets/css/logout-modal.css'); ?>">
     <?php role_splash_head(); ?>
@@ -4644,6 +4645,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <?php if ($is_super_admin): ?>
                         <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
+                        <button class="rq-sub-tab" data-sett-panel="sett-students">Student List</button>
                     <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
@@ -5036,6 +5038,97 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
                         </div><!-- /arb-sub-config -->
 
                     </div><!-- /sett-rules -->
+                <?php endif; ?>
+
+                <!-- ── STUDENT LIST (Super Admin only) ───────────────────────
+                     Import of the official class lists. The Student Portal checks every
+                     student's ID + name against it (config/student-registry.php).
+                     Script: equipment-booking/assets/js/admin-student-registry.js -->
+                <?php if ($is_super_admin): ?>
+                    <?php
+                    require_once __DIR__ . '/config/student-registry.php';
+                    $stu_status = student_registry_status($conn);
+                    $stu_on     = $stu_status['count'] > 0;
+                    $stu_line   = 'No student list has been imported yet.';
+                    if ($stu_on) {
+                        $stu_line = $stu_status['count'] . ' student' . ($stu_status['count'] === 1 ? '' : 's')
+                            . ' across ' . $stu_status['sections'] . ' section' . ($stu_status['sections'] === 1 ? '' : 's');
+                        if ($stu_status['last_at'] !== '') {
+                            $stu_line .= ' · last imported ' . date('M j, Y g:i A', (int)strtotime($stu_status['last_at']));
+                            if ($stu_status['last_by'] !== '') {
+                                $stu_line .= ' by ' . $stu_status['last_by'];
+                            }
+                        }
+                    }
+                    ?>
+                    <div class="rq-sub-panel" id="sett-students">
+                        <div class="ps-card stu-reg-card" id="stu-reg-card">
+                            <?= csrf_field() ?>
+                            <div class="ps-card-header">
+                                <h3>
+                                    <span class="material-symbols-outlined">badge</span> Student List
+                                    <?php if ($stu_on): ?>
+                                        <span class="fac-reg-badge fac-reg-badge--active" id="stu-reg-badge"><?= (int)$stu_status['count'] ?> student<?= $stu_status['count'] === 1 ? '' : 's' ?></span>
+                                    <?php else: ?>
+                                        <span class="fac-reg-badge fac-reg-badge--empty" id="stu-reg-badge">Not imported yet</span>
+                                    <?php endif; ?>
+                                </h3>
+                            </div>
+                            <div class="ps-card-body">
+                                <p class="stu-reg-lead">
+                                    Import the official class lists (the PDFs exported from AIMS). The Student Portal uses this list to
+                                    confirm a student is real: the Student ID they enter must be on the list, otherwise they cannot continue.
+                                </p>
+                                <p class="stu-reg-enforce<?= $stu_on ? ' stu-reg-enforce--on' : '' ?>" id="stu-reg-enforce">
+                                    <?= $stu_on
+                                        ? 'Active — students must match this list to continue.'
+                                        : 'Not active yet — students are not checked until a list is imported.' ?>
+                                </p>
+                                <p class="stu-reg-status" id="stu-reg-status"><?= htmlspecialchars($stu_line, ENT_QUOTES, 'UTF-8') ?></p>
+
+                                <div class="fac-reg-upload-row">
+                                    <label for="stu-reg-file-input" class="fac-reg-file-label" id="stu-reg-file-label">
+                                        <span class="material-symbols-outlined">attach_file</span>
+                                        <span id="stu-reg-file-name">Choose class list PDF(s)…</span>
+                                    </label>
+                                    <input type="file" id="stu-reg-file-input" class="stu-reg-file-input" accept=".pdf,application/pdf" multiple>
+                                    <button type="button" id="stu-reg-import-btn" class="ps-btn ps-btn--primary" disabled>
+                                        <span class="material-symbols-outlined">cloud_upload</span> Import
+                                    </button>
+                                </div>
+
+                                <label class="fac-reg-replace-row stu-reg-replace" for="stu-reg-replace-all">
+                                    <input type="checkbox" id="stu-reg-replace-all">
+                                    <span>Replace the whole list (removes every student currently listed before importing)</span>
+                                </label>
+
+                                <div id="stu-reg-alert" class="alert-banner hidden" role="alert"></div>
+
+                                <div id="stu-reg-preview" class="stu-reg-preview hidden">
+                                    <div class="stu-reg-preview-head">
+                                        <p class="stu-reg-preview-count" id="stu-reg-preview-count"></p>
+                                        <button type="button" id="stu-reg-clear-btn" class="ps-btn ps-btn--ghost ps-btn--sm">
+                                            <span class="material-symbols-outlined">close</span> Clear
+                                        </button>
+                                    </div>
+                                    <div class="tbl-wrap stu-reg-tbl-wrap">
+                                        <table class="admin-table stu-reg-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Student No.</th>
+                                                    <th>Name</th>
+                                                    <th>Section</th>
+                                                    <th>Year Level</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="stu-reg-preview-tbody"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!-- /sett-students -->
                 <?php endif; ?>
 
                 <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->
@@ -6453,6 +6546,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'return_confirm' && isset($_GE
 
     <script src="assets/js/logout-modal.js?v=<?php echo @filemtime('assets/js/logout-modal.js'); ?>"></script>
     <script src="equipment-booking/assets/js/admin-dashboard.js"></script>
+    <script src="equipment-booking/assets/js/admin-student-registry.js?v=<?php echo @filemtime('equipment-booking/assets/js/admin-student-registry.js'); ?>" defer></script>
     <script src="equipment-booking/assets/js/admin-live-render.js"></script>
     <script src="equipment-booking/assets/js/admin-dashboard-responsive.js?v=<?php echo @filemtime('equipment-booking/assets/js/admin-dashboard-responsive.js'); ?>" defer></script>
 
