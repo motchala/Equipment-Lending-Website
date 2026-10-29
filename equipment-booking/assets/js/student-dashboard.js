@@ -18,6 +18,64 @@ function escAttr(str) {
     return String(str ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/* ── Course choices (must match STUDENT_COURSES in config/student-registry.php) ── */
+const STUDENT_COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
+
+/* ── Student ID mask: "20**-*****-BN-*" ─────────────────────────────────────────
+   The 20, the dashes and the BN are fixed; the student only types the 8 digits that
+   replace the asterisks. Typing, Backspace and paste (a full "2024-00048-BN-0" works)
+   are handled here, so the fixed parts can never be edited. The server still
+   validates the final value. */
+function initStudentIdMask(input) {
+    if (!input) return;
+    let digits = '';
+
+    const caretSpot = () => {
+        const at = input.value.indexOf('*');
+        return at === -1 ? input.value.length : at;
+    };
+    const render = () => {
+        const p = (digits + '********').slice(0, 8);
+        input.value = '20' + p.slice(0, 2) + '-' + p.slice(2, 7) + '-BN-' + p.slice(7);
+        const pos = caretSpot();
+        input.setSelectionRange(pos, pos);
+    };
+    const fromText = (txt) => {
+        const t = String(txt || '').toUpperCase();
+        const m = /(\d{4})\D*(\d{5})\D*(?:[A-Z]{2})?\D*(\d)/.exec(t);
+        let d = m ? m[1] + m[2] + m[3] : t.replace(/\D/g, '');
+        if (d.length > 8 && d.startsWith('20')) d = d.slice(2);
+        return d.slice(0, 8);
+    };
+
+    input.addEventListener('beforeinput', (e) => {
+        const type = e.inputType || '';
+        if (type === 'insertCompositionText' || type === 'insertReplacementText') return; // handled by 'input' below
+        e.preventDefault();
+        if (type === 'insertText' && e.data) digits = (digits + e.data.replace(/\D/g, '')).slice(0, 8);
+        else if (type.indexOf('delete') === 0) digits = digits.slice(0, -1);
+        render();
+    });
+    input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const d = fromText((e.clipboardData || window.clipboardData).getData('text'));
+        if (d) digits = d;
+        render();
+    });
+    // Fallback for keyboards that cannot be intercepted (some IME / Android keyboards)
+    input.addEventListener('input', () => {
+        const raw = input.value.replace(/\D/g, '');
+        digits = (raw.startsWith('20') ? raw.slice(2) : raw).slice(0, 8);
+        render();
+    });
+    const toSpot = () => setTimeout(() => { const pos = caretSpot(); input.setSelectionRange(pos, pos); }, 0);
+    input.addEventListener('focus', toSpot);
+    input.addEventListener('click', toSpot);
+    input.addEventListener('keydown', (e) => {
+        if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) !== -1) e.preventDefault();
+    });
+}
+
 /* ================================================================
    INIT — runs on DOMContentLoaded
    Always shows Screen A and initialises the portal.
@@ -33,6 +91,9 @@ function initPortal() {
 
     const facultyCodeModal = document.getElementById('facultyCodeModal');
     if (!facultyCodeModal) return;
+
+    // The first-paint field (before the modal rebuilds it) is masked too
+    initStudentIdMask(document.getElementById('studentId'));
 
     let _verified = null;
     let _lastReceipt = null;
@@ -122,8 +183,17 @@ function initPortal() {
             </div>
             <div class="mb-3">
                 <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Student ID</label>
-                <input type="text" class="form-control" id="studentId" placeholder="20XX-XXXXX-BN-X"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                <input type="text" class="form-control" id="studentId" value="20**-*****-BN-*"
+                    inputmode="numeric" autocomplete="off" spellcheck="false"
+                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;font-family:monospace;letter-spacing:2px;">
+                <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:6px;">Type only the numbers that replace the asterisks.</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Course</label>
+                <select class="form-select" id="studentCourse" style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
+                    <option value="" selected disabled>Select your course</option>
+                    ${STUDENT_COURSES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </select>
             </div>
             <input type="hidden" id="actionType" value="${escAttr(actionType)}">`;
 
@@ -138,6 +208,7 @@ function initPortal() {
                 Verify &amp; Continue
             </button>`;
 
+        initStudentIdMask(document.getElementById('studentId'));
         document.getElementById('btnVerifyCode').addEventListener('click', handleVerify);
     }
 
@@ -392,11 +463,13 @@ function initPortal() {
         const code = (document.getElementById('facultyCode')?.value || '').trim();
         const name = (document.getElementById('studentName')?.value || '').trim();
         const id = (document.getElementById('studentId')?.value || '').trim();
+        const course = (document.getElementById('studentCourse')?.value || '').trim();
         const actionType = (document.getElementById('actionType')?.value || 'borrow').trim();
 
         if (!code) { showPortalError('Please enter the code.'); return; }
         if (!name) { showPortalError('Please enter your name.'); return; }
-        if (!id) { showPortalError('Please enter your Student ID.'); return; }
+        if (!id || id.indexOf('*') !== -1) { showPortalError('Please complete your Student ID (replace every asterisk).'); return; }
+        if (!course) { showPortalError('Please select your course.'); return; }
 
         const btn = document.getElementById('btnVerifyCode');
         btn.disabled = true;
@@ -416,7 +489,7 @@ function initPortal() {
         fetch(verifyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, student_name: name, student_id: id }),
+            body: JSON.stringify({ code, student_name: name, student_id: id, student_course: course }),
         })
             .then(r => r.json())
             .then(data => {
@@ -426,7 +499,7 @@ function initPortal() {
                     showPortalError(data.error);
                     return;
                 }
-                _verified = { ...data, student_name: name, student_id: id };
+                _verified = { ...data, student_name: name, student_id: id, student_course: course };
                 if (actionType === 'room') {
                     showStep2Room(_verified);
                 } else if (isItemCode) {

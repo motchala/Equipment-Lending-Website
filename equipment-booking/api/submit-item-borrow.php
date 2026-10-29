@@ -63,6 +63,15 @@ require_once __DIR__ . '/../core/booking-schedule.php';
 $conn = getDB();
 $conn->set_charset('utf8mb4');
 
+// ── Student must be on the official student list (re-checked here, never trusted from the form) ──
+require_once __DIR__ . '/../../config/student-registry.php';
+$sv = student_registry_validate($conn, $student_id);
+if (!$sv['ok']) {
+    echo json_encode(['error' => $sv['error']]);
+    exit;
+}
+$student_id = $sv['student_no'];
+
 // Ensure borrow_qty, return_time and other scheduling columns exist on tbl_requests
 BookingSchedule::ensureSchema($conn);
 

@@ -5899,9 +5899,8 @@ function psSelectFmt(btn) {
 
 /* ================================================================
    FACULTY REGISTRY UPLOAD
-   Self-contained block. Uses PDF.js (loaded on demand) for PDF
-   parsing. Falls back to a server-side parse notice for XLSX
-   (SimpleXLSX is not vendored yet — the user is guided to use PDF).
+   Self-contained block. Uses PDF.js (loaded on demand) for PDF parsing
+   and the server-side XLSX reader for Excel workbooks.
    Calls upload-faculty-registry.php with the parsed rows as JSON.
 ================================================================ */
 (function () {
@@ -5954,18 +5953,18 @@ function psSelectFmt(btn) {
     // ── Parsed rows store ──────────────────────────────────────────
     var _parsedRows = [];
 
-    function resetParsed() {
+    function resetParsed(clearFile) {
         _parsedRows = [];
         if (previewWrap) previewWrap.style.display = 'none';
         if (previewTbody) previewTbody.innerHTML = '';
-        if (fileInput) fileInput.value = '';
+        if (clearFile && fileInput) fileInput.value = '';
         if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
         if (importBtn) importBtn.disabled = true;
         clearRegAlert();
     }
 
     if (clearBtn) {
-        clearBtn.addEventListener('click', resetParsed);
+        clearBtn.addEventListener('click', function () { resetParsed(true); });
     }
 
     // ── Render preview table ───────────────────────────────────────
@@ -6123,10 +6122,32 @@ function psSelectFmt(btn) {
         });
     }
 
-    // ── XLSX parsing — placeholder ─────────────────────────────────
-    // SimpleXLSX is not yet vendored. Guide the user to PDF for now.
     function parseXlsx(file, onDone, onError) {
-        onError('XLSX import is not yet available. Please export the Faculty Identification Records as a PDF and upload that instead.');
+        var csrfEl = document.querySelector('input[name="csrf_token"]');
+        var csrfToken = csrfEl ? csrfEl.value : '';
+        if (!csrfToken) {
+            onError('Session expired. Please refresh the page.');
+            return;
+        }
+
+        var form = new FormData();
+        form.append('csrf_token', csrfToken);
+        form.append('file', file);
+        fetch('equipment-booking/api/parse-faculty-registry-xlsx.php', {
+            method: 'POST',
+            body: form
+        }).then(function (response) {
+            return response.json().catch(function () {
+                throw new Error('Unexpected response from the server. Please try again.');
+            }).then(function (data) {
+                if (!response.ok || !data || data.status !== 'success' || !Array.isArray(data.rows)) {
+                    throw new Error((data && data.error) || 'Could not read the XLSX file. Please try again.');
+                }
+                onDone(data.rows);
+            });
+        }).catch(function (err) {
+            onError(err.message || 'Could not read the XLSX file. Please try again.');
+        });
     }
 
     // ── File input change ──────────────────────────────────────────
@@ -6165,6 +6186,9 @@ function psSelectFmt(btn) {
                     }
                 );
             } else if (ext === 'xlsx') {
+                alertEl.className = 'alert-banner alert-info';
+                alertEl.textContent = 'Parsing XLSX, this may take a moment';
+                alertEl.classList.remove('hidden');
                 parseXlsx(file,
                     function (rows) {
                         _parsedRows = rows;
