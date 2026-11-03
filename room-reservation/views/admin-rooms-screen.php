@@ -4,7 +4,7 @@
             <div class="tab-panel" id="panel-rooms">
 
                 <!-- ── Page header + Add Room button ──────────────────── -->
-                <div class="pr-page-header-row">
+                <div class="pr-page-header-row admin-screen-header">
                     <div>
                         <h1 class="pr-page-title">Facilities Management</h1>
                         <p class="pr-page-subtitle">Browse facilities, reservations and reported issues.</p>
@@ -620,5 +620,4 @@
 <script src="room-reservation/assets/js/admin-rooms-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-schedule.js'); ?>"></script>
 
             </div><!-- /panel-rooms -->
-
 

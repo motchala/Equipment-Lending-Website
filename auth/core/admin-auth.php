@@ -8,10 +8,8 @@
  *
  *   • dormant_until  – unix time until which the account is locked
  *                      (exists, but cannot log in / keep a session).
- *   • session_epoch  – unix time of the last credential change made by a
- *                      Super Admin. Any session that started before it is
- *                      ended, so a changed password/email takes effect
- *                      everywhere immediately.
+ *   • session_epoch  – revocation timestamp used for credential changes and
+ *                      global sign-out. Sessions authenticated before it end.
  *
  * admin_session_guard() is called from config/session.php, so it runs on
  * every request that carries an admin session (pages AND api endpoints).
@@ -54,6 +52,9 @@ function admin_accounts_ensure_schema(mysqli $conn): void
     }
     if (!in_array('session_epoch', $cols, true)) {
         @$conn->query('ALTER TABLE tbl_accounts ADD COLUMN `session_epoch` BIGINT UNSIGNED NOT NULL DEFAULT 0');
+    }
+    if (!in_array('backup_email', $cols, true)) {
+        @$conn->query('ALTER TABLE tbl_accounts ADD COLUMN `backup_email` VARCHAR(255) NULL DEFAULT NULL');
     }
 }
 

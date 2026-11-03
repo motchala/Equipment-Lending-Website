@@ -7,7 +7,7 @@
                 <div id="lending-inventory">
 
                     <!-- Page Header -->
-                    <div class="inv-redesign-header">
+                    <div class="inv-redesign-header admin-screen-header">
                         <div>
                             <h1 class="inv-page-title">Equipment Inventory</h1>
                             <p class="inv-page-sub">Manage the equipment catalog, stock quantities, and item details.</p>
@@ -666,4 +666,3 @@
                 </div><!-- /lending-inventory -->
 
             </div><!-- /panel-inventory -->
-

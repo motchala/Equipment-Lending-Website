@@ -5,6 +5,7 @@
 
    Public API (window.PSLogout):
      PSLogout.open(triggerEl?)  – show the "Log out?" confirmation dialog
+     PSLogout.openAll(triggerEl?) – show confirmation to log out all sessions
      PSLogout.close()           – dismiss it (ignored while logging out)
      PSLogout.isOpen()          – boolean
 
@@ -35,6 +36,7 @@
 
     var CFG = {
         logoutUrl: 'auth/api/logout.php',
+        logoutAllUrl: 'auth/api/logout-all.php',
         landingUrl: 'landing-page.php',
         minLoadingMs: 1600,   // minimum time the loading state is shown
         successMs: 650        // how long the "logged out" check is shown
@@ -49,6 +51,7 @@
     var card = null;      // dialog element
     var els = {};         // cached child elements
     var state = 'closed'; // closed | confirm | loading | done
+    var logoutAll = false;
     var lastFocus = null;
     var closeTimer = null;
 
@@ -131,12 +134,22 @@
     }
 
     /* ── Open / close ────────────────────────────────────────────── */
-    function open(trigger) {
+    function open(trigger, allSessions) {
         if (state !== 'closed') return;
         build();
 
         clearTimeout(closeTimer);
+        logoutAll = !!allSessions;
         lastFocus = trigger || document.activeElement;
+        els.title.textContent = logoutAll ? 'Log out all sessions?' : 'Log out?';
+        els.desc.textContent = logoutAll
+            ? 'You\u2019ll be signed out on this device and all other devices.'
+            : 'You\u2019ll be signed out of your account.';
+        els.confirm.lastElementChild.textContent = logoutAll ? 'Log out all' : 'Log out';
+        els.busyTitle.textContent = logoutAll ? 'Ending all sessions\u2026' : 'Logging you out\u2026';
+        els.busyDesc.textContent = logoutAll
+            ? 'Securely signing out on all devices.'
+            : 'Securely ending your session.';
         setState('confirm');
 
         root.hidden = false;
@@ -205,6 +218,24 @@
     // false if the request could not be completed.
     function endSession() {
         if (!window.fetch) return Promise.resolve(false);
+        if (logoutAll) {
+            var tokenInput = document.querySelector('input[name="csrf_token"]');
+            var token = tokenInput ? tokenInput.value : '';
+            if (!token) return Promise.resolve(false);
+            return fetch(CFG.logoutAllUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: new URLSearchParams({ csrf_token: token })
+            }).then(function (res) {
+                return res.json().then(function (data) {
+                    return res.ok && data.status === 'success';
+                });
+            }).catch(function () {
+                return false;
+            });
+        }
         return fetch(CFG.logoutUrl, {
             method: 'GET',
             credentials: 'same-origin',
@@ -226,11 +257,27 @@
         Promise.all([endSession(), wait(CFG.minLoadingMs)]).then(function (out) {
             if (!out[0]) {
                 // Background request failed → fall back to the classic navigation
-                window.location.href = CFG.logoutUrl;
+                if (logoutAll) {
+                    var tokenInput = document.querySelector('input[name="csrf_token"]');
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = CFG.logoutAllUrl;
+                    if (tokenInput) {
+                        var csrf = document.createElement('input');
+                        csrf.type = 'hidden';
+                        csrf.name = 'csrf_token';
+                        csrf.value = tokenInput.value;
+                        form.appendChild(csrf);
+                    }
+                    document.body.appendChild(form);
+                    form.submit();
+                } else {
+                    window.location.href = CFG.logoutUrl;
+                }
                 return;
             }
             setState('done');
-            els.busyTitle.textContent = 'You\u2019ve been logged out';
+            els.busyTitle.textContent = logoutAll ? 'All sessions ended' : 'You\u2019ve been logged out';
             els.busyDesc.textContent = 'Redirecting you to the landing page\u2026';
             return wait(CFG.successMs).then(function () {
                 window.location.replace(CFG.landingUrl);
@@ -239,7 +286,8 @@
     }
 
     window.PSLogout = {
-        open: open,
+        open: function (trigger) { open(trigger, false); },
+        openAll: function (trigger) { open(trigger, true); },
         close: close,
         isOpen: function () { return state !== 'closed'; }
     };

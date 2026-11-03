@@ -1,4 +1,42 @@
         (function() {
+            document.addEventListener('click', function(event) {
+                var trigger = event.target.closest('.fac-info-trigger');
+                if (trigger) {
+                    event.preventDefault();
+                    var info = trigger.closest('.fac-info');
+                    var shouldOpen = !info.classList.contains('fac-info-open');
+                    document.querySelectorAll('.fac-info.fac-info-open').forEach(function(openInfo) {
+                        openInfo.classList.remove('fac-info-open');
+                        openInfo.querySelector('.fac-info-trigger').setAttribute('aria-expanded', 'false');
+                        openInfo.querySelector('.fac-info-trigger').blur();
+                    });
+                    if (shouldOpen) {
+                        info.classList.add('fac-info-open');
+                        trigger.setAttribute('aria-expanded', 'true');
+                    } else {
+                        trigger.blur();
+                    }
+                    return;
+                }
+
+                if (!event.target.closest('.fac-info')) {
+                    document.querySelectorAll('.fac-info.fac-info-open').forEach(function(openInfo) {
+                        openInfo.classList.remove('fac-info-open');
+                        openInfo.querySelector('.fac-info-trigger').setAttribute('aria-expanded', 'false');
+                        openInfo.querySelector('.fac-info-trigger').blur();
+                    });
+                }
+            });
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key !== 'Escape') return;
+                document.querySelectorAll('.fac-info.fac-info-open').forEach(function(openInfo) {
+                    openInfo.classList.remove('fac-info-open');
+                    openInfo.querySelector('.fac-info-trigger').setAttribute('aria-expanded', 'false');
+                    openInfo.querySelector('.fac-info-trigger').blur();
+                });
+            });
+
             function openFacModal(id) {
                 var el = document.getElementById(id);
                 if (el) el.classList.add('ps-modal-open');

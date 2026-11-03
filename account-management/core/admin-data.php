@@ -7,6 +7,17 @@ $initials = strtoupper(substr($name_parts[0], 0, 1));
 if (count($name_parts) > 1) $initials .= strtoupper(substr(end($name_parts), 0, 1));
 
 $admin_email = $_SESSION['admin_email'] ?? '';
+$admin_backup_email = '';
+$admin_profile_stmt = $conn->prepare('SELECT backup_email FROM tbl_accounts WHERE email = ? LIMIT 1');
+if ($admin_profile_stmt) {
+    $admin_profile_stmt->bind_param('s', $admin_email);
+    $admin_profile_stmt->execute();
+    $admin_profile_row = $admin_profile_stmt->get_result()->fetch_assoc();
+    $admin_backup_email = (string)($admin_profile_row['backup_email'] ?? '');
+    $admin_profile_stmt->close();
+} else {
+    error_log('[admin-profile] Could not prepare backup email lookup: ' . $conn->error);
+}
 
 // Fail closed: anything other than an explicit 'Super Admin' session value
 // is treated as the more restrictive 'Admin' role.

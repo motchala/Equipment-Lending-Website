@@ -682,6 +682,7 @@ table {
 #panel-settings[data-sett-size="narrow"] .ov-hero-actions,
 #panel-settings[data-sett-size="tiny"] .ov-hero-actions {
     flex-basis: 100%;
+    max-width: 100%;
 }
 
 /* ── tiny: less than ~480px available ─────────────────────────── */
@@ -689,6 +690,10 @@ table {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
+}
+
+#panel-settings[data-sett-size="tiny"] .info-value-wrap {
+    width: 100%;
 }
 
 #panel-settings[data-sett-size="tiny"] .sett-edit-btn,

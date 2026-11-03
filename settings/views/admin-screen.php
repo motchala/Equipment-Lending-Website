@@ -7,7 +7,7 @@
             <div class="tab-panel" id="panel-settings">
 
                 <!-- Page Header -->
-                <div class="sett-page-header">
+                <div class="sett-page-header admin-screen-header">
                     <h1 class="sett-page-title">Settings</h1>
                     <p class="sett-page-sub">Manage your account, preferences, borrowing rules, and get help.</p>
                 </div>
@@ -33,10 +33,10 @@
                         </div>
                         <div class="ov-hero-body">
                             <div class="ov-hero-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                            <div class="ov-hero-role">Administrator &middot; PUPSync Biñan Campus</div>
+                            <div class="ov-hero-role"><?php echo $is_super_admin ? 'Super Admin' : 'Admin'; ?> &middot; PUPSync Biñan Campus</div>
                             <div class="ov-hero-badge">
                                 <span class="material-symbols-outlined">verified</span>
-                                Active &middot; Full Access
+                                Active &middot; <?php echo $is_super_admin ? 'Super Admin Access' : 'Admin Access'; ?>
                             </div>
                         </div>
                         <div class="ov-hero-actions">
@@ -68,27 +68,43 @@
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Display Name</span>
-                                    <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
-                                        data-field="admin_name">
-                                        <?php echo !empty($admin_name) ? htmlspecialchars($admin_name) : '— Not provided'; ?>
-                                    </span>
-                                    <input class="info-input-f" data-input="admin_name"
-                                        value="<?php echo htmlspecialchars($admin_name ?? ''); ?>"
-                                        placeholder="Display Name" disabled style="display:none;">
+                                    <div class="info-value-wrap">
+                                        <span class="info-val <?php echo empty($admin_name) ? 'empty' : ''; ?>"
+                                            data-field="admin_name">
+                                            <?php echo !empty($admin_name) ? htmlspecialchars($admin_name) : '— Not provided'; ?>
+                                        </span>
+                                        <input class="info-input-f" data-input="admin_name"
+                                            value="<?php echo htmlspecialchars($admin_name ?? ''); ?>"
+                                            placeholder="Display Name" disabled>
+                                    </div>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Role</span>
-                                    <span class="info-val">Administrator</span>
+                                    <span class="info-val"><?php echo $is_super_admin ? 'Super Admin' : 'Admin'; ?></span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Email Address</span>
-                                    <span class="info-val <?php echo empty($admin_email) ? 'empty' : ''; ?>"
-                                        data-field="admin_email">
-                                        <?php echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; ?>
-                                    </span>
-                                    <input class="info-input-f" data-input="admin_email" type="email"
-                                        value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
-                                        placeholder="admin@pup.edu.ph" disabled style="display:none;">
+                                    <div class="info-value-wrap">
+                                        <span class="info-val <?php echo empty($admin_email) ? 'empty' : ''; ?>"
+                                            data-field="admin_email">
+                                            <?php echo !empty($admin_email) ? htmlspecialchars($admin_email) : '— Not provided'; ?>
+                                        </span>
+                                        <input class="info-input-f" data-input="admin_email" type="email"
+                                            value="<?php echo htmlspecialchars($admin_email ?? ''); ?>"
+                                            placeholder="admin@pup.edu.ph" disabled>
+                                    </div>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-lbl">Backup Email</span>
+                                    <div class="info-value-wrap">
+                                        <span class="info-val <?php echo empty($admin_backup_email) ? 'empty' : ''; ?>"
+                                            data-field="admin_backup_email">
+                                            <?php echo !empty($admin_backup_email) ? htmlspecialchars($admin_backup_email) : '— Not provided'; ?>
+                                        </span>
+                                        <input class="info-input-f" data-input="admin_backup_email" type="email"
+                                            value="<?php echo htmlspecialchars($admin_backup_email ?? ''); ?>"
+                                            placeholder="backup@example.com" autocomplete="email" disabled>
+                                    </div>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Campus</span>
@@ -97,7 +113,7 @@
                                 <div class="info-row">
                                     <span class="info-lbl">Access Level</span>
                                     <span class="info-val">
-                                        <span class="ov-access-badge">Full Access</span>
+                                        <span class="ov-access-badge"><?php echo $is_super_admin ? 'Super Admin Access' : 'Admin Access'; ?></span>
                                     </span>
                                 </div>
                             </div>
@@ -152,19 +168,18 @@
                                 <div class="info-row">
                                     <span class="info-lbl">Current Password</span>
                                     <span class="info-val">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>
-                                    <button class="btn-inline-sm" data-action="open-change-pass">Change</button>
+                                    <button class="btn-inline-sm" data-action="open-change-pass"
+                                        data-profile-edit-gated disabled aria-hidden="true" tabindex="-1">Change</button>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Last Changed</span>
-                                    <span class="info-val" id="pwLastChangedVal" style="color:var(--text-light)">
-                                        <?php
-                                        $pwc = '— Not tracked';
-                                        if (!empty($admin_last_pw_change)) {
-                                            $ts_pwc = strtotime($admin_last_pw_change);
-                                            if ($ts_pwc !== false) $pwc = date('M d, Y · g:i A', $ts_pwc);
-                                        }
-                                        echo htmlspecialchars($pwc);
-                                        ?>
+                                    <?php
+                                    $ts_pwc = !empty($admin_last_pw_change) ? strtotime($admin_last_pw_change) : false;
+                                    $pwc_untracked = $ts_pwc === false;
+                                    ?>
+                                    <span class="info-val<?php echo $pwc_untracked ? ' pw-change-untracked' : ''; ?>"
+                                        id="pwLastChangedVal" style="color:var(--text-light)">
+                                        <?php echo $pwc_untracked ? '— Not tracked' : htmlspecialchars(date('M d, Y · g:i A', $ts_pwc)); ?>
                                     </span>
                                 </div>
                                 <div class="info-row">
@@ -172,7 +187,7 @@
                                     <span class="info-val">
                                         <span class="ov-status-dot">Active</span>
                                     </span>
-                                    <button class="btn-inline-danger" data-action="logout">Log Out All</button>
+                                    <button class="btn-inline-danger" data-action="logout-all">Log Out All</button>
                                 </div>
                             </div>
                         </div>
@@ -243,79 +258,16 @@
                             </div>
                         </div>
 
-                        <div class="sett-card">
-                            <div class="sett-card-head">
-                                <span class="material-symbols-outlined">accessibility</span>
-                                <h3>Accessibility</h3>
-                            </div>
-                            <div class="sett-card-body">
-                                <div class="form-group">
-                                    <label class="sett-field-lbl">Text Size</label>
-                                    <select class="form-control-custom" id="textSizeSelect">
-                                        <option value="Normal">Normal</option>
-                                        <option value="Large">Large</option>
-                                        <option value="X-Large">X-Large</option>
-                                    </select>
-                                </div>
-                                <div class="sett-notif-row">
-                                    <label class="toggle-sw">
-                                        <input type="checkbox" id="reduceMotionToggle" data-action="apply-reduce-motion">
-                                        <span class="toggle-track"></span>
-                                    </label>
-                                    <div>
-                                        <div class="sett-notif-title">Reduce animations</div>
-                                    </div>
-                                </div>
-                                <div class="sett-notif-row">
-                                    <label class="toggle-sw">
-                                        <input type="checkbox" id="focusRingToggle" data-action="apply-focus-ring">
-                                        <span class="toggle-track"></span>
-                                    </label>
-                                    <div>
-                                        <div class="sett-notif-title">Enhanced Focus Ring</div>
-                                        <div class="sett-notif-sub">Makes keyboard focus outlines more visible</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                     </div><!-- /sett-grid -->
 
-                    <div class="sett-danger-wrap">
-                        <div class="sett-danger-wrap">
-                            <div class="sett-card sett-danger-bdr">
-                                <div class="sett-card-head">
-                                    <span class="material-symbols-outlined" style="color:var(--danger)">warning</span>
-                                    <h3 style="color:var(--danger)">Advanced</h3>
-                                </div>
-                                <div class="sett-card-body">
-                                    <div class="sett-notif-row">
-                                        <label class="toggle-sw"><input type="checkbox" id="showAssetIdsToggle" checked><span class="toggle-track"></span></label>
-                                        <div>
-                                            <div class="sett-notif-title">Show Asset IDs</div>
-                                            <div class="sett-notif-sub">Display equipment item IDs in tables</div>
-                                        </div>
-                                    </div>
-                                    <div class="sett-notif-row">
-                                        <label class="toggle-sw"><input type="checkbox" id="verboseErrorsToggle"><span class="toggle-track"></span></label>
-                                        <div>
-                                            <div class="sett-notif-title">Verbose Error Messages</div>
-                                            <div class="sett-notif-sub">Show detailed database error info (not recommended in production)</div>
-                                        </div>
-                                    </div>
-                                    <div class="sett-adv-reset-row">
-                                        <div>
-                                            <div class="sett-notif-title" style="color:var(--danger)">Reset All Settings</div>
-                                            <div class="sett-notif-sub">Restore all appearance and accessibility defaults</div>
-                                        </div>
-                                        <button class="sett-reset-btn" data-action="reset-settings">
-                                            <span class="material-symbols-outlined">restart_alt</span> Reset
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="sett-reset-row">
+                        <div>
+                            <div class="sett-notif-title">Reset All Settings</div>
+                            <div class="sett-notif-sub">Restore appearance and notification preferences to their default values.</div>
                         </div>
-
+                        <button class="sett-reset-btn" data-action="reset-settings">
+                            <span class="material-symbols-outlined">restart_alt</span> Reset
+                        </button>
                     </div>
                 </div><!-- /sett-prefs -->
 
@@ -650,4 +602,3 @@
                 </div><!-- /sett-help -->
 
             </div><!-- /panel-settings -->
-

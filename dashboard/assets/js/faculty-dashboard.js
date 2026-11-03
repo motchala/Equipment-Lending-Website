@@ -2114,6 +2114,23 @@
         if (btn && !btn.dataset.busy) btn.disabled = !_sovIsDirty();
     }
 
+    function _sovSetEditActions(editing) {
+        const editBtn = document.getElementById('sovEditBtn');
+        const saveBtn = document.getElementById('sovSaveBtn');
+        const cancelBtn = document.getElementById('sovCancelBtn');
+        if (editBtn) editBtn.hidden = editing;
+        if (saveBtn) saveBtn.hidden = !editing;
+        if (cancelBtn) cancelBtn.hidden = !editing;
+        document.querySelectorAll('#sov-tab-settings [data-sov-edit-gated]').forEach(btn => {
+            btn.hidden = !editing;
+        });
+    }
+
+    function _sovIsEditingAccount() {
+        const card = _sovCard();
+        return Boolean(card && card.dataset.editing === 'true');
+    }
+
     // Same rules as the server: 09XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX or 9XXXXXXXXX (spaces / dashes allowed)
     function _sovPhoneOk(v) {
         return /^(?:\+?63|0)?9\d{9}$/.test(String(v).replace(/[\s\-().]/g, ''));
@@ -2123,8 +2140,8 @@
         const c = _sovCard();
         if (!c) return;
         _sovFields().forEach(el => { el.dataset.original = el.value.trim(); el.disabled = false; });
-        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = false; });
         c.dataset.editing = 'true';
+        _sovSetEditActions(true);
         _sovClearErrors();
         _sovSyncSave();
         const first = c.querySelector('[data-edit-field="fullname"]');
@@ -2135,8 +2152,8 @@
         const c = _sovCard();
         if (!c) return;
         _sovFields().forEach(el => { el.disabled = true; });
-        c.querySelectorAll('[data-hint-for]').forEach(h => { h.hidden = true; });
         c.dataset.editing = 'false';
+        _sovSetEditActions(false);
         _sovClearErrors();
     }
 
@@ -2185,8 +2202,9 @@
         if (phoneIn) phoneIn.value = d.phone_display || '';
         const phoneView = document.getElementById('sovPhoneView');
         if (phoneView) {
-            phoneView.textContent = d.phone_display || 'Not set';
+            phoneView.textContent = d.phone_display || '— Not provided';
             phoneView.classList.toggle('acct-row-static-muted', !d.phone_display);
+            phoneView.classList.toggle('acct-row-not-provided', !d.phone_display);
         }
 
         // department: once chosen it becomes a permanent, read-only value
@@ -2197,9 +2215,9 @@
             deptView.classList.remove('acct-row-static-muted');
             deptView.removeAttribute('data-view');
             const row = deptSel.closest('.acct-row');
-            const hint = c.querySelector('[data-hint-for="department"]');
             deptSel.remove();
-            if (hint) hint.remove();
+            const infoButton = row.querySelector('.sov-field-info');
+            if (infoButton) infoButton.remove();
             if (row && !row.querySelector('.fid-lock')) {
                 const lock = document.createElement('span');
                 lock.className = 'material-symbols-outlined fid-lock';
@@ -2246,11 +2264,11 @@
         fd.append('csrf_token', getCsrfToken());
         Object.keys(vals).forEach(k => fd.append(k, vals[k]));
 
-        const label = btn.textContent;
+        const label = btn.querySelector('.sov-profile-save-label');
         btn.dataset.busy = '1';
         btn.disabled = true;
-        btn.textContent = 'Saving\u2026';
-        const cancelBtn = c.querySelector('[data-action="account-cancel"]');
+        if (label) label.textContent = 'Saving\u2026';
+        const cancelBtn = document.getElementById('sovCancelBtn');
         if (cancelBtn) cancelBtn.disabled = true;
 
         fetch('settings/api/update-profile.php', { method: 'POST', body: fd })
@@ -2276,7 +2294,7 @@
             .catch(() => showToast('Network error. Please try again.', 'error'))
             .finally(() => {
                 delete btn.dataset.busy;
-                btn.textContent = label;
+                if (label) label.textContent = 'Save Changes';
                 if (cancelBtn) cancelBtn.disabled = false;
                 _sovSyncSave();
             });
@@ -2406,6 +2424,21 @@
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
+                    const lastChangedEl = document.getElementById('sovPasswordLastChanged');
+                    if (lastChangedEl && data.last_pw_change) {
+                        const changedAt = new Date(data.last_pw_change.replace(' ', 'T'));
+                        if (!Number.isNaN(changedAt.getTime())) {
+                            lastChangedEl.textContent = changedAt.toLocaleString('en-US', {
+                                month: 'short',
+                                day: '2-digit',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true
+                            }).replace(',', ' ·');
+                            lastChangedEl.classList.remove('pw-change-untracked');
+                        }
+                    }
                     closePwModal();
                     showToast(data.msg || 'Password changed successfully!');
                 } else {
@@ -3052,6 +3085,7 @@
                     cancelProfileEdit();
                     break;
                 case 'open-pw-modal':
+                    if (el.hasAttribute('data-sov-edit-gated') && !_sovIsEditingAccount()) break;
                     openPwModal();
                     break;
                 case 'close-pw-modal':
@@ -3070,6 +3104,7 @@
                     submitEmailVerify();
                     break;
                 case 'open-backup-email-modal':
+                    if (el.hasAttribute('data-sov-edit-gated') && !_sovIsEditingAccount()) break;
                     openBackupEmailModal();
                     break;
                 case 'close-backup-email-modal':

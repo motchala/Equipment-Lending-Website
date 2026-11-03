@@ -249,8 +249,8 @@ body {
 .panel-logo-icon {
     position: relative;
     flex-shrink: 0;
-    width: 50px;
-    height: 50px;
+    width: 56px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -264,8 +264,8 @@ body {
 }
 
 .panel-logo-icon svg {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
 }
 
 .panel-logo-text {
@@ -276,7 +276,7 @@ body {
 .panel-logo-name {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 600;
-    font-size: 1.7rem;
+    font-size: 1.85rem;
     color: var(--text-hi);
     letter-spacing: 0.2px;
     line-height: 1.15;
@@ -294,7 +294,7 @@ body {
 .panel-logo-sub {
     margin-top: 2px;
     font-family: 'Outfit', sans-serif;
-    font-size: 0.68rem;
+    font-size: 0.72rem;
     font-weight: 500;
     letter-spacing: 1.5px;
     text-transform: uppercase;
@@ -664,9 +664,9 @@ body {
     align-items: center;
     min-height: 24px;
     margin: 0.1rem 0 0.35rem;
-    color: var(--text-mid);
+    color: color-mix(in srgb, var(--text-mid) 88%, var(--modal-sur));
     font-size: 0.76rem;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.4;
     cursor: pointer;
     transition: color 0.2s;
@@ -726,7 +726,7 @@ body {
 }
 
 .remember-option:hover {
-    color: var(--text-hi);
+    color: var(--text-mid);
 }
 
 .form-field:-webkit-autofill,
@@ -770,7 +770,7 @@ body {
 
 .btn-auth {
     width: 100%;
-    padding: 11px;
+    padding: 14px 11px;
     margin-top: 0.6rem;
     background: linear-gradient(135deg, var(--maroon), var(--maroon-deep));
     color: white;
@@ -778,7 +778,7 @@ body {
     border-radius: var(--r-sm);
     cursor: pointer;
     font-weight: 700;
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     font-family: 'Outfit', sans-serif;
     display: flex;
     align-items: center;
@@ -786,13 +786,13 @@ body {
     gap: 8px;
     transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
     letter-spacing: 0.3px;
-    box-shadow: 0 4px 16px rgba(109, 27, 35, 0.35);
+    box-shadow: 0 6px 16px rgba(74, 15, 21, 0.38), 0 2px 5px rgba(74, 15, 21, 0.22);
 }
 
 .btn-auth:hover {
     opacity: 0.9;
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(109, 27, 35, 0.5);
+    box-shadow: 0 9px 22px rgba(74, 15, 21, 0.46), 0 3px 7px rgba(74, 15, 21, 0.26);
 }
 
 .btn-auth i {
@@ -844,8 +844,8 @@ body {
     }
 
     .btn-auth {
-        padding: 14px;
-        min-height: 48px;
+        padding: 14px 11px;
+        min-height: 52px;
     }
 }
 
@@ -943,7 +943,7 @@ body {
 /* Override the responsive min-height rule so it still applies when disabled */
 @media (max-width: 480px) {
     .btn-auth:disabled {
-        min-height: 48px;
+        min-height: 52px;
     }
 }
 
@@ -1055,8 +1055,8 @@ body {
     }
 
     .btn-auth {
-        min-height: 48px;
-        padding: 14px;
+        min-height: 52px;
+        padding: 14px 11px;
         font-size: 1rem;
     }
 
@@ -1087,7 +1087,7 @@ body {
         .btn-auth:hover {
             opacity: 1;
             transform: none;
-            box-shadow: 0 4px 16px rgba(109, 27, 35, 0.35);
+            box-shadow: 0 6px 16px rgba(74, 15, 21, 0.38), 0 2px 5px rgba(74, 15, 21, 0.22);
         }
     }
 }

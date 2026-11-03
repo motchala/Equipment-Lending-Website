@@ -238,9 +238,9 @@
 #rooms-browse .fcty-landing-head .fcty-pill {
     margin-top: 0;
     padding: 5px 12px 5px 10px;
-    background: color-mix(in srgb, var(--fcty-available) 10%, var(--fcty-card));
-    border: 1px solid color-mix(in srgb, var(--fcty-available) 30%, transparent);
-    color: var(--fcty-ink);
+    background: color-mix(in srgb, var(--fcty-brand) 5%, var(--fcty-card));
+    border: 1px solid color-mix(in srgb, var(--fcty-brand) 15%, var(--fcty-line));
+    color: var(--fcty-muted);
     font-size: .78rem;
     line-height: 1.2;
 }

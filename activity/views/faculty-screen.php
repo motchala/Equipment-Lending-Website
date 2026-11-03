@@ -174,10 +174,12 @@
                         </div>
                     </div>
                     <div class="act-ai-chat-head-btns">
-                        <button class="act-ai-chat-head-btn" data-action="ai-chat-minimize" title="Minimise">
+                        <button type="button" class="act-ai-chat-head-btn" data-action="ai-chat-minimize"
+                            title="Minimise" aria-label="Minimise chat">
                             <span class="material-symbols-outlined">remove</span>
                         </button>
-                        <button class="act-ai-chat-head-btn" data-action="ai-chat-close" title="Close">
+                        <button type="button" class="act-ai-chat-head-btn" data-action="ai-chat-close"
+                            title="Close" aria-label="Close chat">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </div>
@@ -210,8 +212,10 @@
                         <span id="actAiCounter">—</span> messages remaining this hour
                     </div>
                     <div class="act-ai-chat-input">
-                        <input type="text" id="actAiInput" placeholder="Aa" autocomplete="off" maxlength="500">
-                        <button class="act-ai-chat-send" id="actAiSendBtn" data-action="ai-chat-send" title="Send">
+                        <input type="text" id="actAiInput" placeholder="Ask about rooms or reservations..."
+                            autocomplete="off" maxlength="500" aria-label="Message the room assistant">
+                        <button type="button" class="act-ai-chat-send" id="actAiSendBtn"
+                            data-action="ai-chat-send" title="Send" aria-label="Send message">
                             <span class="material-symbols-outlined">send</span>
                         </button>
                     </div>
@@ -229,7 +233,7 @@
 
             <!-- FAB — hidden by default; JS shows it only on the Facilities tab -->
             <button class="act-ai-fab" id="actAiFab" style="display:none;"
-                data-action="ai-fab-toggle" title="Ask about rooms">
+                data-action="ai-fab-toggle" aria-label="Ask about rooms">
                 <span class="material-symbols-outlined">smart_toy</span>
                 <span class="act-ai-fab-tooltip">Ask about rooms</span>
             </button>
@@ -238,8 +242,8 @@
             <div class="act-ai-fab-popover" id="actAiFabPopover">
                 <span class="material-symbols-outlined" style="font-size:16px;flex-shrink:0;">smart_toy</span>
                 <span>Need help finding or booking a room? Ask the AI assistant!</span>
-                <button class="act-ai-fab-popover-close" id="actAiFabPopoverClose" title="Dismiss">
+                <button type="button" class="act-ai-fab-popover-close" id="actAiFabPopoverClose"
+                    title="Dismiss" aria-label="Dismiss assistant hint">
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-

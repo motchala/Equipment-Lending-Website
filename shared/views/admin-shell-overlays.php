@@ -72,10 +72,10 @@
     if ($toast_queue):
     ?>
         <div id="toast-queue" hidden data-strip="<?php echo htmlspecialchars(implode(',', $flash_strip), ENT_QUOTES); ?>">
-            <?php foreach ($toast_queue as $tq_msg): ?>
-                <span data-msg="<?php echo htmlspecialchars($tq_msg, ENT_QUOTES); ?>"></span>
+            <?php foreach ($toast_queue as $tq_index => $tq_msg): ?>
+                <span data-msg="<?php echo htmlspecialchars($tq_msg, ENT_QUOTES); ?>"
+                    <?php echo $show_login_toast && $tq_index === 0 ? 'data-type="login" data-duration="6500"' : ''; ?>></span>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
-
 

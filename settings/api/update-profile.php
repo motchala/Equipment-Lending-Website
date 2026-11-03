@@ -806,7 +806,11 @@ if ($action === 'change_password') {
     $now_timestamp = date('Y-m-d H:i:s');
 
     if (mysqli_query($conn, "UPDATE tbl_users SET password='$hashed', last_password_change='$now_timestamp' WHERE faculty_id='$uid'")) {
-        echo json_encode(['success' => true, 'msg' => 'Password changed successfully! Keep it safe.']);
+        echo json_encode([
+            'success' => true,
+            'msg' => 'Password changed successfully! Keep it safe.',
+            'last_pw_change' => $now_timestamp,
+        ]);
     } else {
         echo json_encode(['success' => false, 'msg' => 'Failed to update password.']);
     }

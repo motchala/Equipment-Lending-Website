@@ -28,7 +28,7 @@
        draws its own icon). */
     let toastTimer;
     const TOAST_MS = 4500;
-    const TOAST_ICONS = { info: 'info', success: 'check_circle', error: 'error', warning: 'warning' };
+    const TOAST_ICONS = { info: 'info', success: 'check_circle', error: 'error', warning: 'warning', login: 'waving_hand' };
 
     function hideToast() {
         const t = document.getElementById('app-toast');
@@ -105,8 +105,14 @@
         const src = document.getElementById('toast-queue');
         if (!src) return;
         const msgs = Array.from(src.querySelectorAll('[data-msg]'))
-            .map(function (n) { return n.getAttribute('data-msg'); })
-            .filter(Boolean);
+            .map(function (n) {
+                return {
+                    text: n.getAttribute('data-msg'),
+                    type: n.getAttribute('data-type') || '',
+                    duration: Number(n.getAttribute('data-duration')) || 0
+                };
+            })
+            .filter(function (message) { return Boolean(message.text); });
         const strip = (src.getAttribute('data-strip') || '').split(',').filter(Boolean);
         src.remove();
 
@@ -136,10 +142,10 @@
         let i = 0;
         function next() {
             if (i >= msgs.length) return;
-            const m = msgs[i++];
-            const ms = Math.min(5000, Math.max(4000, m.length * 45)); // 4–5 s; longer text a bit more
-            showToast(m, ms);
-            setTimeout(next, ms + 650); // let it fade out before the next one
+            const message = msgs[i++];
+            const ms = message.duration || Math.min(5000, Math.max(4000, message.text.length * 45)); // queued login welcome toast stays longer
+            showToast(message.text, message.type || ms, message.type ? ms : undefined);
+            setTimeout(next, ms + 800); // let the toast fade out before the next one
         }
         let waited = 0;
         (function whenSplashGone() {
@@ -192,25 +198,6 @@
         const ac = LS.get('accentColor'), al = LS.get('accentLight');
         if (ac) _applyAccentDOM(ac, al || '#f3e5e6');
 
-        const fs = LS.get('fontSize');
-        if (fs && fs !== '100') {
-            document.documentElement.style.fontSize = (parseFloat(fs) / 100) + 'rem';
-        }
-        const ts = document.getElementById('textSizeSelect');
-        if (ts) ts.value = _pctToTextSize(fs || 100);
-
-        if (LS.get('reduceMotion') === 'true') {
-            const rmt = document.getElementById('reduceMotionToggle');
-            if (rmt) rmt.checked = true;
-            _setReduceMotion(true);
-        }
-
-        if (LS.get('focusRing') === 'true') {
-            const frt = document.getElementById('focusRingToggle');
-            if (frt) frt.checked = true;
-            _setFocusRing(true);
-        }
-
         // Notification Preferences — checkboxes default to checked/unchecked
         // in the markup itself, so only override when a stored value exists.
         [['notifPrefRequestsToggle', 'notifPrefRequests'],
@@ -222,12 +209,6 @@
             if (v !== null) el.checked = (v === 'true');
         });
         _applyNotifPrefsDOM();
-
-        // Advanced toggles
-        const said = document.getElementById('showAssetIdsToggle');
-        if (said) { const v = LS.get('showAssetIds'); if (v !== null) said.checked = (v === 'true'); }
-        const verr = document.getElementById('verboseErrorsToggle');
-        if (verr) { const v = LS.get('verboseErrors'); if (v !== null) verr.checked = (v === 'true'); }
 
         // Notification read/unread state is no longer a client-side guess —
         // it's rendered straight from tbl_notif_state on page load (see
@@ -1076,51 +1057,6 @@
     /* ── Settings ────────────────────────────────────────────── */
     function applyTheme(theme) { _applyThemeDOM(theme); LS.set('theme', theme); showToast('Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1)); }
     function applyAccent(color, light) { _applyAccentDOM(color, light); LS.set('accentColor', color); LS.set('accentLight', light); showToast('Accent color updated!'); }
-    function applyFontSize(val) {
-        const lbl = document.getElementById('fontSizeLbl');
-        if (lbl) lbl.textContent = val + '%';
-        document.documentElement.style.fontSize = (val / 100) + 'rem';
-        LS.set('fontSize', val);
-    }
-    function _setReduceMotion(on) {
-        let s = document.getElementById('reduceMotionStyle');
-        if (!s) { s = document.createElement('style'); s.id = 'reduceMotionStyle'; document.head.appendChild(s); }
-        // Neutralize both CSS animations AND transitions — most of this site's
-        // motion (hover states, tab/panel switches, toasts) is transition-based,
-        // so only silencing @keyframes animations (the old behavior) had almost
-        // no visible effect.
-        s.textContent = on
-            ? '*, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: -0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; transition-delay: -0.001ms !important; } html { scroll-behavior: auto !important; }'
-            : '';
-    }
-    function applyReduceMotion(on) { _setReduceMotion(on); LS.set('reduceMotion', on); showToast(on ? 'Animations disabled' : 'Animations re-enabled'); }
-    function _setFocusRing(on) {
-        let s = document.getElementById('focusRingStyle');
-        if (!s) { s = document.createElement('style'); s.id = 'focusRingStyle'; document.head.appendChild(s); }
-        // The extra rule covers this page's custom toggle switches, whose real
-        // <input> is display:none — an outline drawn only on the hidden input
-        // would never be visible, so also ring the switch's visible track.
-        s.textContent = on
-            ? '*:focus { outline: 3px solid var(--accent-maroon) !important; outline-offset: 3px !important; } .toggle-sw input:focus + .toggle-track { outline: 3px solid var(--accent-maroon) !important; outline-offset: 2px !important; }'
-            : '';
-    }
-    function applyFocusRing(on) { _setFocusRing(on); LS.set('focusRing', on); showToast(on ? 'Focus rings enhanced' : 'Focus rings reset'); }
-
-    /* Text Size (Preferences → Accessibility) — maps the Normal/Large/X-Large
-       select to the same underlying percentage-based font scaling already
-       used elsewhere, so it shares one source of truth (LS 'fontSize'). */
-    function _textSizeToPct(size) { return size === 'Large' ? 115 : (size === 'X-Large' ? 130 : 100); }
-    function _pctToTextSize(pct) {
-        pct = parseFloat(pct);
-        if (pct >= 125) return 'X-Large';
-        if (pct >= 110) return 'Large';
-        return 'Normal';
-    }
-    function applyTextSize(size) {
-        applyFontSize(_textSizeToPct(size));
-        showToast('Text size: ' + size);
-    }
-
     /* Notification Preferences (Preferences → Notification Preferences) —
        mutes/unmutes categories of notification directly in the bell overlay,
        via an injected stylesheet so it stays in effect regardless of which
@@ -1143,24 +1079,8 @@
         showToast(on ? 'Notifications enabled.' : 'Notifications muted.');
     }
 
-    /* Advanced (Preferences → Advanced) — persisted browser-level flags.
-       Verbose Error Messages intentionally never surfaces raw server/DB
-       errors (that was the exact issue the OWASP error-disclosure fix
-       addressed); it's kept as a saved preference only. */
-    function applyShowAssetIds(on) { LS.set('showAssetIds', on); showToast(on ? 'Asset IDs will be shown where available.' : 'Asset IDs hidden.'); }
-    function applyVerboseErrors(on) { LS.set('verboseErrors', on); showToast(on ? 'Verbose error messages enabled.' : 'Verbose error messages disabled.'); }
-
     function resetAllSettings() {
         applyTheme('light');
-
-        const ts = document.getElementById('textSizeSelect'); if (ts) ts.value = 'Normal';
-        applyFontSize(100);
-
-        const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.checked = false;
-        applyReduceMotion(false);
-
-        const frt = document.getElementById('focusRingToggle'); if (frt) frt.checked = false;
-        applyFocusRing(false);
 
         const nReq = document.getElementById('notifPrefRequestsToggle'); if (nReq) nReq.checked = true;
         const nOver = document.getElementById('notifPrefOverdueToggle'); if (nOver) nOver.checked = true;
@@ -1168,12 +1088,11 @@
         LS.del('notifPrefRequests'); LS.del('notifPrefOverdue'); LS.del('notifPrefRoom');
         _applyNotifPrefsDOM();
 
-        const said = document.getElementById('showAssetIdsToggle'); if (said) said.checked = true;
-        const verr = document.getElementById('verboseErrorsToggle'); if (verr) verr.checked = false;
         LS.del('showAssetIds'); LS.del('verboseErrors');
 
         applyAccent('#600302', '#f3e5e6');
         ['theme', 'accentColor', 'accentLight', 'fontSize', 'reduceMotion', 'focusRing'].forEach(k => LS.del(k));
+        document.documentElement.style.removeProperty('font-size');
         showToast('All settings reset to defaults.');
     }
 
@@ -1193,11 +1112,18 @@
         if (eb) eb.style.display = 'none';
         if (sb) sb.style.display = 'flex';
         if (cb) cb.style.display = 'flex';
+        document.querySelectorAll('[data-profile-edit-gated]').forEach(button => {
+            button.disabled = false;
+            button.removeAttribute('aria-hidden');
+            button.removeAttribute('tabindex');
+        });
+        const card = document.getElementById('profileInfoCard');
+        if (card) card.dataset.editing = 'true';
         document.querySelectorAll('[data-field]').forEach(span => {
             const key = span.dataset.field;
             const input = document.querySelector('[data-input="' + key + '"]');
             if (!input) return;
-            span.style.display = 'none'; input.style.display = ''; input.disabled = false;
+            input.disabled = false;
             if (span.classList.contains('empty')) input.value = '';
         });
     }
@@ -1209,23 +1135,31 @@
         if (eb) eb.style.display = 'flex';
         if (sb) sb.style.display = 'none';
         if (cb) cb.style.display = 'none';
+        document.querySelectorAll('[data-profile-edit-gated]').forEach(button => {
+            button.disabled = true;
+            button.setAttribute('aria-hidden', 'true');
+            button.setAttribute('tabindex', '-1');
+        });
+        const card = document.getElementById('profileInfoCard');
+        if (card) delete card.dataset.editing;
         document.querySelectorAll('[data-input]').forEach(input => {
-            const span = document.querySelector('[data-field="' + input.dataset.input + '"]');
-            if (!span) return;
-            span.style.display = ''; input.style.display = 'none'; input.disabled = true;
+            input.disabled = true;
         });
     }
 
     function saveProfileEdit() {
         const nameInput = document.querySelector('[data-input="admin_name"]');
         const emailInput = document.querySelector('[data-input="admin_email"]');
+        const backupEmailInput = document.querySelector('[data-input="admin_backup_email"]');
         const saveBtn = document.getElementById('saveProfileBtn');
 
         const name = nameInput ? nameInput.value.trim() : '';
         const email = emailInput ? emailInput.value.trim() : '';
+        const backupEmail = backupEmailInput ? backupEmailInput.value.trim() : '';
 
         if (!name) { showToast('Display name cannot be empty.'); return; }
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Please enter a valid email address.'); return; }
+        if (backupEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(backupEmail)) { showToast('Please enter a valid backup email address or leave it blank.'); return; }
 
         if (saveBtn) saveBtn.disabled = true;
 
@@ -1233,6 +1167,7 @@
         fd.append('ajax_action', 'update_profile');
         fd.append('admin_name', name);
         fd.append('admin_email', email);
+        fd.append('admin_backup_email', backupEmail);
         fd.append('csrf_token', getCsrfToken());
 
         fetch('admin-dashboard.php', { method: 'POST', body: fd })
@@ -1243,6 +1178,11 @@
                     if (nameSpan) { nameSpan.textContent = data.admin_name; nameSpan.classList.remove('empty'); }
                     const emailSpan = document.querySelector('[data-field="admin_email"]');
                     if (emailSpan) { emailSpan.textContent = data.admin_email; emailSpan.classList.remove('empty'); }
+                    const backupEmailSpan = document.querySelector('[data-field="admin_backup_email"]');
+                    if (backupEmailSpan) {
+                        backupEmailSpan.textContent = data.admin_backup_email || '— Not provided';
+                        backupEmailSpan.classList.toggle('empty', !data.admin_backup_email);
+                    }
 
                     // Reflect the change everywhere else the admin's name/initials
                     // appear on this page (sidebar, hero, greeting) without
@@ -1777,6 +1717,20 @@
                     saveProfileEdit(); break;
                 case 'profile-cancel':
                     cancelProfileEdit(); break;
+                case 'logout-all':
+                    if (window.PSLogout && typeof window.PSLogout.openAll === 'function') {
+                        window.PSLogout.openAll(el);
+                    } else if (confirm('Log out on this device and all other devices?')) {
+                        const fd = new FormData();
+                        fd.append('csrf_token', getCsrfToken());
+                        fetch('auth/api/logout-all.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                            .then(r => {
+                                if (!r.ok) throw new Error('Could not end all sessions.');
+                                window.location.replace('landing-page.php');
+                            })
+                            .catch(() => showToast('Could not end all sessions. Please try again.'));
+                    }
+                    break;
                 case 'mark-all-read':
                     markAllRead(); break;
                 case 'toast':
@@ -3445,16 +3399,9 @@
     });
 
     /* ── Settings toggles ────────────────────────────────────── */
-    const ts = document.getElementById('textSizeSelect'); if (ts) ts.addEventListener('change', function () { applyTextSize(this.value); });
-    const rmt = document.getElementById('reduceMotionToggle'); if (rmt) rmt.addEventListener('change', function () { applyReduceMotion(this.checked); });
-    const frt = document.getElementById('focusRingToggle'); if (frt) frt.addEventListener('change', function () { applyFocusRing(this.checked); });
-
     const nReqT = document.getElementById('notifPrefRequestsToggle'); if (nReqT) nReqT.addEventListener('change', function () { applyNotifPref('notifPrefRequests', this.checked); });
     const nOverT = document.getElementById('notifPrefOverdueToggle'); if (nOverT) nOverT.addEventListener('change', function () { applyNotifPref('notifPrefOverdue', this.checked); });
     const nRoomT = document.getElementById('notifPrefRoomToggle'); if (nRoomT) nRoomT.addEventListener('change', function () { applyNotifPref('notifPrefRoom', this.checked); });
-
-    const saidT = document.getElementById('showAssetIdsToggle'); if (saidT) saidT.addEventListener('change', function () { applyShowAssetIds(this.checked); });
-    const verrT = document.getElementById('verboseErrorsToggle'); if (verrT) verrT.addEventListener('change', function () { applyVerboseErrors(this.checked); });
 
     /* ── Change Password Form Handler ───────────────────────── */
     const cpForm = document.getElementById('changePasswordForm');
@@ -3499,6 +3446,7 @@
                                 lastChangedEl.textContent = d.toLocaleString('en-US', {
                                     month: 'short', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
                                 }).replace(',', ' ·');
+                                lastChangedEl.classList.remove('pw-change-untracked');
                             }
                         }
 

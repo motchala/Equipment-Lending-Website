@@ -150,7 +150,7 @@ if (isset($_POST['login'])) {
     // dormant_until / session_epoch columns (Manage Admins → locked accounts)
     admin_accounts_ensure_schema($conn);
 
-    $stmt_acc  = $conn->prepare("SELECT fullName, password, role, dormant_until FROM tbl_accounts WHERE email = ? LIMIT 1");
+    $stmt_acc  = $conn->prepare("SELECT fullName, password, role, dormant_until, session_epoch FROM tbl_accounts WHERE email = ? LIMIT 1");
     $row_acc   = null;
     if ($stmt_acc) {
         $stmt_acc->bind_param("s", $email);
@@ -177,7 +177,7 @@ if (isset($_POST['login'])) {
             $_SESSION['admin']      = true;
             require_once PS_ROOT . '/shared/core/activity-logger.php';
             admin_log_activity($conn, 'login', 'Signed in', $email);
-            $_SESSION['login_time'] = time();
+            $_SESSION['login_time'] = max(time(), (int)($row_acc['session_epoch'] ?? 0));
 
             $admin_name_db = 'Administrator';
 

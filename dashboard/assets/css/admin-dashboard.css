@@ -4400,7 +4400,7 @@ input[type="range"] {
 /* ── TOAST / POP-UP ALERT ─────────────────────────────────────── */
 /* Same design as the faculty "Borrowing Blocked" alert: a bottom-centre card with
    an icon, the message and a close button, tinted by type (data-type = info |
-   success | error | warning). It fades up, stays about 4.5 s (see showToast in
+   success | error | warning | login). It fades up, stays about 4.5 s (see showToast in
    admin-dashboard.js) and disappears by itself. Every admin snackbar uses it. */
 #app-toast {
     --toast-bg: #f8ecec;
@@ -4429,7 +4429,7 @@ input[type="range"] {
     opacity: 0;
     visibility: hidden;
     transform: translate(-50%, 12px);
-    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+    transition: opacity 0.45s ease, transform 0.45s ease, visibility 0s linear 0.45s;
     pointer-events: none;
 }
 
@@ -4445,6 +4445,12 @@ input[type="range"] {
     --toast-bg: #dcfce7;
     --toast-fg: #14532d;
     --toast-edge: #166534;
+}
+
+#app-toast[data-type="login"] {
+    --toast-bg: #fff4cc;
+    --toast-fg: #664d03;
+    --toast-edge: #e6c65c;
 }
 
 #app-toast[data-type="error"],
@@ -4495,6 +4501,12 @@ input[type="range"] {
     --toast-edge: #4ade80;
 }
 
+[data-theme="dark"] #app-toast[data-type="login"] {
+    --toast-bg: #51400e;
+    --toast-fg: #ffe28a;
+    --toast-edge: #c9a83b;
+}
+
 [data-theme="dark"] #app-toast[data-type="error"],
 [data-theme="dark"] #app-toast[data-type="warning"] {
     --toast-bg: #7f1d1d;
@@ -4515,6 +4527,12 @@ input[type="range"] {
     --toast-bg: #003300;
     --toast-fg: #00ff88;
     --toast-edge: #00ff88;
+}
+
+[data-theme="high-contrast"] #app-toast[data-type="login"] {
+    --toast-bg: #4a3b00;
+    --toast-fg: #fff200;
+    --toast-edge: #fff200;
 }
 
 [data-theme="high-contrast"] #app-toast[data-type="error"],
@@ -7309,6 +7327,16 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 /* ── Page Header ─────────────────────────────────────────────────── */
+.admin-screen-header {
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid color-mix(in srgb, var(--khaki-border) 55%, transparent);
+}
+
+.fac-management-head {
+    margin-bottom: 20px;
+}
+
 .sett-page-title {
     font-size: 1.6rem;
     font-weight: 700;
@@ -7320,7 +7348,7 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 .sett-page-sub {
     font-size: 13px;
     color: var(--text-light);
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
     margin-top: 2px;
 }
 
@@ -7351,13 +7379,8 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     border-bottom: 1px solid var(--khaki-border);
 }
 
-/* Appearance / Notification Preferences / Accessibility / Auto-Approval
-   Rules / Thresholds & Limits / Decision Log now use the same plain
-   header as every other container in the app (Requests, Equipment,
-   Faculty, Rooms) — the reddish gradient tint that used to set these
-   apart from everywhere else has been removed for consistency. The
-   Advanced/Danger Zone card (.sett-danger-bdr) is the one deliberate
-   exception and keeps its distinct danger-tinted header. */
+/* Preferences and borrowing-rule cards use the same plain header as the
+   other containers in the app for a consistent visual hierarchy. */
 
 .sett-card-head .material-symbols-outlined {
     font-size: 18px;
@@ -7451,27 +7474,14 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     margin-top: 1px;
 }
 
-/* ── Danger / Advanced zone ──────────────────────────────────────── */
-.sett-danger-wrap {
-    background: var(--secondary-cream);
-    border: 1px solid var(--khaki-border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.sett-danger-bdr {
-    border-color: rgba(180, 20, 20, 0.2);
-}
-
-.sett-adv-reset-row {
+/* ── Preference reset ────────────────────────────────────────────── */
+.sett-reset-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding-top: 0.75rem;
+    margin-top: 1.25rem;
+    padding: 1rem 0.25rem 0;
     border-top: 1px solid var(--khaki-border);
 }
 
@@ -7480,10 +7490,10 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     align-items: center;
     gap: 5px;
     padding: 0.45rem 0.9rem;
-    border: 1.5px solid var(--danger);
+    border: 1.5px solid var(--khaki-border);
     border-radius: 8px;
-    background: transparent;
-    color: var(--danger);
+    background: var(--primary-white);
+    color: var(--text-dark);
     font-family: 'Poppins', sans-serif;
     font-size: 12px;
     font-weight: 600;
@@ -7494,7 +7504,9 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .sett-reset-btn:hover {
-    background: var(--hover-bg);
+    border-color: var(--accent-maroon);
+    color: var(--accent-maroon);
+    background: var(--accent-light);
 }
 
 .sett-reset-btn .material-symbols-outlined {
@@ -7505,6 +7517,11 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 @media (max-width: 900px) {
     .sett-grid {
         grid-template-columns: 1fr;
+    }
+
+    .sett-reset-row {
+        padding-left: 0;
+        padding-right: 0;
     }
 
 }
@@ -7661,10 +7678,30 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .ov-hero-actions {
+    position: relative;
     display: flex;
-    gap: 8px;
     align-items: center;
-    flex-shrink: 0;
+    justify-content: space-between;
+    width: 244px;
+    height: 44px;
+    flex: 0 0 244px;
+}
+
+.ov-hero-actions > button {
+    position: absolute;
+    top: 0;
+    height: 44px;
+    justify-content: center;
+    margin: 0;
+}
+
+.ov-hero-actions > #editProfileBtn,
+.ov-hero-actions > #saveProfileBtn {
+    right: 0;
+}
+
+.ov-hero-actions > #cancelProfileBtn {
+    left: 0;
 }
 
 /* Edit / Save / Cancel buttons as they appear inside the fixed dark-wine
@@ -7678,13 +7715,14 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 0.45rem 0.9rem;
+    min-height: 44px;
+    padding: 0.6rem 1.15rem;
     background: #570000;
     border: 1.5px solid rgba(255, 255, 255, 0.35);
     box-shadow: 0 2px 8px rgba(87, 0, 0, 0.35);
     border-radius: 8px;
     font-family: 'Poppins', sans-serif;
-    font-size: 12.5px;
+    font-size: 13.5px;
     font-weight: 600;
     color: #fff;
     cursor: pointer;
@@ -7692,7 +7730,7 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-edit-acc .material-symbols-outlined {
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .ov-profile-hero .btn-edit-acc:hover {
@@ -7704,7 +7742,8 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 0.45rem 0.9rem;
+    min-height: 44px;
+    padding: 0.6rem 1.15rem;
     background: rgba(255, 255, 255, 0.9);
     border: none;
     border-radius: 8px;
@@ -7725,7 +7764,8 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
 }
 
 .ov-profile-hero .btn-cancel-acc {
-    padding: 0.45rem 0.9rem;
+    min-height: 44px;
+    padding: 0.6rem 1.15rem;
     background: rgba(87, 0, 0, 0.62);
     border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 8px;
@@ -7798,12 +7838,50 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     color: var(--text-dark);
 }
 
+#panel-settings .info-card .info-val:not(.empty):not(.pw-change-untracked) {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
 .info-val.empty {
     color: var(--text-light);
 }
 
-.info-input-f {
+.pw-change-untracked {
+    font-style: italic;
+}
+
+.info-value-wrap {
+    position: relative;
     flex: 1;
+    min-width: 0;
+}
+
+.info-value-wrap .info-val {
+    display: block;
+}
+
+.info-value-wrap .info-input-f {
+    display: none;
+}
+
+#profileInfoCard[data-editing="true"] .info-value-wrap .info-val[data-field] {
+    visibility: hidden;
+}
+
+#profileInfoCard[data-editing="true"] .info-value-wrap .info-input-f {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: 36px;
+    min-width: 0;
+    box-sizing: border-box;
+    transform: translateY(-50%);
+}
+
+.info-input-f {
     padding: 0.4rem 0.75rem;
     border: 1.5px solid var(--accent-maroon);
     border-radius: 7px;
@@ -7847,6 +7925,16 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     white-space: nowrap;
     transition: all 0.15s;
     flex-shrink: 0;
+}
+
+.info-row [data-profile-edit-gated] {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.info-row [data-profile-edit-gated]:not(:disabled) {
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .btn-inline-sm:hover {
@@ -12683,6 +12771,114 @@ body.sidebar-collapsed nav.sidebar .nav-group+.nav-group {
 .faculty-form-card .fac-edit-section span {
     text-transform: none;
     letter-spacing: 0;
+}
+
+.faculty-form-card .fac-edit-section .fac-info {
+    flex: 0 0 auto;
+}
+
+.faculty-form-card .fac-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.faculty-form-card .fac-label-row label {
+    margin-bottom: 0;
+}
+
+.faculty-form-card .fac-info {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    line-height: 1;
+    z-index: 4;
+}
+
+.faculty-form-card .fac-info-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    color: color-mix(in srgb, var(--text-light) 72%, var(--card-bg));
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.faculty-form-card .fac-info-trigger:hover,
+.faculty-form-card .fac-info-trigger:focus-visible {
+    color: var(--text-light);
+    background: color-mix(in srgb, var(--text-light) 7%, transparent);
+}
+
+.faculty-form-card .fac-info-trigger:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--text-light) 55%, var(--card-bg));
+    outline-offset: 1px;
+}
+
+.faculty-form-card .fac-info-trigger .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.faculty-form-card .fac-info-popover {
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 0;
+    display: none;
+    width: min(280px, calc(100vw - 64px));
+    padding: 0.65rem 0.75rem;
+    color: var(--text-dark);
+    background: var(--card-bg);
+    border: 1px solid var(--khaki-border);
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: normal;
+    z-index: 20;
+}
+
+.faculty-form-card .fac-info-popover::before {
+    position: absolute;
+    top: -5px;
+    left: 7px;
+    width: 8px;
+    height: 8px;
+    content: '';
+    background: var(--card-bg);
+    border-top: 1px solid var(--khaki-border);
+    border-left: 1px solid var(--khaki-border);
+    transform: rotate(45deg);
+}
+
+.faculty-form-card .fac-info:hover,
+.faculty-form-card .fac-info:focus-within,
+.faculty-form-card .fac-info.fac-info-open {
+    z-index: 25;
+}
+
+.faculty-form-card .fac-label-row .fac-info-popover {
+    right: 0;
+    left: auto;
+}
+
+.faculty-form-card .fac-label-row .fac-info-popover::before {
+    right: 7px;
+    left: auto;
+}
+
+.faculty-form-card .fac-info:hover .fac-info-popover,
+.faculty-form-card .fac-info:focus-within .fac-info-popover,
+.faculty-form-card .fac-info.fac-info-open .fac-info-popover {
+    display: block;
 }
 
 /* "Look up in Faculty Registry" — a real, clearly clickable button */

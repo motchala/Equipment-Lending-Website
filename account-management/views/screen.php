@@ -4,7 +4,7 @@
             <?php if ($is_super_admin): ?>
                 <div class="tab-panel" id="panel-faculty">
 
-                    <div style="margin-bottom:1.5rem">
+                    <div class="admin-screen-header fac-management-head">
                         <h2 style="font-size:1.3rem;font-weight:700;color:var(--text-dark)">Faculty Management</h2>
                         <p style="color:var(--text-light);font-size:12.5px;margin-top:2px">Create, edit, and remove faculty accounts.</p>
                     </div>
@@ -135,7 +135,18 @@
                             <div class="eq-card-body">
                                 <?= csrf_field() ?>
 
-                                <div class="fac-edit-section">Name</div>
+                                <div class="fac-edit-section">
+                                    Name
+                                    <span class="fac-info">
+                                        <button type="button" class="fac-info-trigger" aria-label="Name entry guidance"
+                                            aria-expanded="false" aria-controls="fac-name-guidance" aria-describedby="fac-name-guidance">
+                                            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                        </button>
+                                        <span class="fac-info-popover" id="fac-name-guidance" role="tooltip">
+                                            Enter the whole surname under Last name, e.g. Dela Cruz. In the registry, everything after the middle initial (Edmundo B. Dela Cruz) is the surname; with no initial, the last word is.
+                                        </span>
+                                    </span>
+                                </div>
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="fac-first">First name <span class="req-star">*</span></label>
@@ -148,10 +159,6 @@
                                             class="form-control-custom" maxlength="100" required placeholder="Last">
                                     </div>
                                 </div>
-                                <small class="fac-field-hint" style="display:block;margin:-0.35rem 0 0.75rem">
-                                    Type the whole surname under Last name, e.g. <strong>Dela Cruz</strong>. In the registry, everything after the middle initial
-                                    (Edmundo B. <strong>Dela Cruz</strong>) is the surname; with no initial, the last word is.
-                                </small>
                                 <button type="button" id="fac-lookup-btn"
                                     class="ps-btn ps-btn--outline fac-lookup-btn">
                                     <span class="material-symbols-outlined">manage_search</span>
@@ -167,25 +174,56 @@
                                     <select id="fac-disambig-select" class="form-control-custom"></select>
                                 </div>
 
-                                <div class="fac-edit-section">Account <span style="font-size:11px;font-weight:400;color:var(--text-light)">(auto-filled from registry)</span></div>
+                                <div class="fac-edit-section">Account</div>
                                 <div class="form-group">
-                                    <label for="fac-email">PUPSync email</label>
+                                    <div class="fac-label-row">
+                                        <label for="fac-email">PUPSync email</label>
+                                        <span class="fac-info">
+                                            <button type="button" class="fac-info-trigger" aria-label="Email guidance"
+                                                aria-expanded="false" aria-controls="fac-email-guidance" aria-describedby="fac-email-guidance">
+                                                <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                            </button>
+                                            <span class="fac-info-popover" id="fac-email-guidance" role="tooltip">
+                                                The address is suggested from the registry name. Edit it if needed, for example when a surname has two words but no middle initial. It must end with @pupsync.edu.
+                                            </span>
+                                        </span>
+                                    </div>
                                     <input type="email" id="fac-email"
                                         class="form-control-custom" maxlength="254"
                                         autocomplete="off" spellcheck="false" placeholder="Auto-filled after lookup">
-                                    <small class="fac-field-hint">Suggested from the registry name. You can edit it, for example when a surname has two words but no middle initial. It must end with @pupsync.edu.</small>
                                 </div>
                                 <div class="form-group">
-                                    <label for="fac-faculty-id">Faculty ID</label>
+                                    <div class="fac-label-row">
+                                        <label for="fac-faculty-id">Faculty ID</label>
+                                        <span class="fac-info">
+                                            <button type="button" class="fac-info-trigger" aria-label="Faculty ID guidance"
+                                                aria-expanded="false" aria-controls="fac-id-guidance" aria-describedby="fac-id-guidance">
+                                                <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                            </button>
+                                            <span class="fac-info-popover" id="fac-id-guidance" role="tooltip">
+                                                This ID comes from the Faculty Identification Records. It cannot be edited and is permanent after account creation.
+                                            </span>
+                                        </span>
+                                    </div>
                                     <input type="text" id="fac-faculty-id"
                                         class="form-control-custom" maxlength="30"
                                         autocomplete="off" spellcheck="false"
                                         placeholder="Auto-filled after lookup"
                                         readonly aria-readonly="true" tabindex="-1">
-                                    <small class="fac-field-hint">From the Faculty Identification Records. Cannot be edited, and is permanent after account creation.</small>
                                 </div>
 
-                                <div class="fac-edit-section">Password</div>
+                                <div class="fac-edit-section">
+                                    Password
+                                    <span class="fac-info">
+                                        <button type="button" class="fac-info-trigger" aria-label="Password requirements"
+                                            aria-expanded="false" aria-controls="fac-password-guidance" aria-describedby="fac-password-guidance">
+                                            <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                        </button>
+                                        <span class="fac-info-popover" id="fac-password-guidance" role="tooltip">
+                                            Passwords must contain at least 8 characters and both password fields must match.
+                                        </span>
+                                    </span>
+                                </div>
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="fac-password">Password <span class="req-star">*</span></label>
@@ -261,7 +299,6 @@
                                     <span class="material-symbols-outlined">person_add</span>
                                     Create Account
                                 </button>
-                                <p class="fac-form-hint">Faculty ID and email are sourced from the Faculty Identification Records document.</p>
                             </div><!-- /eq-card-body -->
                         </div><!-- /faculty-form-card -->
 
@@ -398,7 +435,7 @@
             <?php if ($is_super_admin): ?>
                 <div class="tab-panel" id="panel-admins">
 
-                    <div class="am-head">
+                    <div class="am-head admin-screen-header">
                         <div class="am-head-text">
                             <h2 class="am-title">Admin Accounts</h2>
                             <p class="am-sub">Control who can sign in and review what each admin has been doing.</p>
@@ -549,4 +586,3 @@
                     </div>
                 </div><!-- /panel-admins -->
             <?php endif; ?>
-

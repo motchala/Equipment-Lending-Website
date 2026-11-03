@@ -315,6 +315,22 @@
                             </span>
                         </div>
                     </div>
+                    <div class="sov-profile-actions">
+                        <button type="button" class="sov-btn-outline sov-profile-edit-btn" id="sovEditBtn"
+                            data-action="account-edit">
+                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                            Edit Profile
+                        </button>
+                        <button type="button" class="sov-btn-primary sov-profile-save-btn" id="sovSaveBtn"
+                            data-action="account-save" disabled hidden>
+                            <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                            <span class="sov-profile-save-label">Save Changes</span>
+                        </button>
+                        <button type="button" class="sov-btn-outline sov-profile-cancel-btn" id="sovCancelBtn"
+                            data-action="account-cancel" hidden>
+                            Cancel
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Views -->
@@ -333,7 +349,7 @@
                             </header>
                             <div class="sx-grid sx-grid--lead">
 
-                                <!-- Personal Information: read-only until "Edit Account" is clicked -->
+                                <!-- Personal Information: read-only until the profile-bar Edit Profile action is clicked -->
                                 <?php
                                 $sov_email_masked = faculty_mask_email($db_email);
                                 $sov_phone_view   = faculty_phone_display($db_phone);
@@ -342,10 +358,6 @@
                                     <div class="acct-card-head">
                                         <span class="material-symbols-outlined">badge</span>
                                         <h3>Personal Information</h3>
-                                        <button type="button" class="sov-btn-outline sov-edit-btn" id="sovEditBtn" data-action="account-edit">
-                                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                                            Edit Account
-                                        </button>
                                     </div>
                                     <div class="acct-rows">
                                         <div class="acct-row">
@@ -372,8 +384,8 @@
                                         <div class="acct-row">
                                             <span class="acct-row-label">Email Address</span>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static <?php echo $sov_email_masked === '' ? 'acct-row-static-muted' : 'acct-row-email'; ?>" id="sovEmailMasked"
-                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, partially hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? 'Not set' : htmlspecialchars($sov_email_masked); ?></span>
+                                                <span class="acct-row-static <?php echo $sov_email_masked === '' ? 'acct-row-static-muted acct-row-not-provided' : 'acct-row-email'; ?>" id="sovEmailMasked"
+                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, partially hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? '— Not provided' : htmlspecialchars($sov_email_masked); ?></span>
                                             </div>
                                             <span class="material-symbols-outlined fid-lock" title="Your email is your sign-in ID and is managed by the administrator">lock</span>
                                         </div>
@@ -383,14 +395,18 @@
                                                 <?php if ($department_locked): ?>
                                                     <span class="acct-row-static" id="sovDepartmentView"><?php echo htmlspecialchars($db_department); ?></span>
                                                 <?php else: ?>
-                                                    <span class="acct-row-static acct-row-static-muted" id="sovDepartmentView" data-view="department">Not set</span>
+                                                    <span class="acct-row-static acct-row-static-muted acct-row-not-provided" id="sovDepartmentView" data-view="department">— Not provided</span>
                                                     <select class="acct-row-input" id="sovDepartment" name="department" data-edit-field="department" disabled>
                                                         <option value="">Select your department&hellip;</option>
                                                         <?php foreach (faculty_departments() as $sov_dept): ?>
                                                             <option value="<?php echo htmlspecialchars($sov_dept); ?>"><?php echo htmlspecialchars($sov_dept); ?></option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <p class="acct-field-hint" data-hint-for="department" hidden>You can choose this once &mdash; it can&rsquo;t be changed afterwards.</p>
+                                                    <button type="button" class="sov-field-info" data-sov-edit-gated hidden
+                                                        aria-label="Department selection information" aria-describedby="sovDepartmentHint">
+                                                        <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                                        <span class="sov-field-info-tip" id="sovDepartmentHint" role="tooltip">You can choose your department once; it can&rsquo;t be changed afterwards.</span>
+                                                    </button>
                                                 <?php endif; ?>
                                                 <p class="acct-field-error" data-error-for="department" role="alert" hidden></p>
                                             </div>
@@ -401,17 +417,13 @@
                                         <div class="acct-row">
                                             <label class="acct-row-label" for="sovPhone">Mobile Number</label>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static <?php echo $sov_phone_view === '' ? 'acct-row-static-muted' : ''; ?>" id="sovPhoneView" data-view="phone"><?php echo $sov_phone_view === '' ? 'Not set' : htmlspecialchars($sov_phone_view); ?></span>
+                                                <span class="acct-row-static <?php echo $sov_phone_view === '' ? 'acct-row-static-muted acct-row-not-provided' : ''; ?>" id="sovPhoneView" data-view="phone"><?php echo $sov_phone_view === '' ? '— Not provided' : htmlspecialchars($sov_phone_view); ?></span>
                                                 <input class="acct-row-input" id="sovPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
                                                     maxlength="20" placeholder="09XX XXX XXXX" value="<?php echo htmlspecialchars($sov_phone_view); ?>"
                                                     data-edit-field="phone" disabled>
                                                 <p class="acct-field-error" data-error-for="phone" role="alert" hidden></p>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="acct-card-foot sov-edit-foot">
-                                        <button type="button" class="sov-btn-outline" data-action="account-cancel">Cancel</button>
-                                        <button type="button" class="sov-btn-primary" id="sovSaveBtn" data-action="account-save" disabled>Save Changes</button>
                                     </div>
                                 </div>
 
@@ -428,18 +440,37 @@
                                             <div class="acct-row-value">
                                                 <span class="acct-row-static">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
                                             </div>
-                                            <button class="sov-btn-outline" data-action="open-pw-modal">Change</button>
+                                            <span class="sov-gated-action-slot">
+                                                <button type="button" class="sov-btn-outline" data-action="open-pw-modal"
+                                                    data-sov-edit-gated hidden>Change</button>
+                                            </span>
+                                        </div>
+                                        <?php
+                                        $sov_pw_changed_ts = !empty($db_last_pw_change) ? strtotime($db_last_pw_change) : false;
+                                        $sov_pw_untracked = $sov_pw_changed_ts === false;
+                                        ?>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Last Changed</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-password-change<?php echo $sov_pw_untracked ? ' pw-change-untracked' : ''; ?>"
+                                                    id="sovPasswordLastChanged">
+                                                    <?php echo $sov_pw_untracked ? '— Not tracked' : htmlspecialchars(date('M d, Y · g:i A', $sov_pw_changed_ts)); ?>
+                                                </span>
+                                            </div>
                                         </div>
                                         <div class="acct-row">
                                             <span class="acct-row-label">Backup Email</span>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static">
-                                                    <?php echo $masked_backup ? htmlspecialchars($masked_backup) : 'Not set'; ?>
+                                                <span class="acct-row-static <?php echo $masked_backup ? '' : 'acct-row-static-muted acct-row-not-provided'; ?>">
+                                                    <?php echo $masked_backup ? htmlspecialchars($masked_backup) : '— Not provided'; ?>
                                                 </span>
                                             </div>
-                                            <button class="sov-btn-outline" data-action="open-backup-email-modal">
-                                                <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
-                                            </button>
+                                            <span class="sov-gated-action-slot">
+                                                <button type="button" class="sov-btn-outline"
+                                                    data-action="open-backup-email-modal" data-sov-edit-gated hidden>
+                                                    <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
+                                                </button>
+                                            </span>
                                         </div>
                                         <?php
                                         $sov_dev      = faculty_device_info($_SERVER['HTTP_USER_AGENT'] ?? '');
@@ -696,4 +727,3 @@
             </div><!-- /sov-body -->
         </div><!-- /sov-shell -->
     </div><!-- /settingsOverlay -->
-

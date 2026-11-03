@@ -7,7 +7,7 @@
     ============================================================ -->
             <div class="tab-panel" id="panel-activity">
 
-                <div class="act-head">
+                <div class="act-head admin-screen-header">
                     <h2 class="act-title">Activity</h2>
                     <p class="act-sub">Every decision and change, and who made it. Automatic decisions come from the rules engine.</p>
                 </div>
@@ -60,7 +60,6 @@
                     </div>
                 </section>
             </div><!-- /panel-activity -->
-
 
 
 

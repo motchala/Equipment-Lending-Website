@@ -43,7 +43,8 @@ CREATE TABLE `tbl_accounts` (
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
   `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
-  `last_password_change` datetime DEFAULT NULL
+  `last_password_change` datetime DEFAULT NULL,
+  `backup_email` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --

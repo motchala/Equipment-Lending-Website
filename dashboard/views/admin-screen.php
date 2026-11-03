@@ -19,7 +19,7 @@
                          Everything here is static (never swapped by the live refresh), so the ids that
                          admin-dashboard.js binds to — greetName, dashNotifBtn, dashNotifBadge, dashAvatarBtn,
                          openQrScannerBtn — stay put. -->
-                    <header class="dash-head">
+                    <header class="dash-head admin-screen-header">
                         <div class="dash-head-text">
                             <h1>Good <?php
                                         $hour = (int)date('H');
@@ -59,7 +59,6 @@
                 </div><!-- /dash -->
 
             </div><!-- /panel-dashboard -->
-
 
 
 
