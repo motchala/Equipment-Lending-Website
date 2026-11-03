@@ -150,7 +150,7 @@ class RoomCancellation
 
     if (!$facRow || empty($facRow['email'])) return;
 
-    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+    require_once __DIR__ . '/../../shared/core/mailer.php';
 
     $dateDisplay  = date('F j, Y', strtotime($row['reservation_date']));
     $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $row['start_time']));
@@ -228,7 +228,7 @@ class RoomCancellation
 
     if (empty($entries)) return;
 
-    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+    require_once __DIR__ . '/../../shared/core/mailer.php';
 
     $dateDisplay  = date('F j, Y', strtotime($resDate));
     $startDisplay = date('g:i A',  strtotime('1970-01-01 ' . $startTime));

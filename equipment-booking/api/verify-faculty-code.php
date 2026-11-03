@@ -41,7 +41,7 @@ if ($row['is_used']) {
 
 // ── Student must be on the official student list (Settings → Student List) ──
 // Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
-require_once __DIR__ . '/../../config/student-registry.php';
+require_once __DIR__ . '/../../shared/core/student-registry.php';
 $student_course = trim((string)($body['student_course'] ?? ''));
 if (!student_registry_valid_course($student_course)) {
     echo json_encode(['error' => 'Please select your course.']);
@@ -84,7 +84,7 @@ $fac_mail_row = $fac_mail_stmt->get_result()->fetch_assoc();
 $fac_mail_stmt->close();
 
 if ($fac_mail_row && !empty($fac_mail_row['email'])) {
-    require_once __DIR__ . '/../core/mailer.php';
+    require_once __DIR__ . '/../../shared/core/mailer.php';
     $email_subject = 'PUPSync: ' . $student_name . ' is about to borrow equipment';
     $email_body = '
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">

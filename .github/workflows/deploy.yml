@@ -26,4 +26,8 @@ jobs:
             **/.git*/**
             .env
             **/config/db.php 
+            database/**
+            docs/**
+            z-README.md
+            .env.example
             **/node_modules/**

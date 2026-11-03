@@ -60,7 +60,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/booking-schedule.php';
-require_once __DIR__ . '/../../room-reservation/core/faculty-room-quota.php';   // fact_day_label(), fact_time()
+require_once __DIR__ . '/../../room-reservation/core/room-quota.php';   // fact_day_label(), fact_time()
 
 final class BorrowExtension
 {
@@ -105,7 +105,7 @@ final class BorrowExtension
                 $have = $columns();
             }
 
-            // Same table the admin Activity feed creates (config/admin-activity.php), so either side can be first
+            // Same table the admin Activity feed creates (shared/core/activity-logger.php), so either side can be first
             $conn->query(
                 "CREATE TABLE IF NOT EXISTS `tbl_request_events` (
                     `id`             int(11) NOT NULL AUTO_INCREMENT,

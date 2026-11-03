@@ -135,7 +135,7 @@ if (!$room_row) {
 $room_name = (string)$room_row['room_name'];
 
 // ── Quota check ───────────────────────────────────────────────────────────────
-require_once __DIR__ . '/../core/faculty-room-quota.php';
+require_once __DIR__ . '/../core/room-quota.php';
 fcty_quota_lock($conn, $faculty_id);
 
 $active_now = fcty_active_room_reservations($conn, $faculty_id);

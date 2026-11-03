@@ -92,7 +92,7 @@ if (!$result['success']) {
 
 // Activity log: only manual cancellations by an admin (faculty cancelling their own booking is not admin activity).
 if ($isAdmin) {
-    require_once __DIR__ . '/../../config/admin-activity.php';
+    require_once __DIR__ . '/../../shared/core/activity-logger.php';
     $label = 'Cancelled reservation #' . $reservationId;
     if ($q = $conn->prepare('SELECT r.room_name, rr.faculty_name FROM tbl_room_reservations rr LEFT JOIN tbl_rooms r ON r.room_id = rr.room_id WHERE rr.id = ? LIMIT 1')) {
         $q->bind_param('i', $reservationId);

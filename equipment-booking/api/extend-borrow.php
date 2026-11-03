@@ -43,7 +43,7 @@ if ($method !== 'GET' && $method !== 'POST') {
 }
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../core/faculty-activity.php';   // also loads BookingSchedule + BorrowExtension
+require_once __DIR__ . '/../../activity/core/faculty-data.php';   // also loads BookingSchedule + BorrowExtension
 
 $conn       = getDB();
 $faculty_id = (string)$_SESSION['faculty_id'];

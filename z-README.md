@@ -22,40 +22,32 @@ There is **no build step and no Composer/npm dependency manager** — everything
 
 ## Architecture
 
-Monolithic, module-per-feature PHP app. No MVC framework — each role has one large "portal" file that renders the whole SPA-like dashboard, backed by small stateless JSON API endpoints for AJAX/polling.
+Monolithic, module-per-feature PHP app. No MVC framework — each role has one thin "portal" entry file that assembles the SPA-like dashboard from module pieces, backed by small stateless JSON API endpoints for AJAX/polling.
 
 ```
-├── landing-page.php          # Unified login (Faculty + Admin) — public entry point
+├── landing-page.php          # Public entry: login (thin loader -> auth/core/login-handler.php + auth/views/landing.php)
 ├── student-dashboard.php     # Student portal (code-based access, no login)
-├── faculty-dashboard.php     # Faculty portal (borrowing + room reservation UI)
-├── admin-dashboard.php       # Admin/Super Admin control center
+├── faculty-dashboard.php     # Faculty portal entry (thin loader; pieces live in dashboard/ + the feature modules)
+├── admin-dashboard.php       # Admin / Super Admin entry (thin loader)
 │
-├── equipment-booking/        # Equipment-lending module
-│   ├── api/                  #   AJAX endpoints (submit, verify, poll, admin actions)
-│   ├── core/                 #   Business logic (see below)
-│   └── assets/                #   Module-scoped CSS/JS
+├── auth/                     # Sign-in: login handler + landing view, logout, rate limiter, role splash
+├── dashboard/                # Dashboard data, render and handlers + the dashboard CSS/JS
+├── equipment-booking/        # Equipment lending (api/, core/, views/, assets/)
+├── room-reservation/         # Room booking (api/, core/, views/, assets/)
+├── account-management/       # Admin + faculty accounts, faculty/student registry uploads
+├── notifications/            # Notification feed (admin + faculty)
+├── activity/                 # Activity feed
+├── settings/                 # Profile, password, data export, student registry screen
+├── shared/                   # Cross-module code: core/ (mailer, activity logger, paths), views/ (page shells), assets/ (shell CSS/JS, logout modal, favicons), document-viewer.php
 │
-├── room-reservation/         # Room-booking module (mirrors equipment-booking's shape)
-│   ├── api/
-│   ├── core/
-│   └── assets/
-│
-├── assets/                   # Shared static files: landing-page + role-splash css/js, fonts, images
-│
-├── config/                   # Cross-cutting bootstrap, required by every entry point
-│   ├── db.php                #   getDB() — cached MySQLi connection (gitignored, see Setup)
-│   ├── env.php                #   Minimal .env parser → $_ENV
-│   ├── session.php             #   Hardened session_start() wrapper
-│   ├── csrf.php                #   csrf_token() / csrf_field() / csrf_verify()
-│   ├── security-headers.php     #   CSP/X-Frame-Options fallback for AJAX endpoints
-│   └── role-splash.php          #   role_splash_head() / render_role_splash() — post-login overlay markup
-│
-├── database/lending_db.sql   # Full schema + seed data (idempotent migrations baked in as
-│                              #   "ALTER TABLE IF NOT EXISTS column" guards — see below)
+├── assets/                   # Third-party and database-referenced files only: fonts/, js/vendor/, images/faculty/ (building photos, paths stored in the DB)
+├── config/                   # Bootstrap required by every entry point: db, env, session, csrf, security-headers
+├── database/lending_db.sql   # Full schema + seed data (never deploy this folder)
 ├── vendor/PHPMailer/         # Vendored library (no Composer)
 ├── uploads/                  # User-submitted files: item photos, profile pictures, request letters
 └── .github/workflows/deploy.yml
 ```
+Each module folder uses the same shape: `api/` (HTTP endpoints), `core/` (logic, include-only), `views/` (page pieces, include-only) and `assets/` (that module's CSS/JS). `core/` and `views/` are blocked from direct web access by a `.htaccess` in each.
 
 **Why "core" is split from "api":** `core/*.php` holds pure(r) business logic and is `require`'d by multiple callers; `api/*.php` files are thin HTTP endpoints — they handle the request, call into `core/`, and echo JSON. `admin-dashboard.php` and `faculty-dashboard.php` also `require_once` `core/` files directly to render initial page state without an AJAX round-trip.
 
@@ -112,10 +104,10 @@ Inventory CRUD (with archiving, not hard deletes), request oversight and manual 
 Deliberately **not stored as generated events** — the feed is computed fresh on every load from the current state of `tbl_requests`, `tbl_room_issues`, and `tbl_inventory` (e.g. "3 items overdue" is a live query, not a row someone inserted). Only read/deleted state per notification persists, in `tbl_notif_state`, keyed by a synthetic id like `overdue-12`.
 
 ### 6. Role splash (post-login transition)
-A short full-screen overlay (PUPSYNC wordmark → role name: Admin / Super Admin / Faculty / Student) shown **only right after a successful sign-in** — never on a refresh or ordinary navigation. `landing-page.php` arms a one-shot session flag (`role_splash_arm()`) just before redirecting; the dashboard consumes it on that first load. Logging out destroys the session, so the next login shows it again. Students don't log in, so "Continue as Student" routes through `landing-page.php?go=student`, which arms the flag for them. Purely cosmetic — no auth or DB logic. Three files: `config/role-splash.php` (markup helper + flag), `assets/css/role-splash.css` (look + entire timeline, tunable via the `--rs-t-*` variables), `assets/js/role-splash.js` (cleanup/skip only). Each dashboard integrates it with three lines: a `require_once`, `role_splash_head()` in `<head>`, and `render_role_splash('<Role>')` right after `<body>`.
+A short full-screen overlay (PUPSYNC wordmark → role name: Admin / Super Admin / Faculty / Student) shown **only right after a successful sign-in** — never on a refresh or ordinary navigation. `landing-page.php` arms a one-shot session flag (`role_splash_arm()`) just before redirecting; the dashboard consumes it on that first load. Logging out destroys the session, so the next login shows it again. Students don't log in, so "Continue as Student" routes through `landing-page.php?go=student`, which arms the flag for them. Purely cosmetic — no auth or DB logic. Three files: `auth/core/role-splash.php` (markup helper + flag), `assets/css/role-splash.css` (look + entire timeline, tunable via the `--rs-t-*` variables), `assets/js/role-splash.js` (cleanup/skip only). Each dashboard integrates it with three lines: a `require_once`, `role_splash_head()` in `<head>`, and `render_role_splash('<Role>')` right after `<body>`.
 
 ### 7. Responsive admin (mobile / tablet)
-The admin portal adapts to phones and tablets without changing the desktop layout (verified pixel-identical at 1200/1440/1920px). The base `admin-dashboard.css` already carries the off-canvas sidebar drawer and its 1024/768/480/400px breakpoints; `equipment-booking/assets/css/admin-dashboard-responsive.css` (loaded after it) adds what was missing, and `equipment-booking/assets/js/admin-dashboard-responsive.js` (deferred) prepares the markup it needs. **Tablet (769–1024px):** icon-rail sidebar, tighter table padding and scroll-shadow hints. **Phone (≤768px):** every data table (`.ps-table`, `.pr-table`, `.admin-table`) becomes stacked cards — the JS copies each column header onto its cells as `data-label` and tags the headline, thumbnail and actions cells, and re-runs whenever live-render/AJAX swaps rows in, so new tables need no extra work; the Room Schedule's Mon–Fri grid becomes a one-day agenda with day tabs; touch targets are ≥44px; text inputs are 16px so iOS doesn't auto-zoom. No existing class, id or script was renamed or modified.
+The admin portal adapts to phones and tablets without changing the desktop layout (verified pixel-identical at 1200/1440/1920px). The base `admin-dashboard.css` already carries the off-canvas sidebar drawer and its 1024/768/480/400px breakpoints; `dashboard/assets/css/admin-dashboard-responsive.css` (loaded after it) adds what was missing, and `dashboard/assets/js/admin-dashboard-responsive.js` (deferred) prepares the markup it needs. **Tablet (769–1024px):** icon-rail sidebar, tighter table padding and scroll-shadow hints. **Phone (≤768px):** every data table (`.ps-table`, `.pr-table`, `.admin-table`) becomes stacked cards — the JS copies each column header onto its cells as `data-label` and tags the headline, thumbnail and actions cells, and re-runs whenever live-render/AJAX swaps rows in, so new tables need no extra work; the Room Schedule's Mon–Fri grid becomes a one-day agenda with day tabs; touch targets are ≥44px; text inputs are 16px so iOS doesn't auto-zoom. No existing class, id or script was renamed or modified.
 
 ### 8. Admin Dashboard tab (home screen)
 The Dashboard tab is a read-only overview: five clickable stat cards (pending approvals, active loans, overdue returns, rooms today, stock alerts), a 7/14/30-day *Demand & decisions* chart (Equipment / Rooms), a *Needs attention* list, and panels for rooms, most-requested equipment, stock watch, latest requests and the arbitration decision log. It lives entirely in the three existing admin files: `admin-dashboard.php` (top of the file: `dash_collect()` gathers the numbers, `dash_render()` prints the markup; the Dashboard panel calls them for first paint, and `admin-dashboard.php?fragment=dashboard` returns the same markup for the live refresh), `assets/css/admin-dashboard.css` (the `dash-*` block at the end, laid out with container queries so it follows the content width rather than the window) and `assets/js/admin-dashboard.js` (the dashboard block at the end: draws the chart as plain SVG because the CSP allows no chart libraries, routes card clicks through the real sidebar items, and swaps in fresh markup every 15 s). The header (greeting, action buttons, bell, avatar) sits outside the swapped `#dashLive` region on purpose, since the rest of `admin-dashboard.js` binds to those ids. Read-only: overdue/auto-decline housekeeping stays in `admin-functions.php` and `poll-requests-data.php`.

@@ -35,7 +35,7 @@ if (!isset($_SESSION['faculty_id'])) {
 date_default_timezone_set('Asia/Manila');
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../core/faculty-room-quota.php';
+require_once __DIR__ . '/../core/room-quota.php';
 
 $conn       = getDB();
 $faculty_id = (string)$_SESSION['faculty_id'];

@@ -92,7 +92,7 @@ require_once __DIR__ . '/../core/booking-schedule.php';
 BookingSchedule::ensureSchema($conn);
 
 // Activity log: make sure override_by_id exists (DDL) BEFORE the transaction starts.
-require_once __DIR__ . '/../../config/admin-activity.php';
+require_once __DIR__ . '/../../shared/core/activity-logger.php';
 admin_activity_bootstrap($conn);
 $acting_admin_id = admin_current_id($conn);
 

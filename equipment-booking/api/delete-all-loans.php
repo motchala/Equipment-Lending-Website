@@ -85,7 +85,7 @@ csrf_verify();
 date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
-require_once __DIR__ . '/../../config/admin-activity.php';
+require_once __DIR__ . '/../../shared/core/activity-logger.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');
@@ -188,6 +188,7 @@ unset($_SESSION['mgmt_reauth_fails'], $_SESSION['mgmt_reauth_lock_until']);
 $deleted      = 0;
 $restore_done = 0;
 $docs         = [];
+$counts       = ['waiting' => 0, 'scheduled' => 0, 'out' => 0, 'returned' => 0];
 
 $conn->begin_transaction();
 try {

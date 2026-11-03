@@ -102,7 +102,7 @@ if ($row['is_used']) {
 }
 
 // ── Student must be on the official student list (Settings → Student List) ──
-require_once __DIR__ . '/../../config/student-registry.php';
+require_once __DIR__ . '/../../shared/core/student-registry.php';
 $student_course = trim((string)($body['student_course'] ?? ''));
 if (!student_registry_valid_course($student_course)) {
     echo json_encode(['error' => 'Please select your course.']);
