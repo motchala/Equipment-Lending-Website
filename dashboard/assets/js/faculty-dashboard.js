@@ -5459,7 +5459,8 @@
 
         neverMindBtn.addEventListener('click', function () {
             chips.remove();
-            appendAiBubble(body, 'No problem! Your reservation(s) are unchanged.');
+            var chatBody = document.getElementById('actAiChatBody');
+            appendAiBubble(chatBody, 'No problem! Your reservation(s) are unchanged.');
             setSending(false);
         });
     }
