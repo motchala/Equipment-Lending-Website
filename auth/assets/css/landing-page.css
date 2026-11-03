@@ -148,7 +148,7 @@ body {
     position: absolute;
     left: clamp(1.75rem, 4vw, 4rem);
     right: clamp(1.75rem, 10vw, 9rem);
-    bottom: clamp(2.25rem, 7vh, 4.5rem);
+    bottom: calc(clamp(2.25rem, 7vh, 4.5rem) + 1rem);
     z-index: 2;
     max-width: 480px;
     padding-left: 1.15rem;
@@ -169,7 +169,7 @@ body {
 .visual-heading {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 300;
-    font-size: clamp(2.15rem, 3.6vw, 3.4rem);
+    font-size: clamp(2.3rem, 3.8vw, 3.7rem);
     line-height: 1.1;
     color: var(--cream);
     letter-spacing: -0.3px;
@@ -186,7 +186,7 @@ body {
     margin-top: 1.1rem;
     font-family: 'Outfit', sans-serif;
     font-weight: 300;
-    font-size: clamp(0.82rem, 1.05vw, 0.95rem);
+    font-size: clamp(0.86rem, 1.1vw, 1rem);
     line-height: 1.7;
     color: rgba(255, 255, 255, 0.78);
     text-shadow: 0 1px 14px rgba(10, 2, 3, 0.4);
@@ -332,9 +332,7 @@ body {
     color: var(--maroon);
 }
 
-/* "Continue as Student" — deliberately called out in red so it reads
-   as a distinct path from the login form above, not just another
-   footer link like Lending Policy / FAQs. */
+/* "Continue as Student" is called out as a distinct path from the login form. */
 #studentLink {
     color: #d32f2f;
     font-weight: 600;
@@ -342,10 +340,6 @@ body {
 
 #studentLink:hover {
     color: #b71c1c;
-}
-
-.panel-dot {
-    color: var(--text-dim);
 }
 
 .panel-badges {
@@ -399,7 +393,7 @@ body {
     }
 
     .visual-heading {
-        font-size: clamp(1.9rem, 5.2vw, 2.6rem);
+        font-size: clamp(2.1rem, 5.4vw, 2.8rem);
     }
 }
 
@@ -662,6 +656,77 @@ body {
     border-color: rgba(109, 27, 35, 0.45);
     box-shadow: 0 0 0 3px rgba(109, 27, 35, 0.08);
     transform: translateY(-1px);
+}
+
+.remember-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    margin: 0.1rem 0 0.35rem;
+    color: var(--text-mid);
+    font-size: 0.76rem;
+    font-weight: 500;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.remember-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.remember-option span {
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.remember-option span::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    border: 1px solid var(--modal-bdr);
+    border-radius: 4px;
+    background: var(--modal-sur);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.remember-option span::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    width: 5px;
+    height: 9px;
+    border: solid var(--cream);
+    border-width: 0 2px 2px 0;
+    opacity: 0;
+    transform: translateY(-65%) rotate(45deg);
+    transition: opacity 0.15s;
+}
+
+.remember-option input:checked + span::before {
+    border-color: var(--maroon);
+    background: var(--maroon);
+}
+
+.remember-option input:checked + span::after {
+    opacity: 1;
+}
+
+.remember-option input:focus-visible + span::before {
+    box-shadow: 0 0 0 3px rgba(96, 3, 2, 0.16);
+}
+
+.remember-option:hover {
+    color: var(--text-hi);
 }
 
 .form-field:-webkit-autofill,
@@ -1068,16 +1133,10 @@ body {
         gap: 0.25rem 1rem;
     }
 
-    /* Three footer links spread evenly across the row; the middle-dot
-       separators are redundant once each link has its own 44px box. */
     .panel-links {
         width: 100%;
-        justify-content: space-between;
+        justify-content: center;
         gap: 0;
-    }
-
-    .panel-dot {
-        display: none;
     }
 }
 
@@ -1120,16 +1179,16 @@ body {
     .visual-content {
         left: max(1.25rem, env(safe-area-inset-left));
         right: 1.25rem;
-        bottom: 1rem;
+        bottom: 1.75rem;
     }
 
     .visual-heading {
-        font-size: clamp(1.5rem, 3.6vw, 2rem);
+        font-size: clamp(1.7rem, 3.9vw, 2.2rem);
     }
 
     .visual-sub {
         margin-top: 0.6rem;
-        font-size: 0.78rem;
+        font-size: 0.82rem;
         line-height: 1.55;
         display: -webkit-box;
         -webkit-line-clamp: 3;

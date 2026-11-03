@@ -38,6 +38,7 @@ require_once PS_ROOT . '/config/db.php';
 require_once PS_ROOT . '/shared/core/mailer.php';
 require_once PS_ROOT . '/auth/core/rate-limiter.php';
 $conn = getDB();
+$rl_ip = rl_get_client_ip();
 
 // ── PRG: read and immediately clear any flash data from the session ────────
 // Flash keys are written by the POST handler below and consumed exactly once
@@ -47,13 +48,40 @@ $login_error     = $_SESSION['flash_login_error']     ?? "";
 $login_email_val = $_SESSION['flash_login_email']     ?? "";
 $lockout_seconds = (int)($_SESSION['flash_lockout_seconds'] ?? 0);
 $lockout_until   = $_SESSION['flash_lockout_until']   ?? "";
+$remember_me     = !empty($_SESSION['flash_remember_me']);
 
 unset(
     $_SESSION['flash_login_error'],
     $_SESSION['flash_login_email'],
     $_SESSION['flash_lockout_seconds'],
-    $_SESSION['flash_lockout_until']
+    $_SESSION['flash_lockout_until'],
+    $_SESSION['flash_remember_me']
 );
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    $ip_check = checkIpAllowed($rl_ip, $conn);
+    $lockout_email = (string)($_SESSION['login_lockout_email'] ?? '');
+    $email_check = $lockout_email !== ''
+        ? checkLoginAllowed($lockout_email, $rl_ip, $conn)
+        : ['allowed' => true, 'seconds_left' => 0, 'locked_until' => ''];
+
+    if (!$ip_check['allowed']) {
+        $lockout_seconds = (int)$ip_check['seconds_left'];
+        $lockout_until = (string)$ip_check['locked_until'];
+        $login_error = 'Too many failed attempts from this location.';
+        $login_email_val = $lockout_email !== '' ? $lockout_email : $login_email_val;
+        if ($lockout_email !== '') {
+            $_SESSION['login_lockout_email'] = $lockout_email;
+        }
+    } elseif (!$email_check['allowed']) {
+        $lockout_seconds = (int)$email_check['seconds_left'];
+        $lockout_until = (string)$email_check['locked_until'];
+        $login_error = 'Too many failed attempts.';
+        $login_email_val = $lockout_email;
+    } elseif ($lockout_email !== '') {
+        unset($_SESSION['login_lockout_email']);
+    }
+}
 
 // ── POST handler ───────────────────────────────────────────────────────────
 // Single unified login — the form no longer asks the user whether they're
@@ -68,16 +96,17 @@ if (isset($_POST['login'])) {
     csrf_verify();
     $email    = trim($_POST['email']);
     $password = $_POST['password'];
+    $remember_me_requested = ($_POST['remember_me'] ?? '') === '1';
 
     // Preserve the submitted email so the field stays populated on redirect.
     $_SESSION['flash_login_email'] = $email;
+    $_SESSION['flash_remember_me'] = $remember_me_requested;
 
     // ── Rate-limit pre-checks ──────────────────────────────────────────────
-    $rl_ip = rl_get_client_ip();
-
     // Layer 1 — IP-wide throttle (runs first; broader restriction).
     $ip_check = checkIpAllowed($rl_ip, $conn);
     if (!$ip_check['allowed']) {
+        $_SESSION['login_lockout_email'] = $email;
         $_SESSION['flash_login_error']     = "Too many failed attempts from this location. Try again in " . gmdate('i:s', $ip_check['seconds_left']) . ".";
         $_SESSION['flash_lockout_seconds'] = $ip_check['seconds_left'];
         $_SESSION['flash_lockout_until']   = $ip_check['locked_until'];
@@ -88,12 +117,14 @@ if (isset($_POST['login'])) {
     // Layer 2 — per-account throttle (email + IP pair).
     $rl_check = checkLoginAllowed($email, $rl_ip, $conn);
     if (!$rl_check['allowed']) {
+        $_SESSION['login_lockout_email'] = $email;
         $_SESSION['flash_login_error']     = "Too many failed attempts. Try again in " . gmdate('i:s', $rl_check['seconds_left']) . ".";
         $_SESSION['flash_lockout_seconds'] = $rl_check['seconds_left'];
         $_SESSION['flash_lockout_until']   = $rl_check['locked_until'];
         header("Location: landing-page.php");
         exit();
     }
+    unset($_SESSION['login_lockout_email']);
 
     // ===== Try ADMIN account first (tbl_accounts) =====
     // NOTE: previously hardcoded to only accept email === 'main@admin.edu'.
@@ -140,6 +171,9 @@ if (isset($_POST['login'])) {
             }
 
             // ── Successful admin login ─────────────────────────
+            if (!session_regenerate_id(true)) {
+                throw new RuntimeException('Could not renew the session after login.');
+            }
             $_SESSION['admin']      = true;
             require_once PS_ROOT . '/shared/core/activity-logger.php';
             admin_log_activity($conn, 'login', 'Signed in', $email);
@@ -195,8 +229,14 @@ if (isset($_POST['login'])) {
 
             // Clear flash_login_email — no longer needed on success.
             unset($_SESSION['flash_login_email']);
+            unset($_SESSION['flash_remember_me']);
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
+            if ($remember_me_requested) {
+                remember_me_issue($conn, 'admin', $email, (string)$row_acc['password'], (int)$_SESSION['login_time']);
+            } else {
+                remember_me_remove_current($conn);
+            }
             role_splash_arm($_SESSION['admin_role']); // one-shot: splash shows once, on this hand-off only
             $_SESSION['admin_login_toast'] = true;    // one-shot: welcome toast shows once, right after this sign-in
             header("Location: admin-dashboard.php");
@@ -206,6 +246,7 @@ if (isset($_POST['login'])) {
             $rl_result = recordFailedAttempt($email, $rl_ip, true, $row_acc['fullName'] ?? 'Administrator', $conn);
             $_SESSION['flash_login_error'] = $rl_result['message'];
             if ($rl_result['locked']) {
+                $_SESSION['login_lockout_email'] = $email;
                 $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
                 $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
             }
@@ -224,6 +265,9 @@ if (isset($_POST['login'])) {
         $user = $result->fetch_assoc();
         if (password_verify($password, $user['password'])) {
             // ── Successful faculty login ───────────────────────────────
+            if (!session_regenerate_id(true)) {
+                throw new RuntimeException('Could not renew the session after login.');
+            }
             $_SESSION['faculty_id']    = $user['faculty_id'];
             $_SESSION['faculty_name']  = $user['fullname'];
             $_SESSION['faculty_email'] = $email;
@@ -231,8 +275,14 @@ if (isset($_POST['login'])) {
 
             // Clear flash_login_email — no longer needed on success.
             unset($_SESSION['flash_login_email']);
+            unset($_SESSION['flash_remember_me']);
 
             recordSuccessfulLogin($email, $rl_ip, $conn);
+            if ($remember_me_requested) {
+                remember_me_issue($conn, 'faculty', $email, (string)$user['password'], (int)$_SESSION['login_time']);
+            } else {
+                remember_me_remove_current($conn);
+            }
             role_splash_arm('Faculty'); // one-shot: splash shows once, on this hand-off only
             header("Location: faculty-dashboard.php");
             exit();
@@ -241,6 +291,7 @@ if (isset($_POST['login'])) {
             $rl_result = recordFailedAttempt($email, $rl_ip, true, $user['fullname'] ?? '', $conn);
             $_SESSION['flash_login_error'] = $rl_result['message'];
             if ($rl_result['locked']) {
+                $_SESSION['login_lockout_email'] = $email;
                 $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
                 $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];
             }
@@ -253,10 +304,12 @@ if (isset($_POST['login'])) {
         $ip_result  = recordIpFailedAttempt($rl_ip, $conn);
 
         if ($ip_result['locked']) {
+            $_SESSION['login_lockout_email'] = $email;
             $_SESSION['flash_login_error']     = $ip_result['message'];
             $_SESSION['flash_lockout_seconds'] = $ip_result['seconds_left'];
             $_SESSION['flash_lockout_until']   = $ip_result['locked_until'];
         } elseif ($rl_result['locked']) {
+            $_SESSION['login_lockout_email'] = $email;
             $_SESSION['flash_login_error']     = $rl_result['message'];
             $_SESSION['flash_lockout_seconds'] = $rl_result['seconds_left'];
             $_SESSION['flash_lockout_until']   = $rl_result['locked_until'];

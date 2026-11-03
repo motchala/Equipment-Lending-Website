@@ -57,6 +57,27 @@ INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `crea
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tbl_remember_tokens`
+--
+
+CREATE TABLE `tbl_remember_tokens` (
+  `selector` char(32) NOT NULL,
+  `validator_hash` char(64) NOT NULL,
+  `account_type` enum('admin','faculty') NOT NULL,
+  `account_email` varchar(255) NOT NULL,
+  `credential_hash` char(64) NOT NULL,
+  `auth_time` bigint(20) unsigned NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`selector`),
+  KEY `idx_remember_expiry` (`expires_at`),
+  KEY `idx_remember_account` (`account_type`,`account_email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `tbl_admin_activity`
 --
 

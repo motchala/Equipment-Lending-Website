@@ -18,7 +18,7 @@
     <link rel="preload" as="image" href="auth/assets/images/landing-page/1-hero-page.jpg">
     <!-- Fonts with display=swap to avoid FOIT -->
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 
     <link rel="stylesheet" href="auth/assets/css/landing-page.css">
 </head>
@@ -104,7 +104,7 @@
                             <label for="login-email">Email</label>
                             <div class="input-wrap">
                                 <input class="form-field" type="email" id="login-email" name="email"
-                                    placeholder="you@pup.edu.ph"
+                                    placeholder="you@pupsync.edu"
                                     value="<?= htmlspecialchars($login_email_val) ?>"
                                     autocomplete="email" required>
                                 <i class="fa-solid fa-envelope input-icon-left"></i>
@@ -122,6 +122,11 @@
                                 </button>
                             </div>
                         </div>
+                        <label class="remember-option" for="remember-me">
+                            <input type="checkbox" id="remember-me" name="remember_me" value="1"
+                                <?= $remember_me ? 'checked' : '' ?>>
+                            <span>Stay logged in for 30 days</span>
+                        </label>
                         <button type="submit" name="login" class="btn-auth"
                             id="loginSubmitBtn"
                             <?php if ($lockout_seconds > 0): ?>
@@ -138,10 +143,6 @@
 
             <div class="panel-bottom">
                 <div class="panel-links">
-                    <a href="#">Policy</a>
-                    <span class="panel-dot">&middot;</span>
-                    <a href="#">FAQs</a>
-                    <span class="panel-dot">&middot;</span>
                     <a href="landing-page.php?go=student" id="studentLink">Continue as Student</a>
                 </div>
                 <div class="panel-badges">
