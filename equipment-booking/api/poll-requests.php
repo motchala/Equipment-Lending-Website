@@ -19,7 +19,7 @@ $uid = $_SESSION['faculty_id'];
 // same functions the dashboard uses on first paint (core/faculty-activity.php, fact_eq_*):
 //   { body: html, rows: html, stats: { loans, overdue, pending } }
 if (($_GET['view'] ?? '') === 'activity') {
-    require_once __DIR__ . '/../core/faculty-activity.php';
+    require_once __DIR__ . '/../../activity/core/faculty-data.php';
     $root_url = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'], 3)), '/') . '/';
     fact_eq_housekeeping($conn);
     $activity = fact_eq_load($conn, is_scalar($uid) ? (string)$uid : '');

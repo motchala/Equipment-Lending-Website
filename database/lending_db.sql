@@ -43,7 +43,8 @@ CREATE TABLE `tbl_accounts` (
   `last_login` datetime DEFAULT NULL,
   `dormant_until` bigint(20) UNSIGNED DEFAULT NULL,
   `session_epoch` bigint(20) UNSIGNED NOT NULL DEFAULT 0,
-  `last_password_change` datetime DEFAULT NULL
+  `last_password_change` datetime DEFAULT NULL,
+  `backup_email` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -53,6 +54,27 @@ CREATE TABLE `tbl_accounts` (
 INSERT INTO `tbl_accounts` (`id`, `fullName`, `email`, `password`, `role`, `created_at`, `last_login`, `dormant_until`, `session_epoch`, `last_password_change`) VALUES
 (1, 'Redg Admin', 'main@admin.edu', '$2y$10$dLNCtd5IGqTMf7VUHFYyEOPI00YWyd9h9n4uj6dTptlcKwFNcw57e', 'Super Admin', '2026-01-01 00:00:00', '2026-10-24 17:33:45', NULL, 0, NULL),
 (2, 'Chico Ramos', 'chico@admin.edu', '$2y$10$w.G7jIE6r6iSsVyn/T/G2OAhoqpyxgu4kkWKbHIhOky/CJk94xLGC', 'Admin', '2026-10-02 11:05:03', '2026-10-04 05:50:19', NULL, 0, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tbl_remember_tokens`
+--
+
+CREATE TABLE `tbl_remember_tokens` (
+  `selector` char(32) NOT NULL,
+  `validator_hash` char(64) NOT NULL,
+  `account_type` enum('admin','faculty') NOT NULL,
+  `account_email` varchar(255) NOT NULL,
+  `credential_hash` char(64) NOT NULL,
+  `auth_time` bigint(20) unsigned NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`selector`),
+  KEY `idx_remember_expiry` (`expires_at`),
+  KEY `idx_remember_account` (`account_type`,`account_email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 

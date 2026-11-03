@@ -1,0 +1,729 @@
+    <!-- ================================================================
+     OVERLAY: ACCOUNT — merged into settingsOverlay below
+     (kept as hidden anchor for legacy data-target references)
+================================================================ -->
+    <div class="overlay-page" id="accountOverlay">
+        <div class="overlay-topbar">
+            <button class="overlay-back-btn" data-action="close-overlay" data-target="accountOverlay">
+                <span class="material-symbols-outlined">arrow_back</span> Back
+            </button>
+            <span class="overlay-topbar-title">My Account</span>
+            <div class="overlay-topbar-brand"><strong>PUP</strong>SYNC</div>
+        </div>
+        <div class="account-layout">
+            <div class="account-sidebar">
+                <span class="account-sidebar-label">My Account</span>
+                <button class="acc-nav-btn active" data-acc-tab="acc-overview">
+                    <span class="material-symbols-outlined">badge</span> Overview
+                </button>
+                <button class="acc-nav-btn" data-acc-tab="acc-academic">
+                    <span class="material-symbols-outlined">school</span> Department Info
+                </button>
+                <button class="acc-nav-btn" data-acc-tab="acc-contact">
+                    <span class="material-symbols-outlined">contacts</span> Contact Details
+                </button>
+            </div>
+            <div class="account-content">
+
+                <!-- Overview -->
+                <div id="acc-overview" class="overlay-sub-panel active">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account ║ Overview</span>
+                        <h2>Profile &amp; Identity</h2>
+                        <p>Your personal details and login information.</p>
+                    </div>
+                    <div class="account-hero-card">
+                        <div class="acc-avatar-section">
+                            <div class="acc-avatar-large" id="accOverlayAvatar">
+                                <?php if ($profile_pic_url): ?>
+                                    <img src="<?php echo htmlspecialchars($profile_pic_url); ?>" alt="Profile"
+                                        class="avatar-img"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.removeProperty('display');">
+                                    <span class="avatar-initials-fallback" style="display:none;"><?php echo htmlspecialchars($initials); ?></span>
+                                <?php else: ?>
+                                    <?php echo htmlspecialchars($initials); ?>
+                                <?php endif; ?>
+                            </div>
+                            <div style="position:relative;">
+                                <button class="btn-change-profile" id="accOverlayChangePhotoBtn"
+                                    data-action="open-picture-menu">Change Photo</button>
+                                <div class="picture-menu" id="accOverlayPictureMenu" style="display:none;">
+                                    <button class="pic-menu-item" data-action="upload-picture">
+                                        <span class="material-symbols-outlined"
+                                            style="font-size:15px;margin-right:8px;">upload</span>Upload Photo
+                                    </button>
+                                    <?php if ($profile_pic_url): ?>
+                                        <button class="pic-menu-item pic-menu-danger" data-action="remove-picture">
+                                            <span class="material-symbols-outlined"
+                                                style="font-size:15px;margin-right:8px;">delete</span>Remove Photo
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <input type="file" id="accOverlayPicInput" accept="image/jpeg,image/png,image/jpg,image/webp"
+                                style="display:none;">
+                        </div>
+                        <div class="acc-hero-info">
+                            <h2>
+                                <?php echo htmlspecialchars($fullname); ?>
+                            </h2>
+                            <p>ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
+                            <span class="acc-badge">
+                                <span
+                                    style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px;vertical-align:middle;"></span>
+                                Active Faculty
+                            </span>
+                        </div>
+                        <div class="acc-action-wrap">
+                            <button class="btn-edit-acc" id="accOverlayEditBtn" data-action="profile-edit">Edit
+                                Profile</button>
+                            <button class="btn-save-acc" id="accOverlaySaveBtn" style="display:none;"
+                                data-action="profile-save">
+                                <span class="material-symbols-outlined"
+                                    style="font-size:14px;margin-right:4px;">check</span>Save
+                            </button>
+                            <button class="btn-cancel-acc" id="accOverlayCancelBtn" style="display:none;"
+                                data-action="profile-cancel">Cancel</button>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Personal Information</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Full Name</span>
+                            <span class="info-val" data-field="fullname">
+                                <?php echo htmlspecialchars($fullname); ?>
+                            </span>
+                            <input class="info-input-f" data-input="fullname"
+                                value="<?php echo htmlspecialchars($fullname); ?>" disabled style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Login &amp; Security</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Primary Email</span>
+                            <span class="info-val <?php echo $masked_email ? '' : 'empty'; ?>">
+                                <?php echo $masked_email ?: '— Not provided'; ?>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Backup Email</span>
+                            <span class="info-val <?php echo $masked_backup ? '' : 'empty'; ?>"
+                                data-field="backup_email">
+                                <?php echo $masked_backup ?: '— Not provided'; ?>
+                            </span>
+                            <?php if (!$backup_locked): ?>
+                                <button class="btn-inline-action" data-action="open-backup-email-modal">Add</button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Password</span>
+                            <span class="info-val">••••••••••</span>
+                            <button class="btn-inline-action" data-action="open-email-verify-modal">Change</button>
+                        </div>
+                    </div>
+                </div><!-- /acc-overview -->
+
+                <!-- Department -->
+                <div id="acc-academic" class="overlay-sub-panel">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account ║ Department</span>
+                        <h2>Department Information</h2>
+                        <p>Your faculty department and assignment details.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Department Assignment</h3>
+                            <button class="btn-edit-acc" id="editAcademicBtn" data-action="academic-edit"
+                                style="display:inline-flex;">Edit</button>
+                            <button class="btn-save-acc" id="saveAcademicBtn" style="display:none;"
+                                data-action="academic-save">Save Changes</button>
+                            <button class="btn-cancel-acc" id="cancelAcademicBtn" style="display:none;"
+                                data-action="academic-cancel">Cancel</button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Faculty ID</span>
+                            <span class="info-val <?php echo $fid_unset ? 'empty' : ''; ?>" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                            <?php if ($fid_unset): ?>
+                                <button class="btn-inline-action" data-action="open-faculty-id-modal">Add</button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Full Name</span>
+                            <span class="info-val">
+                                <?php echo htmlspecialchars($fullname); ?>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Department</span>
+                            <span class="info-val <?php echo $department_locked ? '' : 'empty'; ?>" data-field="department">
+                                <?php echo $department_locked ? htmlspecialchars($db_department) : '— Not provided'; ?>
+                            </span>
+                            <?php if (!$department_locked): ?>
+                                <select class="info-input-f" data-input="department" disabled style="display:none;">
+                                    <option value="">Select Department...</option>
+                                    <?php foreach (['BEED', 'BSBA-HRM', 'BSCpE', 'BSED', 'BSIE', 'BSIT', 'BSPSY', 'DCET', 'DIT'] as $p): ?>
+                                        <option value="<?php echo $p; ?>">
+                                            <?php echo $p; ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php endif; ?>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Position / Rank</span>
+                            <span class="info-val <?php echo $db_faculty_rank ? '' : 'empty'; ?>" data-field="faculty_rank">
+                                <?php echo $db_faculty_rank ? htmlspecialchars($db_faculty_rank) : '— Not provided'; ?>
+                            </span>
+                            <select class="info-input-f" data-input="faculty_rank" disabled style="display:none;">
+                                <option value="">Select Position...</option>
+                                <?php foreach (['Instructor I', 'Instructor II', 'Instructor III', 'Assistant Professor I', 'Assistant Professor II', 'Assistant Professor III', 'Associate Professor I', 'Associate Professor II', 'Professor I', 'Professor II', 'Part-time Faculty'] as $rank): ?>
+                                    <option value="<?php echo $rank; ?>">
+                                        <?php echo $rank; ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Status</span>
+                            <span class="info-val"><span class="stock-badge stock-avail">Active / Regular</span></span>
+                        </div>
+                    </div>
+                </div><!-- /acc-academic -->
+
+                <!-- Contact -->
+                <div id="acc-contact" class="overlay-sub-panel">
+                    <div class="overlay-section-header">
+                        <span class="section-eyebrow">My Account ║ Contact</span>
+                        <h2>Contact Details</h2>
+                        <p>How we can reach you.</p>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Address</h3>
+                            <button class="btn-edit-acc" id="editContactBtn" data-action="contact-edit"
+                                style="display:inline-flex;">Edit</button>
+                            <button class="btn-save-acc" id="saveContactBtn" style="display:none;"
+                                data-action="contact-save">Save Changes</button>
+                            <button class="btn-cancel-acc" id="cancelContactBtn" style="display:none;"
+                                data-action="contact-cancel">Cancel</button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Present Address</span>
+                            <span class="info-val <?php echo $db_present_address ? '' : 'empty'; ?>"
+                                data-field="present_address">
+                                <?php echo $db_present_address ? htmlspecialchars($db_present_address) : '— Not provided'; ?>
+                            </span>
+                            <textarea class="info-input-f" data-input="present_address"
+                                placeholder="Enter your current address" disabled
+                                style="display:none;min-height:60px;"></textarea>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Permanent Address</span>
+                            <span class="info-val <?php echo $db_permanent_address ? '' : 'empty'; ?>"
+                                data-field="permanent_address">
+                                <?php echo $db_permanent_address ? htmlspecialchars($db_permanent_address) : '— Not provided'; ?>
+                            </span>
+                            <textarea class="info-input-f" data-input="permanent_address"
+                                placeholder="Enter your permanent address" disabled
+                                style="display:none;min-height:60px;"></textarea>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-head">
+                            <h3>Phone</h3>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Mobile Number</span>
+                            <span class="info-val <?php echo $db_phone ? '' : 'empty'; ?>" data-field="phone">
+                                <?php echo $db_phone ? htmlspecialchars($db_phone) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="phone" placeholder="e.g. +63 912 345 6789" disabled
+                                style="display:none;">
+                        </div>
+                        <div class="info-row">
+                            <span class="info-lbl">Landline</span>
+                            <span class="info-val <?php echo $db_landline ? '' : 'empty'; ?>" data-field="landline">
+                                <?php echo $db_landline ? htmlspecialchars($db_landline) : '— Not provided'; ?>
+                            </span>
+                            <input class="info-input-f" data-input="landline" placeholder="e.g. (02) 1234-5678" disabled
+                                style="display:none;">
+                        </div>
+                    </div>
+                </div><!-- /acc-contact -->
+
+            </div>
+        </div>
+    </div><!-- /accountOverlay -->
+
+    <!-- ================================================================
+     OVERLAY: SETTINGS
+================================================================ -->
+    <div class="overlay-page" id="settingsOverlay">
+
+        <!-- Shell -->
+        <div class="sov-shell">
+
+            <!-- -- Page heading + view switch ------------------------ -->
+            <div class="sov-pagehead sx-head">
+                <div class="sx-head-text">
+                    <h1 class="sov-pagehead-title">Settings</h1>
+                    <p class="sov-pagehead-sub">Manage your profile, security, appearance and notifications in one place.</p>
+                </div>
+                <!-- Two views only: the unified Settings screen, and Help &amp; Support kept on its own.
+                     (Same .sov-nav-item / data-sov-tab hooks the existing tab script already handles.) -->
+                <nav class="acct-tabs sx-switch" id="sovSidenav" aria-label="Settings views">
+                    <button type="button" class="sov-nav-item active" data-sov-tab="sov-tab-settings">
+                        <span class="material-symbols-outlined">tune</span>
+                        Settings
+                    </button>
+                    <button type="button" class="sov-nav-item" data-sov-tab="sov-tab-help">
+                        <span class="material-symbols-outlined">help_outline</span>
+                        Help &amp; Support
+                    </button>
+                </nav>
+            </div>
+
+            <!-- -- Body ------------------------------------------- -->
+            <div class="sov-body">
+
+                <?php
+                $acct_meta_parts = array_filter([$db_department]);
+                $acct_meta = $acct_meta_parts ? implode(' &middot; ', array_map('htmlspecialchars', $acct_meta_parts)) : 'PUPSync Faculty';
+                ?>
+
+                <!-- Identity banner -->
+                <div class="acct-banner">
+                    <div class="acct-banner-left">
+                        <div class="acct-banner-avatar"><?php echo htmlspecialchars($initials); ?></div>
+                        <div class="acct-banner-text">
+                            <h2 class="acct-banner-name"><?php echo htmlspecialchars($fullname); ?></h2>
+                            <p class="acct-banner-meta"><?php echo $acct_meta; ?> &middot; ID: <span data-fid-display><?php echo htmlspecialchars($fid_label); ?></span></p>
+                            <span class="acct-banner-badge">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Active Faculty Account
+                            </span>
+                        </div>
+                    </div>
+                    <div class="sov-profile-actions">
+                        <button type="button" class="sov-btn-outline sov-profile-edit-btn" id="sovEditBtn"
+                            data-action="account-edit">
+                            <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                            Edit Profile
+                        </button>
+                        <button type="button" class="sov-btn-primary sov-profile-save-btn" id="sovSaveBtn"
+                            data-action="account-save" disabled hidden>
+                            <span class="material-symbols-outlined" aria-hidden="true">save</span>
+                            <span class="sov-profile-save-label">Save Changes</span>
+                        </button>
+                        <button type="button" class="sov-btn-outline sov-profile-cancel-btn" id="sovCancelBtn"
+                            data-action="account-cancel" hidden>
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Views -->
+                <div class="sov-content">
+
+                    <!-- VIEW: Settings -- Account, Appearance and Notifications & Data on ONE screen -->
+                    <div class="sov-tab-panel active" id="sov-tab-settings">
+
+                        <section class="sx-section" aria-labelledby="sxAccountTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">person</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxAccountTitle">Account</h2>
+                                    <p class="sx-section-sub">Your profile details and sign-in security.</p>
+                                </div>
+                            </header>
+                            <div class="sx-grid sx-grid--lead">
+
+                                <!-- Personal Information: read-only until the profile-bar Edit Profile action is clicked -->
+                                <?php
+                                $sov_email_masked = faculty_mask_email($db_email);
+                                $sov_phone_view   = faculty_phone_display($db_phone);
+                                ?>
+                                <div class="acct-card sov-edit-card" id="sovPersonalCard" data-editing="false">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">badge</span>
+                                        <h3>Personal Information</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <label class="acct-row-label" for="sovFullName">Full Name</label>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static" id="sovFullNameView" data-view="fullname"><?php echo htmlspecialchars($fullname); ?></span>
+                                                <input class="acct-row-input" id="sovFullName" name="fullname" type="text" maxlength="120"
+                                                    autocomplete="name" value="<?php echo htmlspecialchars($fullname); ?>"
+                                                    data-edit-field="fullname" disabled>
+                                                <p class="acct-field-error" data-error-for="fullname" role="alert" hidden></p>
+                                            </div>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Faculty ID</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static <?php echo $fid_unset ? 'acct-row-static-muted' : ''; ?>" id="sovFacultyId" data-fid-display><?php echo htmlspecialchars($fid_label); ?></span>
+                                            </div>
+                                            <?php if ($fid_unset): ?>
+                                                <button type="button" class="sov-btn-outline sov-fid-add" data-action="open-faculty-id-modal">Add</button>
+                                            <?php else: ?>
+                                                <span class="material-symbols-outlined fid-lock" title="Your Faculty ID is permanent">lock</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Email Address</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static <?php echo $sov_email_masked === '' ? 'acct-row-static-muted acct-row-not-provided' : 'acct-row-email'; ?>" id="sovEmailMasked"
+                                                    <?php echo $sov_email_masked === '' ? '' : 'aria-label="Email address, partially hidden for privacy"'; ?>><?php echo $sov_email_masked === '' ? '— Not provided' : htmlspecialchars($sov_email_masked); ?></span>
+                                            </div>
+                                            <span class="material-symbols-outlined fid-lock" title="Your email is your sign-in ID and is managed by the administrator">lock</span>
+                                        </div>
+                                        <div class="acct-row">
+                                            <label class="acct-row-label" for="sovDepartment">Department</label>
+                                            <div class="acct-row-value">
+                                                <?php if ($department_locked): ?>
+                                                    <span class="acct-row-static" id="sovDepartmentView"><?php echo htmlspecialchars($db_department); ?></span>
+                                                <?php else: ?>
+                                                    <span class="acct-row-static acct-row-static-muted acct-row-not-provided" id="sovDepartmentView" data-view="department">— Not provided</span>
+                                                    <select class="acct-row-input" id="sovDepartment" name="department" data-edit-field="department" disabled>
+                                                        <option value="">Select your department&hellip;</option>
+                                                        <?php foreach (faculty_departments() as $sov_dept): ?>
+                                                            <option value="<?php echo htmlspecialchars($sov_dept); ?>"><?php echo htmlspecialchars($sov_dept); ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <button type="button" class="sov-field-info" data-sov-edit-gated hidden
+                                                        aria-label="Department selection information" aria-describedby="sovDepartmentHint">
+                                                        <span class="material-symbols-outlined" aria-hidden="true">info</span>
+                                                        <span class="sov-field-info-tip" id="sovDepartmentHint" role="tooltip">You can choose your department once; it can&rsquo;t be changed afterwards.</span>
+                                                    </button>
+                                                <?php endif; ?>
+                                                <p class="acct-field-error" data-error-for="department" role="alert" hidden></p>
+                                            </div>
+                                            <?php if ($department_locked): ?>
+                                                <span class="material-symbols-outlined fid-lock" title="Your department is permanent once set">lock</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="acct-row">
+                                            <label class="acct-row-label" for="sovPhone">Mobile Number</label>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static <?php echo $sov_phone_view === '' ? 'acct-row-static-muted acct-row-not-provided' : ''; ?>" id="sovPhoneView" data-view="phone"><?php echo $sov_phone_view === '' ? '— Not provided' : htmlspecialchars($sov_phone_view); ?></span>
+                                                <input class="acct-row-input" id="sovPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
+                                                    maxlength="20" placeholder="09XX XXX XXXX" value="<?php echo htmlspecialchars($sov_phone_view); ?>"
+                                                    data-edit-field="phone" disabled>
+                                                <p class="acct-field-error" data-error-for="phone" role="alert" hidden></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <!-- Password & Security -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">lock</span>
+                                        <h3>Password &amp; Security</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Password</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+                                            </div>
+                                            <span class="sov-gated-action-slot">
+                                                <button type="button" class="sov-btn-outline" data-action="open-pw-modal"
+                                                    data-sov-edit-gated hidden>Change</button>
+                                            </span>
+                                        </div>
+                                        <?php
+                                        $sov_pw_changed_ts = !empty($db_last_pw_change) ? strtotime($db_last_pw_change) : false;
+                                        $sov_pw_untracked = $sov_pw_changed_ts === false;
+                                        ?>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Last Changed</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-password-change<?php echo $sov_pw_untracked ? ' pw-change-untracked' : ''; ?>"
+                                                    id="sovPasswordLastChanged">
+                                                    <?php echo $sov_pw_untracked ? '— Not tracked' : htmlspecialchars(date('M d, Y · g:i A', $sov_pw_changed_ts)); ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Backup Email</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static <?php echo $masked_backup ? '' : 'acct-row-static-muted acct-row-not-provided'; ?>">
+                                                    <?php echo $masked_backup ? htmlspecialchars($masked_backup) : '— Not provided'; ?>
+                                                </span>
+                                            </div>
+                                            <span class="sov-gated-action-slot">
+                                                <button type="button" class="sov-btn-outline"
+                                                    data-action="open-backup-email-modal" data-sov-edit-gated hidden>
+                                                    <?php echo $backup_locked ? 'Edit' : 'Add'; ?>
+                                                </button>
+                                            </span>
+                                        </div>
+                                        <?php
+                                        $sov_dev      = faculty_device_info($_SERVER['HTTP_USER_AGENT'] ?? '');
+                                        $sov_dev_icon = ['phone' => 'smartphone', 'tablet' => 'tablet_mac', 'desktop' => 'computer'][$sov_dev['kind']] ?? 'devices';
+                                        ?>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">This Device</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-device">
+                                                    <span class="material-symbols-outlined" aria-hidden="true"><?php echo $sov_dev_icon; ?></span>
+                                                    <span><?php echo htmlspecialchars($sov_dev['label']); ?></span>
+                                                </span>
+                                                <span class="acct-device-note">The device you are signed in on right now</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </section>
+
+                        <section class="sx-section" aria-labelledby="sxAppearanceTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">palette</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxAppearanceTitle">Appearance</h2>
+                                    <p class="sx-section-sub">How PUPSync looks on your screen.</p>
+                                </div>
+                            </header>
+                            <div class="sx-grid sx-grid--single">
+
+                                <!-- Theme -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">palette</span>
+                                        <h3>Theme</h3>
+                                    </div>
+                                    <div class="sov-theme-row">
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="light">
+                                            <div class="sov-theme-swatch sov-swatch-light">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-light">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">Light</span>
+                                        </div>
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="dark">
+                                            <div class="sov-theme-swatch sov-swatch-dark">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-dark">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">Dark</span>
+                                        </div>
+                                        <div class="sov-theme-option" data-action="apply-theme" data-theme="high-contrast">
+                                            <div class="sov-theme-swatch sov-swatch-hc">
+                                                <div class="sov-swatch-topbar"></div>
+                                                <div class="sov-swatch-body">
+                                                    <div class="sov-swatch-sidebar"></div>
+                                                    <div class="sov-swatch-content"></div>
+                                                </div>
+                                            </div>
+                                            <div class="sov-theme-check" id="tc-hc">
+                                                <span class="material-symbols-outlined">check</span>
+                                            </div>
+                                            <span class="sov-theme-name">High Contrast</span>
+                                        </div>
+                                    </div>
+                                    <!-- Hidden legacy elements kept for JS compatibility -->
+                                    <select id="themeSelectUnified" style="display:none;">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="high-contrast">High Contrast</option>
+                                    </select>
+                                    <div style="display:none;">
+                                        <div id="tp-light"></div>
+                                        <div id="tp-dark"></div>
+                                        <div id="tp-hc"></div>
+                                    </div>
+                                    <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
+                                </div>
+
+                            </div>
+                        </section>
+
+                        <section class="sx-section" aria-labelledby="sxNotifTitle">
+                            <header class="sx-section-head">
+                                <span class="sx-section-icon material-symbols-outlined">notifications</span>
+                                <div>
+                                    <h2 class="sx-section-title" id="sxNotifTitle">Notifications &amp; Data</h2>
+                                    <p class="sx-section-sub">Choose what you hear about, and manage your data.</p>
+                                </div>
+                            </header>
+                            <div class="sx-grid ">
+
+                                <!-- Notification Preferences -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">notifications</span>
+                                        <h3>Notification Preferences</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Email Alerts</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Overdue reminders via email</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Reservation Reminders</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">24 hours before a booking</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox" checked><span class="toggle-track"></span></label>
+                                        </div>
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Account Activity</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Security &amp; login notifications</span>
+                                            </div>
+                                            <label class="toggle-sw"><input type="checkbox"><span class="toggle-track"></span></label>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <!-- Data Management -->
+                                <div class="acct-card">
+                                    <div class="acct-card-head">
+                                        <span class="material-symbols-outlined">database</span>
+                                        <h3>Data Management</h3>
+                                    </div>
+                                    <div class="acct-rows">
+                                        <div class="acct-row">
+                                            <span class="acct-row-label">Export Data</span>
+                                            <div class="acct-row-value">
+                                                <span class="acct-row-static acct-row-static-muted">Your account details and past activity (completed requests &amp; bookings) as a spreadsheet file</span>
+                                            </div>
+                                            <button type="button" class="sov-btn-outline" id="sovExportBtn" data-action="export-my-data">Export</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </section>
+                    </div><!-- /sov-tab-settings -->
+
+                    <div class="sov-tab-panel" id="sov-tab-help">
+                        <header class="sx-section-head">
+                            <span class="sx-section-icon material-symbols-outlined">support_agent</span>
+                            <div>
+                                <h2 class="sx-section-title">Help &amp; Support</h2>
+                                <p class="sx-section-sub">Answers to common questions, and how to reach the administrator.</p>
+                            </div>
+                        </header>
+                        <div class="acct-card acct-card-full">
+                            <div class="acct-card-head">
+                                <span class="material-symbols-outlined">help_outline</span>
+                                <h3>Frequently Asked Questions</h3>
+                            </div>
+
+                            <div class="sov-help-list">
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I borrow equipment?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Go to the <strong>Equipment</strong> tab on the sidebar, browse the catalog, and click
+                                        <em>Borrow</em> on any available item. Fill in the borrow date, return date, room, and
+                                        instructor, then submit. Your request will be reviewed by the admin.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I return a borrowed item?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Physically return the borrowed item to the Admin Office. The administrator will then confirm and
+                                        mark your item as returned in the system. You can track the status update in <strong>Equipment
+                                            &mdash; My Requests</strong> or the <strong>My Activity</strong> tab.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        Why is my request showing as Overdue?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Your item's return date has passed without it being marked as returned. Please return the item
+                                        to the Admin Office immediately. Contact the system administrator if you believe this is an
+                                        error.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I reserve a facility or room?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Go to the <strong>Facilities</strong> tab on the sidebar. Browse available rooms, check their
+                                        availability, and submit a reservation request. Approvals are handled by the facilities
+                                        coordinator.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I update my profile or change my password?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Open <strong>Settings</strong> from the sidebar. Under <strong>Account</strong> you can update your
+                                        name, email, department and mobile number, and change your password securely.
+                                    </div>
+                                </details>
+
+                            </div>
+
+                            <div class="help-contact-card">
+                                <span class="material-symbols-outlined help-contact-icon">support_agent</span>
+                                <h4>Still need help?</h4>
+                                <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
+                                <a href="mailto:admin@pupsync.edu.ph" class="sov-btn-primary help-contact-btn">
+                                    <span class="material-symbols-outlined">mail</span>
+                                    Email Administrator
+                                </a>
+                            </div>
+                        </div>
+                    </div><!-- /sov-tab-help -->
+
+                </div><!-- /sov-content -->
+            </div><!-- /sov-body -->
+        </div><!-- /sov-shell -->
+    </div><!-- /settingsOverlay -->

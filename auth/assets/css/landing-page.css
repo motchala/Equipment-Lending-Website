@@ -1,0 +1,1216 @@
+:root {
+    --maroon: #600302;
+    --maroon-deep: #4a0f15;
+    --maroon-dim: #2d0509;
+    --maroon-glow: rgba(96, 3, 2, 0.6);
+    --cream: #f5f0e8;
+    --white: #ffffff;
+    --border: rgba(255, 255, 255, 0.12);
+    --card-bg: rgba(15, 5, 7, 0.82);
+
+    /* Auth card tokens — warm cream, easy on the eyes */
+    --modal-bg: #ede8e0;
+    --modal-sur: #e4ddd4;
+    --modal-bdr: #cdc6bb;
+    --text-hi: #2c2c2c;
+    --text-mid: #666666;
+    --text-dim: #aaa49d;
+
+    --r-sm: 10px;
+    --r-md: 16px;
+    --r-lg: 22px;
+
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+
+    /* Academic gold — PUP's own secondary institutional color alongside
+       maroon. Used sparingly, as fine-detail accents only. */
+    --gold: #c8a35c;
+    --gold-soft: rgba(200, 163, 92, 0.4);
+}
+
+/* ================================================================
+   RESET & BASE
+================================================================ */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    /* Fluid root: scales from 14px at 360px wide up to 16px at 1920px wide.
+       Because virtually every size in this stylesheet uses rem, this single
+       rule makes the entire page proportionally smaller on smaller viewports
+       and larger on larger ones — no layout overflows, no overlaps. */
+    font-size: clamp(14px, 0.729vw + 11.375px, 16px);
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--maroon-dim);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ================================================================
+   GATEWAY — split-screen institutional access portal
+   (Replaces the old carousel hero + full footer with a single,
+   full-viewport role-selection screen.)
+================================================================ */
+.gateway {
+    position: relative;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 560px;
+    display: flex;
+    overflow: hidden;
+    background: var(--cream);
+}
+
+/* ---------------------------------------------------------------
+   LEFT — photo visual + headline
+--------------------------------------------------------------- */
+.gateway-visual {
+    position: relative;
+    flex: 1 1 60%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.visual-strip {
+    position: absolute;
+    inset: 0;
+    display: flex;
+}
+
+.strip-photo {
+    flex: 1 1 0;
+    height: 100%;
+    background-size: cover;
+    background-repeat: no-repeat;
+    filter: sepia(0.22) saturate(1.22) hue-rotate(-6deg) brightness(0.96) contrast(1.04);
+    animation: photoDrift 32s var(--ease-out) infinite alternate;
+    transform-origin: center;
+}
+
+.strip-photo:not(:first-child) {
+    box-shadow: inset 1px 0 0 rgba(245, 240, 232, 0.14);
+}
+
+.strip-photo-2 {
+    animation-delay: -8s;
+}
+
+.strip-photo-3 {
+    animation-delay: -16s;
+}
+
+@keyframes photoDrift {
+    from {
+        transform: scale(1.04);
+    }
+
+    to {
+        transform: scale(1.12);
+    }
+}
+
+.strip-photo-1 {
+    background-image: url('../images/landing-page/1-hero-page.jpg');
+    background-position: center 32%;
+}
+
+.strip-photo-2 {
+    background-image: url('../images/landing-page/2-hero-page.jpg');
+    background-position: center 58%;
+}
+
+.strip-photo-3 {
+    background-image: url('../images/landing-page/6-hero-page.jpg');
+    background-position: center 38%;
+}
+
+.visual-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(20, 3, 4, 0.12) 0%, rgba(20, 3, 4, 0.02) 32%, rgba(20, 3, 4, 0.72) 100%),
+        linear-gradient(102deg, rgba(74, 15, 21, 0.97) 0%, rgba(74, 15, 21, 0.9) 20%, rgba(74, 15, 21, 0.5) 44%, rgba(74, 15, 21, 0.1) 64%, transparent 78%),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 3px);
+}
+
+.visual-content {
+    position: absolute;
+    left: clamp(1.75rem, 4vw, 4rem);
+    right: clamp(1.75rem, 10vw, 9rem);
+    bottom: calc(clamp(2.25rem, 7vh, 4.5rem) + 1rem);
+    z-index: 2;
+    max-width: 480px;
+    padding-left: 1.15rem;
+    animation: fadeDown 0.8s 0.15s var(--ease-out) both;
+}
+
+.visual-content::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.2em;
+    bottom: 0.55em;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--gold) 0%, rgba(200, 163, 92, 0.15) 100%);
+}
+
+.visual-heading {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(2.3rem, 3.8vw, 3.7rem);
+    line-height: 1.1;
+    color: var(--cream);
+    letter-spacing: -0.3px;
+}
+
+.visual-heading em {
+    display: block;
+    font-style: italic;
+    font-weight: 500;
+    color: rgba(232, 190, 180, 0.95);
+}
+
+.visual-sub {
+    margin-top: 1.1rem;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 300;
+    font-size: clamp(0.86rem, 1.1vw, 1rem);
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.78);
+    text-shadow: 0 1px 14px rgba(10, 2, 3, 0.4);
+    max-width: 420px;
+}
+
+/* Top-left brand chip, floating over the photo */
+.visual-brand {
+    position: absolute;
+    top: clamp(1.5rem, 3vh, 2.25rem);
+    left: clamp(1.75rem, 4vw, 4rem);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px 7px 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 100px;
+    backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    animation: fadeIn 0.6s 0.05s both;
+}
+
+.visual-brand i {
+    color: rgba(232, 144, 138, 0.85);
+    font-size: 0.7rem;
+}
+
+/* ---------------------------------------------------------------
+   RIGHT — access panel
+--------------------------------------------------------------- */
+.gateway-panel {
+    flex: 1 1 40%;
+    max-width: 560px;
+    min-width: 340px;
+    background:
+        radial-gradient(rgba(96, 3, 2, 0.05) 1px, transparent 1.2px) 0 0/22px 22px,
+        var(--cream);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: clamp(2rem, 5vh, 2.75rem);
+    padding: clamp(3.5rem, 12vh, 6rem) clamp(2rem, 4vw, 3.75rem) clamp(2rem, 4vw, 3.25rem);
+    position: relative;
+    overflow-y: auto;
+}
+
+.panel-logo {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: fadeDown 0.7s 0.05s var(--ease-out) both;
+}
+
+.panel-logo-icon {
+    position: relative;
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(150deg, var(--maroon) 0%, var(--maroon-deep) 100%);
+    border-radius: var(--r-md);
+    color: var(--cream);
+    box-shadow:
+        0 8px 18px rgba(96, 3, 2, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -8px 12px rgba(0, 0, 0, 0.16);
+}
+
+.panel-logo-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.panel-logo-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-logo-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+    font-size: 1.85rem;
+    color: var(--text-hi);
+    letter-spacing: 0.2px;
+    line-height: 1.15;
+}
+
+.brand-pup {
+    font-weight: 700;
+    color: var(--maroon);
+}
+
+.brand-sync {
+    font-weight: 500;
+}
+
+.panel-logo-sub {
+    margin-top: 2px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-mid);
+}
+
+.panel-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    margin-top: auto;
+    padding-top: clamp(1.25rem, 3vh, 2rem);
+    border-top: 1px solid rgba(96, 3, 2, 0.1);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.78rem;
+    color: var(--text-mid);
+    animation: fadeIn 0.8s 0.3s both;
+}
+
+.panel-links {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.panel-links a {
+    color: var(--text-mid);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.panel-links a:hover {
+    color: var(--maroon);
+}
+
+/* "Continue as Student" is called out as a distinct path from the login form. */
+#studentLink {
+    color: #d32f2f;
+    font-weight: 600;
+}
+
+#studentLink:hover {
+    color: #b71c1c;
+}
+
+.panel-badges {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+
+.panel-badges span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 5px 11px 5px 9px;
+    background: rgba(96, 3, 2, 0.05);
+    border: 1px solid rgba(96, 3, 2, 0.09);
+    border-radius: 100px;
+}
+
+.panel-badges i {
+    font-size: 0.72rem;
+    color: var(--maroon);
+}
+
+/* ---------------------------------------------------------------
+   RESPONSIVE — stack the panel below the photo on narrow screens
+--------------------------------------------------------------- */
+@media (max-width: 991.98px) {
+    .gateway {
+        flex-direction: column;
+        height: auto;
+        min-height: 100dvh;
+        overflow-y: auto;
+    }
+
+    .gateway-visual {
+        flex: 0 0 auto;
+        height: 40vh;
+        min-height: 260px;
+    }
+
+    .gateway-panel {
+        flex: 1 1 auto;
+        max-width: none;
+        min-width: 0;
+        justify-content: flex-start;
+        padding-top: clamp(1.75rem, 5vh, 2.5rem) !important;
+    }
+
+    .visual-content {
+        right: clamp(1.75rem, 6vw, 3rem);
+    }
+
+    .visual-heading {
+        font-size: clamp(2.1rem, 5.4vw, 2.8rem);
+    }
+}
+
+@media (max-width: 640px) {
+    .gateway-visual {
+        height: 40vh;
+        min-height: 260px;
+    }
+
+    .visual-sub {
+        font-size: 0.78rem;
+        line-height: 1.6;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .visual-brand {
+        top: 1.1rem;
+        left: 1.1rem;
+        padding: 6px 12px 6px 8px;
+    }
+
+    .gateway-panel {
+        padding-left: 1.6rem;
+        padding-right: 1.6rem;
+        gap: 1.75rem;
+    }
+
+    .panel-bottom {
+        font-size: 0.72rem;
+    }
+
+    .panel-badges {
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 380px) {
+    .panel-logo-name {
+        font-size: 1.45rem;
+    }
+
+    .panel-badges span:nth-child(2) span {
+        display: none;
+    }
+}
+
+@media (max-height: 700px) and (min-width: 992px) {
+    .gateway-panel {
+        gap: 1.5rem;
+        padding-top: 1.75rem;
+        padding-bottom: 1.75rem;
+    }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .gateway-panel {
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+}
+
+/* ================================================================
+   PANEL STAGE — the right-hand panel swaps its own content in place
+   (role picker <-> login form) instead of opening a popup/modal.
+================================================================ */
+.panel-stage {
+    position: relative;
+    padding-top: clamp(1.75rem, 4vh, 2.4rem);
+}
+
+.panel-stage::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--maroon));
+}
+
+.panel-view {
+    display: none;
+}
+
+.panel-view.active {
+    display: block;
+    animation: panelViewIn 0.4s var(--ease-out) both;
+}
+
+@keyframes panelViewIn {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* .panel-view-auth carries no styling of its own — .panel-view / .active
+   above already handles show/hide + fade-in. The class stays on the
+   facultyView/adminView markup only so JS (Esc-to-back) can target
+   "any open login form" without caring which role it is. Faculty/Admin
+   login now sit flat on the panel's own background: no card, no border,
+   no shadow — same elements as the role picker, just swapped in place. */
+
+.auth-head {
+    margin-bottom: 1.75rem;
+}
+
+.auth-head .pane-title {
+    margin-bottom: 4px;
+}
+
+.auth-head .pane-subtitle {
+    margin-bottom: 0;
+}
+
+.pane-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.55rem;
+    font-weight: 600;
+    color: var(--text-hi);
+    margin-bottom: 3px;
+    line-height: 1.15;
+}
+
+.pane-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-mid);
+    margin-bottom: 1.4rem;
+}
+
+@keyframes paneFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px)
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0)
+    }
+}
+
+.form-group {
+    margin-bottom: 0.85rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    transition: color 0.2s;
+}
+
+.form-group:focus-within label {
+    color: var(--maroon);
+}
+
+.input-wrap {
+    position: relative;
+}
+
+/* Only direct <i> children — prevents bleeding into .eye-toggle icon */
+.input-wrap>i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    pointer-events: none;
+    transition: color 0.2s;
+}
+
+.input-wrap:focus-within>i {
+    color: var(--maroon);
+}
+
+/* Explicit left-icon alias (used on all field icons) */
+.input-wrap .input-icon-left {
+    left: 12px;
+    right: auto;
+}
+
+/* Eye toggle — sits flush inside the right edge of password inputs */
+.eye-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 3;
+    background: none;
+    border: none;
+    padding: 4px 6px;
+    cursor: pointer;
+    color: #c8c1b8;
+    font-size: 0.82rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: all;
+    transition: color 0.2s;
+}
+
+/* Reset icon inside eye-toggle so it flows naturally inside the button */
+.eye-toggle i {
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+    font-size: 0.82rem;
+    color: inherit;
+    pointer-events: none;
+}
+
+.eye-toggle:hover {
+    color: var(--maroon);
+}
+
+.form-field {
+    width: 100%;
+    padding: 10px 36px 10px 34px;
+    background: var(--modal-sur);
+    border: 1px solid var(--modal-bdr);
+    border-radius: var(--r-sm);
+    color: var(--text-hi);
+    font-size: 0.85rem;
+    font-family: 'Outfit', sans-serif;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-text-fill-color: var(--text-hi);
+}
+
+.form-field::placeholder {
+    color: #b8b2aa;
+    -webkit-text-fill-color: #b8b2aa;
+    font-size: 0.8rem;
+    transition: color 0.2s, -webkit-text-fill-color 0.2s;
+}
+
+.form-field:focus::placeholder {
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+.form-field:focus {
+    border-color: rgba(109, 27, 35, 0.45);
+    box-shadow: 0 0 0 3px rgba(109, 27, 35, 0.08);
+    transform: translateY(-1px);
+}
+
+.remember-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    margin: 0.1rem 0 0.35rem;
+    color: color-mix(in srgb, var(--text-mid) 88%, var(--modal-sur));
+    font-size: 0.76rem;
+    font-weight: 400;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.remember-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.remember-option span {
+    position: relative;
+    padding-left: 1.5rem;
+}
+
+.remember-option span::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translateY(-50%);
+    border: 1px solid var(--modal-bdr);
+    border-radius: 4px;
+    background: var(--modal-sur);
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.remember-option span::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    width: 5px;
+    height: 9px;
+    border: solid var(--cream);
+    border-width: 0 2px 2px 0;
+    opacity: 0;
+    transform: translateY(-65%) rotate(45deg);
+    transition: opacity 0.15s;
+}
+
+.remember-option input:checked + span::before {
+    border-color: var(--maroon);
+    background: var(--maroon);
+}
+
+.remember-option input:checked + span::after {
+    opacity: 1;
+}
+
+.remember-option input:focus-visible + span::before {
+    box-shadow: 0 0 0 3px rgba(96, 3, 2, 0.16);
+}
+
+.remember-option:hover {
+    color: var(--text-mid);
+}
+
+.form-field:-webkit-autofill,
+.form-field:-webkit-autofill:hover,
+.form-field:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px var(--modal-sur) inset;
+    -webkit-text-fill-color: var(--text-hi);
+    border-color: var(--modal-bdr);
+}
+
+.auth-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 0.7rem 1rem;
+    border-radius: var(--r-sm);
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin-bottom: 0.8rem;
+    animation: paneFadeIn 0.3s var(--ease-out) both;
+    line-height: 1.4;
+}
+
+.auth-alert.error {
+    background: rgba(192, 57, 43, 0.07);
+    color: #c0392b;
+    border: 1px solid rgba(192, 57, 43, 0.2);
+}
+
+.auth-alert.success {
+    background: rgba(39, 174, 96, 0.07);
+    color: #27ae60;
+    border: 1px solid rgba(39, 174, 96, 0.2);
+}
+
+.auth-alert i {
+    margin-top: 1px;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.btn-auth {
+    width: 100%;
+    padding: 14px 11px;
+    margin-top: 0.6rem;
+    background: linear-gradient(135deg, var(--maroon), var(--maroon-deep));
+    color: white;
+    border: none;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    letter-spacing: 0.3px;
+    box-shadow: 0 6px 16px rgba(74, 15, 21, 0.38), 0 2px 5px rgba(74, 15, 21, 0.22);
+}
+
+.btn-auth:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 9px 22px rgba(74, 15, 21, 0.46), 0 3px 7px rgba(74, 15, 21, 0.26);
+}
+
+.btn-auth i {
+    transition: transform 0.25s var(--ease-out);
+}
+
+.btn-auth:hover i {
+    transform: translateX(2px);
+}
+
+.btn-auth:active {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* ================================================================
+   ANIMATIONS
+================================================================ */
+@keyframes fadeDown {
+    from {
+        opacity: 0;
+        transform: translateY(-16px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ================================================================
+   AUTH FORM — RESPONSIVE (facultyView / adminView inputs)
+================================================================ */
+@media (max-width: 480px) {
+    .form-field {
+        padding: 12px 12px 12px 34px;
+        font-size: 16px;
+        /* prevents iOS auto-zoom on focus */
+    }
+
+    .btn-auth {
+        padding: 14px 11px;
+        min-height: 52px;
+    }
+}
+
+/* ================================================================
+   ACCESSIBILITY — respect user's motion preference
+================================================================ */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.15ms !important;
+    }
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(109, 27, 35, 0.45) transparent;
+}
+
+/* Webkit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(109, 27, 35, 0.4);
+    border-radius: 100px;
+    transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(109, 27, 35, 0.7);
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* ================================================================
+   BACK BUTTON — sits above the login form, returns to the role picker
+================================================================ */
+.back-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    padding: 0.3rem 0.4rem 0.3rem 0;
+    margin: 0 0 0.9rem 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: color 0.2s;
+}
+
+.back-btn:hover,
+.back-btn:focus-visible {
+    color: var(--maroon);
+    outline: none;
+}
+
+.back-btn i {
+    font-size: 0.72rem;
+    transition: transform 0.25s var(--ease-out);
+}
+
+.back-btn:hover i {
+    transform: translateX(-3px);
+}
+
+/* Disabled Sign In button during an active lockout.
+   Uses the same maroon palette but reduces visual weight to signal
+   unavailability without breaking the existing button shape/layout. */
+.btn-auth:disabled {
+    background: linear-gradient(135deg, rgba(109, 27, 35, 0.38), rgba(80, 18, 24, 0.38));
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+    pointer-events: none;
+    /* belt-and-suspenders: block hover transforms too */
+}
+
+/* Override the responsive min-height rule so it still applies when disabled */
+@media (max-width: 480px) {
+    .btn-auth:disabled {
+        min-height: 52px;
+    }
+}
+
+/* Lockout-specific banner variant.
+   Uses an amber/warning tone to visually distinguish a lockout
+   (a time-bound state) from a plain credential error (actionable now). */
+.auth-alert.warning {
+    background: rgba(180, 110, 0, 0.07);
+    color: #8a5700;
+    border: 1px solid rgba(180, 110, 0, 0.22);
+}
+
+/* Countdown span inside the lockout banner — monospace keeps the
+   digits from jumping as the width changes each second. */
+
+/* ================================================================
+   SIGN-IN DEPARTURE — brief exit cue while the credential POST is
+   in flight, so the handoff to the destination dashboard's own
+   role-splash overlay feels continuous rather than an abrupt cut.
+================================================================ */
+.gateway.is-leaving {
+    opacity: 0;
+    transform: scale(1.015);
+    transition: opacity 0.45s var(--ease-in), transform 0.45s var(--ease-in);
+    pointer-events: none;
+}
+
+#loginSubmitIcon.is-spinning {
+    animation: loginSpin 0.7s linear infinite;
+}
+
+@keyframes loginSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Cross-document view transition (Chromium): crossfades this page into the
+   role-splash overlay of the destination dashboard. Ignored elsewhere. */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gateway.is-leaving {
+        transition: opacity 0.2s linear;
+        transform: none;
+    }
+
+    #loginSubmitIcon.is-spinning {
+        animation: none;
+    }
+}
+
+/* ---------- Tablet & below (< lg) — shared touch/mobile rules ---------- */
+@media (max-width: 991.98px) {
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        -webkit-tap-highlight-color: rgba(96, 3, 2, 0.12);
+    }
+
+    .gateway {
+        width: 100%;
+        /* 100vw ignores the scrollbar and can cause sideways scroll */
+    }
+
+    /* Hero: use the *small* viewport height so the mobile browser's
+       collapsing address bar can't resize the hero mid-scroll. */
+    @supports (height: 1svh) {
+        .gateway-visual {
+            height: 40svh;
+        }
+    }
+
+    /* Inputs — 16px minimum stops iOS/Android zooming on focus.
+       Right padding leaves room for the 44px eye button so typed
+       characters never run underneath it. */
+    .form-field {
+        font-size: 16px;
+        min-height: 48px;
+        padding: 12px 48px 12px 40px;
+    }
+
+    .form-field::placeholder {
+        font-size: inherit;
+    }
+
+    .form-group label {
+        font-size: 0.75rem;
+    }
+
+    .input-wrap>i {
+        font-size: 0.9rem;
+    }
+
+    /* Eye toggle — 44 x 44 hit area, icon stays visually where it was. */
+    .eye-toggle {
+        right: 2px;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+    }
+
+    .eye-toggle i {
+        font-size: 1rem;
+    }
+
+    .btn-auth {
+        min-height: 52px;
+        padding: 14px 11px;
+        font-size: 1rem;
+    }
+
+    .auth-alert {
+        font-size: 0.85rem;
+    }
+
+    /* Campus chip is a link — give it a full touch target. */
+    .visual-brand {
+        min-height: 44px;
+        padding: 0 16px 0 12px;
+        font-size: 0.8rem;
+        text-decoration: none;
+    }
+
+    /* Footer links — 44px tall rows, no cramped tap zones. */
+    .panel-links a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* Touch screens have no real hover — stop the button "sticking"
+       in its lifted hover state after a tap. */
+    @media (hover: none) {
+        .btn-auth:hover {
+            opacity: 1;
+            transform: none;
+            box-shadow: 0 6px 16px rgba(74, 15, 21, 0.38), 0 2px 5px rgba(74, 15, 21, 0.22);
+        }
+    }
+}
+
+/* ---------- md: tablets in portrait (576px – 991.98px) ---------- */
+@media (min-width: 576px) and (max-width: 991.98px) {
+
+    /* Keep the form at a comfortable reading width instead of
+       stretching edge-to-edge across a 768px+ screen. */
+    .gateway-panel>* {
+        width: 100%;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* ---------- sm: phones in portrait (< 576px) ---------- */
+@media (max-width: 575.98px) {
+    .gateway-visual {
+        min-height: 240px;
+        /* tall enough for chip + headline + sub without overlap */
+    }
+
+    @supports (height: 1svh) {
+        .gateway-visual {
+            height: 36svh;
+        }
+    }
+
+    .gateway-panel {
+        padding-left: max(1.4rem, env(safe-area-inset-left));
+        padding-right: max(1.4rem, env(safe-area-inset-right));
+    }
+
+    .visual-brand {
+        top: 0.9rem;
+        left: 1.1rem;
+    }
+
+    .panel-bottom {
+        font-size: 0.85rem;
+        gap: 0.25rem 1rem;
+    }
+
+    .panel-links {
+        width: 100%;
+        justify-content: center;
+        gap: 0;
+    }
+}
+
+/* ---------- Landscape phones / small tablets (short & wide) ----------
+   Stacking would leave only the hero above the fold, so go side-by-side
+   and let the form column scroll on its own if it is taller than the
+   screen. */
+@media (max-width: 991.98px) and (orientation: landscape) and (max-height: 500px) {
+    .gateway {
+        flex-direction: row;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .gateway-visual {
+        flex: 1 1 50%;
+        height: auto;
+        min-height: 0;
+    }
+
+    .gateway-panel {
+        flex: 1 1 50%;
+        min-width: 0;
+        max-width: none;
+        gap: 1rem;
+        padding: 1rem max(1.5rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) 1.5rem !important;
+        overflow-y: auto;
+    }
+
+    .gateway-panel>* {
+        max-width: 480px;
+    }
+
+    .visual-brand {
+        top: 0.75rem;
+        left: max(1.25rem, env(safe-area-inset-left));
+    }
+
+    .visual-content {
+        left: max(1.25rem, env(safe-area-inset-left));
+        right: 1.25rem;
+        bottom: 1.75rem;
+    }
+
+    .visual-heading {
+        font-size: clamp(1.7rem, 3.9vw, 2.2rem);
+    }
+
+    .visual-sub {
+        margin-top: 0.6rem;
+        font-size: 0.82rem;
+        line-height: 1.55;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .panel-logo-icon {
+        width: 42px;
+        height: 42px;
+    }
+
+    .panel-stage {
+        padding-top: 1rem;
+    }
+
+    .auth-head {
+        margin-bottom: 1rem;
+    }
+
+    .panel-bottom {
+        padding-top: 0.5rem;
+    }
+}

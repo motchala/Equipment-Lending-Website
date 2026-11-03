@@ -56,15 +56,15 @@ if (!preg_match('/^\d{2}:\d{2}$/', $return_time)) {
 $today = date('Y-m-d');
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../config/faculty-id.php';
-require_once __DIR__ . '/../core/faculty-notif-functions.php';
+require_once __DIR__ . '/../../shared/core/faculty-id.php';
+require_once __DIR__ . '/../../notifications/core/faculty-data.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');
 
 // ── Student must be on the official student list (re-checked here, never trusted from the form) ──
-require_once __DIR__ . '/../../config/student-registry.php';
+require_once __DIR__ . '/../../shared/core/student-registry.php';
 $sv = student_registry_validate($conn, $student_id);
 if (!$sv['ok']) {
     echo json_encode(['error' => $sv['error']]);

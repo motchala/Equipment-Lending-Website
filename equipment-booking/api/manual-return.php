@@ -45,7 +45,7 @@ if (mb_strlen($notes) > 2000) {
 date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../core/booking-schedule.php';
-require_once __DIR__ . '/../../config/admin-activity.php';
+require_once __DIR__ . '/../../shared/core/activity-logger.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');

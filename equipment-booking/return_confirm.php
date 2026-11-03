@@ -20,7 +20,7 @@ require_once __DIR__ . '/core/booking-schedule.php';
 BookingSchedule::ensureSchema($conn);
 
 // Activity log: make sure override_by_id exists (DDL) BEFORE the transaction starts.
-require_once __DIR__ . '/../config/admin-activity.php';
+require_once __DIR__ . '/../shared/core/activity-logger.php';
 admin_activity_bootstrap($conn);
 $acting_admin_id = admin_current_id($conn);
 
@@ -114,10 +114,10 @@ if ($is_ajax) {
     <meta charset="UTF-8">
     <title>Return Confirmation</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
-    <link rel="icon" href="../assets/images/favicon.ico" sizes="32x32">
-    <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="192x192" href="../assets/images/favicon-192.png">
-    <link rel="apple-touch-icon" href="../assets/images/apple-touch-icon.png">
+    <link rel="icon" href="../shared/assets/images/favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="../shared/assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="../shared/assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="../shared/assets/images/apple-touch-icon.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style nonce="<?php echo $csp_nonce; ?>">
         body {

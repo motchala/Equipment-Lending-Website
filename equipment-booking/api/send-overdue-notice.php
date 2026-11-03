@@ -35,8 +35,8 @@ if (!is_scalar($rawId) || !ctype_digit((string)$rawId) || (int)$rawId < 1) {
 
 date_default_timezone_set('Asia/Manila');
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../config/admin-activity.php';
-require_once __DIR__ . '/../core/faculty-notif-functions.php';
+require_once __DIR__ . '/../../shared/core/activity-logger.php';
+require_once __DIR__ . '/../../notifications/core/faculty-data.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');

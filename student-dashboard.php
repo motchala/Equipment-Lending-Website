@@ -10,7 +10,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 header("X-Frame-Options: DENY");
 
 require_once __DIR__ . '/config/session.php';      // needed to read the one-shot role-splash flag
-require_once __DIR__ . '/config/role-splash.php';
+require_once __DIR__ . '/auth/core/role-splash.php';
 ?>
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
@@ -20,23 +20,23 @@ require_once __DIR__ . '/config/role-splash.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PUPSync | Student Portal</title>
     <!-- Favicon: the PUPSync logo mark (maroon square + layers) -->
-    <link rel="icon" href="assets/images/favicon.ico" sizes="32x32">
-    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
-    <link rel="icon" type="image/png" sizes="192x192" href="assets/images/favicon-192.png">
-    <link rel="apple-touch-icon" href="assets/images/apple-touch-icon.png">
+    <link rel="icon" href="shared/assets/images/favicon.ico" sizes="32x32">
+    <link rel="icon" type="image/svg+xml" href="shared/assets/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="shared/assets/images/favicon-192.png">
+    <link rel="apple-touch-icon" href="shared/assets/images/apple-touch-icon.png">
 
     <!-- Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/fonts/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
 
     <!-- PUPSync Student Styles -->
-    <link rel="stylesheet" href="equipment-booking/assets/css/student-dashboard.css">
+    <link rel="stylesheet" href="dashboard/assets/css/student-dashboard.css">
     <?php role_splash_head(); ?>
 </head>
 
@@ -272,7 +272,7 @@ require_once __DIR__ . '/config/role-splash.php';
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 
     <!-- PUPSync Student JS -->
-    <script src="equipment-booking/assets/js/student-dashboard.js"></script>
+    <script src="dashboard/assets/js/student-dashboard.js"></script>
 
 </body>
 

@@ -45,7 +45,7 @@ date_default_timezone_set('Asia/Manila');
 
 // ── My Activity feed (?view=activity) ─────────────────────────────────────
 if (($_GET['view'] ?? '') === 'activity') {
-    require_once __DIR__ . '/../core/faculty-room-quota.php';
+    require_once __DIR__ . '/../core/room-quota.php';
     $activity = fact_load_rooms($conn, is_scalar($faculty_id) ? (string)$faculty_id : '');
     header('Cache-Control: no-store');
     echo json_encode([

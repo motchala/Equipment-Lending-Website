@@ -227,6 +227,22 @@
 
 #rooms-browse .fcty-landing-head {
     margin-bottom: 16px;
+    justify-content: space-between;
+    /* title on the left, live count on the right */
+    gap: 8px 16px;
+}
+
+/* "63 rooms free now": a real, vertically centred pill. The generic .fcty-pill further down is
+   styled for the booking dialog (margin-top + see-through white fill), which pushed this one
+   below the title and made it look like loose text. */
+#rooms-browse .fcty-landing-head .fcty-pill {
+    margin-top: 0;
+    padding: 5px 12px 5px 10px;
+    background: color-mix(in srgb, var(--fcty-brand) 5%, var(--fcty-card));
+    border: 1px solid color-mix(in srgb, var(--fcty-brand) 15%, var(--fcty-line));
+    color: var(--fcty-muted);
+    font-size: .78rem;
+    line-height: 1.2;
 }
 
 #rooms-browse .fcty-pill.is-live::before {

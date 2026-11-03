@@ -43,7 +43,7 @@ if ($id <= 0) {
 }
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../core/faculty-activity.php';   // also loads BookingSchedule + BorrowCancellation
+require_once __DIR__ . '/../../activity/core/faculty-data.php';   // also loads BookingSchedule + BorrowCancellation
 
 $conn = getDB();
 
