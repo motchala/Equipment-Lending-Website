@@ -1,0 +1,9 @@
+            /* Panel switching for the dual-mode tabs. Visual styling of the tabs,
+               checklist and form lives in faculty-dashboard.css (Borrow Request modal). */
+            .borrow-subtab-panel {
+                display: none;
+            }
+
+            .borrow-subtab-panel.active {
+                display: block;
+            }

@@ -131,7 +131,7 @@ try {
     $log->execute();
     $log->close();
 
-    require_once __DIR__ . '/../../config/admin-activity.php';
+    require_once __DIR__ . '/../../shared/core/activity-logger.php';
     admin_log_activity(
         $conn,
         'room',

@@ -48,9 +48,9 @@ if (session_status() === PHP_SESSION_NONE) {
 // ── Admin session re-validation ─────────────────────────────────────────
 // Ends admin sessions whose account was deleted, locked, or had its
 // credentials changed by a Super Admin. No-op for visitors/faculty/students.
-require_once __DIR__ . '/admin-auth.php';
-require_once __DIR__ . '/faculty-id.php';
-require_once __DIR__ . '/organizations.php';
+require_once __DIR__ . '/../auth/core/admin-auth.php';
+require_once __DIR__ . '/../shared/core/faculty-id.php';
+require_once __DIR__ . '/../shared/core/organizations.php';
 admin_session_guard();
 
 // ── Faculty session re-validation ───────────────────────────────────────

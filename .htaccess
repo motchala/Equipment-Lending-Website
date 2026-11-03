@@ -1,4 +1,15 @@
 DirectoryIndex landing-page.php
+Options -Indexes
+# PUPSync: never serve the secrets file. If this block ever causes an HTTP 500, delete these lines (down to </Files>).
+<Files ".env">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</Files>
 
 <IfModule mod_headers.c>
     Header set X-Content-Type-Options "nosniff"

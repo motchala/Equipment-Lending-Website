@@ -75,7 +75,7 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 // ── Student must be on the official student list (re-checked here, never trusted from the form) ──
-require_once __DIR__ . '/../../config/student-registry.php';
+require_once __DIR__ . '/../../shared/core/student-registry.php';
 $sv = student_registry_validate($conn, $student_id, $student_name);
 if (!$sv['ok']) {
     echo json_encode(['error' => $sv['error']]);
@@ -195,7 +195,7 @@ $fac_row = $fac_stmt->get_result()->fetch_assoc();
 $fac_stmt->close();
 
 if ($fac_row && !empty($fac_row['email'])) {
-    require_once __DIR__ . '/../../equipment-booking/core/mailer.php';
+    require_once __DIR__ . '/../../shared/core/mailer.php';
     $is_pending   = ($final_status === 'Waiting');
     $status_color = $final_status === 'Approved' ? '#2e7d32' : ($is_pending ? '#b26a00' : '#c62828');
     $status_icon  = $final_status === 'Approved' ? '&#10003; Approved' : ($is_pending ? '&#9203; Pending admin review' : '&#10007; Declined');

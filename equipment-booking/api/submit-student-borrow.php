@@ -40,7 +40,7 @@ require_once __DIR__ . '/../../config/db.php';
 $conn = getDB();
 
 // ── Student must be on the official student list (re-checked here, never trusted from the form) ──
-require_once __DIR__ . '/../../config/student-registry.php';
+require_once __DIR__ . '/../../shared/core/student-registry.php';
 $sv = student_registry_validate($conn, $student_id);
 if (!$sv['ok']) {
     $conn->close();
@@ -144,7 +144,7 @@ $fac_mail_row2 = $fac_mail_stmt2->get_result()->fetch_assoc();
 $fac_mail_stmt2->close();
 
 if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
-    require_once __DIR__ . '/../core/mailer.php';
+    require_once __DIR__ . '/../../shared/core/mailer.php';
     $email_subject2 = 'PUPSync: Borrowing Confirmed — ' . $equipment;
     $email_body2 = '
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden;">

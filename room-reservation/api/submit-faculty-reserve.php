@@ -46,7 +46,7 @@ date_default_timezone_set('Asia/Manila');
 
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../core/faculty-room-quota.php';
+require_once __DIR__ . '/../core/room-quota.php';
 
 // ── Read the body (multipart or JSON) ─────────────────────────────────────
 $is_multipart = stripos($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data') === 0;
