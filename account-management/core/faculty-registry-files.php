@@ -9,7 +9,8 @@ declare(strict_types=1);
  * import (Faculty tab -> Faculty Registry), so each import is fully recorded:
  *
  *   upload-faculty-registry-file.php   stores the original file + a record
- *   upload-faculty-registry.php        marks that record as imported (+ counts)
+ *   upload-faculty-registry.php        marks that record as imported (+ counts) and
+ *                                      removes the previous import's file (only the latest is kept)
  *   list-faculty-registry-files.php    password-gated history of all files
  *   get-faculty-registry-file.php      password-gated view / download
  *
@@ -49,11 +50,11 @@ function frf_ensure_dir(): bool
         @file_put_contents(
             $ht,
             "# Faculty Registry originals are never served directly.\n" .
-            "# They are only available through account-management/api/get-faculty-registry-file.php\n" .
-            "# (Super Admin + password).\n" .
-            "Options -Indexes\n" .
-            "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n" .
-            "<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Deny from all\n</IfModule>\n"
+                "# They are only available through account-management/api/get-faculty-registry-file.php\n" .
+                "# (Super Admin + password).\n" .
+                "Options -Indexes\n" .
+                "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n" .
+                "<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Deny from all\n</IfModule>\n"
         );
     }
     return is_writable($dir);
@@ -66,6 +67,70 @@ function frf_stored_path(string $stored_name): ?string
         return null;
     }
     return frf_dir() . '/' . $stored_name;
+}
+
+/**
+ * Keeps ONLY the file of the import that just finished.
+ *
+ * Called after a successful import: every older stored file (and its history
+ * record) is removed, so a new import replaces the previous file instead of
+ * piling up next to it. Also sweeps any leftover file in the folder that has no
+ * record (e.g. an upload whose import was abandoned).
+ *
+ * A record is kept if its file could not be deleted, so nothing is ever hidden
+ * from the list while still sitting on disk - the next import tries again.
+ *
+ * @return int number of old files removed
+ */
+function frf_purge_other_files(mysqli $conn, int $keep_id): int
+{
+    $removed = 0;
+    $keep_stored = '';
+
+    $old = [];
+    if ($st = $conn->prepare('SELECT id, stored_name FROM tbl_faculty_registry_files')) {
+        $st->execute();
+        $st->bind_result($rid, $rstored);
+        while ($st->fetch()) {
+            if ((int)$rid === $keep_id) {
+                $keep_stored = (string)$rstored;
+            } else {
+                $old[] = ['id' => (int)$rid, 'stored' => (string)$rstored];
+            }
+        }
+        $st->close();
+    }
+
+    foreach ($old as $o) {
+        $path = frf_stored_path($o['stored']);
+        if ($path !== null && is_file($path)) {
+            if (!@unlink($path)) {
+                error_log('[faculty-registry-files] could not delete old file ' . $path);
+                continue;   // keep its record; it is retried on the next import
+            }
+            $removed++;
+        }
+        if ($del = $conn->prepare('DELETE FROM tbl_faculty_registry_files WHERE id = ?')) {
+            $del->bind_param('i', $o['id']);
+            $del->execute();
+            $del->close();
+        }
+    }
+
+    // Files in the folder that no record points to (never touches the kept file)
+    if ($keep_stored !== '' && is_dir(frf_dir())) {
+        foreach ((array)scandir(frf_dir()) as $f) {
+            if ($f === $keep_stored || !preg_match('/^[a-f0-9]{32}\.(pdf|xlsx)$/', (string)$f)) {
+                continue;
+            }
+            $path = frf_dir() . '/' . $f;
+            if (is_file($path) && @unlink($path)) {
+                $removed++;
+            }
+        }
+    }
+
+    return $removed;
 }
 
 /** Self-healing: creates the history table on first use. */

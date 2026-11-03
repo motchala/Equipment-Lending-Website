@@ -232,8 +232,8 @@
 
     <!-- ================================================================
      MODAL: IMPORTED FILES
-     Opened after the password step above. Lists every file imported into the
-     Faculty Registry (newest first) with View (PDF, in the browser) and Download.
+     Opened after the password step above. Shows the file of the latest import into the
+     Faculty Registry (older ones are replaced) with View (PDF, in the browser) and Download.
      The files themselves come from get-faculty-registry-file.php.
     ================================================================ -->
     <div class="ps-modal-backdrop" id="fac-reg-files-modal">
@@ -248,10 +248,10 @@
                 </button>
             </div>
             <div class="ps-modal-body fac-reg-files-body">
-                <p class="fac-reg-files-note">Every file imported into the registry is kept here exactly as it was uploaded. Files imported before this list existed were not kept.</p>
+                <p class="fac-reg-files-note">Only the file from the most recent import is kept here, exactly as it was uploaded. Importing a new file replaces the previous one.</p>
                 <p class="fac-del-error hidden" id="fac-reg-files-alert" role="alert"></p>
                 <ul class="fac-files-list" id="fac-reg-files-list"></ul>
-                <p class="fac-reg-list-empty hidden" id="fac-reg-files-empty">No files recorded yet. Files you import from now on will appear here.</p>
+                <p class="fac-reg-list-empty hidden" id="fac-reg-files-empty">No file on record yet. The file you import will appear here.</p>
             </div>
             <div class="ps-modal-foot fac-reg-list-foot">
                 <span class="fac-reg-list-meta" id="fac-reg-files-meta"></span>
@@ -259,5 +259,3 @@
             </div>
         </div>
     </div>
-
-

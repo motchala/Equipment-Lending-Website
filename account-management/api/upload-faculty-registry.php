@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 /**
  * upload-faculty-registry.php
@@ -55,8 +56,10 @@ if (!is_array($body)) {
 // CSRF from JSON body
 $submitted_token = trim((string)($body['csrf_token'] ?? ''));
 $session_token   = (string)($_SESSION['csrf_token'] ?? '');
-if ($session_token === '' || $submitted_token === '' ||
-    !hash_equals($session_token, $submitted_token)) {
+if (
+    $session_token === '' || $submitted_token === '' ||
+    !hash_equals($session_token, $submitted_token)
+) {
     ur_respond(403, ['status' => 'error', 'error' => 'Invalid session token. Please refresh the page.']);
 }
 
@@ -212,8 +215,17 @@ if ($ust = $conn->prepare(
       WHERE id = ?"
 )) {
     $ust->bind_param('siiiii', $mode, $total, $inserted, $updated, $skipped, $file_id);
-    $ust->execute();
+    $recorded = $ust->execute() && $ust->affected_rows > 0;
     $ust->close();
+}
+
+// The import went through and its file is on record: this new file REPLACES the old
+// one(s). Every previously stored file (and its record) is removed so only the latest
+// import's file is kept. Never runs when the import failed, so a failed import can
+// never cost the previous file.
+$old_files_removed = 0;
+if (!empty($recorded)) {
+    $old_files_removed = frf_purge_other_files($conn, $file_id);
 }
 
 require_once __DIR__ . '/../../shared/core/activity-logger.php';
@@ -221,7 +233,7 @@ admin_log_activity(
     $conn,
     'faculty',
     'Uploaded faculty registry: ' . $inserted . ' inserted, ' . $updated . ' updated, ' . $skipped . ' skipped'
-        . ' (file: ' . mb_strimwidth($file_name, 0, 80, '…') . ($replace_all ? ', replaced the whole registry' : '') . ')'
+        . ' (file: ' . mb_strimwidth($file_name, 0, 80, '…') . ($replace_all ? ', replaced the whole registry' : '') . ($old_files_removed > 0 ? ', replaced the previous file' : '') . ')'
 );
 
 // Count total entries now in the registry for the badge update
