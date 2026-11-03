@@ -1,0 +1,7 @@
+{
+    // PUPSync splits pages into partial files that are pulled in with require/include.
+    // $conn, $root_url, $edit_item, etc. are created in the parent file, so Intelephense
+    // cannot see where they come from and reports them as "Undefined variable".
+    // They exist at runtime, so this check is turned off for this project only.
+    "intelephense.diagnostics.undefinedVariables": "off"
+}
