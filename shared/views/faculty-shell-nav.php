@@ -1,10 +1,9 @@
-
-    <!-- Responsive System. Loaded LAST on purpose: the inline <style> block above uses !important
+<!-- Responsive System. Loaded LAST on purpose: the inline <style> block above uses !important
          and sets the desktop layout, so these mobile/tablet overrides only win if they come after it. -->
-    <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-responsive.css'); ?>">
-    <!-- Phone app layout (only active when <html class="rx-mobile">) -->
-    <link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-mobile.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-mobile.css'); ?>">
-    <?php role_splash_head(); ?>
+<link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-responsive.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-responsive.css'); ?>">
+<!-- Phone app layout (only active when <html class="rx-mobile">) -->
+<link rel="stylesheet" href="dashboard/assets/css/faculty-dashboard-mobile.css?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/css/faculty-dashboard-mobile.css'); ?>">
+<?php role_splash_head(); ?>
 </head>
 
 <body>
@@ -47,7 +46,7 @@
             <div class="side-nav-section" role="group" aria-labelledby="fnavg-overview">
                 <span class="side-nav-section-title" id="fnavg-overview">Overview</span>
                 <a class="side-nav-item active" id="nav-home" data-tab="home" href="#">
-                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">dashboard</span>
+                    <span class="material-symbols-outlined">dashboard</span>
                     <span>Dashboard</span>
                 </a>
                 <a class="side-nav-item" id="nav-activity" data-tab="activity" href="#">

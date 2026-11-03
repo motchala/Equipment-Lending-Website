@@ -58,8 +58,7 @@
     <!-- Dashboard Redesign v3 — Google Font -->
 
     <!-- facilities tab portal -->
-    <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css">
+    <link rel="stylesheet" href="room-reservation/assets/css/fcty-facilities.css?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/css/fcty-facilities.css'); ?>">
 
     <!-- Shared logout confirmation dialog + loading state -->
     <link rel="stylesheet" href="shared/assets/css/logout-modal.css?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/css/logout-modal.css'); ?>">
-

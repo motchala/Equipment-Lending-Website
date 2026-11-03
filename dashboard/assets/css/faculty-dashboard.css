@@ -8730,6 +8730,12 @@ body .side-nav .side-nav-item.active {
     box-shadow: none;
 }
 
+/* Icons are outlined while a tab is idle and turn filled on the current tab (hover does not fill).
+   Same behaviour as the Admin sidebar. Settings gets the same fill while its screen is open. */
+body .side-nav .side-nav-item.active .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1;
+}
+
 /* Only inactive tabs get the subtle white hover highlight. */
 body .side-nav .side-nav-item:not(.active):hover {
     background: var(--nav-hover-bg) !important;
@@ -12908,4 +12914,73 @@ body .side-nav .side-nav-user .side-nav-user-name {
     background: transparent !important;
     color: var(--color-secondary, #666) !important;
     border-color: var(--color-outline-variant, #ccc) !important;
+}
+
+/* ── Faculty screens: one subtle line under every page header + sub header ──────────────
+   Dashboard, My Activity, Equipment, Facilities and Settings all use the same line, so the
+   look is changed in ONE place (--page-head-line below). It is the theme's outline colour at
+   45% strength, so it stays soft in light, dark and high-contrast.
+   Phones in the app layout (html.rx-mobile) already hide these headers or clear their borders
+   with !important, so nothing shows there. */
+html body {
+    --page-head-line: color-mix(in srgb, var(--color-outline-variant) 45%, transparent);
+}
+
+html body #panel-home .dash-flat-header,
+html body #panel-activity .fact-head,
+html body #panel-rooms .page-header-block,
+html body #panel-lending .page-header-block {
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--page-head-line);
+}
+
+/* Settings: the header itself is full width (the page padding lives inside it), so the line is
+   drawn inset to line up with the content below instead of running edge to edge. */
+html body #settingsOverlay .sov-pagehead {
+    --sov-side: 40px;
+    position: relative;
+}
+
+html body #settingsOverlay .sov-pagehead::after {
+    content: '';
+    position: absolute;
+    left: var(--sov-side);
+    right: var(--sov-side);
+    bottom: 0;
+    height: 1px;
+    background: var(--page-head-line);
+    pointer-events: none;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    html body #settingsOverlay .sov-pagehead {
+        --sov-side: 20px;
+    }
+}
+
+/* phone app layout: Settings has no visible heading there, so no line either */
+html.rx-mobile body #settingsOverlay .sov-pagehead::after {
+    display: none;
+}
+
+@media (max-width: 768px) {
+
+    html body #panel-home .dash-flat-header,
+    html body #panel-activity .fact-head,
+    html body #panel-rooms .page-header-block,
+    html body #panel-lending .page-header-block {
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+    }
+
+    html body #settingsOverlay .sov-pagehead {
+        --sov-side: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    html body #settingsOverlay .sov-pagehead {
+        --sov-side: 10px;
+    }
 }
