@@ -788,14 +788,29 @@
             });
         });
 
-        /* ── Start: if the server session is still unlocked (page reload), reopen quietly ── */
-        postJson('status').then(function (d) {
-            if (d && d.status === 'success' && d.unlocked) {
+        function restoreUnlock() {
+            postJson('status', { touch: 1 }).then(function (d) {
+                if (!d || d.status !== 'success') return;
+                if (!d.unlocked) {
+                    if (unlocked) relock('Imports were locked. Unlock them again to continue.');
+                    return;
+                }
                 setExpiry(d.remaining);
-                setLocked(false);
-                loadOverview();
-            }
-        }).catch(function () { /* stay locked */ });
+                if (!unlocked) {
+                    setLocked(false);
+                    loadOverview();
+                }
+            }).catch(function () { /* keep the current state if the status check fails */ });
+        }
+
+        /* Re-check the server session on reload and whenever Imports is revisited. */
+        restoreUnlock();
+        var settingsTabs = $('settMainTabs');
+        if (settingsTabs) {
+            settingsTabs.addEventListener('click', function (e) {
+                if (e.target.closest('[data-sett-panel="sett-imports"]')) restoreUnlock();
+            });
+        }
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

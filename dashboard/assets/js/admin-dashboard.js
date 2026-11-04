@@ -2749,17 +2749,30 @@
             detailEmpty.hidden = false;
         }
 
-        /* Open the panel with someone already showing (first manageable admin, else the first row). */
+        /* Who shows when the panel opens: your own account (the signed-in Super Admin), else any Super Admin,
+           else the first manageable admin, else the first row. */
+        function defaultItem() {
+            const all = items();
+            return all.find(function (i) { return i.getAttribute('data-you') === '1'; })
+                || all.find(function (i) { return i.getAttribute('data-role') === 'Super Admin'; })
+                || all.find(function (i) { return i.getAttribute('data-manage') === '1'; })
+                || all[0];
+        }
+
         function ensureSelected() {
             if (current && document.body.contains(current)) return;
-            const all = items();
-            if (!all.length) return;
-            const first = all.find(function (i) { return i.getAttribute('data-manage') === '1'; }) || all[0];
-            select(first, false);
+            const first = defaultItem();
+            if (first) select(first, false);
+        }
+
+        /* Clicking Admins in the sidebar always lands on your own account. */
+        function showDefault() {
+            const first = defaultItem();
+            if (first) select(first, false);
         }
 
         const navAdmins = document.querySelector('.nav-item[data-tab="admins"]');
-        if (navAdmins) navAdmins.addEventListener('click', ensureSelected);
+        if (navAdmins) navAdmins.addEventListener('click', showDefault);
         if (document.getElementById('panel-admins').classList.contains('active')) ensureSelected();
         window.psAdminsPanelReady = ensureSelected; // lets ?view=admins open it with someone selected
 
@@ -4951,7 +4964,7 @@ function psSelectFmt(btn) {
 
         /* geometry */
         var W = Math.max(240, chartEl.clientWidth || 600);
-        var H = Math.max(200, chartEl.clientHeight || 230);
+        var H = Math.max(120, chartEl.clientHeight || 150);
         var m = { l: 4, r: 4, t: ins.bands.length ? 26 : 8, b: 24 };   // extra room on top for the band labels
         var pw = W - m.l - m.r, ph = H - m.t - m.b;
         var step = Math.max(1, Math.ceil(peak / 4));

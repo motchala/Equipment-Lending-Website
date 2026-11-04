@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Everything the Settings -> Imports tab reads, behind ONE password unlock.
  * POST only (form-encoded), always: logged-in Super Admin + CSRF token.
  *
- *   action=status    { unlocked, remaining }                 (touch=1 keeps an open unlock alive)
+ *   action=status    { unlocked, remaining }                 (touch=1 refreshes an open unlock)
  *   action=unlock    current_password -> opens the unlock (10 min, sliding)
  *   action=lock      closes it
  *   -- everything below needs the unlock; otherwise HTTP 403 { code: "locked" } --

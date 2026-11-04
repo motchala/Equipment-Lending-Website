@@ -1,4 +1,5 @@
 <?php
+
 /** Echo the dashboard body. */
 function dash_render(array $d): void
 {
@@ -6,11 +7,15 @@ function dash_render(array $d): void
     $alerts = $d['inv_out'] + $d['inv_low'];
     $tomorrow = date('Y-m-d', strtotime('+1 day', strtotime($d['today'])));
 
+    // Overview strip: two groups inside ONE card (replaces the six separate stat cards).
+    $kpi_groups = ['loans' => 'Equipment loans', 'places' => 'Facilities & stock'];
+
     $kpis = [
         [
             'tone' => $d['waiting'] > 0 ? 'warn' : 'ok',
             'icon' => 'assignment',
             'label' => 'Pending requests',
+            'group' => 'loans',
             'val' => $d['waiting'],
             'sub' => $d['waiting'] > 0 ? 'Awaiting a decision' : 'Queue is clear',
             'go' => 'inventory',
@@ -21,6 +26,7 @@ function dash_render(array $d): void
             'tone' => $d['pickup'] > 0 ? 'warn' : 'ok',
             'icon' => 'move_to_inbox',
             'label' => 'Ready for pickup',
+            'group' => 'loans',
             'val' => $d['pickup'],
             'sub' => $d['pickup'] > 0 ? 'Awaiting claim scan' : 'Nothing to hand over',
             'go' => 'inventory',
@@ -31,6 +37,7 @@ function dash_render(array $d): void
             'tone' => 'ok',
             'icon' => 'swap_horiz',
             'label' => 'Active loans',
+            'group' => 'loans',
             'val' => $d['active'],
             'sub' => $d['due_today'] > 0 ? dash_pl($d['due_today'], 'item') . ' due back today' : 'None due today',
             'go' => 'inventory',
@@ -41,6 +48,7 @@ function dash_render(array $d): void
             'tone' => $d['overdue'] > 0 ? 'danger' : 'ok',
             'icon' => 'schedule',
             'label' => 'Overdue returns',
+            'group' => 'loans',
             'val' => $d['overdue'],
             'sub' => $d['overdue'] > 0
                 ? ($d['overdue_days'] > 0 ? 'Oldest ' . dash_pl($d['overdue_days'], 'day') . ' late' : 'Needs follow-up')
@@ -53,9 +61,10 @@ function dash_render(array $d): void
             'tone' => 'info',
             'icon' => 'meeting_room',
             'label' => 'Facilities today',
+            'group' => 'places',
             'val' => $d['rooms_today'],
             'sub' => $d['rooms_bookable'] > 0
-                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' facilities in use (' . $d['rooms_pct'] . '%)'
+                ? $d['rooms_in_use'] . ' of ' . $d['rooms_bookable'] . ' in use'
                 : 'No bookable facilities yet',
             'go' => 'rooms',
             'chip' => '',
@@ -64,29 +73,36 @@ function dash_render(array $d): void
             'tone' => $d['inv_out'] > 0 ? 'danger' : ($alerts > 0 ? 'warn' : 'ok'),
             'icon' => 'inventory_2',
             'label' => 'Stock alerts',
+            'group' => 'places',
             'val' => $alerts,
             'sub' => $alerts > 0
-                ? $d['inv_out'] . ' out · ' . $d['inv_low'] . ' low · of ' . $d['inv_total'] . ' items'
+                ? $d['inv_out'] . ' out · ' . $d['inv_low'] . ' low'
                 : 'All ' . $d['inv_total'] . ' items stocked',
             'go' => 'inventory',
             'chip' => '',
         ],
     ];
 ?>
-    <!-- ── Stat cards ─────────────────────────────────────────────── -->
-    <section class="dash-kpis" aria-label="Key figures">
-        <?php foreach ($kpis as $k): ?>
-            <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
-                data-dash-go="<?php echo dash_h($k['go']); ?>"
-                data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
-                <span class="dash-kpi-icon" aria-hidden="true"><span class="material-symbols-outlined"><?php echo dash_h($k['icon']); ?></span></span>
-                <span class="dash-kpi-body">
-                    <span class="dash-kpi-label"><?php echo dash_h($k['label']); ?></span>
-                    <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
-                    <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
-                </span>
-                <span class="material-symbols-outlined dash-kpi-go" aria-hidden="true">arrow_outward</span>
-            </button>
+    <!-- ── Overview: ONE card, two groups ─────────────────────────────
+         Keeps the .dash-kpis class: admin-dashboard.js checks for it before swapping a live refresh in.
+         Every stat is still a button with data-dash-go / data-dash-loan-filter, so the delegated click
+         handler in admin-dashboard.js needs no change. -->
+    <section class="dash-kpis dash-overview" aria-label="Key figures">
+        <?php foreach ($kpi_groups as $gk => $gl): ?>
+            <div class="dash-ov-group dash-ov-group--<?php echo dash_h($gk); ?>" role="group" aria-label="<?php echo dash_h($gl); ?>">
+                <h2 class="dash-ov-title"><?php echo dash_h($gl); ?></h2>
+                <div class="dash-ov-stats">
+                    <?php foreach ($kpis as $k): if (($k['group'] ?? 'loans') !== $gk) continue; ?>
+                        <button type="button" class="dash-kpi dash-tone-<?php echo dash_h($k['tone']); ?>"
+                            data-dash-go="<?php echo dash_h($k['go']); ?>"
+                            data-dash-loan-filter="<?php echo dash_h($k['loan_filter'] ?? ''); ?>">
+                            <span class="dash-kpi-label"><span class="dash-kpi-dot" aria-hidden="true"></span><?php echo dash_h($k['label']); ?></span>
+                            <span class="dash-kpi-val"><?php echo (int)$k['val']; ?></span>
+                            <span class="dash-kpi-sub"><?php echo dash_h($k['sub']); ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </div>
+            </div>
         <?php endforeach; ?>
     </section>
 
@@ -351,5 +367,5 @@ function dash_render(array $d): void
         </section>
 
     </div>
-    <?php
+<?php
 }

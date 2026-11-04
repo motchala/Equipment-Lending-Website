@@ -512,7 +512,7 @@
                                     <h4>Imports are locked</h4>
                                     <p>Click the lock and enter your password to view or make imports, or to open the files that were imported.</p>
                                     <p class="imp-lock-msg hidden" id="imp-lock-msg"></p>
-                                    <span class="imp-lock-note"><span class="material-symbols-outlined">shield_person</span> Super Admin only</span>
+                                    <span class="imp-lock-note"><span class="material-symbols-outlined">lock</span> Password required to unlock</span>
                                 </div>
                             </div>
 
