@@ -20,3 +20,5 @@ importing.md
 # Faculty Registry originals (private; only the folder's .htaccess is tracked)
 /uploads/faculty_registry/*
 !/uploads/faculty_registry/.htaccess
+/uploads/student_registry/*
+!/uploads/student_registry/.htaccess

@@ -30,6 +30,7 @@ if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 
     frf_respond(413, ['status' => 'error', 'error' => 'That file is larger than this server accepts. Choose a smaller file.']);
 }
 
+require_once __DIR__ . '/../../shared/core/imports-lock.php';
 require_once __DIR__ . '/../../config/csrf.php';
 csrf_verify();
 
@@ -39,6 +40,7 @@ $conn->set_charset('utf8mb4');
 if (!admin_is_super_admin($conn)) {
     frf_respond(403, ['status' => 'error', 'error' => 'Super Admin only.']);
 }
+imports_require_unlocked();   // Settings -> Imports must be unlocked with the Super Admin's password
 
 $file = $_FILES['file'] ?? null;
 if (!is_array($file) || !isset($file['error']) || is_array($file['error'])) {

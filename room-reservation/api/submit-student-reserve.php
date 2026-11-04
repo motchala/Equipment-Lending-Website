@@ -76,7 +76,7 @@ $conn = getDB();
 
 // ── Student must be on the official student list (re-checked here, never trusted from the form) ──
 require_once __DIR__ . '/../../shared/core/student-registry.php';
-$sv = student_registry_validate($conn, $student_id, $student_name);
+$sv = student_registry_validate($conn, $student_id);
 if (!$sv['ok']) {
     echo json_encode(['error' => $sv['error']]);
     exit();

@@ -80,3 +80,96 @@
         </div>
     </div>
 
+    <!-- ================================================================
+     MODALS: SETTINGS -> IMPORTS
+     imp-auth-modal   the password step (opened from the lock)
+     imp-list-modal   read-only list of what was imported
+     imp-files-modal  every original file that was imported (View / Download)
+    ================================================================ -->
+    <div class="ps-modal-backdrop" id="imp-auth-modal">
+        <div class="ps-modal ps-modal--sm imp-auth">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">lock</span>
+                </div>
+                <h3>Unlock Imports</h3>
+                <button class="ps-modal-close" id="imp-auth-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <p class="imp-auth-lead">Enter your password to view and make imports, and to open the files that were imported. It locks again after 10 minutes without use.</p>
+                <label class="fac-del-pw-label" for="imp-auth-password">Your password</label>
+                <div class="fac-pw-wrap">
+                    <input type="password" id="imp-auth-password" class="form-control-custom"
+                        maxlength="128" autocomplete="current-password" placeholder="Your password">
+                    <button type="button" class="fac-pw-toggle"
+                        data-target="imp-auth-password" aria-label="Toggle password">
+                        <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                </div>
+                <p class="fac-del-error hidden" id="imp-auth-error" role="alert"></p>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" id="imp-auth-cancel">Cancel</button>
+                <button class="ps-btn ps-btn--primary" id="imp-auth-confirm">
+                    <span class="material-symbols-outlined">lock_open</span> Unlock
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ps-modal-backdrop" id="imp-list-modal">
+        <div class="ps-modal ps-modal--lg imp-list-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined" id="imp-list-icon">table_view</span>
+                </div>
+                <h3><span id="imp-list-title">Imported list</span> <span class="fac-count-badge" id="imp-list-count"></span></h3>
+                <button class="ps-modal-close" id="imp-list-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body imp-list-body">
+                <div class="imp-search">
+                    <span class="material-symbols-outlined">search</span>
+                    <input type="text" id="imp-list-search" placeholder="Search by name or ID…" autocomplete="off">
+                </div>
+                <div class="imp-table-wrap imp-table-wrap--tall">
+                    <table class="imp-table">
+                        <thead id="imp-list-thead"></thead>
+                        <tbody id="imp-list-tbody"></tbody>
+                    </table>
+                    <p class="imp-empty hidden" id="imp-list-empty">No matching entries.</p>
+                </div>
+            </div>
+            <div class="ps-modal-foot imp-modal-foot">
+                <span class="imp-modal-meta" id="imp-list-meta"></span>
+                <button class="ps-btn ps-btn--ghost" id="imp-list-done">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ps-modal-backdrop" id="imp-files-modal">
+        <div class="ps-modal ps-modal--lg imp-files-modal">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--maroon">
+                    <span class="material-symbols-outlined">folder_open</span>
+                </div>
+                <h3><span id="imp-files-title">Original file</span> <span class="fac-count-badge" id="imp-files-total"></span></h3>
+                <button class="ps-modal-close" id="imp-files-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body imp-files-body">
+                <p class="imp-files-note">Only the file from the most recent import is kept here, exactly as it was uploaded. Importing a new file replaces it.</p>
+                <p class="fac-del-error hidden" id="imp-files-alert" role="alert"></p>
+                <ul class="imp-files-list" id="imp-files-list"></ul>
+                <p class="imp-empty hidden" id="imp-files-empty">No file on record yet. The file you import will appear here.</p>
+            </div>
+            <div class="ps-modal-foot imp-modal-foot">
+                <span class="imp-modal-meta" id="imp-files-meta"></span>
+                <button class="ps-btn ps-btn--ghost" id="imp-files-done">Close</button>
+            </div>
+        </div>
+    </div>
