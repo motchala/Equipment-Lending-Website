@@ -13,8 +13,9 @@
  *                                                 a request is decided, an item goes overdue)
  *
  * RULES (all times Asia/Manila, same as the Home tab, the booking form and the notifications)
- *   Status lifecycle   Waiting (shown "Pending") -> Approved -> Overdue -> Returned
+ *   Status lifecycle   Waiting (shown "Pending") -> Approved -> On Loan -> Overdue -> Returned
  *                                         \-> Declined
+ *                      (On Loan = Claim QR scanned, item physically handed over)
  *   In progress        Overdue, or Approved whose start time has already arrived
  *                      (a booking for later today is NOT "in progress" until it starts,
  *                      exactly when BookingSchedule::activateDue() takes its stock)
@@ -140,7 +141,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
         'live'     => [],
         'upcoming' => [],
         'history'  => [],
-        'counts'   => ['active' => 0, 'overdue' => 0, 'pending' => 0],
+        'counts'   => ['pickup' => 0, 'active' => 0, 'overdue' => 0, 'pending' => 0],
     ];
     $tz     = new DateTimeZone('Asia/Manila');
     $now    = new DateTimeImmutable('now', $tz);
@@ -155,7 +156,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 
         $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.borrow_date, r.borrow_time, $extCol,
                  r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule,
-                 r.request_date, r.return_token, r.submitted_as, r.submitted_by_name,
+                 r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name,
                  rm.room_name, b.building_key, b.name AS building_name,
                  COALESCE(rm.floor_label, CONCAT(rm.floor_number, 'F')) AS floor_label
             FROM tbl_requests r
@@ -165,8 +166,8 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
 
         // Open requests are never cut off; history is capped (the table pages 10 at a time).
         $queries = [
-            "SELECT $cols AND r.status IN ('Waiting','Approved','Overdue') ORDER BY r.request_date DESC",
-            "SELECT $cols AND r.status NOT IN ('Waiting','Approved','Overdue') ORDER BY r.request_date DESC LIMIT 200",
+            "SELECT $cols AND r.status IN ('Waiting','Approved','On Loan','Overdue') ORDER BY r.request_date DESC",
+            "SELECT $cols AND r.status NOT IN ('Waiting','Approved','On Loan','Overdue') ORDER BY r.request_date DESC LIMIT 200",
         ];
 
         foreach ($queries as $sql) {
@@ -200,6 +201,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'reason'      => trim(fact_s($row, 'reason')),
                     'rule'        => fact_s($row, 'arbitration_rule'),
                     'token'       => fact_s($row, 'return_token'),
+                    'claim_token' => fact_s($row, 'claim_token'),
                     'student'     => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_name')) : '',
                     'image'       => $images[strtolower(trim($name))] ?? '',
                     'icon'        => actEquipIcon($name),
@@ -240,8 +242,14 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                         $out['counts']['overdue']++;
                         $out['live'][] = $item;
                         break;
-                    case 'Approved':
+                    case 'On Loan':
+                        // Claimed — item physically out. Counts as active loan.
                         $out['counts']['active']++;
+                        $out['live'][] = $item;
+                        break;
+                    case 'Approved':
+                        // Approved but not yet physically collected — counts as "ready for pickup".
+                        $out['counts']['pickup']++;
                         if ($start <= $now) {
                             $out['live'][] = $item;
                         } else {
@@ -285,6 +293,7 @@ function fact_eq_stats(array $d): array
 {
     $c = is_array($d['counts'] ?? null) ? $d['counts'] : [];
     return [
+        'pickup'  => (int)($c['pickup'] ?? 0),
         'loans'   => (int)($c['active'] ?? 0),
         'overdue' => (int)($c['overdue'] ?? 0),
         'pending' => (int)($c['pending'] ?? 0),
@@ -386,25 +395,41 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     $html .= '<p class="fact-item-meta">' . $when . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
 
-    // Upcoming: Cancel, or a quiet note when it is too late to cancel
+    // Upcoming: Claim QR (for Approved only) + Cancel button
     if ($kind === 'upcoming') {
+        $upButtons = '';
+        // Claim QR — shown while the request is Approved and not yet physically collected
+        if ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
+            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
+                . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
+        }
         if (!empty($it['can_cancel'])) {
-            $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-borrow"'
+            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-borrow"'
                 . ' data-request-id="' . fact_i($it, 'id') . '"'
                 . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '"'
-                . ' title="Cancel this request">Cancel</button></div>';
+                . ' title="Cancel this request">Cancel</button>';
         } elseif (fact_s($it, 'cancel_note') !== '') {
-            $html .= '<div class="fact-item-actions"><span class="fact-note" title="Requests can\'t be cancelled within 1 hour of the start time">'
-                . fact_icon('lock') . fact_h(fact_s($it, 'cancel_note')) . '</span></div>';
+            $upButtons .= '<span class="fact-note" title="Requests can\'t be cancelled within 1 hour of the start time">'
+                . fact_icon('lock') . fact_h(fact_s($it, 'cancel_note')) . '</span>';
+        }
+        if ($upButtons !== '') {
+            $html .= '<div class="fact-item-actions">' . $upButtons . '</div>';
         }
     }
 
-    // Actions on a loan: Return QR (the admin scans it to confirm the return) and, once the
-    // return time has been reached, Extend. (The old "Report issue" button is gone: the AI chat is
-    // now the Room Assistant on the Facilities tab and has no equipment flow. Damaged or lost
-    // items go to the Admin Office.)
+    // Actions on a live loan:
+    //   Approved-started (claim_token still set) → Claim QR first, then Return QR
+    //   On Loan / Overdue (claim_token nulled)   → Return QR only
+    //   Once return time reached                 → Extend option
     if ($kind === 'live') {
         $buttons = '';
+        // Claim QR: item is Approved and started but not yet physically collected
+        if ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
+            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
+                . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
+        }
         if (fact_s($it, 'token') !== '') {
             $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-return-qr"'
                 . ' data-token="' . fact_h(fact_s($it, 'token')) . '"'

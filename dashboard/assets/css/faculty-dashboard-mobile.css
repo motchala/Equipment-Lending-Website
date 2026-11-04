@@ -775,7 +775,7 @@ html.rx-mobile #panel-activity .fact-stat:nth-child(odd) {
     border-right: 1px solid var(--rxm-line) !important;
 }
 
-html.rx-mobile #panel-home .fdb-kpi:nth-child(-n+2),
+html.rx-mobile #panel-home .fdb-kpi:nth-child(-n+4),
 html.rx-mobile #panel-activity .fact-stat:nth-child(-n+2) {
     border-bottom: 1px solid var(--rxm-line) !important;
 }

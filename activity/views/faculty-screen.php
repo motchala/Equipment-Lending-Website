@@ -44,10 +44,15 @@
 
                 <!-- ── Summary: four cards ──────────────────────────────── -->
                 <div class="fact-stats" role="group" aria-label="Activity summary">
+                    <div class="fact-stat <?php echo $act_eq_stats['pickup'] > 0 ? 'is-wait' : 'is-ok'; ?>">
+                        <span class="fact-stat-label">Ready for pickup</span>
+                        <span class="fact-stat-value" data-fact-stat="pickup"><?php echo (int) $act_eq_stats['pickup']; ?></span>
+                        <span class="fact-stat-note">Approved, not yet claimed</span>
+                    </div>
                     <div class="fact-stat is-ok">
                         <span class="fact-stat-label">Active loans</span>
                         <span class="fact-stat-value" data-fact-stat="loans"><?php echo (int) $act_eq_stats['loans']; ?></span>
-                        <span class="fact-stat-note">Approved equipment</span>
+                        <span class="fact-stat-note">Item in your hands</span>
                     </div>
                     <div class="fact-stat is-bad<?php echo $act_eq_stats['overdue'] > 0 ? ' is-alert' : ''; ?>">
                         <span class="fact-stat-label">Overdue</span>

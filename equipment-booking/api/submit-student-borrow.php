@@ -77,19 +77,20 @@ if (!$stock_row || $stock_row['quantity'] < $quantity) {
     exit();
 }
 
-// ── Generate return token ─────────────────────────────────────────────────
+// ── Generate return token + claim token ───────────────────────────────────
 $return_token = bin2hex(random_bytes(32));
+$claim_token  = bin2hex(random_bytes(32));
 
 // ── Insert as Approved (faculty code is the authorization) ────────────────
 $ins = $conn->prepare(
     "INSERT INTO tbl_requests
         (faculty_name, faculty_id, equipment_name, instructor, room,
          borrow_date, return_date, status, request_date,
-         return_token, submitted_by_name, submitted_by_id, submitted_as)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, 'student')"
+         return_token, claim_token, submitted_by_name, submitted_by_id, submitted_as)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
 );
 $ins->bind_param(
-    'ssssssssss',
+    'sssssssssss',
     $faculty_name,
     $faculty_id,
     $equipment,
@@ -98,6 +99,7 @@ $ins->bind_param(
     $borrow_date,
     $return_date,
     $return_token,
+    $claim_token,
     $student_name,
     $student_id
 );
@@ -202,4 +204,4 @@ if ($fac_mail_row2 && !empty($fac_mail_row2['email'])) {
 
 $conn->close();
 
-echo json_encode(['success' => true, 'request_id' => $request_id, 'return_token' => $return_token]);
+echo json_encode(['success' => true, 'request_id' => $request_id, 'return_token' => $return_token, 'claim_token' => $claim_token]);

@@ -255,15 +255,27 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         }
 
         // Prepared INSERT — includes submitted_as = 'personal' (Requirement 3.2)
+        // Collector info from the form
+        $collector_type_p = (string)($_POST['collector_type'] ?? 'faculty');
+        $collector_name_p = trim((string)($_POST['submitted_by_name'] ?? ''));
+        if ($collector_type_p !== 'student') {
+            $collector_name_p = '';
+        }
+        if ($collector_type_p === 'student' && $collector_name_p === '') {
+            bm_fail('Please enter the student\'s name.');
+        }
+        $collector_id_p = ''; // ID field removed from this form
+
         $stmt_ins_p = $conn->prepare(
             "INSERT INTO tbl_requests
              (faculty_name, faculty_id, equipment_name, instructor, room,
               borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
-              booking_mode, stock_applied, status, request_date, submitted_as)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal')"
+              booking_mode, stock_applied, status, request_date, submitted_as,
+              submitted_by_name, submitted_by_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal', ?, ?)"
         );
         $stmt_ins_p->bind_param(
-            'sssssssssiis',
+            'ssssssssssiiss',
             $faculty_name,
             $faculty_id,
             $equipment_name,
@@ -275,7 +287,9 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $bk['return_time'],
             $bk['qty'],
             $room_id,
-            $bk['mode']
+            $bk['mode'],
+            $collector_name_p,
+            $collector_id_p
         );
         if ($stmt_ins_p->execute()) {
             $new_request_id = $conn->insert_id;

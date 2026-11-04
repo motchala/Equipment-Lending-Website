@@ -4173,8 +4173,15 @@
                         return;
                     }
 
-                    // Hit return_confirm.php via fetch — no page reload
-                    fetch('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), {
+                    // Detect QR type by the endpoint path encoded in the QR URL itself.
+                    // Claim QRs point to claim_confirm.php; Return QRs point to return_confirm.php.
+                    // This prevents a used Claim QR from accidentally triggering a return.
+                    const isClaimQr  = code.data.includes('claim_confirm.php');
+                    const endpoint   = isClaimQr
+                        ? 'equipment-booking/claim_confirm.php?token='  + encodeURIComponent(token)
+                        : 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(token);
+
+                    fetch(endpoint, {
                         credentials: 'same-origin',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     })
@@ -4182,12 +4189,15 @@
                         .then(data => {
                             if (data.success) {
                                 scannedCount++;
-                                status.textContent = '✅ Return confirmed!';
-                                status.style.color = '#22c55e';
-                                showToast('✅ Equipment return confirmed via QR.');
-                                // Stay open and keep scanning — a return day usually
-                                // means several faculty in a row, not just one, so
-                                // don't force reopening the modal for every scan.
+                                if (isClaimQr) {
+                                    status.textContent = '✅ Claim confirmed!';
+                                    status.style.color = '#22c55e';
+                                    showToast('✅ Equipment claim confirmed — item handed over.');
+                                } else {
+                                    status.textContent = '✅ Return confirmed!';
+                                    status.style.color = '#22c55e';
+                                    showToast('✅ Equipment return confirmed via QR.');
+                                }
                                 setTimeout(() => {
                                     status.textContent = scannedCount > 1
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
@@ -5349,6 +5359,7 @@ function psSelectFmt(btn) {
         var TITLES = {
             all: 'All Loans',
             waiting: 'Pending & Scheduled',
+            pickup: 'Ready for Pickup',
             active: 'Active Borrowings',
             overdue: 'Overdue Items',
             returned: 'Returned Equipment'
@@ -5362,6 +5373,7 @@ function psSelectFmt(btn) {
 
         function matchesMode(state) {
             if (mode === 'all') return true;
+            if (mode === 'pickup') return state === 'pickup';
             if (mode === 'active') return state === 'ok' || state === 'due';
             if (mode === 'waiting') return state === 'waiting' || state === 'scheduled';
             return state === mode; /* overdue | returned */

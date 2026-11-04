@@ -91,6 +91,20 @@ if ($room_label === '') {
 $room    = $room_label;
 $room_id = null;
 
+// Collector info — who will physically pick up the equipment
+$collector_type = (string)($body['collector_type'] ?? 'faculty');
+$collector_name = trim((string)($body['collector_name'] ?? ''));
+// Server-side validation: if student selected, name is required
+if ($collector_type === 'student' && $collector_name === '') {
+    echo json_encode(['ok' => false, 'error' => 'Student name is required when a student will collect.']);
+    exit;
+}
+// Normalize: if faculty collecting, clear the student field
+if ($collector_type !== 'student') {
+    $collector_name = '';
+}
+$collector_id = ''; // ID field removed from this form
+
 // Validate items array
 $raw_items = $body['items'] ?? [];
 if (!is_array($raw_items) || empty($raw_items)) {
@@ -140,15 +154,16 @@ foreach ($raw_items as $raw) {
         "INSERT INTO tbl_requests
          (faculty_name, faculty_id, equipment_name, instructor, room,
           borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
-          booking_mode, stock_applied, status, request_date, submitted_as)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal')"
+          booking_mode, stock_applied, status, request_date, submitted_as,
+          submitted_by_name, submitted_by_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal', ?, ?)"
     );
     if (!$stmt_ins) {
         $failed[] = ['name' => $name, 'error' => 'Database error. Please try again.'];
         continue;
     }
     $stmt_ins->bind_param(
-        'sssssssssiis',
+        'ssssssssssiiss',
         $faculty_name,
         $faculty_id,
         $name,
@@ -160,7 +175,9 @@ foreach ($raw_items as $raw) {
         $bk['return_time'],
         $bk['qty'],
         $room_id,
-        $bk['mode']
+        $bk['mode'],
+        $collector_name,
+        $collector_id
     );
     if (!$stmt_ins->execute()) {
         $stmt_ins->close();

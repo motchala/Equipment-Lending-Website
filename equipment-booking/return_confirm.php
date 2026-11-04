@@ -35,7 +35,7 @@ if ($token) {
         $stmt = $conn->prepare(
             "SELECT id, faculty_name, equipment_name, status, return_token, borrow_qty, stock_applied
                FROM tbl_requests
-              WHERE return_token = ? AND status IN ('Approved','Overdue')
+              WHERE return_token = ? AND status IN ('Approved','On Loan','Overdue')
               LIMIT 1 FOR UPDATE"
         );
         $stmt->bind_param('s', $token);

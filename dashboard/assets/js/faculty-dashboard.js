@@ -1197,6 +1197,23 @@
             // Reset the form fields each time the modal opens
             const form = document.getElementById('borrowForm');
             if (form) {
+                // Keep hidden collector name input in sync with the visible text field
+                const nameVis = document.getElementById('bm_collector_name_input');
+                const nameHid = document.getElementById('bm_collector_name');
+                if (nameVis && nameHid) nameVis.addEventListener('input', () => { nameHid.value = nameVis.value.trim(); });
+
+                // Validate student name on submit
+                form.addEventListener('submit', function (ev) {
+                    const type = form.querySelector('input[name="collector_type"]:checked');
+                    if (type && type.value === 'student') {
+                        const n = (nameVis?.value || '').trim();
+                        if (!n) {
+                            ev.preventDefault();
+                            alert('Please enter the student\'s name before submitting.');
+                        }
+                    }
+                }, { once: false });
+
                 const fileInp = document.getElementById('request_document');
                 if (fileInp) fileInp.value = '';
                 syncBorrowDrops();
@@ -1228,8 +1245,23 @@
     }
     window.syncBorrowDrops = syncBorrowDrops;
 
+    // Toggle student collector fields in borrow forms (personal + cart)
     document.addEventListener('change', function (e) {
         const inp = e.target;
+
+        // Personal borrow form collector toggle
+        if (inp && inp.matches('input[name="collector_type"]')) {
+            const fields = document.getElementById('collectorStudentFields');
+            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
+            // Sync hidden inputs from visible text inputs on every keystroke already wired below
+        }
+
+        // Cart checkout collector toggle
+        if (inp && inp.matches('input[name="cart_collector_type"]')) {
+            const fields = document.getElementById('cartCollectorStudentFields');
+            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
+        }
+
         if (!inp || !inp.matches || !inp.matches('.bm-drop input[type="file"]')) return;
         syncBorrowDrops();
         const group = inp.closest('.form-group');
@@ -3169,8 +3201,17 @@
                     // the real network IP, not localhost
                     const base = window.SERVER_BASE_URL
                         || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-                    const returnUrl = base + 'return_confirm.php?token=' + token;
-                    _openReturnQrModal(equipment, returnUrl);
+                    const returnUrl = base + 'equipment-booking/return_confirm.php?token=' + token;
+                    _openReturnQrModal(equipment, returnUrl, 'Return QR', 'Show this to the admin when returning the equipment.');
+                    break;
+                }
+                case 'show-claim-qr': {
+                    const token = el.dataset.token;
+                    const equipment = el.dataset.equipment;
+                    const base = window.SERVER_BASE_URL
+                        || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+                    const claimUrl = base + 'equipment-booking/claim_confirm.php?token=' + token;
+                    _openReturnQrModal(equipment, claimUrl, 'Claim QR', 'Show this to the admin to collect your equipment.');
                     break;
                 }
                 case 'logout':
@@ -4221,8 +4262,64 @@
     // showToast is already defined above using #app-toast
 
 
-    /* ── Return QR Modal ───────────────────────────────────────────────── */
-    function _openReturnQrModal(equipment, url) {
+    /* ── Coach mark: "Your Claim QR is in My Activity" ────────────────── */
+    function _showClaimHint(equipmentName) {
+        // Remove any existing hint first
+        const old = document.getElementById('claimHintBubble');
+        if (old) old.remove();
+
+        const activityBtn = document.querySelector('[data-tab="activity"], [href="#activity"], #nav-activity');
+        const bubble = document.createElement('div');
+        bubble.id = 'claimHintBubble';
+        bubble.setAttribute('role', 'status');
+        bubble.setAttribute('aria-live', 'polite');
+        bubble.style.cssText = [
+            'position:fixed',
+            'bottom:24px',
+            'left:50%',
+            'transform:translateX(-50%)',
+            'z-index:10000',
+            'background:#600302',
+            'color:#fff',
+            'padding:12px 20px 12px 16px',
+            'border-radius:14px',
+            'box-shadow:0 4px 20px rgba(0,0,0,0.25)',
+            'font-size:.85rem',
+            'max-width:320px',
+            'width:max-content',
+            'display:flex',
+            'align-items:flex-start',
+            'gap:10px',
+            'cursor:pointer',
+        ].join(';');
+        bubble.innerHTML = `
+            <span class="material-symbols-outlined" style="font-size:22px;flex-shrink:0;margin-top:1px;">qr_code_2</span>
+            <div>
+                <strong style="display:block;margin-bottom:2px;">${equipmentName} approved!</strong>
+                <span style="opacity:.9;">Your Claim QR is saved in <strong>My Activity</strong>. Show it to Sir Redg to collect the equipment.</span>
+            </div>
+            <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0;margin-left:6px;flex-shrink:0;font-size:18px;line-height:1;" aria-label="Dismiss" onclick="this.closest('#claimHintBubble').remove()">×</button>`;
+
+        // Clicking the bubble navigates to My Activity and dismisses
+        bubble.addEventListener('click', function (e) {
+            if (e.target.tagName === 'BUTTON') return;
+            bubble.remove();
+            // Try to activate the My Activity tab
+            const tab = document.querySelector('[data-tab="activity"]')
+                || document.querySelector('.nav-link[href="#panel-activity"]')
+                || document.getElementById('nav-activity');
+            if (tab) tab.click();
+        });
+
+        document.body.appendChild(bubble);
+        // Auto-dismiss after 12 seconds
+        setTimeout(() => { if (bubble.parentNode) bubble.remove(); }, 12000);
+    }
+
+    /* ── Return / Claim QR Modal ───────────────────────────────────────── */
+    function _openReturnQrModal(equipment, url, modalTitle, modalDesc) {
+        const title = modalTitle || 'Return QR';
+        const desc  = modalDesc  || 'Show this QR code to the admin when returning the equipment.';
         // Reuse or create the modal
         let modal = document.getElementById('returnQrModal');
         if (!modal) {
@@ -4235,8 +4332,9 @@
                         <span class="material-symbols-outlined">close</span>
                     </button>
                     <span class="material-symbols-outlined" style="font-size:36px;color:var(--accent-maroon,#600302);margin-bottom:8px;display:block;">qr_code_2</span>
-                    <h3 id="returnQrTitle" style="font-size:1rem;font-weight:700;margin-bottom:4px;"></h3>
-                    <p style="font-size:0.8rem;color:var(--color-on-surface-variant);margin-bottom:16px;">Show this QR code to the admin when returning the equipment.</p>
+                    <h3 id="returnQrModalLabel" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-on-surface-variant);margin-bottom:2px;"></h3>
+                    <h4 id="returnQrTitle" style="font-size:1rem;font-weight:700;margin-bottom:4px;"></h4>
+                    <p id="returnQrDesc" style="font-size:0.8rem;color:var(--color-on-surface-variant);margin-bottom:16px;"></p>
                     <div id="returnQrCanvas" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
                     <p style="font-size:0.7rem;color:var(--color-on-surface-variant);word-break:break-all;">Token verified on scan</p>
                 </div>`;
@@ -4248,7 +4346,9 @@
                 if (e.target === modal) modal.style.display = 'none';
             });
         }
+        document.getElementById('returnQrModalLabel').textContent = title;
         document.getElementById('returnQrTitle').textContent = equipment;
+        document.getElementById('returnQrDesc').textContent = desc;
         document.getElementById('returnQrCanvas').setAttribute('title', url);
         document.getElementById('returnQrCanvas').innerHTML = '';
         modal.style.display = 'flex';
@@ -4280,9 +4380,10 @@
     function _updateFacultyStatCards(data) {
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
-            overdue: data.filter(r => r.status === 'Overdue').length,
-            waiting: data.filter(r => r.status === 'Waiting').length,
-            total: data.length,
+            on_loan:  data.filter(r => r.status === 'On Loan').length,
+            overdue:  data.filter(r => r.status === 'Overdue').length,
+            waiting:  data.filter(r => r.status === 'Waiting').length,
+            total:    data.length,
         };
         // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
         document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
@@ -4290,6 +4391,10 @@
             if (!(key in counts)) return;
             const val = tile.querySelector('.fdb-kpi-val, .stat-tile-value');
             if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
+            // Ready for pickup card: amber tone when there are items waiting, neutral when none
+            if (key === 'approved') {
+                tile.className = tile.className.replace(/fdb-tone-\w+/, counts[key] > 0 ? 'fdb-tone-warn' : 'fdb-tone-ok');
+            }
         });
     }
 
@@ -4374,6 +4479,15 @@
                             if (prev !== undefined) {
                                 if (r.status === 'Returned') {
                                     showToast(r.equipment_name + ' has been marked as Returned.', 'success');
+                                }
+                                // Coach mark: first time a Waiting request becomes Approved,
+                                // point faculty to My Activity where the Claim QR lives.
+                                if (r.status === 'Approved' && prev === 'Waiting') {
+                                    const _claimKey = 'eq_claim_hint_shown_' + r.id;
+                                    if (!localStorage.getItem(_claimKey)) {
+                                        localStorage.setItem(_claimKey, '1');
+                                        _showClaimHint(r.equipment_name);
+                                    }
                                 }
                             }
                         }
@@ -5807,7 +5921,8 @@
                 if (card && typeof data.body === 'string') swapBody(card, data.body);
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
                 if (data.stats) {
-                    setStat('loans', data.stats.loans);
+                    setStat('pickup',  data.stats.pickup);
+                    setStat('loans',   data.stats.loans);
                     setStat('overdue', data.stats.overdue);
                     setStat('pending', data.stats.pending);
                 }
@@ -6510,6 +6625,18 @@
             }
             return;
         }
+
+        // Validate student collector fields if "Student" is selected
+        var cartCollectorType = (document.querySelector('input[name="cart_collector_type"]:checked') || {}).value || 'faculty';
+        var cartCollectorName = ((document.getElementById('cartCollectorName') || {}).value || '').trim();
+        if (cartCollectorType === 'student' && !cartCollectorName) {
+            if (err) {
+                err.textContent = 'Please enter the student\'s name before submitting.';
+                err.style.display = '';
+            }
+            return;
+        }
+
         if (err) { err.style.display = 'none'; err.textContent = ''; }
 
         if (Object.keys(_cart).length === 0) return;
@@ -6530,11 +6657,13 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                csrf_token: csrf,
-                room:       room,
-                items:      itemsPayload,
-                time_slot:  timeSlot,
-                duration:   1,
+                csrf_token:          csrf,
+                room:                room,
+                items:               itemsPayload,
+                time_slot:           timeSlot,
+                duration:            1,
+                collector_type:      cartCollectorType,
+                collector_name:      cartCollectorName,
             }),
         })
         .then(function (r) { return r.json(); })

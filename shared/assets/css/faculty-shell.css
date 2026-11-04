@@ -449,7 +449,7 @@
         /* key figures: icon + number + one-word label */
         #panel-home .fdb-kpis {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 14px;
             margin-bottom: 18px;
         }
@@ -1074,7 +1074,7 @@
 
         @media (max-width: 1180px) {
             #panel-home .fdb-kpis {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             #panel-home .fdb-area-chart {

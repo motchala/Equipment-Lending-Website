@@ -46,6 +46,24 @@
                                 <p class="bm-hint">A signed letter may help prioritise your request.</p>
                             </div>
                         <?php endif; ?>
+                        <div class="form-group">
+                            <span class="form-label">Who will collect the equipment?</span>
+                            <div class="bm-collector-toggle" role="radiogroup" aria-label="Collector">
+                                <label class="bm-collector-opt">
+                                    <input type="radio" name="collector_type" value="faculty" checked> Faculty (me)
+                                </label>
+                                <label class="bm-collector-opt">
+                                    <input type="radio" name="collector_type" value="student"> Student
+                                </label>
+                            </div>
+                            <div class="bm-collector-student" id="collectorStudentFields" style="display:none;margin-top:10px;">
+                                <input type="hidden" name="submitted_by_name" id="bm_collector_name" value="">
+                                <input type="text" class="form-control-custom" id="bm_collector_name_input"
+                                    placeholder="Student full name" autocomplete="off"
+                                    style="width:100%;">
+                                <p class="bm-hint">The student will show the Claim QR to collect.</p>
+                            </div>
+                        </div>
                         <div class="bm-actions">
                             <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
                             <button type="submit" class="btn-save-acc">
@@ -105,6 +123,24 @@
                             <?= BookingSchedule::renderSchedule('bm2', false) ?>
                             <?= BookingSchedule::renderRoomPicker('bm2Room') ?>
                             <!-- No document upload in personal tab for dual-mode accounts (Requirement 4.3) -->
+                            <div class="form-group">
+                                <span class="form-label">Who will collect the equipment?</span>
+                                <div class="bm-collector-toggle" role="radiogroup" aria-label="Collector">
+                                    <label class="bm-collector-opt">
+                                        <input type="radio" name="collector_type" value="faculty" checked> Faculty (me)
+                                    </label>
+                                    <label class="bm-collector-opt">
+                                        <input type="radio" name="collector_type" value="student"> Student
+                                    </label>
+                                </div>
+                                <div class="bm-collector-student" id="collectorStudentFields" style="display:none;margin-top:10px;">
+                                    <input type="hidden" name="submitted_by_name" id="bm_collector_name" value="">
+                                    <input type="text" class="form-control-custom" id="bm_collector_name_input"
+                                        placeholder="Student full name" autocomplete="off"
+                                        style="width:100%;">
+                                    <p class="bm-hint">The student will show the Claim QR to collect.</p>
+                                </div>
+                            </div>
                             <div class="bm-actions">
                                 <button type="button" class="btn-cancel-acc" data-action="close-borrow-modal">Cancel</button>
                                 <button type="submit" class="btn-save-acc">
@@ -227,6 +263,24 @@
                     <input type="text" id="cartRoom" class="form-control-custom"
                         placeholder="e.g. B-205"
                         autocomplete="off">
+                </div>
+                <!-- Who will collect -->
+                <div class="form-group">
+                    <span class="form-label">Who will collect the equipment?</span>
+                    <div class="bm-collector-toggle" role="radiogroup" aria-label="Collector">
+                        <label class="bm-collector-opt">
+                            <input type="radio" name="cart_collector_type" id="cartCollectorFaculty" value="faculty" checked> Faculty (me)
+                        </label>
+                        <label class="bm-collector-opt">
+                            <input type="radio" name="cart_collector_type" id="cartCollectorStudent" value="student"> Student
+                        </label>
+                    </div>
+                    <div id="cartCollectorStudentFields" style="display:none;margin-top:10px;">
+                        <input type="text" class="form-control-custom" id="cartCollectorName"
+                            placeholder="Student full name" autocomplete="off"
+                            style="width:100%;">
+                        <p class="bm-hint">The student will show the Claim QR to collect.</p>
+                    </div>
                 </div>
                 <!-- Error message area -->
                 <p id="cartCheckoutError" class="bm-error" style="display:none"></p>

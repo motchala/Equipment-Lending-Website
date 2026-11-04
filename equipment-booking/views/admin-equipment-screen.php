@@ -25,7 +25,7 @@
                     $eq_loan_q = mysqli_query($conn, "SELECT r.*,
                             (SELECT i.`condition` FROM tbl_inventory i WHERE i.item_name = r.equipment_name LIMIT 1) AS item_condition
                         FROM tbl_requests r
-                        WHERE r.status IN ('Approved','Overdue')
+                        WHERE r.status IN ('Approved','On Loan','Overdue')
                           AND NOT COALESCE((r.status = 'Approved'
                                 AND COALESCE(r.booking_mode, '') = 'future'
                                 AND TIMESTAMP(r.borrow_date, COALESCE(r.borrow_time, '00:00:00')) > '{$eq_now}'), 0)
@@ -33,13 +33,23 @@
                     if ($eq_loan_q) {
                         while ($lr = mysqli_fetch_assoc($eq_loan_q)) {
                             $lr['_days']  = (int)floor((strtotime($eq_today) - strtotime($lr['return_date'])) / 86400);
-                            $lr['_state'] = ($lr['status'] === 'Overdue' || $lr['_days'] > 0) ? 'overdue' : ($lr['_days'] === 0 ? 'due' : 'ok');
+                            if ($lr['status'] === 'Approved') {
+                                // Approved but not yet claimed — show as "ready for pickup", never as overdue
+                                $lr['_state'] = 'pickup';
+                            } elseif ($lr['status'] === 'Overdue' || $lr['_days'] > 0) {
+                                $lr['_state'] = 'overdue';
+                            } elseif ($lr['_days'] === 0) {
+                                $lr['_state'] = 'due';
+                            } else {
+                                $lr['_state'] = 'ok';
+                            }
                             if ($lr['_state'] === 'overdue') $eq_loan_overdue++;
                             $eq_loan_rows[] = $lr;
                         }
                     }
-                    $eq_loan_total  = count($eq_loan_rows);
-                    $eq_loan_active = $eq_loan_total - $eq_loan_overdue;
+                    $eq_loan_total   = count($eq_loan_rows);
+                    $eq_loan_pickup  = count(array_filter($eq_loan_rows, fn($r) => $r['_state'] === 'pickup'));
+                    $eq_loan_active  = $eq_loan_total - $eq_loan_overdue - $eq_loan_pickup;
                     // Returned history for the Returned / All tabs (newest first, last 100)
                     $eq_ret_rows = [];
                     $eq_ret_q = mysqli_query($conn, "SELECT r.*,
@@ -455,6 +465,7 @@
                                 <div class="eq-loan-tabs" id="eqLoanFilter" role="tablist" aria-label="Filter loans by status">
                                     <button type="button" class="eq-loan-tab active" data-loan-filter="all" role="tab" aria-selected="true">All</button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="waiting" role="tab" aria-selected="false">Waiting <span class="eq-loan-tab-count<?php echo $eq_pend_total > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_wait_total; ?></span></button>
+                                    <button type="button" class="eq-loan-tab" data-loan-filter="pickup" role="tab" aria-selected="false">Pickup <span class="eq-loan-tab-count<?php echo $eq_loan_pickup > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_pickup; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="active" role="tab" aria-selected="false">Active <span class="eq-loan-tab-count"><?php echo (int)$eq_loan_active; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="overdue" role="tab" aria-selected="false">Overdue <span class="eq-loan-tab-count<?php echo $eq_loan_overdue > 0 ? ' has' : ''; ?>"><?php echo (int)$eq_loan_overdue; ?></span></button>
                                     <button type="button" class="eq-loan-tab" data-loan-filter="returned" role="tab" aria-selected="false">Returned</button>
@@ -576,6 +587,8 @@
                                                         <?php elseif ($lst === 'scheduled'): ?>
                                                             <span class="ps-badge ps-badge--scheduled">Scheduled</span>
                                                             <div class="ps-appr-sub"><?php echo $ldays > 0 ? 'Starts in ' . $ldays . ' day' . ($ldays === 1 ? '' : 's') : 'Starts today'; ?></div>
+                                                        <?php elseif ($lst === 'pickup'): ?>
+                                                            <span class="ps-badge ps-badge--waiting">Ready for pickup</span>
                                                         <?php elseif ($lst === 'overdue'): ?>
                                                             <span class="ps-badge ps-badge--overdue"><?php echo max(1, $ldays); ?> day<?php echo max(1, $ldays) === 1 ? '' : 's'; ?> overdue</span>
                                                         <?php elseif ($lst === 'due'): ?>
@@ -610,6 +623,9 @@
                                                                 <?php else: ?>
                                                                     <span class="ps-appr-sub" title="Organization Adviser requests with a supporting document can only be changed by a Super Admin">Super Admin only</span>
                                                                 <?php endif; ?>
+                                                            <?php elseif ($lst === 'pickup'): ?>
+                                                                <!-- Item approved but not yet collected — admin waits for faculty to show Claim QR -->
+                                                                <span class="ps-appr-sub">Waiting for Claim QR scan</span>
                                                             <?php elseif ($lst === 'returned'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
                                                                     data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
