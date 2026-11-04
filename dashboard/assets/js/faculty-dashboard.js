@@ -6271,3 +6271,321 @@
         }
     });
 })();
+
+/* ================================================================
+   EQUIPMENT CART — multi-item borrowing (today only)
+   Self-contained IIFE. Zero changes to any existing borrow logic.
+   Works in both single-mode and dual-mode faculty accounts.
+================================================================ */
+(function () {
+    'use strict';
+
+    // ── State ──────────────────────────────────────────────────────
+    // Map of item_id (string) → { name, shelf, qty }
+    var _cart = {};
+
+    function cartCount() { return Object.keys(_cart).length; }
+
+    function getCsrf() {
+        var m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) return m.content;
+        var i = document.querySelector('input[name="csrf_token"]');
+        return i ? i.value : '';
+    }
+
+    function _esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Sync bar ────────────────────────────────────────────────────
+    function syncBar() {
+        var bar   = document.getElementById('eqCartBar');
+        var label = document.getElementById('eqCartBarLabel');
+        var n = cartCount();
+        if (!bar) return;
+        bar.style.display = n > 0 ? '' : 'none';
+        if (label) {
+            label.textContent = n === 1 ? '1 item selected' : n + ' items selected';
+        }
+    }
+
+    // ── Add / remove card from cart ─────────────────────────────────
+    function addToCart(card, itemId, itemName, shelf) {
+        _cart[itemId] = { name: itemName, shelf: shelf, qty: 1 };
+        card.classList.add('eq-item-card--in-cart');
+
+        var chkIcon = card.querySelector('.eq-cart-chk-icon');
+        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
+        var qtyWrap = card.querySelector('.eq-cart-qty');
+
+        if (chkIcon) chkIcon.textContent = 'check_box';
+        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'true');
+        syncBar();
+    }
+
+    function removeFromCart(card, itemId) {
+        delete _cart[itemId];
+        card.classList.remove('eq-item-card--in-cart');
+
+        var chkIcon = card.querySelector('.eq-cart-chk-icon');
+        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
+        var qtyWrap = card.querySelector('.eq-cart-qty');
+
+        if (chkIcon) chkIcon.textContent = 'check_box_outline_blank';
+        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'false');
+        syncBar();
+    }
+
+    function clearCart() {
+        Object.keys(_cart).forEach(function (id) {
+            var card = document.querySelector('[data-item-id="' + id + '"].eq-item-card');
+            if (card) removeFromCart(card, id);
+        });
+        _cart = {};
+        syncBar();
+    }
+
+    // ── Delegated click handler ─────────────────────────────────────
+    document.addEventListener('click', function (e) {
+
+        // Toggle cart item
+        var toggleBtn = e.target.closest('[data-action="toggle-cart-item"]');
+        if (toggleBtn) {
+            var card     = toggleBtn.closest('.eq-item-card');
+            var itemId   = toggleBtn.dataset.itemId;
+            var itemName = toggleBtn.dataset.itemName;
+            var shelf    = parseInt(toggleBtn.dataset.shelf, 10) || 0;
+            if (!card || !itemId) return;
+            if (_cart[itemId]) {
+                removeFromCart(card, itemId);
+            } else {
+                addToCart(card, itemId, itemName, shelf);
+            }
+            return;
+        }
+
+        // Quantity decrement
+        var decBtn = e.target.closest('[data-action="cart-qty-dec"]');
+        if (decBtn) {
+            var wrap = decBtn.closest('.eq-cart-qty');
+            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
+            var card = decBtn.closest('.eq-item-card');
+            var id   = card && card.dataset.itemId;
+            if (!inp || !id || !_cart[id]) return;
+            var v = Math.max(1, parseInt(inp.value, 10) - 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+
+        // Quantity increment
+        var incBtn = e.target.closest('[data-action="cart-qty-inc"]');
+        if (incBtn) {
+            var wrap = incBtn.closest('.eq-cart-qty');
+            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
+            var card = incBtn.closest('.eq-item-card');
+            var id   = card && card.dataset.itemId;
+            if (!inp || !id || !_cart[id]) return;
+            var max = parseInt(inp.max, 10) || _cart[id].shelf;
+            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+
+        // Clear cart
+        if (e.target.closest('[data-action="cart-clear"]')) {
+            clearCart();
+            return;
+        }
+
+        // Open checkout modal
+        if (e.target.closest('[data-action="cart-checkout"]')) {
+            openCartCheckout();
+            return;
+        }
+
+        // Close checkout modal
+        if (e.target.closest('[data-action="cart-checkout-close"]')) {
+            closeCartCheckout();
+            return;
+        }
+    });
+
+    // Live quantity input typing — checkout modal qty inputs
+    document.addEventListener('input', function (e) {
+        var inp = e.target;
+        if (!inp.classList.contains('eq-cco-qty-input')) return;
+        var id  = inp.dataset.id;
+        if (!id || !_cart[id]) return;
+        var max = parseInt(inp.max, 10) || _cart[id].shelf;
+        var v   = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 1) v = 1;
+        if (v > max) v = max;
+        inp.value = v;
+        _cart[id].qty = v;
+    });
+
+    // Checkout modal qty buttons
+    document.addEventListener('click', function (e) {
+        var decBtn = e.target.closest('[data-cco-dec]');
+        if (decBtn) {
+            var id  = decBtn.dataset.id;
+            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
+            if (!inp || !_cart[id]) return;
+            var v = Math.max(1, parseInt(inp.value, 10) - 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+        var incBtn = e.target.closest('[data-cco-inc]');
+        if (incBtn) {
+            var id  = incBtn.dataset.id;
+            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
+            if (!inp || !_cart[id]) return;
+            var max = parseInt(inp.max, 10) || _cart[id].shelf;
+            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
+            inp.value = v;
+            _cart[id].qty = v;
+        }
+    });
+
+    // ── Checkout modal ──────────────────────────────────────────────
+    function openCartCheckout() {
+        if (cartCount() === 0) return;
+        var modal = document.getElementById('cartCheckoutModal');
+        var list  = document.getElementById('cartCheckoutList');
+        var err   = document.getElementById('cartCheckoutError');
+        var room  = document.getElementById('cartRoom');
+        if (!modal || !list) return;
+
+        // Build item rows with quantity input per item
+        list.innerHTML = '';
+        Object.keys(_cart).forEach(function (id) {
+            var item = _cart[id];
+            var row = document.createElement('div');
+            row.className = 'eq-cart-checkout-item';
+            row.setAttribute('data-cart-id', id);
+            row.innerHTML =
+                '<span class="eq-cco-name">' + _esc(item.name) + '</span>' +
+                '<div class="eq-cco-qty">' +
+                '<button type="button" class="eq-cco-qty-btn" data-cco-dec data-id="' + id + '">\u2212</button>' +
+                '<input type="number" class="eq-cco-qty-input" value="' + item.qty + '" min="1" max="' + item.shelf + '" data-id="' + id + '" aria-label="Quantity for ' + _esc(item.name) + '">' +
+                '<button type="button" class="eq-cco-qty-btn" data-cco-inc data-id="' + id + '">+</button>' +
+                '</div>' +
+                '<span class="eq-cco-stock">of ' + item.shelf + ' available</span>';
+            list.appendChild(row);
+        });
+
+        if (err)  { err.style.display = 'none'; err.textContent = ''; }
+        if (room) room.value = '';
+        modal.style.display = 'flex';
+    }
+
+    function closeCartCheckout() {
+        var modal = document.getElementById('cartCheckoutModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // ── Submit ──────────────────────────────────────────────────────
+    var _submitting = false;
+
+    // Delegated on document so it works even if the modal isn't in the DOM yet
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('#cartCheckoutSubmit')) return;
+
+        if (_submitting) return;
+        var room = (document.getElementById('cartRoom') ? document.getElementById('cartRoom').value : '').trim();
+        var err  = document.getElementById('cartCheckoutError');
+
+        if (!room) {
+            if (err) {
+                err.textContent = 'Room / Location is required.';
+                err.style.display = '';
+                document.getElementById('cartRoom').focus();
+            }
+            return;
+        }
+        if (err) { err.style.display = 'none'; err.textContent = ''; }
+
+        if (Object.keys(_cart).length === 0) return;
+
+        _submitting = true;
+        var submitBtn = document.getElementById('cartCheckoutSubmit');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submitting\u2026'; }
+
+        var csrf = getCsrf();
+        var itemsPayload = Object.values(_cart).map(function (it) {
+            return { name: it.name, qty: it.qty };
+        });
+        var now = new Date();
+        var timeSlot = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        var roomIdEl = document.getElementById('cartRoomId');
+
+        fetch('equipment-booking/api/submit-cart-borrow.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                csrf_token: csrf,
+                room:       room,
+                items:      itemsPayload,
+                time_slot:  timeSlot,
+                duration:   1,
+            }),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            _submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
+            }
+
+            if (!data.ok) {
+                var errEl = document.getElementById('cartCheckoutError');
+                if (errEl) { errEl.textContent = data.error || 'An error occurred. Please try again.'; errEl.style.display = ''; }
+                return;
+            }
+
+            closeCartCheckout();
+            clearCart();
+
+            var okCount   = (data.submitted || []).length;
+            var failCount = (data.failed    || []).length;
+
+            if (failCount === 0) {
+                if (typeof showToast === 'function') {
+                    showToast(okCount + ' borrow request' + (okCount !== 1 ? 's' : '') + ' submitted.');
+                }
+            } else if (okCount > 0) {
+                if (typeof showToast === 'function') {
+                    var failNames = (data.failed || []).map(function (f) { return f.name; }).join(', ');
+                    showToast(okCount + ' submitted. Could not submit: ' + failNames);
+                }
+            } else {
+                var errEl2 = document.getElementById('cartCheckoutError');
+                var modal2 = document.getElementById('cartCheckoutModal');
+                if (modal2) modal2.style.display = 'flex';
+                var failMsg = (data.failed || []).map(function (f) { return f.name + ': ' + f.error; }).join(' | ');
+                if (errEl2) { errEl2.textContent = failMsg; errEl2.style.display = ''; }
+            }
+
+            document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
+        })
+        .catch(function () {
+            _submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
+            }
+            var errEl = document.getElementById('cartCheckoutError');
+            if (errEl) { errEl.textContent = 'Network error. Please try again.'; errEl.style.display = ''; }
+        });
+    });
+
+})();
+

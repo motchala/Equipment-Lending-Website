@@ -202,6 +202,20 @@
                                                     <span class="material-symbols-outlined">inventory_2</span>
                                                 </div>
                                             <?php endif; ?>
+                                            <!-- Cart checkbox — bottom-right of image, in-stock items only -->
+                                            <?php if ((int)$item['quantity'] > 0 && !$has_overdue_block): ?>
+                                            <button type="button"
+                                                class="eq-cart-chk"
+                                                data-action="toggle-cart-item"
+                                                data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
+                                                data-item-id="<?php echo (int)$item['item_id']; ?>"
+                                                data-shelf="<?php echo (int)$item['quantity']; ?>"
+                                                aria-label="Add <?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?> to cart"
+                                                aria-pressed="false">
+                                                <span class="material-symbols-outlined eq-cart-chk-icon">check_box_outline_blank</span>
+                                            </button>
+                                            <?php endif; ?>
+
                                             <!-- Stock badge overlay on image -->
                                             <div class="eq-stock-overlay">
                                                 <?php if ($item['quantity'] > 0): ?>
@@ -217,11 +231,12 @@
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                        <div class="eq-item-body">
-                                            <!-- Item Code chevron — top right of card body -->
-                                            <button type="button"
-                                                class="eq-ic-btn<?php echo ((int)$item['quantity'] <= 0) ? ' eq-ic-btn--disabled' : ''; ?>"
-                                                data-action="toggle-item-code"
+                                    <div class="eq-item-body">
+                                        <!-- Item Code chevron — top right of card body -->
+                                        <button type="button"
+                                            class="eq-ic-btn<?php echo ((int)$item['quantity'] <= 0) ? ' eq-ic-btn--disabled' : ''; ?>"
+                                            data-action="toggle-item-code"
+
                                                 data-item-id="<?php echo (int)$item['item_id']; ?>"
                                                 data-item-name="<?php echo htmlspecialchars($item['item_name'], ENT_QUOTES); ?>"
                                                 <?php if ((int)$item['quantity'] <= 0): ?>
@@ -264,8 +279,8 @@
                                                 <div class="eq-ic-error" style="display:none;color:var(--color-error,#c62828);font-size:11px;padding:4px 0"></div>
                                             </div>
 
-                                            <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
-                                            <div class="eq-item-cat">
+                                        <div class="eq-item-name"><?php echo htmlspecialchars($item['item_name']); ?></div>
+                                        <div class="eq-item-cat">
                                                 <span class="material-symbols-outlined">label</span>
                                                 <?php echo htmlspecialchars($item['category']); ?>
                                             </div>
@@ -294,6 +309,20 @@
                                     </div>
                                 <?php endforeach; ?>
                             <?php endif; ?>
+                        </div>
+
+                        <!-- ── Cart sticky bar ─────────────────────────────────── -->
+                        <div id="eqCartBar" class="eq-cart-bar" style="display:none" aria-live="polite" role="status">
+                            <div class="eq-cart-bar-summary">
+                                <span class="material-symbols-outlined">shopping_cart</span>
+                                <span id="eqCartBarLabel">0 items selected</span>
+                            </div>
+                            <div class="eq-cart-bar-actions">
+                                <button type="button" class="eq-cart-bar-clear" data-action="cart-clear">Clear</button>
+                                <button type="button" class="eq-cart-bar-submit" data-action="cart-checkout">
+                                    <span class="material-symbols-outlined">send</span> Borrow All
+                                </button>
+                            </div>
                         </div>
 
                         <!-- No results (search/filter matched nothing) -->

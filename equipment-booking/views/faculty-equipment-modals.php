@@ -196,3 +196,47 @@
         <script src="equipment-booking/assets/js/faculty-equipment-modals.js?v=<?php echo @filemtime(PS_ROOT . '/equipment-booking/assets/js/faculty-equipment-modals.js'); ?>"></script>
     <?php endif; ?><!-- /dual-mode borrowModal -->
 
+    <!-- ── Cart Checkout Modal ───────────────────────────────────────── -->
+    <div class="modal-backdrop" id="cartCheckoutModal" style="display:none;" role="dialog"
+         aria-modal="true" aria-labelledby="cartCheckoutTitle">
+        <div class="modal-box borrow-modal-box">
+            <div class="modal-header bm-head">
+                <span class="bm-tile" aria-hidden="true">
+                    <span class="material-symbols-outlined">shopping_cart_checkout</span>
+                </span>
+                <div class="bm-heading">
+                    <h3 id="cartCheckoutTitle">Borrow Multiple Items</h3>
+                    <p class="bm-sub">All selected items will be borrowed today.</p>
+                </div>
+                <button class="modal-close-btn" data-action="cart-checkout-close" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Items with quantity per row -->
+                <div class="form-group">
+                    <span class="form-label">Items to borrow</span>
+                    <div id="cartCheckoutList" class="eq-cart-checkout-list"></div>
+                </div>
+                <!-- Shared room field -->
+                <input type="hidden" id="cartRoomId" value="">
+                <div class="form-group">
+                    <label class="form-label" for="cartRoom">
+                        Room / Location <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <input type="text" id="cartRoom" class="form-control-custom"
+                        placeholder="e.g. B-205"
+                        autocomplete="off">
+                </div>
+                <!-- Error message area -->
+                <p id="cartCheckoutError" class="bm-error" style="display:none"></p>
+                <div class="bm-actions">
+                    <button type="button" class="btn-cancel-acc" data-action="cart-checkout-close">Cancel</button>
+                    <button type="button" class="btn-save-acc" id="cartCheckoutSubmit">
+                        <span class="material-symbols-outlined">send</span> Submit Borrow Requests
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div><!-- /cartCheckoutModal -->
+
