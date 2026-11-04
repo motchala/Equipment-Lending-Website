@@ -4016,9 +4016,52 @@
                 .then(function (data) {
                     if (data && data.status === 'success') {
                         showToast(newStatus === 'Approved' ? 'Request approved.' : 'Request declined.');
+                        btn.disabled = false;
+                        btn.innerHTML = btn.dataset.origLabel;
                         psCloseModal('ps-approve-modal');
                         psCloseModal('ps-decline-modal');
                         psCloseModal('ps-req-detail-modal');
+                        reqCtx = null; // clear stale context so next action reads from the correct row
+
+                        // Live update: update the row in-place without a page reload
+                        var loanTable = document.getElementById('eq-loan-table');
+                        if (loanTable && requestId) {
+                            var tr = loanTable.querySelector('tr.eq-loan-row[data-id="' + requestId + '"]');
+                            if (tr) {
+                                if (newStatus === 'Approved') {
+                                    // Move from waiting to active — update state attributes and status badge
+                                    tr.classList.remove('is-waiting');
+                                    tr.classList.add('is-ok');
+                                    tr.dataset.loanState = 'ok';
+                                    tr.dataset.status = 'Approved';
+                                    var statusCell = tr.querySelector('.ps-badge--waiting, .ps-badge--dot');
+                                    if (statusCell) {
+                                        statusCell.className = 'ps-badge ps-badge--approved';
+                                        statusCell.textContent = 'Approved';
+                                    }
+                                    // Remove the Approve/Decline buttons, replace with Manual Return
+                                    var actionCell = tr.querySelector('td:last-child > div');
+                                    if (actionCell) {
+                                        actionCell.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal"><span class="material-symbols-outlined">assignment_return</span> Manual Return</button>';
+                                    }
+                                } else {
+                                    // Declined — remove the row entirely
+                                    var idx = (typeof rows !== 'undefined') ? rows.indexOf(tr) : -1;
+                                    if (idx !== -1) rows.splice(idx, 1);
+                                    tr.parentNode && tr.parentNode.removeChild(tr);
+                                }
+
+                                // Update the Waiting count chip
+                                var tabBar = document.getElementById('eqLoanFilter');
+                                if (tabBar) {
+                                    var waitChip = tabBar.querySelector('[data-loan-filter="waiting"] .eq-loan-tab-count');
+                                    if (waitChip) {
+                                        waitChip.textContent = String(Math.max(0, (parseInt(waitChip.textContent, 10) || 0) - 1));
+                                    }
+                                }
+                            }
+                        }
+
                         if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');

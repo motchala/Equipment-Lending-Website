@@ -170,45 +170,8 @@ foreach ($raw_items as $raw) {
     $request_id = (int)$conn->insert_id;
     $stmt_ins->close();
 
-    // Run arbitration
-    require_once __DIR__ . '/../core/arbitration-engine.php';
-    ArbitrationEngine::process($conn, $request_id);
-    $why = ArbitrationEngine::discardIfDeclined($conn, $request_id);
-    if ($why !== null) {
-        $failed[] = ['name' => $name, 'error' => $name . ' was declined: ' . $why];
-        continue;
-    }
-
-    // Generate return token if approved
-    $tok_chk = $conn->prepare(
-        "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
-    );
-    if ($tok_chk) {
-        $tok_chk->bind_param('i', $request_id);
-        $tok_chk->execute();
-        $tok_chk->store_result();
-        if ($tok_chk->num_rows > 0) {
-            $token = bin2hex(random_bytes(32));
-            $tok_upd = $conn->prepare(
-                "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND return_token IS NULL"
-            );
-            if ($tok_upd) {
-                $tok_upd->bind_param('si', $token, $request_id);
-                $tok_upd->execute();
-                $tok_upd->close();
-            }
-        }
-        $tok_chk->close();
-    }
-
-    // Get final status
-    $st = $conn->prepare("SELECT status FROM tbl_requests WHERE id = ? LIMIT 1");
-    $st->bind_param('i', $request_id);
-    $st->execute();
-    $final_status = (string)($st->get_result()->fetch_assoc()['status'] ?? 'Waiting');
-    $st->close();
-
-    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => $final_status];
+    // Request stays Waiting — admin/super admin reviews and approves.
+    $submitted[] = ['name' => $name, 'request_id' => $request_id, 'status' => 'Waiting'];
 }
 
 echo json_encode([

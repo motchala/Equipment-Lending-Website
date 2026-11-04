@@ -158,6 +158,15 @@ $direction_ok = match ($current_status) {
     default               => false,
 };
 
+// Exception: a Waiting request that tick() promoted to Overdue before admin reviewed it
+// can still be approved — the admin's decision takes precedence over the schedule tick.
+if (!$direction_ok && $current_status === 'Overdue' && $new_status === 'Approved') {
+    $orig_rule = (string)($request['arbitration_rule'] ?? '');
+    if ($orig_rule === '' || $orig_rule === 'waiting') {
+        $direction_ok = true;
+    }
+}
+
 if (!$direction_ok) {
     send_json(422, 'error', 'Invalid status transition.');
 }
