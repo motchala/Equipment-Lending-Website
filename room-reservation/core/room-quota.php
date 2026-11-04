@@ -366,6 +366,7 @@ function fact_status_chip(string $status): string
         'Waiting'    => ['Pending',    'wait'],
         'Waitlisted' => ['Waitlisted', 'wait'],
         'Approved'   => ['Approved',   'ok'],
+        'On Loan'    => ['On Loan',    'ok'],
         'Overdue'    => ['Overdue',    'bad'],
         'Declined'   => ['Declined',   'bad'],
         'Returned'   => ['Returned',   'muted'],

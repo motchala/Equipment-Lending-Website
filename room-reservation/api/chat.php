@@ -478,10 +478,15 @@ SIGNAL FORMATS — append these at the very end of your message, exactly as writ
   INTENT:cancel_confirm_multi:{id1},{id2} (replace with comma-separated IDs)
   INTENT:cancel_pick                      (when faculty must choose)
 
-Example correct response for 1 reservation:
-"You have a reservation for Room 308 on Oct 26, 10:00–12:00. Would you like me to cancel it? INTENT:cancel_confirm:12"
+Example correct responses:
+- 1 reservation: "You have a reservation for Room 308 · Building A on Oct 26, 10:00–12:00. Shall I cancel it? INTENT:cancel_confirm:12"
+- 2 reservations, cancel all: "I'll cancel both. Room 308 on Oct 26 and Room 201 on Oct 27. Confirm? INTENT:cancel_confirm_multi:12,15"
+- 2 reservations, not specified: "Which one? INTENT:cancel_pick"
 
-NEVER cancel without the signal. NEVER emit a signal with an ID not listed in FACULTY CONTEXT.
+⛔ WRONG (never do this): "Sure, I'll cancel your reservation." — NO SIGNAL = NOTHING HAPPENS
+✅ RIGHT: Always end with the signal so the system shows confirmation buttons.
+
+NEVER omit the signal when cancelling. NEVER use an ID not in FACULTY CONTEXT.
 
 ## LIVE AVAILABILITY DATA
 {$avail_section}

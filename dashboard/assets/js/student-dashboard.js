@@ -399,7 +399,8 @@ function initPortal() {
     /* ── STEP 3 (Borrow): receipt + QR ─────────────────────────── */
     function showStep3(receipt) {
         const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-        const returnUrl = base + 'return_confirm.php?token=' + encodeURIComponent(receipt.return_token || '');
+        const claimUrl  = base + 'equipment-booking/claim_confirm.php?token='  + encodeURIComponent(receipt.claim_token  || '');
+        const returnUrl = base + 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(receipt.return_token || '');
 
         document.querySelector('.modal-header').innerHTML = `
             <div>
@@ -422,12 +423,19 @@ function initPortal() {
                 <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Borrow</span><strong>${escHTML(receipt.borrow_date)}</strong></div>
                 <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Return by</span><strong>${escHTML(receipt.return_date)}</strong></div>
             </div>
-            <div style="text-align:center;">
-                <p style="font-size:.78rem;color:#666;margin-bottom:10px;">
-                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;">qr_code_2</span>
-                    Show this QR to the admin to <strong>claim</strong> and again when <strong>returning</strong>.
+            <div style="text-align:center;margin-bottom:12px;">
+                <p style="font-size:.78rem;color:#555;font-weight:600;margin-bottom:8px;">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;color:#800000;">qr_code_2</span>
+                    Step 1 — Show this QR to <strong>claim</strong> the equipment
                 </p>
-                <div id="studentReceiptQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #800000;"></div>
+                <div id="studentClaimQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #800000;"></div>
+            </div>
+            <div style="text-align:center;">
+                <p style="font-size:.78rem;color:#555;font-weight:600;margin-bottom:8px;">
+                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;color:#444;">qr_code_2</span>
+                    Step 2 — Show this QR when <strong>returning</strong>
+                </p>
+                <div id="studentReceiptQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #444;"></div>
             </div>`;
 
         document.querySelector('.modal-footer').innerHTML = `
@@ -436,18 +444,21 @@ function initPortal() {
                 Done
             </button>`;
 
-        _renderStudentQr(returnUrl);
+        _renderStudentQr(claimUrl, 'studentClaimQr', '#800000');
+        _renderStudentQr(returnUrl, 'studentReceiptQr', '#444444');
     }
 
-    function _renderStudentQr(url) {
+    function _renderStudentQr(url, containerId, darkColor) {
+        const cid   = containerId || 'studentReceiptQr';
+        const dark  = darkColor   || '#800000';
         function doRender() {
-            const container = document.getElementById('studentReceiptQr');
+            const container = document.getElementById(cid);
             if (!container) return;
             container.innerHTML = '';
             const canvasEl = document.createElement('canvas');
             canvasEl.style.cssText = 'display:block;margin:0 auto;';
             container.appendChild(canvasEl);
-            QRCode.toCanvas(canvasEl, url, { width: 160, margin: 2, color: { dark: '#800000', light: '#ffffff' } });
+            QRCode.toCanvas(canvasEl, url, { width: 160, margin: 2, color: { dark, light: '#ffffff' } });
         }
         if (window._qrStudentLoaded) { doRender(); return; }
         const s = document.createElement('script');

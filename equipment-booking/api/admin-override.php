@@ -158,6 +158,15 @@ $direction_ok = match ($current_status) {
     default               => false,
 };
 
+// Exception: a Waiting request that tick() promoted to Overdue before admin reviewed it
+// can still be approved — the admin's decision takes precedence over the schedule tick.
+if (!$direction_ok && $current_status === 'Overdue' && $new_status === 'Approved') {
+    $orig_rule = (string)($request['arbitration_rule'] ?? '');
+    if ($orig_rule === '' || $orig_rule === 'waiting') {
+        $direction_ok = true;
+    }
+}
+
 if (!$direction_ok) {
     send_json(422, 'error', 'Invalid status transition.');
 }
@@ -226,14 +235,15 @@ try {
 
     $upd_stmt->close();
 
-    // ── If approving, generate a unique return token ──────────────────────────
+    // ── If approving, generate return token + claim token ─────────────────────
     if ($new_status === 'Approved') {
         $return_token = bin2hex(random_bytes(32)); // 64-char hex token
+        $claim_token  = bin2hex(random_bytes(32)); // 64-char hex token
         $tok_stmt = $conn->prepare(
-            "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND return_token IS NULL"
+            "UPDATE tbl_requests SET return_token = ?, claim_token = ? WHERE id = ? AND return_token IS NULL"
         );
         if ($tok_stmt) {
-            $tok_stmt->bind_param('si', $return_token, $request_id);
+            $tok_stmt->bind_param('ssi', $return_token, $claim_token, $request_id);
             $tok_stmt->execute();
             $tok_stmt->close();
         }

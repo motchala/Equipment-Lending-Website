@@ -1197,6 +1197,23 @@
             // Reset the form fields each time the modal opens
             const form = document.getElementById('borrowForm');
             if (form) {
+                // Keep hidden collector name input in sync with the visible text field
+                const nameVis = document.getElementById('bm_collector_name_input');
+                const nameHid = document.getElementById('bm_collector_name');
+                if (nameVis && nameHid) nameVis.addEventListener('input', () => { nameHid.value = nameVis.value.trim(); });
+
+                // Validate student name on submit
+                form.addEventListener('submit', function (ev) {
+                    const type = form.querySelector('input[name="collector_type"]:checked');
+                    if (type && type.value === 'student') {
+                        const n = (nameVis?.value || '').trim();
+                        if (!n) {
+                            ev.preventDefault();
+                            alert('Please enter the student\'s name before submitting.');
+                        }
+                    }
+                }, { once: false });
+
                 const fileInp = document.getElementById('request_document');
                 if (fileInp) fileInp.value = '';
                 syncBorrowDrops();
@@ -1228,8 +1245,23 @@
     }
     window.syncBorrowDrops = syncBorrowDrops;
 
+    // Toggle student collector fields in borrow forms (personal + cart)
     document.addEventListener('change', function (e) {
         const inp = e.target;
+
+        // Personal borrow form collector toggle
+        if (inp && inp.matches('input[name="collector_type"]')) {
+            const fields = document.getElementById('collectorStudentFields');
+            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
+            // Sync hidden inputs from visible text inputs on every keystroke already wired below
+        }
+
+        // Cart checkout collector toggle
+        if (inp && inp.matches('input[name="cart_collector_type"]')) {
+            const fields = document.getElementById('cartCollectorStudentFields');
+            if (fields) fields.style.display = inp.value === 'student' ? 'block' : 'none';
+        }
+
         if (!inp || !inp.matches || !inp.matches('.bm-drop input[type="file"]')) return;
         syncBorrowDrops();
         const group = inp.closest('.form-group');
@@ -3169,8 +3201,17 @@
                     // the real network IP, not localhost
                     const base = window.SERVER_BASE_URL
                         || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-                    const returnUrl = base + 'return_confirm.php?token=' + token;
-                    _openReturnQrModal(equipment, returnUrl);
+                    const returnUrl = base + 'equipment-booking/return_confirm.php?token=' + token;
+                    _openReturnQrModal(equipment, returnUrl, 'Return QR', 'Show this to the admin when returning the equipment.');
+                    break;
+                }
+                case 'show-claim-qr': {
+                    const token = el.dataset.token;
+                    const equipment = el.dataset.equipment;
+                    const base = window.SERVER_BASE_URL
+                        || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+                    const claimUrl = base + 'equipment-booking/claim_confirm.php?token=' + token;
+                    _openReturnQrModal(equipment, claimUrl, 'Claim QR', 'Show this to the admin to collect your equipment.');
                     break;
                 }
                 case 'logout':
@@ -4221,8 +4262,64 @@
     // showToast is already defined above using #app-toast
 
 
-    /* ── Return QR Modal ───────────────────────────────────────────────── */
-    function _openReturnQrModal(equipment, url) {
+    /* ── Coach mark: "Your Claim QR is in My Activity" ────────────────── */
+    function _showClaimHint(equipmentName) {
+        // Remove any existing hint first
+        const old = document.getElementById('claimHintBubble');
+        if (old) old.remove();
+
+        const activityBtn = document.querySelector('[data-tab="activity"], [href="#activity"], #nav-activity');
+        const bubble = document.createElement('div');
+        bubble.id = 'claimHintBubble';
+        bubble.setAttribute('role', 'status');
+        bubble.setAttribute('aria-live', 'polite');
+        bubble.style.cssText = [
+            'position:fixed',
+            'bottom:24px',
+            'left:50%',
+            'transform:translateX(-50%)',
+            'z-index:10000',
+            'background:#600302',
+            'color:#fff',
+            'padding:12px 20px 12px 16px',
+            'border-radius:14px',
+            'box-shadow:0 4px 20px rgba(0,0,0,0.25)',
+            'font-size:.85rem',
+            'max-width:320px',
+            'width:max-content',
+            'display:flex',
+            'align-items:flex-start',
+            'gap:10px',
+            'cursor:pointer',
+        ].join(';');
+        bubble.innerHTML = `
+            <span class="material-symbols-outlined" style="font-size:22px;flex-shrink:0;margin-top:1px;">qr_code_2</span>
+            <div>
+                <strong style="display:block;margin-bottom:2px;">${equipmentName} approved!</strong>
+                <span style="opacity:.9;">Your Claim QR is saved in <strong>My Activity</strong>. Show it to Sir Redg to collect the equipment.</span>
+            </div>
+            <button style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;padding:0;margin-left:6px;flex-shrink:0;font-size:18px;line-height:1;" aria-label="Dismiss" onclick="this.closest('#claimHintBubble').remove()">×</button>`;
+
+        // Clicking the bubble navigates to My Activity and dismisses
+        bubble.addEventListener('click', function (e) {
+            if (e.target.tagName === 'BUTTON') return;
+            bubble.remove();
+            // Try to activate the My Activity tab
+            const tab = document.querySelector('[data-tab="activity"]')
+                || document.querySelector('.nav-link[href="#panel-activity"]')
+                || document.getElementById('nav-activity');
+            if (tab) tab.click();
+        });
+
+        document.body.appendChild(bubble);
+        // Auto-dismiss after 12 seconds
+        setTimeout(() => { if (bubble.parentNode) bubble.remove(); }, 12000);
+    }
+
+    /* ── Return / Claim QR Modal ───────────────────────────────────────── */
+    function _openReturnQrModal(equipment, url, modalTitle, modalDesc) {
+        const title = modalTitle || 'Return QR';
+        const desc  = modalDesc  || 'Show this QR code to the admin when returning the equipment.';
         // Reuse or create the modal
         let modal = document.getElementById('returnQrModal');
         if (!modal) {
@@ -4235,8 +4332,9 @@
                         <span class="material-symbols-outlined">close</span>
                     </button>
                     <span class="material-symbols-outlined" style="font-size:36px;color:var(--accent-maroon,#600302);margin-bottom:8px;display:block;">qr_code_2</span>
-                    <h3 id="returnQrTitle" style="font-size:1rem;font-weight:700;margin-bottom:4px;"></h3>
-                    <p style="font-size:0.8rem;color:var(--color-on-surface-variant);margin-bottom:16px;">Show this QR code to the admin when returning the equipment.</p>
+                    <h3 id="returnQrModalLabel" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--color-on-surface-variant);margin-bottom:2px;"></h3>
+                    <h4 id="returnQrTitle" style="font-size:1rem;font-weight:700;margin-bottom:4px;"></h4>
+                    <p id="returnQrDesc" style="font-size:0.8rem;color:var(--color-on-surface-variant);margin-bottom:16px;"></p>
                     <div id="returnQrCanvas" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
                     <p style="font-size:0.7rem;color:var(--color-on-surface-variant);word-break:break-all;">Token verified on scan</p>
                 </div>`;
@@ -4248,7 +4346,9 @@
                 if (e.target === modal) modal.style.display = 'none';
             });
         }
+        document.getElementById('returnQrModalLabel').textContent = title;
         document.getElementById('returnQrTitle').textContent = equipment;
+        document.getElementById('returnQrDesc').textContent = desc;
         document.getElementById('returnQrCanvas').setAttribute('title', url);
         document.getElementById('returnQrCanvas').innerHTML = '';
         modal.style.display = 'flex';
@@ -4280,9 +4380,10 @@
     function _updateFacultyStatCards(data) {
         const counts = {
             approved: data.filter(r => r.status === 'Approved').length,
-            overdue: data.filter(r => r.status === 'Overdue').length,
-            waiting: data.filter(r => r.status === 'Waiting').length,
-            total: data.length,
+            on_loan:  data.filter(r => r.status === 'On Loan').length,
+            overdue:  data.filter(r => r.status === 'Overdue').length,
+            waiting:  data.filter(r => r.status === 'Waiting').length,
+            total:    data.length,
         };
         // .fdb-kpi = the Dashboard key-figure cards; .stat-tile = the older tiles (kept working)
         document.querySelectorAll('.fdb-kpi[data-stat], .stat-tile[data-stat]').forEach(tile => {
@@ -4290,6 +4391,10 @@
             if (!(key in counts)) return;
             const val = tile.querySelector('.fdb-kpi-val, .stat-tile-value');
             if (val && val.textContent.trim() !== String(counts[key])) val.textContent = counts[key];
+            // Ready for pickup card: amber tone when there are items waiting, neutral when none
+            if (key === 'approved') {
+                tile.className = tile.className.replace(/fdb-tone-\w+/, counts[key] > 0 ? 'fdb-tone-warn' : 'fdb-tone-ok');
+            }
         });
     }
 
@@ -4374,6 +4479,15 @@
                             if (prev !== undefined) {
                                 if (r.status === 'Returned') {
                                     showToast(r.equipment_name + ' has been marked as Returned.', 'success');
+                                }
+                                // Coach mark: first time a Waiting request becomes Approved,
+                                // point faculty to My Activity where the Claim QR lives.
+                                if (r.status === 'Approved' && prev === 'Waiting') {
+                                    const _claimKey = 'eq_claim_hint_shown_' + r.id;
+                                    if (!localStorage.getItem(_claimKey)) {
+                                        localStorage.setItem(_claimKey, '1');
+                                        _showClaimHint(r.equipment_name);
+                                    }
                                 }
                             }
                         }
@@ -5459,7 +5573,8 @@
 
         neverMindBtn.addEventListener('click', function () {
             chips.remove();
-            appendAiBubble(body, 'No problem! Your reservation(s) are unchanged.');
+            var chatBody = document.getElementById('actAiChatBody');
+            appendAiBubble(chatBody, 'No problem! Your reservation(s) are unchanged.');
             setSending(false);
         });
     }
@@ -5806,7 +5921,8 @@
                 if (card && typeof data.body === 'string') swapBody(card, data.body);
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
                 if (data.stats) {
-                    setStat('loans', data.stats.loans);
+                    setStat('pickup',  data.stats.pickup);
+                    setStat('loans',   data.stats.loans);
                     setStat('overdue', data.stats.overdue);
                     setStat('pending', data.stats.pending);
                 }
@@ -6270,3 +6386,335 @@
         }
     });
 })();
+
+/* ================================================================
+   EQUIPMENT CART — multi-item borrowing (today only)
+   Self-contained IIFE. Zero changes to any existing borrow logic.
+   Works in both single-mode and dual-mode faculty accounts.
+================================================================ */
+(function () {
+    'use strict';
+
+    // ── State ──────────────────────────────────────────────────────
+    // Map of item_id (string) → { name, shelf, qty }
+    var _cart = {};
+
+    function cartCount() { return Object.keys(_cart).length; }
+
+    function getCsrf() {
+        var m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) return m.content;
+        var i = document.querySelector('input[name="csrf_token"]');
+        return i ? i.value : '';
+    }
+
+    function _esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Sync bar ────────────────────────────────────────────────────
+    function syncBar() {
+        var bar   = document.getElementById('eqCartBar');
+        var label = document.getElementById('eqCartBarLabel');
+        var n = cartCount();
+        if (!bar) return;
+        bar.style.display = n > 0 ? '' : 'none';
+        if (label) {
+            label.textContent = n === 1 ? '1 item selected' : n + ' items selected';
+        }
+    }
+
+    // ── Add / remove card from cart ─────────────────────────────────
+    function addToCart(card, itemId, itemName, shelf) {
+        _cart[itemId] = { name: itemName, shelf: shelf, qty: 1 };
+        card.classList.add('eq-item-card--in-cart');
+
+        var chkIcon = card.querySelector('.eq-cart-chk-icon');
+        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
+        var qtyWrap = card.querySelector('.eq-cart-qty');
+
+        if (chkIcon) chkIcon.textContent = 'check_box';
+        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'true');
+        syncBar();
+    }
+
+    function removeFromCart(card, itemId) {
+        delete _cart[itemId];
+        card.classList.remove('eq-item-card--in-cart');
+
+        var chkIcon = card.querySelector('.eq-cart-chk-icon');
+        var chkBtn  = card.querySelector('[data-action="toggle-cart-item"]');
+        var qtyWrap = card.querySelector('.eq-cart-qty');
+
+        if (chkIcon) chkIcon.textContent = 'check_box_outline_blank';
+        if (chkBtn)  chkBtn.setAttribute('aria-pressed', 'false');
+        syncBar();
+    }
+
+    function clearCart() {
+        Object.keys(_cart).forEach(function (id) {
+            var card = document.querySelector('[data-item-id="' + id + '"].eq-item-card');
+            if (card) removeFromCart(card, id);
+        });
+        _cart = {};
+        syncBar();
+    }
+
+    // ── Delegated click handler ─────────────────────────────────────
+    document.addEventListener('click', function (e) {
+
+        // Toggle cart item
+        var toggleBtn = e.target.closest('[data-action="toggle-cart-item"]');
+        if (toggleBtn) {
+            var card     = toggleBtn.closest('.eq-item-card');
+            var itemId   = toggleBtn.dataset.itemId;
+            var itemName = toggleBtn.dataset.itemName;
+            var shelf    = parseInt(toggleBtn.dataset.shelf, 10) || 0;
+            if (!card || !itemId) return;
+            if (_cart[itemId]) {
+                removeFromCart(card, itemId);
+            } else {
+                addToCart(card, itemId, itemName, shelf);
+            }
+            return;
+        }
+
+        // Quantity decrement
+        var decBtn = e.target.closest('[data-action="cart-qty-dec"]');
+        if (decBtn) {
+            var wrap = decBtn.closest('.eq-cart-qty');
+            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
+            var card = decBtn.closest('.eq-item-card');
+            var id   = card && card.dataset.itemId;
+            if (!inp || !id || !_cart[id]) return;
+            var v = Math.max(1, parseInt(inp.value, 10) - 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+
+        // Quantity increment
+        var incBtn = e.target.closest('[data-action="cart-qty-inc"]');
+        if (incBtn) {
+            var wrap = incBtn.closest('.eq-cart-qty');
+            var inp  = wrap && wrap.querySelector('.eq-cart-qty-input');
+            var card = incBtn.closest('.eq-item-card');
+            var id   = card && card.dataset.itemId;
+            if (!inp || !id || !_cart[id]) return;
+            var max = parseInt(inp.max, 10) || _cart[id].shelf;
+            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+
+        // Clear cart
+        if (e.target.closest('[data-action="cart-clear"]')) {
+            clearCart();
+            return;
+        }
+
+        // Open checkout modal
+        if (e.target.closest('[data-action="cart-checkout"]')) {
+            openCartCheckout();
+            return;
+        }
+
+        // Close checkout modal
+        if (e.target.closest('[data-action="cart-checkout-close"]')) {
+            closeCartCheckout();
+            return;
+        }
+    });
+
+    // Live quantity input typing — checkout modal qty inputs
+    document.addEventListener('input', function (e) {
+        var inp = e.target;
+        if (!inp.classList.contains('eq-cco-qty-input')) return;
+        var id  = inp.dataset.id;
+        if (!id || !_cart[id]) return;
+        var max = parseInt(inp.max, 10) || _cart[id].shelf;
+        var v   = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 1) v = 1;
+        if (v > max) v = max;
+        inp.value = v;
+        _cart[id].qty = v;
+    });
+
+    // Checkout modal qty buttons
+    document.addEventListener('click', function (e) {
+        var decBtn = e.target.closest('[data-cco-dec]');
+        if (decBtn) {
+            var id  = decBtn.dataset.id;
+            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
+            if (!inp || !_cart[id]) return;
+            var v = Math.max(1, parseInt(inp.value, 10) - 1);
+            inp.value = v;
+            _cart[id].qty = v;
+            return;
+        }
+        var incBtn = e.target.closest('[data-cco-inc]');
+        if (incBtn) {
+            var id  = incBtn.dataset.id;
+            var inp = document.querySelector('.eq-cco-qty-input[data-id="' + id + '"]');
+            if (!inp || !_cart[id]) return;
+            var max = parseInt(inp.max, 10) || _cart[id].shelf;
+            var v   = Math.min(max, parseInt(inp.value, 10) + 1);
+            inp.value = v;
+            _cart[id].qty = v;
+        }
+    });
+
+    // ── Checkout modal ──────────────────────────────────────────────
+    function openCartCheckout() {
+        if (cartCount() === 0) return;
+        var modal = document.getElementById('cartCheckoutModal');
+        var list  = document.getElementById('cartCheckoutList');
+        var err   = document.getElementById('cartCheckoutError');
+        var room  = document.getElementById('cartRoom');
+        if (!modal || !list) return;
+
+        // Build item rows with quantity input per item
+        list.innerHTML = '';
+        Object.keys(_cart).forEach(function (id) {
+            var item = _cart[id];
+            var row = document.createElement('div');
+            row.className = 'eq-cart-checkout-item';
+            row.setAttribute('data-cart-id', id);
+            row.innerHTML =
+                '<span class="eq-cco-name">' + _esc(item.name) + '</span>' +
+                '<div class="eq-cco-qty">' +
+                '<button type="button" class="eq-cco-qty-btn" data-cco-dec data-id="' + id + '">\u2212</button>' +
+                '<input type="number" class="eq-cco-qty-input" value="' + item.qty + '" min="1" max="' + item.shelf + '" data-id="' + id + '" aria-label="Quantity for ' + _esc(item.name) + '">' +
+                '<button type="button" class="eq-cco-qty-btn" data-cco-inc data-id="' + id + '">+</button>' +
+                '</div>' +
+                '<span class="eq-cco-stock">of ' + item.shelf + ' available</span>';
+            list.appendChild(row);
+        });
+
+        if (err)  { err.style.display = 'none'; err.textContent = ''; }
+        if (room) room.value = '';
+        modal.style.display = 'flex';
+    }
+
+    function closeCartCheckout() {
+        var modal = document.getElementById('cartCheckoutModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // ── Submit ──────────────────────────────────────────────────────
+    var _submitting = false;
+
+    // Delegated on document so it works even if the modal isn't in the DOM yet
+    document.addEventListener('click', function (e) {
+        if (!e.target.closest('#cartCheckoutSubmit')) return;
+
+        if (_submitting) return;
+        var room = (document.getElementById('cartRoom') ? document.getElementById('cartRoom').value : '').trim();
+        var err  = document.getElementById('cartCheckoutError');
+
+        if (!room) {
+            if (err) {
+                err.textContent = 'Room / Location is required.';
+                err.style.display = '';
+                document.getElementById('cartRoom').focus();
+            }
+            return;
+        }
+
+        // Validate student collector fields if "Student" is selected
+        var cartCollectorType = (document.querySelector('input[name="cart_collector_type"]:checked') || {}).value || 'faculty';
+        var cartCollectorName = ((document.getElementById('cartCollectorName') || {}).value || '').trim();
+        if (cartCollectorType === 'student' && !cartCollectorName) {
+            if (err) {
+                err.textContent = 'Please enter the student\'s name before submitting.';
+                err.style.display = '';
+            }
+            return;
+        }
+
+        if (err) { err.style.display = 'none'; err.textContent = ''; }
+
+        if (Object.keys(_cart).length === 0) return;
+
+        _submitting = true;
+        var submitBtn = document.getElementById('cartCheckoutSubmit');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submitting\u2026'; }
+
+        var csrf = getCsrf();
+        var itemsPayload = Object.values(_cart).map(function (it) {
+            return { name: it.name, qty: it.qty };
+        });
+        var now = new Date();
+        var timeSlot = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        var roomIdEl = document.getElementById('cartRoomId');
+
+        fetch('equipment-booking/api/submit-cart-borrow.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                csrf_token:          csrf,
+                room:                room,
+                items:               itemsPayload,
+                time_slot:           timeSlot,
+                duration:            1,
+                collector_type:      cartCollectorType,
+                collector_name:      cartCollectorName,
+            }),
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            _submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
+            }
+
+            if (!data.ok) {
+                var errEl = document.getElementById('cartCheckoutError');
+                if (errEl) { errEl.textContent = data.error || 'An error occurred. Please try again.'; errEl.style.display = ''; }
+                return;
+            }
+
+            closeCartCheckout();
+            clearCart();
+
+            var okCount   = (data.submitted || []).length;
+            var failCount = (data.failed    || []).length;
+
+            if (failCount === 0) {
+                if (typeof showToast === 'function') {
+                    showToast(okCount + ' borrow request' + (okCount !== 1 ? 's' : '') + ' submitted.');
+                }
+            } else if (okCount > 0) {
+                if (typeof showToast === 'function') {
+                    var failNames = (data.failed || []).map(function (f) { return f.name; }).join(', ');
+                    showToast(okCount + ' submitted. Could not submit: ' + failNames);
+                }
+            } else {
+                var errEl2 = document.getElementById('cartCheckoutError');
+                var modal2 = document.getElementById('cartCheckoutModal');
+                if (modal2) modal2.style.display = 'flex';
+                var failMsg = (data.failed || []).map(function (f) { return f.name + ': ' + f.error; }).join(' | ');
+                if (errEl2) { errEl2.textContent = failMsg; errEl2.style.display = ''; }
+            }
+
+            document.dispatchEvent(new CustomEvent('pupsync:requests-changed'));
+        })
+        .catch(function () {
+            _submitting = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<span class="material-symbols-outlined">send</span> Submit Borrow Requests';
+            }
+            var errEl = document.getElementById('cartCheckoutError');
+            if (errEl) { errEl.textContent = 'Network error. Please try again.'; errEl.style.display = ''; }
+        });
+    });
+
+})();
+

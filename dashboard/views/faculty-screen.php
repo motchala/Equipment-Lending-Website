@@ -208,10 +208,11 @@
                 if ((int)$notif_count > 0) $fdb_attn[] = ['tone' => 'info', 'icon' => 'notifications',  'act' => 'notif',    'title' => (int)$notif_count . ' unread'];
 
                 $fdb_kpis = [
-                    ['tone' => 'ok',                                'icon' => 'swap_horiz',    'label' => 'Active loans', 'val' => (int)$stat_approved, 'stat' => 'approved', 'id' => ''],
-                    ['tone' => $stat_overdue > 0 ? 'danger' : 'ok', 'icon' => 'schedule',      'label' => 'Overdue',      'val' => (int)$stat_overdue,  'stat' => 'overdue',  'id' => 'statOverdueVal'],
-                    ['tone' => $stat_waiting > 0 ? 'warn' : 'ok',   'icon' => 'hourglass_top', 'label' => 'Pending',      'val' => (int)$stat_waiting,  'stat' => 'waiting',  'id' => ''],
-                    ['tone' => 'info',                              'icon' => 'meeting_room',  'label' => 'Reservations', 'val' => $fdb_rooms_n,        'stat' => '',         'id' => ''],
+                    ['tone' => $stat_approved > 0 ? 'warn' : 'ok',  'icon' => 'move_to_inbox',  'label' => 'Ready for pickup', 'val' => (int)$stat_approved, 'stat' => 'approved', 'id' => ''],
+                    ['tone' => 'ok',                                 'icon' => 'swap_horiz',     'label' => 'Active loans',     'val' => (int)$stat_on_loan,  'stat' => 'on_loan',  'id' => ''],
+                    ['tone' => $stat_overdue > 0 ? 'danger' : 'ok',  'icon' => 'schedule',       'label' => 'Overdue',          'val' => (int)$stat_overdue,  'stat' => 'overdue',  'id' => 'statOverdueVal'],
+                    ['tone' => $stat_waiting > 0 ? 'warn' : 'ok',    'icon' => 'hourglass_top',  'label' => 'Pending',          'val' => (int)$stat_waiting,  'stat' => 'waiting',  'id' => ''],
+                    ['tone' => 'info',                               'icon' => 'meeting_room',   'label' => 'Reservations',     'val' => $fdb_rooms_n,        'stat' => '',         'id' => ''],
                 ];
                 ?>
 

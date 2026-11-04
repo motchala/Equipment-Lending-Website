@@ -4016,9 +4016,52 @@
                 .then(function (data) {
                     if (data && data.status === 'success') {
                         showToast(newStatus === 'Approved' ? 'Request approved.' : 'Request declined.');
+                        btn.disabled = false;
+                        btn.innerHTML = btn.dataset.origLabel;
                         psCloseModal('ps-approve-modal');
                         psCloseModal('ps-decline-modal');
                         psCloseModal('ps-req-detail-modal');
+                        reqCtx = null; // clear stale context so next action reads from the correct row
+
+                        // Live update: update the row in-place without a page reload
+                        var loanTable = document.getElementById('eq-loan-table');
+                        if (loanTable && requestId) {
+                            var tr = loanTable.querySelector('tr.eq-loan-row[data-id="' + requestId + '"]');
+                            if (tr) {
+                                if (newStatus === 'Approved') {
+                                    // Move from waiting to active — update state attributes and status badge
+                                    tr.classList.remove('is-waiting');
+                                    tr.classList.add('is-ok');
+                                    tr.dataset.loanState = 'ok';
+                                    tr.dataset.status = 'Approved';
+                                    var statusCell = tr.querySelector('.ps-badge--waiting, .ps-badge--dot');
+                                    if (statusCell) {
+                                        statusCell.className = 'ps-badge ps-badge--approved';
+                                        statusCell.textContent = 'Approved';
+                                    }
+                                    // Remove the Approve/Decline buttons, replace with Manual Return
+                                    var actionCell = tr.querySelector('td:last-child > div');
+                                    if (actionCell) {
+                                        actionCell.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal"><span class="material-symbols-outlined">assignment_return</span> Manual Return</button>';
+                                    }
+                                } else {
+                                    // Declined — remove the row entirely
+                                    var idx = (typeof rows !== 'undefined') ? rows.indexOf(tr) : -1;
+                                    if (idx !== -1) rows.splice(idx, 1);
+                                    tr.parentNode && tr.parentNode.removeChild(tr);
+                                }
+
+                                // Update the Waiting count chip
+                                var tabBar = document.getElementById('eqLoanFilter');
+                                if (tabBar) {
+                                    var waitChip = tabBar.querySelector('[data-loan-filter="waiting"] .eq-loan-tab-count');
+                                    if (waitChip) {
+                                        waitChip.textContent = String(Math.max(0, (parseInt(waitChip.textContent, 10) || 0) - 1));
+                                    }
+                                }
+                            }
+                        }
+
                         if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
                     } else {
                         showAlert(alertId, (data && data.message) || 'Action failed. Please try again.');
@@ -4130,8 +4173,15 @@
                         return;
                     }
 
-                    // Hit return_confirm.php via fetch — no page reload
-                    fetch('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), {
+                    // Detect QR type by the endpoint path encoded in the QR URL itself.
+                    // Claim QRs point to claim_confirm.php; Return QRs point to return_confirm.php.
+                    // This prevents a used Claim QR from accidentally triggering a return.
+                    const isClaimQr  = code.data.includes('claim_confirm.php');
+                    const endpoint   = isClaimQr
+                        ? 'equipment-booking/claim_confirm.php?token='  + encodeURIComponent(token)
+                        : 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(token);
+
+                    fetch(endpoint, {
                         credentials: 'same-origin',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     })
@@ -4139,12 +4189,15 @@
                         .then(data => {
                             if (data.success) {
                                 scannedCount++;
-                                status.textContent = '✅ Return confirmed!';
-                                status.style.color = '#22c55e';
-                                showToast('✅ Equipment return confirmed via QR.');
-                                // Stay open and keep scanning — a return day usually
-                                // means several faculty in a row, not just one, so
-                                // don't force reopening the modal for every scan.
+                                if (isClaimQr) {
+                                    status.textContent = '✅ Claim confirmed!';
+                                    status.style.color = '#22c55e';
+                                    showToast('✅ Equipment claim confirmed — item handed over.');
+                                } else {
+                                    status.textContent = '✅ Return confirmed!';
+                                    status.style.color = '#22c55e';
+                                    showToast('✅ Equipment return confirmed via QR.');
+                                }
                                 setTimeout(() => {
                                     status.textContent = scannedCount > 1
                                         ? `Point camera at the next QR code. (${scannedCount} confirmed this session)`
@@ -5306,6 +5359,7 @@ function psSelectFmt(btn) {
         var TITLES = {
             all: 'All Loans',
             waiting: 'Pending & Scheduled',
+            pickup: 'Ready for Pickup',
             active: 'Active Borrowings',
             overdue: 'Overdue Items',
             returned: 'Returned Equipment'
@@ -5319,6 +5373,7 @@ function psSelectFmt(btn) {
 
         function matchesMode(state) {
             if (mode === 'all') return true;
+            if (mode === 'pickup') return state === 'pickup';
             if (mode === 'active') return state === 'ok' || state === 'due';
             if (mode === 'waiting') return state === 'waiting' || state === 'scheduled';
             return state === mode; /* overdue | returned */

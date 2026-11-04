@@ -572,7 +572,9 @@ CREATE TABLE `tbl_requests` (
   `borrow_date` date NOT NULL,
   `return_date` date NOT NULL,
   `return_token` varchar(64) DEFAULT NULL,
+  `claim_token` varchar(64) DEFAULT NULL,
   `returned_at` datetime DEFAULT NULL,
+  `claimed_at` datetime DEFAULT NULL,
   `status` varchar(20) DEFAULT 'Waiting',
   `request_date` datetime DEFAULT current_timestamp(),
   `reason` varchar(255) DEFAULT NULL,
@@ -1055,7 +1057,9 @@ ALTER TABLE `tbl_organizations`
 ALTER TABLE `tbl_requests`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `return_token` (`return_token`),
-  ADD KEY `idx_return_token` (`return_token`);
+  ADD UNIQUE KEY `claim_token` (`claim_token`),
+  ADD KEY `idx_return_token` (`return_token`),
+  ADD KEY `idx_claim_token` (`claim_token`);
 
 --
 -- Indexes for table `tbl_rooms`

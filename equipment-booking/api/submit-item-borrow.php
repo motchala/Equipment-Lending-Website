@@ -113,8 +113,9 @@ try {
         exit;
     }
 
-    // Generate return token
+    // Generate return token + claim token
     $return_token = bin2hex(random_bytes(32));
+    $claim_token  = bin2hex(random_bytes(32));
 
     // Insert request — borrow_date and return_date both = today (same-day)
     // return_time stored in the return_time column (BookingSchedule column)
@@ -122,16 +123,16 @@ try {
         "INSERT INTO tbl_requests
             (faculty_name, faculty_id, equipment_name, instructor, room,
              borrow_date, return_date, borrow_qty, return_time,
-             status, request_date, return_token,
+             status, request_date, return_token, claim_token,
              submitted_by_name, submitted_by_id, submitted_as)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, 'student')"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
     );
     if (!$ins) throw new RuntimeException('Could not save request.');
     $ins->bind_param(
-        'sssssssissss',
+        'sssssssisssss',
         $faculty_name, $faculty_id, $item_name, $faculty_name, $room,
         $today, $today, $quantity, $return_time,
-        $return_token, $student_name, $student_id
+        $return_token, $claim_token, $student_name, $student_id
     );
     if (!$ins->execute()) throw new RuntimeException('Insert failed: ' . $ins->error);
     $request_id = (int)$conn->insert_id;
@@ -199,6 +200,7 @@ try {
         'success'      => true,
         'request_id'   => $request_id,
         'return_token' => $return_token,
+        'claim_token'  => $claim_token,
     ]);
 
 } catch (Throwable $e) {

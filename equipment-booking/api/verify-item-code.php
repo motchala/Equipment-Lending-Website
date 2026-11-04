@@ -81,7 +81,7 @@ $stmt = $conn->prepare(
             inv.quantity
        FROM tbl_faculty_item_codes ic
        JOIN tbl_inventory inv ON inv.item_id = ic.item_id AND inv.is_archived = 0
-      WHERE ic.code = ? LIMIT 1"
+      WHERE ic.code = BINARY ? LIMIT 1"
 );
 $stmt->bind_param('s', $code);
 $stmt->execute();

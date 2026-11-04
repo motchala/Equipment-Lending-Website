@@ -18,6 +18,16 @@ function dash_render(array $d): void
             'loan_filter' => 'waiting',
         ],
         [
+            'tone' => $d['pickup'] > 0 ? 'warn' : 'ok',
+            'icon' => 'move_to_inbox',
+            'label' => 'Ready for pickup',
+            'val' => $d['pickup'],
+            'sub' => $d['pickup'] > 0 ? 'Awaiting claim scan' : 'Nothing to hand over',
+            'go' => 'inventory',
+            'chip' => '',
+            'loan_filter' => 'active',
+        ],
+        [
             'tone' => 'ok',
             'icon' => 'swap_horiz',
             'label' => 'Active loans',

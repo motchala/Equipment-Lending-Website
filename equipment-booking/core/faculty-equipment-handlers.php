@@ -173,43 +173,10 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
                 continue;
             }
 
-            ArbitrationEngine::process($conn, $new_request_id);
-            // A declined request is never kept: drop it and report the reason on the spot.
-            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
-            if ($why_declined !== null) {
-                $declined_items[] = '"' . $item_name . '": ' . $why_declined;
-                continue;
-            }
+            // Request stays Waiting — admin/super admin reviews and approves.
             $kept_items++;
-
-            // ── Generate return token if engine approved this item ────────────
-            $chk = $conn->prepare(
-                "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
-            );
-            if ($chk) {
-                $chk->bind_param('i', $new_request_id);
-                $chk->execute();
-                $chk->store_result();
-                if ($chk->num_rows > 0) {
-                    $auto_token = bin2hex(random_bytes(32));
-                    $tok = $conn->prepare(
-                        "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
-                    );
-                    if ($tok) {
-                        $tok->bind_param('si', $auto_token, $new_request_id);
-                        $tok->execute();
-                        $tok->close();
-                    }
-                }
-                $chk->close();
-            }
         }
 
-        if ($declined_items) {
-            // Nothing is logged for the declined items: say why, right here.
-            bm_fail('Not booked – ' . implode(' | ', $declined_items)
-                . ($kept_items > 0 ? ' (The other items in your request were submitted.)' : ''));
-        }
         header("Location: faculty-dashboard.php?success=1");
         exit();
     } else {
@@ -288,15 +255,27 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
         }
 
         // Prepared INSERT — includes submitted_as = 'personal' (Requirement 3.2)
+        // Collector info from the form
+        $collector_type_p = (string)($_POST['collector_type'] ?? 'faculty');
+        $collector_name_p = trim((string)($_POST['submitted_by_name'] ?? ''));
+        if ($collector_type_p !== 'student') {
+            $collector_name_p = '';
+        }
+        if ($collector_type_p === 'student' && $collector_name_p === '') {
+            bm_fail('Please enter the student\'s name.');
+        }
+        $collector_id_p = ''; // ID field removed from this form
+
         $stmt_ins_p = $conn->prepare(
             "INSERT INTO tbl_requests
              (faculty_name, faculty_id, equipment_name, instructor, room,
               borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
-              booking_mode, stock_applied, status, request_date, submitted_as)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal')"
+              booking_mode, stock_applied, status, request_date, submitted_as,
+              submitted_by_name, submitted_by_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal', ?, ?)"
         );
         $stmt_ins_p->bind_param(
-            'sssssssssiis',
+            'ssssssssssiiss',
             $faculty_name,
             $faculty_id,
             $equipment_name,
@@ -308,7 +287,9 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
             $bk['return_time'],
             $bk['qty'],
             $room_id,
-            $bk['mode']
+            $bk['mode'],
+            $collector_name_p,
+            $collector_id_p
         );
         if ($stmt_ins_p->execute()) {
             $new_request_id = $conn->insert_id;
@@ -333,37 +314,7 @@ if (isset($_POST['borrow_submit']) || isset($_POST['equipment_name']) || isset($
                 }
             }
 
-            ArbitrationEngine::process($conn, $new_request_id);
-
-            // A declined request is never kept: drop it and report the reason on the spot.
-            $why_declined = ArbitrationEngine::discardIfDeclined($conn, $new_request_id);
-            if ($why_declined !== null) {
-                bm_fail($why_declined);
-            }
-
-            // ── Generate return token if engine approved the request ──────────
-            $check_approved = $conn->prepare(
-                "SELECT id FROM tbl_requests WHERE id = ? AND status = 'Approved' AND return_token IS NULL LIMIT 1"
-            );
-            if ($check_approved) {
-                $check_approved->bind_param('i', $new_request_id);
-                $check_approved->execute();
-                $check_approved->get_result(); // consume result
-                if ($check_approved->affected_rows > 0 || $conn->affected_rows > 0) {
-                    // NULL guard in the UPDATE prevents double-write
-                    $auto_token = bin2hex(random_bytes(32));
-                    $tok = $conn->prepare(
-                        "UPDATE tbl_requests SET return_token = ? WHERE id = ? AND status = 'Approved' AND return_token IS NULL"
-                    );
-                    if ($tok) {
-                        $tok->bind_param('si', $auto_token, $new_request_id);
-                        $tok->execute();
-                        $tok->close();
-                    }
-                }
-                $check_approved->close();
-            }
-
+            // Request stays Waiting — admin/super admin reviews and approves.
             header("Location: faculty-dashboard.php?success=1");
             exit();
         } else {
