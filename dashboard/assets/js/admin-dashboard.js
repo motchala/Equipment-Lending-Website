@@ -1411,14 +1411,14 @@
         render();
     }
 
-    /* ── Faculty list: client-side search + pagination (10 per page) ──
+    /* ── Faculty list: client-side search + pagination (20 per page) ──
        Mirrors setupInventoryList(): every <tr[data-faculty-id]> is rendered by
        PHP (or swapped in by adminRefreshFacultyList, or removed by the delete
        flow) and this only shows/hides them: filter by the search box, then show
-       10 rows per page. A MutationObserver re-renders whenever rows are added or
+       20 rows per page. A MutationObserver re-renders whenever rows are added or
        removed, so none of that other code needs to know the list is paged. */
     function setupFacultyList() {
-        const PAGE_SIZE = 10;
+        const PAGE_SIZE = 20;
         const body = document.getElementById('faculty-list-tbody');
         if (!body) return;
 
@@ -1476,13 +1476,13 @@
             if (noMatch) noMatch.hidden = !(rows.length > 0 && total === 0);
 
             if (!pager) return;
-            pager.hidden = rows.length === 0;
+            pager.hidden = false;
             if (info) {
                 info.textContent = total
                     ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
                     : 'No results';
             }
-            if (ctl) ctl.hidden = pages <= 1;
+            if (ctl) ctl.hidden = false;
             if (prevBtn) prevBtn.disabled = page <= 1;
             if (nextBtn) nextBtn.disabled = page >= pages;
             if (nums) {
@@ -1501,7 +1501,10 @@
                     btn.dataset.page = String(n);
                     btn.textContent = String(n);
                     btn.setAttribute('aria-label', 'Page ' + n);
-                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    if (n === page) {
+                        btn.setAttribute('aria-current', 'page');
+                        btn.disabled = pages <= 1;
+                    }
                     nums.appendChild(btn);
                 });
             }
@@ -1940,10 +1943,10 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'no_registry') {
-                        // Registry not yet uploaded — show a soft notice but allow creation
+                        // This is a warning, not a successful lookup; creation remains allowed.
                         _showLookupAlert(
                             'No faculty registry has been uploaded yet. Account will be created without ID validation.',
-                            false
+                            true
                         );
                         // Allow submit without a registry match
                         _facRegistryMatch = { faculty_id: '', email_preview: '' };
@@ -2009,6 +2012,82 @@
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
+    const facPasswordInput = document.getElementById('fac-password');
+    const facPasswordStrength = document.getElementById('fac-password-strength');
+    const facPasswordStrengthMeter = document.getElementById('fac-password-strength-meter');
+    const facPasswordStrengthFill = document.getElementById('fac-password-strength-fill');
+    const facPasswordStrengthLabel = document.getElementById('fac-password-strength-label');
+
+    function _getFacPasswordStrength(password) {
+        if (password.length < 8) return null;
+
+        const normalized = password.toLowerCase();
+        const weakPatterns = [
+            '0123', '1234', '2345', '3456', '4567', '5678', '6789', '7890',
+            '9876', '8765', '7654', '6543', '5432', '4321', '3210',
+            'abcd', 'bcde', 'cdef', 'defg', 'efgh', 'fghi', 'ghij', 'hijk',
+            'ijkl', 'jklm', 'klmn', 'lmno', 'mnop', 'nopq', 'opqr', 'pqrs',
+            'qrst', 'rstu', 'stuv', 'tuvw', 'uvwx', 'vwxy', 'wxyz',
+            'dcba', 'edcb', 'fedc', 'gfed', 'hgfe', 'ihgf', 'jihg', 'kjih',
+            'lkji', 'mlkj', 'nmlk', 'onml', 'ponm', 'qpon', 'rqpo', 'srqp',
+            'tsrq', 'utsr', 'vuts', 'wvut', 'xwvu', 'yxwv', 'zyxw',
+            'qwer', 'wert', 'erty', 'asdf', 'sdfg', 'dfgh', 'zxcv', 'xcvb',
+            'password', 'passw0rd', 'qwerty', 'welcome', 'letmein', 'admin',
+            'iloveyou', 'monkey', 'dragon', 'football', 'baseball', 'master'
+        ];
+        const hasWeakPattern = /(.)\1{3,}/i.test(password) ||
+            weakPatterns.some(function (pattern) { return normalized.includes(pattern); });
+        if (hasWeakPattern) return { level: 1, label: 'Weak' };
+
+        let score = password.length >= 16 ? 3 : (password.length >= 12 ? 2 : 1);
+        if (/[a-z]/.test(password)) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[^A-Za-z0-9]/.test(password)) score++;
+
+        if (score <= 1) return { level: 0, label: 'Very weak' };
+        if (score <= 2) return { level: 1, label: 'Weak' };
+        if (score === 3) return { level: 2, label: 'Fair' };
+        if (score <= 5) return { level: 3, label: 'Strong' };
+        return { level: 4, label: 'Very strong' };
+    }
+
+    function _updateFacPasswordStrength() {
+        if (!facPasswordInput || !facPasswordStrength || !facPasswordStrengthMeter ||
+            !facPasswordStrengthFill || !facPasswordStrengthLabel) return;
+
+        const password = facPasswordInput.value;
+        if (password.length < 8) {
+            facPasswordStrength.hidden = true;
+            facPasswordStrengthMeter.setAttribute('aria-valuenow', '0');
+            facPasswordStrengthMeter.setAttribute('aria-valuetext', password ? 'Enter at least 8 characters' : 'No password entered');
+            facPasswordStrengthFill.style.width = '0%';
+            facPasswordStrengthLabel.textContent = '';
+            return;
+        }
+
+        const levels = [
+            { label: 'Very weak', color: '#e53e3e' },
+            { label: 'Weak', color: '#dd6b20' },
+            { label: 'Fair', color: '#d69e2e' },
+            { label: 'Strong', color: '#38a169' },
+            { label: 'Very strong', color: '#2b6cb0' }
+        ];
+        const result = _getFacPasswordStrength(password);
+        const strength = result.level;
+        const level = levels[strength];
+        facPasswordStrength.hidden = false;
+        facPasswordStrengthMeter.setAttribute('aria-valuenow', String(strength));
+        facPasswordStrengthMeter.setAttribute('aria-valuetext', level.label);
+        facPasswordStrengthFill.style.width = (strength + 1) * 20 + '%';
+        facPasswordStrengthFill.style.backgroundColor = level.color;
+        facPasswordStrengthLabel.textContent = result.label;
+        facPasswordStrengthLabel.style.color = level.color;
+    }
+
+    if (facPasswordInput) {
+        facPasswordInput.addEventListener('input', _updateFacPasswordStrength);
+    }
 
     function _showFacAlert(msg, isError) {
         if (!facFormAlert) return;
@@ -2079,6 +2158,7 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
+            _updateFacPasswordStrength();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -2113,6 +2193,10 @@
             }
             if (password.length < 8) {
                 _showFacAlert('Password must be at least 8 characters.', true); return;
+            }
+            const passwordStrength = _getFacPasswordStrength(password);
+            if (passwordStrength.level < 2) {
+                _showFacAlert('Password is too weak. Use a stronger password rated Fair or higher.', true); return;
             }
             if (password !== confirm) {
                 _showFacAlert('Passwords do not match.', true); return;
@@ -4415,6 +4499,76 @@ function psSelectFmt(btn) {
             psCloseModal('ps-appr-drawer');
         }
     });
+})();
+
+/* Equipment > On Loan: show the loan's full record in a side drawer. */
+(function () {
+    function el(id) { return document.getElementById(id); }
+    function txt(id, value) {
+        var node = el(id);
+        if (node) node.textContent = value !== undefined && value !== null && String(value).trim() !== ''
+            ? value
+            : '\u2014';
+    }
+
+    function openFor(row) {
+        if (!el('ps-loan-detail-drawer')) return;
+        var d = row.dataset;
+        var state = d.loanState || '';
+        var labels = {
+            scheduled: 'Scheduled',
+            returned: 'Returned',
+            overdue: 'Overdue by ' + Math.max(1, Number(d.daysOverdue) || 0) + ' day' + (Number(d.daysOverdue) === 1 ? '' : 's'),
+            due: 'Due today',
+            pickup: 'Ready for pickup',
+            waiting: 'Pending review',
+            ok: 'Active'
+        };
+        var classes = {
+            scheduled: 'ps-badge--scheduled',
+            returned: 'ps-badge--returned',
+            overdue: 'ps-badge--overdue',
+            due: 'ps-badge--waiting',
+            pickup: 'ps-badge--waiting',
+            waiting: 'ps-badge--waiting',
+            ok: 'ps-badge--active'
+        };
+        var status = el('ps-loan-detail-status');
+        if (status) {
+            status.className = 'ps-badge ps-badge--dot ' + (classes[state] || 'ps-badge--active');
+            status.textContent = labels[state] || d.status || '—';
+        }
+
+        txt('ps-loan-detail-number', '#' + String(d.id || 0).padStart(4, '0'));
+        txt('ps-loan-detail-submitted', d.submitted);
+        txt('ps-loan-detail-equipment', d.equipment);
+        txt('ps-loan-detail-quantity', d.qty ? d.qty + (Number(d.qty) === 1 ? ' unit' : ' units') : '');
+        txt('ps-loan-detail-issued', d.startLabel);
+        txt('ps-loan-detail-due', d.dueLabel);
+        txt('ps-loan-detail-returned', d.returnedAtDisplay || 'Not recorded');
+        var returnedSection = el('ps-loan-detail-returned-section');
+        if (returnedSection) returnedSection.hidden = state !== 'returned';
+        txt('ps-loan-detail-condition', d.condition);
+        txt('ps-loan-detail-room', d.room);
+        txt('ps-loan-detail-instructor', d.instructor);
+        txt('ps-loan-detail-borrower', d.borrower);
+        txt('ps-loan-detail-type', d.reqType);
+        txt('ps-loan-detail-id-number', d.idNumber);
+        txt('ps-loan-detail-note', d.note);
+        txt('ps-loan-detail-handled-by', d.handledBy || 'Not recorded');
+        if (typeof psOpenModal === 'function') psOpenModal('ps-loan-detail-drawer');
+    }
+
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('#eq-loan-table [data-action="eq-open-loan-detail"]');
+        if (!trigger) return;
+        var row = trigger.closest('tr.eq-loan-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openFor(row);
+    }, true);
 })();
 
 

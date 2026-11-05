@@ -76,12 +76,13 @@ try {
         manual_return_response(409, 'error', 'This loan has already been closed or cannot be returned.');
     }
 
+    $returnedAt = date('Y-m-d H:i:s');
     $update = $conn->prepare(
-        "UPDATE tbl_requests SET status = 'Returned', returned_at = NOW(), return_token = NULL
+        "UPDATE tbl_requests SET status = 'Returned', returned_at = ?, return_token = NULL
           WHERE id = ? AND status IN ('Approved', 'Overdue')"
     );
     if (!$update) throw new RuntimeException('Could not update the loan record.');
-    $update->bind_param('i', $requestId);
+    $update->bind_param('si', $returnedAt, $requestId);
     $update->execute();
     if ($update->affected_rows !== 1) {
         $update->close();
@@ -108,14 +109,14 @@ try {
     $log = $conn->prepare(
         "INSERT INTO tbl_arbitration_log
             (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_by_id, override_reason, created_at)
-         VALUES (?, ?, ?, ?, 'Returned', 'manual_return', ?, ?, ?, ?, NOW())
+         VALUES (?, ?, ?, ?, 'Returned', 'manual_return', ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
             decision = 'Returned', rule_applied = 'manual_return', reason = VALUES(reason),
             override_by = VALUES(override_by), override_by_id = VALUES(override_by_id),
-            override_reason = VALUES(override_reason), created_at = NOW()"
+            override_reason = VALUES(override_reason), created_at = VALUES(created_at)"
     );
     if (!$log) throw new RuntimeException('Could not record the return.');
-    $log->bind_param('isssssis', $requestId, $loan['faculty_id'], $loan['faculty_name'], $loan['equipment_name'], $reason, $adminName, $adminId, $details);
+    $log->bind_param('isssssiss', $requestId, $loan['faculty_id'], $loan['faculty_name'], $loan['equipment_name'], $reason, $adminName, $adminId, $details, $returnedAt);
     $log->execute();
     $log->close();
 

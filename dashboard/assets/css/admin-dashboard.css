@@ -8507,6 +8507,32 @@ body:has(#roomDeleteConfirm:not(.hidden)) {
     margin: 0.6rem 0 0;
 }
 
+.fac-password-strength {
+    margin-top: 7px;
+}
+
+.fac-password-strength-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--color-outline-variant, #e2e2e2);
+}
+
+.fac-password-strength-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.2s ease, background-color 0.2s ease;
+}
+
+.fac-password-strength-label {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
 /* ── Faculty list ──────────────────────────────────────────── */
 .fac-list-head {
     flex-wrap: wrap;

@@ -35,6 +35,35 @@
         <div class="fcty-panel is-skeleton" aria-hidden="true"></div>
     </div>
 
+    <!-- ── My class schedule ─────────────────────────────────────────
+         Monday–Saturday week calendar of the signed-in faculty member's own approved
+         room bookings (type, time, duration, room). Drawn by fcty-class-schedule.js
+         from room-reservation/api/get-faculty-schedule.php. -->
+    <section class="fcs" id="fcty-class-schedule" aria-labelledby="fcs-title">
+        <div class="fcty-head-row fcty-landing-head fcs-head">
+            <div class="fcs-heading">
+                <h2 class="fcty-title fcs-title" id="fcs-title">My class schedule</h2>
+                <p class="fcs-sub">Your approved room bookings, Monday to Saturday.</p>
+            </div>
+            <div class="fcs-nav">
+                <button type="button" class="fcty-icon-btn" id="fcs-prev" aria-label="Previous week" disabled>
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                </button>
+                <span class="fcs-range" id="fcs-range" aria-live="polite"></span>
+                <button type="button" class="fcty-icon-btn" id="fcs-next" aria-label="Next week" disabled>
+                    <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="fcs-today" id="fcs-today" disabled>This week</button>
+            </div>
+        </div>
+
+        <div class="fcs-card">
+            <div class="fcs-body" id="fcs-body" aria-live="polite">
+                <div class="fcs-skeleton" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            </div>
+        </div>
+    </section>
+
 </section><!-- /#fcty-buildings-view -->
 
 

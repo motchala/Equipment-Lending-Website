@@ -2297,3 +2297,545 @@ textarea.fcty-input {
         padding: 2px 10px 12px;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MY CLASS SCHEDULE  (under the three building panels)
+   Mon–Sat week calendar of the faculty member's own approved room
+   bookings. Wide: calendar grid.  Narrow: day-by-day list (container
+   query, so it reacts to the space the panel really has, not the
+   window). Colours come from the dashboard tokens, so light, dark and
+   high-contrast all work. Drawn by fcty-class-schedule.js.
+═══════════════════════════════════════════════════════════════ */
+#rooms-browse .fcs {
+    container-type: inline-size;
+    container-name: fcs;
+    margin-top: 40px;
+    --fcs-line: color-mix(in srgb, var(--fcty-line) 55%, transparent);
+}
+
+#rooms-browse .fcs-head {
+    align-items: flex-end;
+}
+
+#rooms-browse .fcs-heading {
+    min-width: 0;
+}
+
+#rooms-browse .fcs-title {
+    margin: 0;
+}
+
+#rooms-browse .fcs-sub {
+    margin: 4px 0 0;
+    font-size: .875rem;
+    color: var(--fcty-muted);
+}
+
+/* week switcher */
+#rooms-browse .fcs-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#rooms-browse .fcs-range {
+    min-width: 150px;
+    text-align: center;
+    font-size: .9rem;
+    font-weight: 700;
+    color: var(--fcty-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+#rooms-browse .fcs-nav .fcty-icon-btn:disabled {
+    opacity: .4;
+    cursor: default;
+    background: transparent;
+}
+
+#rooms-browse .fcs-today,
+#rooms-browse .fcs-retry {
+    height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 999px;
+    background: var(--fcty-card);
+    color: var(--fcty-ink);
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .18s, border-color .18s, opacity .18s;
+}
+
+#rooms-browse .fcs-today {
+    margin-left: 8px;
+}
+
+#rooms-browse .fcs-today:hover:not(:disabled),
+#rooms-browse .fcs-retry:hover {
+    background: var(--fcty-soft);
+}
+
+#rooms-browse .fcs-today:disabled {
+    opacity: .5;
+    cursor: default;
+}
+
+#rooms-browse .fcs-nav .fcty-icon-btn:focus-visible,
+#rooms-browse .fcs-today:focus-visible,
+#rooms-browse .fcs-retry:focus-visible,
+#rooms-browse .fcs-ev:focus-visible {
+    outline: 2px solid var(--fcty-brand);
+    outline-offset: 2px;
+}
+
+/* card */
+#rooms-browse .fcs-card {
+    position: relative;
+    background: var(--fcty-card);
+    border: 1px solid var(--fcty-line);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+#rooms-browse .fcs-body {
+    min-height: 120px;
+    transition: opacity .2s;
+}
+
+#rooms-browse .fcs-body.is-busy {
+    opacity: .5;
+    pointer-events: none;
+}
+
+/* ── Calendar grid ─────────────────────────────────────────── */
+#rooms-browse .fcs-grid-wrap {
+    position: relative;
+}
+
+#rooms-browse .fcs-grid {
+    display: grid;
+    grid-template-columns: 68px repeat(6, minmax(0, 1fr));
+    padding-bottom: 12px;
+    /* room for the last hour label */
+}
+
+#rooms-browse .fcs-corner {
+    border-bottom: 1px solid var(--fcty-line);
+}
+
+#rooms-browse .fcs-dayhead {
+    padding: 12px 6px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--fcty-line);
+    border-left: 1px solid var(--fcs-line);
+}
+
+#rooms-browse .fcs-dow {
+    display: block;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--fcty-muted);
+}
+
+#rooms-browse .fcs-dom {
+    display: inline-grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    margin-top: 2px;
+    padding: 0 4px;
+    border-radius: 16px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--fcty-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+#rooms-browse .fcs-dayhead.is-today .fcs-dow,
+#rooms-browse .fcs-ag-day.is-today .fcs-dow {
+    color: var(--fcty-brand);
+}
+
+#rooms-browse .fcs-dayhead.is-today .fcs-dom,
+#rooms-browse .fcs-ag-day.is-today .fcs-dom {
+    background: var(--fcty-brand);
+    color: #fff;
+}
+
+#rooms-browse .fcs-gutter {
+    position: relative;
+    height: var(--fcs-h);
+}
+
+#rooms-browse .fcs-hour {
+    position: absolute;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: .7rem;
+    font-weight: 600;
+    color: var(--fcty-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+#rooms-browse .fcs-col {
+    position: relative;
+    height: var(--fcs-h);
+    border-left: 1px solid var(--fcs-line);
+    background-image: repeating-linear-gradient(to bottom,
+            transparent 0,
+            transparent calc(var(--fcs-hh) - 1px),
+            var(--fcs-line) calc(var(--fcs-hh) - 1px),
+            var(--fcs-line) var(--fcs-hh));
+}
+
+#rooms-browse .fcs-col.is-today {
+    background-color: color-mix(in srgb, var(--fcty-brand) 4%, transparent);
+}
+
+/* current time (today's column only) */
+#rooms-browse .fcs-now {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 2px solid var(--fcty-booked);
+    z-index: 3;
+    pointer-events: none;
+}
+
+#rooms-browse .fcs-now::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: -5px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--fcty-booked);
+}
+
+/* ── One booking (grid block and list card share the look) ─── */
+#rooms-browse .fcs-ev,
+#rooms-browse .fcs-ag-ev {
+    --ev: var(--fcty-static);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--ev) 30%, transparent);
+    border-left: 4px solid var(--ev);
+    background: color-mix(in srgb, var(--ev) 12%, var(--fcty-card));
+    color: var(--fcty-ink);
+    font-size: .72rem;
+    line-height: 1.3;
+}
+
+#rooms-browse .fcs-ev {
+    position: absolute;
+    padding: 5px 8px 4px 9px;
+    border-radius: 9px;
+    transition: box-shadow .15s, opacity .15s;
+}
+
+#rooms-browse .fcs-ev:hover,
+#rooms-browse .fcs-ev:focus-visible {
+    box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ev) 55%, transparent);
+    z-index: 4;
+}
+
+#rooms-browse .fcs-ag-ev {
+    padding: 9px 12px 9px 12px;
+    border-radius: 10px;
+    gap: 2px;
+    font-size: .8rem;
+}
+
+#rooms-browse .fcs-ev-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-width: 0;
+}
+
+#rooms-browse .fcs-ev-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .8rem;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--ev) 60%, var(--fcty-ink));
+}
+
+#rooms-browse .fcs-ag-ev .fcs-ev-title {
+    font-size: .9rem;
+}
+
+#rooms-browse .fcs-ev-dur {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ev) 16%, transparent);
+    color: color-mix(in srgb, var(--ev) 60%, var(--fcty-ink));
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .01em;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcs-ev-time {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--fcty-muted);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+#rooms-browse .fcs-ev-where {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    color: var(--fcty-muted);
+}
+
+#rooms-browse .fcs-ev-where>span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcs-ev-where .material-symbols-outlined {
+    font-size: 13px;
+}
+
+/* bookings that overlap in time sit side by side, so each is narrow: stack the length under the title */
+#rooms-browse .fcs-ev.is-lane .fcs-ev-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+/* short bookings drop detail instead of overflowing */
+#rooms-browse .fcs-ev.is-short .fcs-ev-where {
+    display: none;
+}
+
+#rooms-browse .fcs-ev.is-tiny {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    justify-content: center;
+}
+
+#rooms-browse .fcs-ev.is-tiny .fcs-ev-time {
+    display: none;
+}
+
+/* finished bookings are softened */
+#rooms-browse .fcs-ev.is-past,
+#rooms-browse .fcs-ag-ev.is-past {
+    opacity: .7;
+}
+
+#rooms-browse .fcs-ev.is-past:hover,
+#rooms-browse .fcs-ev.is-past:focus-visible {
+    opacity: 1;
+}
+
+/* booking types */
+#rooms-browse .fcs-t-lecture {
+    --ev: var(--fcty-brand);
+}
+
+#rooms-browse .fcs-t-lab {
+    --ev: var(--accent-gold-deep, #b8913a);
+}
+
+#rooms-browse .fcs-t-exam {
+    --ev: #2f6a9a;
+}
+
+#rooms-browse .fcs-t-seminar {
+    --ev: var(--fcty-available);
+}
+
+#rooms-browse .fcs-t-meeting,
+#rooms-browse .fcs-t-other {
+    --ev: var(--fcty-static);
+}
+
+/* the maroon is too dark to read on a dark surface, so lectures use a lighter rose there */
+[data-theme="dark"] #rooms-browse .fcs-t-exam {
+    --ev: #8cbbe6;
+}
+
+[data-theme="dark"] #rooms-browse .fcs-t-lecture {
+    --ev: #e59a9a;
+}
+
+[data-theme="dark"] #rooms-browse .fcs-dayhead.is-today .fcs-dow,
+[data-theme="dark"] #rooms-browse .fcs-ag-day.is-today .fcs-dow {
+    color: #e59a9a;
+}
+
+[data-theme="high-contrast"] #rooms-browse .fcs-t-exam {
+    --ev: #7cc0ff;
+}
+
+[data-theme="high-contrast"] #rooms-browse .fcs-t-lecture {
+    --ev: #ff9d9d;
+}
+
+/* nothing booked this week */
+#rooms-browse .fcs-empty {
+    position: absolute;
+    left: 68px;
+    right: 0;
+    top: 72px;
+    bottom: 12px;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    pointer-events: none;
+}
+
+#rooms-browse .fcs-empty-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    max-width: 400px;
+    padding: 22px 28px;
+    border: 1px solid var(--fcty-line);
+    border-radius: 16px;
+    background: var(--fcty-card);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+    color: var(--fcty-muted);
+    font-size: .85rem;
+}
+
+#rooms-browse .fcs-empty-card .material-symbols-outlined {
+    font-size: 28px;
+    margin-bottom: 4px;
+    color: var(--fcty-static);
+}
+
+#rooms-browse .fcs-empty-card strong {
+    color: var(--fcty-ink);
+    font-size: .95rem;
+}
+
+/* ── Day-by-day list (narrow panels) ───────────────────────── */
+#rooms-browse .fcs-agenda {
+    display: none;
+    padding: 4px 16px 8px;
+}
+
+#rooms-browse .fcs-ag-day {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px 0;
+    border-top: 1px solid var(--fcs-line);
+}
+
+#rooms-browse .fcs-ag-day:first-child {
+    border-top: 0;
+}
+
+#rooms-browse .fcs-ag-date {
+    text-align: center;
+}
+
+#rooms-browse .fcs-ag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+#rooms-browse .fcs-ag-none {
+    margin: 0;
+    align-self: center;
+    color: var(--fcty-muted);
+    font-size: .85rem;
+    opacity: .8;
+}
+
+@container fcs (max-width: 780px) {
+    #rooms-browse .fcs-grid-wrap {
+        display: none;
+    }
+
+    #rooms-browse .fcs-agenda {
+        display: block;
+    }
+
+    /* the week switcher drops under the title and uses the full width */
+    #rooms-browse .fcs-nav {
+        width: 100%;
+    }
+
+    #rooms-browse .fcs-range {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* ── Loading + error ───────────────────────────────────────── */
+#rooms-browse .fcs-skeleton {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+    height: 320px;
+    padding: 20px;
+}
+
+#rooms-browse .fcs-skeleton span {
+    border-radius: 12px;
+    background: var(--fcty-soft);
+    animation: fcsPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes fcsPulse {
+
+    0%,
+    100% {
+        opacity: .55;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}
+
+#rooms-browse .fcs-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 40px 16px;
+    color: var(--fcty-muted);
+    font-size: .9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    #rooms-browse .fcs-skeleton span,
+    #rooms-browse .fcs-ev,
+    #rooms-browse .fcs-body {
+        animation: none;
+        transition: none;
+    }
+}

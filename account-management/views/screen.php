@@ -107,7 +107,7 @@
                                 <span class="material-symbols-outlined" aria-hidden="true">info</span>
                             </button>
                             <span class="fac-info-popover" id="fac-password-guidance" role="tooltip">
-                                Passwords must contain at least 8 characters and both password fields must match.
+                                Passwords must contain at least 8 characters and be rated Fair or stronger. Avoid common words, repeated characters, and predictable sequences. Both password fields must match.
                             </span>
                         </span>
                     </div>
@@ -122,6 +122,15 @@
                                     data-target="fac-password" aria-label="Toggle password">
                                     <span class="material-symbols-outlined" style="font-size:17px">visibility</span>
                                 </button>
+                            </div>
+                            <div class="fac-password-strength" id="fac-password-strength" hidden>
+                                <div class="fac-password-strength-track" id="fac-password-strength-meter"
+                                    role="meter" aria-label="Password strength" aria-valuemin="0"
+                                    aria-valuemax="4" aria-valuenow="0" aria-valuetext="No password entered">
+                                    <span class="fac-password-strength-fill" id="fac-password-strength-fill"></span>
+                                </div>
+                                <span class="fac-password-strength-label" id="fac-password-strength-label"
+                                    aria-live="polite"></span>
                             </div>
                         </div>
                         <div class="form-group">
@@ -294,7 +303,7 @@
                     </div>
                 </div>
 
-                <!-- Pagination (10 per page, client-side; works together with the search box) -->
+                <!-- Pagination (20 per page, client-side; works together with the search box) -->
                 <div class="inv-pager" id="fac-pager" hidden>
                     <span class="inv-pager-info" id="fac-pager-info"></span>
                     <div class="inv-pager-ctl" id="fac-pager-ctl" role="navigation" aria-label="Faculty list pages">

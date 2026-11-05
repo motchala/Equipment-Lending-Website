@@ -539,7 +539,9 @@
                                                     data-doc-url="<?php echo $ldoc ? htmlspecialchars($ldoc['url']) : ''; ?>"
                                                     data-doc-open-url="<?php echo $ldoc ? htmlspecialchars($ldoc['open_url']) : ''; ?>"
                                                     data-doc-name="<?php echo $ldoc ? htmlspecialchars($ldoc['name']) : ''; ?>"
-                                                    data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>">
+                                                    data-doc-kind="<?php echo $ldoc ? $ldoc['kind'] : ''; ?>"
+                                                    data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
+                                                    data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>">
                                                     <td>
                                                         <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
                                                         <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
@@ -614,7 +616,7 @@
                                                                 </button>
                                                             <?php elseif ($lst === 'scheduled'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
+                                                                    data-action="eq-open-loan-detail">View</button>
                                                                 <?php if ($lcan_cancel): ?>
                                                                     <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
                                                                         data-action="ps-open-modal" data-modal="ps-cancel-booking-modal">
@@ -628,7 +630,7 @@
                                                                 <span class="ps-appr-sub">Waiting for Claim QR scan</span>
                                                             <?php elseif ($lst === 'returned'): ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
-                                                                    data-action="ps-open-modal" data-modal="ps-req-detail-modal">View</button>
+                                                                    data-action="eq-open-loan-detail">View</button>
                                                             <?php else: ?>
                                                                 <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm"
                                                                     data-action="ps-open-modal" data-modal="ps-return-modal">Manual Return</button>

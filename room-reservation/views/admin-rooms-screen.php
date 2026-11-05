@@ -473,7 +473,7 @@
                         </div>
                         <div class="inv-pager" id="rrPager" hidden>
                             <span class="inv-pager-info" id="rrPagerInfo"></span>
-                            <div class="inv-pager-ctl" id="rrPagerCtl">
+                            <div class="inv-pager-ctl" id="rrPagerCtl" role="navigation" aria-label="Reservation pages">
                                 <button type="button" class="inv-pager-btn" id="rrPgPrev" aria-label="Previous page">
                                     <span class="material-symbols-outlined">chevron_left</span>
                                 </button>

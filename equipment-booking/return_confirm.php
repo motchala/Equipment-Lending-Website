@@ -48,12 +48,13 @@ if ($token) {
         } else {
             $req_id   = (int)$row['id'];
             $eq_name  = $row['equipment_name'];
+            $returned_at = date('Y-m-d H:i:s');
 
             // Mark as Returned
             $upd = $conn->prepare(
-                "UPDATE tbl_requests SET status = 'Returned', returned_at = NOW(), return_token = NULL WHERE id = ?"
+                "UPDATE tbl_requests SET status = 'Returned', returned_at = ?, return_token = NULL WHERE id = ?"
             );
-            $upd->bind_param('i', $req_id);
+            $upd->bind_param('si', $returned_at, $req_id);
             $upd->execute();
             $upd->close();
 
@@ -74,10 +75,10 @@ if ($token) {
             $log = $conn->prepare(
                 "INSERT INTO tbl_arbitration_log
                  (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_by_id, override_reason, created_at)
-                 VALUES (?, ?, ?, ?, 'Returned', 'qr_return', 'Equipment returned via QR scan', ?, ?, 'QR Token Return', NOW())
-                 ON DUPLICATE KEY UPDATE decision='Returned', rule_applied='qr_return', override_by=VALUES(override_by), override_by_id=VALUES(override_by_id), created_at=NOW()"
+                 VALUES (?, ?, ?, ?, 'Returned', 'qr_return', 'Equipment returned via QR scan', ?, ?, 'QR Token Return', ?)
+                 ON DUPLICATE KEY UPDATE decision='Returned', rule_applied='qr_return', override_by=VALUES(override_by), override_by_id=VALUES(override_by_id), created_at=VALUES(created_at)"
             );
-            $log->bind_param('issssi', $req_id, $row['faculty_name'], $row['faculty_name'], $eq_name, $admin_name, $acting_admin_id);
+            $log->bind_param('issssis', $req_id, $row['faculty_name'], $row['faculty_name'], $eq_name, $admin_name, $acting_admin_id, $returned_at);
             $log->execute();
             $log->close();
 
