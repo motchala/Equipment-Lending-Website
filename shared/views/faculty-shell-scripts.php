@@ -25,5 +25,6 @@
     <script src="shared/assets/js/logout-modal.js?v=<?php echo @filemtime(PS_ROOT . '/shared/assets/js/logout-modal.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard.js'); ?>"></script>
     <script src="room-reservation/assets/js/fcty-facilities.js"></script>
+    <script src="room-reservation/assets/js/fcty-class-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/fcty-class-schedule.js'); ?>"></script>
     <script src="dashboard/assets/js/faculty-dashboard-responsive.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-responsive.js'); ?>" defer></script>
     <script src="dashboard/assets/js/faculty-dashboard-mobile.js?v=<?php echo @filemtime(PS_ROOT . '/dashboard/assets/js/faculty-dashboard-mobile.js'); ?>" defer></script>

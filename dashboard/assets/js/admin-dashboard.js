@@ -1411,14 +1411,14 @@
         render();
     }
 
-    /* ── Faculty list: client-side search + pagination (10 per page) ──
+    /* ── Faculty list: client-side search + pagination (20 per page) ──
        Mirrors setupInventoryList(): every <tr[data-faculty-id]> is rendered by
        PHP (or swapped in by adminRefreshFacultyList, or removed by the delete
        flow) and this only shows/hides them: filter by the search box, then show
-       10 rows per page. A MutationObserver re-renders whenever rows are added or
+       20 rows per page. A MutationObserver re-renders whenever rows are added or
        removed, so none of that other code needs to know the list is paged. */
     function setupFacultyList() {
-        const PAGE_SIZE = 10;
+        const PAGE_SIZE = 20;
         const body = document.getElementById('faculty-list-tbody');
         if (!body) return;
 
@@ -1476,13 +1476,13 @@
             if (noMatch) noMatch.hidden = !(rows.length > 0 && total === 0);
 
             if (!pager) return;
-            pager.hidden = rows.length === 0;
+            pager.hidden = false;
             if (info) {
                 info.textContent = total
                     ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total
                     : 'No results';
             }
-            if (ctl) ctl.hidden = pages <= 1;
+            if (ctl) ctl.hidden = false;
             if (prevBtn) prevBtn.disabled = page <= 1;
             if (nextBtn) nextBtn.disabled = page >= pages;
             if (nums) {
@@ -1501,7 +1501,10 @@
                     btn.dataset.page = String(n);
                     btn.textContent = String(n);
                     btn.setAttribute('aria-label', 'Page ' + n);
-                    if (n === page) btn.setAttribute('aria-current', 'page');
+                    if (n === page) {
+                        btn.setAttribute('aria-current', 'page');
+                        btn.disabled = pages <= 1;
+                    }
                     nums.appendChild(btn);
                 });
             }
@@ -1940,10 +1943,10 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.status === 'no_registry') {
-                        // Registry not yet uploaded — show a soft notice but allow creation
+                        // This is a warning, not a successful lookup; creation remains allowed.
                         _showLookupAlert(
                             'No faculty registry has been uploaded yet. Account will be created without ID validation.',
-                            false
+                            true
                         );
                         // Allow submit without a registry match
                         _facRegistryMatch = { faculty_id: '', email_preview: '' };
@@ -2009,6 +2012,82 @@
     /* ── Faculty: create-account submit ──────────────────────── */
     const facSubmitBtn = document.getElementById('fac-submit-btn');
     const facFormAlert = document.getElementById('fac-form-alert');
+    const facPasswordInput = document.getElementById('fac-password');
+    const facPasswordStrength = document.getElementById('fac-password-strength');
+    const facPasswordStrengthMeter = document.getElementById('fac-password-strength-meter');
+    const facPasswordStrengthFill = document.getElementById('fac-password-strength-fill');
+    const facPasswordStrengthLabel = document.getElementById('fac-password-strength-label');
+
+    function _getFacPasswordStrength(password) {
+        if (password.length < 8) return null;
+
+        const normalized = password.toLowerCase();
+        const weakPatterns = [
+            '0123', '1234', '2345', '3456', '4567', '5678', '6789', '7890',
+            '9876', '8765', '7654', '6543', '5432', '4321', '3210',
+            'abcd', 'bcde', 'cdef', 'defg', 'efgh', 'fghi', 'ghij', 'hijk',
+            'ijkl', 'jklm', 'klmn', 'lmno', 'mnop', 'nopq', 'opqr', 'pqrs',
+            'qrst', 'rstu', 'stuv', 'tuvw', 'uvwx', 'vwxy', 'wxyz',
+            'dcba', 'edcb', 'fedc', 'gfed', 'hgfe', 'ihgf', 'jihg', 'kjih',
+            'lkji', 'mlkj', 'nmlk', 'onml', 'ponm', 'qpon', 'rqpo', 'srqp',
+            'tsrq', 'utsr', 'vuts', 'wvut', 'xwvu', 'yxwv', 'zyxw',
+            'qwer', 'wert', 'erty', 'asdf', 'sdfg', 'dfgh', 'zxcv', 'xcvb',
+            'password', 'passw0rd', 'qwerty', 'welcome', 'letmein', 'admin',
+            'iloveyou', 'monkey', 'dragon', 'football', 'baseball', 'master'
+        ];
+        const hasWeakPattern = /(.)\1{3,}/i.test(password) ||
+            weakPatterns.some(function (pattern) { return normalized.includes(pattern); });
+        if (hasWeakPattern) return { level: 1, label: 'Weak' };
+
+        let score = password.length >= 16 ? 3 : (password.length >= 12 ? 2 : 1);
+        if (/[a-z]/.test(password)) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[0-9]/.test(password)) score++;
+        if (/[^A-Za-z0-9]/.test(password)) score++;
+
+        if (score <= 1) return { level: 0, label: 'Very weak' };
+        if (score <= 2) return { level: 1, label: 'Weak' };
+        if (score === 3) return { level: 2, label: 'Fair' };
+        if (score <= 5) return { level: 3, label: 'Strong' };
+        return { level: 4, label: 'Very strong' };
+    }
+
+    function _updateFacPasswordStrength() {
+        if (!facPasswordInput || !facPasswordStrength || !facPasswordStrengthMeter ||
+            !facPasswordStrengthFill || !facPasswordStrengthLabel) return;
+
+        const password = facPasswordInput.value;
+        if (password.length < 8) {
+            facPasswordStrength.hidden = true;
+            facPasswordStrengthMeter.setAttribute('aria-valuenow', '0');
+            facPasswordStrengthMeter.setAttribute('aria-valuetext', password ? 'Enter at least 8 characters' : 'No password entered');
+            facPasswordStrengthFill.style.width = '0%';
+            facPasswordStrengthLabel.textContent = '';
+            return;
+        }
+
+        const levels = [
+            { label: 'Very weak', color: '#e53e3e' },
+            { label: 'Weak', color: '#dd6b20' },
+            { label: 'Fair', color: '#d69e2e' },
+            { label: 'Strong', color: '#38a169' },
+            { label: 'Very strong', color: '#2b6cb0' }
+        ];
+        const result = _getFacPasswordStrength(password);
+        const strength = result.level;
+        const level = levels[strength];
+        facPasswordStrength.hidden = false;
+        facPasswordStrengthMeter.setAttribute('aria-valuenow', String(strength));
+        facPasswordStrengthMeter.setAttribute('aria-valuetext', level.label);
+        facPasswordStrengthFill.style.width = (strength + 1) * 20 + '%';
+        facPasswordStrengthFill.style.backgroundColor = level.color;
+        facPasswordStrengthLabel.textContent = result.label;
+        facPasswordStrengthLabel.style.color = level.color;
+    }
+
+    if (facPasswordInput) {
+        facPasswordInput.addEventListener('input', _updateFacPasswordStrength);
+    }
 
     function _showFacAlert(msg, isError) {
         if (!facFormAlert) return;
@@ -2079,6 +2158,7 @@
             // Reset the create-account form so it's blank for the next account.
             var form = document.getElementById('fac-create-form') || document.getElementById('facCreateForm');
             if (form) form.reset();
+            _updateFacPasswordStrength();
             // Refresh the faculty list from the server so the new account appears immediately.
             if (typeof window.adminRefreshFacultyList === 'function') window.adminRefreshFacultyList();
         }, FAC_CREATED_OVERLAY_MS);
@@ -2113,6 +2193,10 @@
             }
             if (password.length < 8) {
                 _showFacAlert('Password must be at least 8 characters.', true); return;
+            }
+            const passwordStrength = _getFacPasswordStrength(password);
+            if (passwordStrength.level < 2) {
+                _showFacAlert('Password is too weak. Use a stronger password rated Fair or higher.', true); return;
             }
             if (password !== confirm) {
                 _showFacAlert('Passwords do not match.', true); return;
@@ -2749,17 +2833,30 @@
             detailEmpty.hidden = false;
         }
 
-        /* Open the panel with someone already showing (first manageable admin, else the first row). */
+        /* Who shows when the panel opens: your own account (the signed-in Super Admin), else any Super Admin,
+           else the first manageable admin, else the first row. */
+        function defaultItem() {
+            const all = items();
+            return all.find(function (i) { return i.getAttribute('data-you') === '1'; })
+                || all.find(function (i) { return i.getAttribute('data-role') === 'Super Admin'; })
+                || all.find(function (i) { return i.getAttribute('data-manage') === '1'; })
+                || all[0];
+        }
+
         function ensureSelected() {
             if (current && document.body.contains(current)) return;
-            const all = items();
-            if (!all.length) return;
-            const first = all.find(function (i) { return i.getAttribute('data-manage') === '1'; }) || all[0];
-            select(first, false);
+            const first = defaultItem();
+            if (first) select(first, false);
+        }
+
+        /* Clicking Admins in the sidebar always lands on your own account. */
+        function showDefault() {
+            const first = defaultItem();
+            if (first) select(first, false);
         }
 
         const navAdmins = document.querySelector('.nav-item[data-tab="admins"]');
-        if (navAdmins) navAdmins.addEventListener('click', ensureSelected);
+        if (navAdmins) navAdmins.addEventListener('click', showDefault);
         if (document.getElementById('panel-admins').classList.contains('active')) ensureSelected();
         window.psAdminsPanelReady = ensureSelected; // lets ?view=admins open it with someone selected
 
@@ -3870,6 +3967,7 @@
             return {
                 id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
+                submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
                 arbRule: d.arbRule
@@ -3895,7 +3993,8 @@
         function fillApprove(ctx) {
             document.getElementById('approve-request-id').value = ctx.id;
             document.getElementById('ps-approve-reqno').textContent = reqNo(ctx.id);
-            document.getElementById('approve-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('approve-borrower').textContent =
+                ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('approve-equipment').textContent = ctx.equipment || '—';
             document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
             const dd = document.getElementById('approve-due-date');
@@ -3908,7 +4007,8 @@
         function fillDecline(ctx) {
             document.getElementById('decline-request-id').value = ctx.id;
             document.getElementById('ps-decline-reqno').textContent = reqNo(ctx.id);
-            document.getElementById('decline-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('decline-borrower').textContent =
+                ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
             if (declineReasonInput) declineReasonInput.value = '';
             if (declineConfirmBtn) declineConfirmBtn.disabled = true;
@@ -3918,9 +4018,14 @@
         function fillDetail(ctx) {
             document.getElementById('detail-request-id').value = ctx.id;
             document.getElementById('detail-submitted').textContent = ctx.submitted || '—';
-            document.getElementById('detail-requester').textContent = ctx.borrower || '—';
-            document.getElementById('detail-id-number').textContent = ctx.idNumber || '—';
-            document.getElementById('detail-req-type').textContent = ctx.reqType || 'Faculty';
+            const studentRequest = ctx.submittedAs === 'student' && ctx.studentName;
+            document.getElementById('detail-requester').textContent = studentRequest ? ctx.studentName : (ctx.borrower || '—');
+            document.getElementById('detail-id-number').textContent = studentRequest ? (ctx.studentId || 'Not recorded') : (ctx.idNumber || '—');
+            document.getElementById('detail-req-type').textContent = studentRequest ? 'Student (faculty-authorized)' : (ctx.reqType || 'Faculty');
+            const authorizerItem = document.getElementById('detail-authorizer-item');
+            const authorizer = document.getElementById('detail-authorizer');
+            if (authorizerItem) authorizerItem.hidden = !studentRequest;
+            if (authorizer) authorizer.textContent = studentRequest ? ctx.borrower + ' (' + ctx.idNumber + ')' : '—';
             document.getElementById('detail-room').textContent = ctx.room || '—';
             document.getElementById('detail-equipment').textContent = ctx.equipment || '—';
             document.getElementById('detail-date-needed').textContent = ctx.dateNeeded || '—';
@@ -4059,6 +4164,7 @@
                                         waitChip.textContent = String(Math.max(0, (parseInt(waitChip.textContent, 10) || 0) - 1));
                                     }
                                 }
+                                if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans();
                             }
                         }
 
@@ -4098,6 +4204,129 @@
                 submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
             });
         }
+    })();
+
+    (function initBundleApproval() {
+        var modal = document.getElementById('eq-bundle-approve-modal');
+        var batchInput = document.getElementById('eq-bundle-approve-id');
+        var itemsBox = document.getElementById('eq-bundle-approve-items');
+        var reasonInput = document.getElementById('eq-bundle-approve-reason');
+        var alertBox = document.getElementById('eq-bundle-approve-alert');
+        var confirmButton = document.getElementById('eq-bundle-approve-confirm');
+        if (!modal || !batchInput || !itemsBox || !reasonInput || !confirmButton) return;
+
+        var pendingRows = [];
+        function showError(message) {
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#ffeaea';
+            alertBox.style.color = 'var(--danger)';
+        }
+        function clearError() {
+            alertBox.textContent = '';
+            alertBox.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            var trigger = e.target.closest('[data-action="eq-open-bundle-approve"]');
+            if (!trigger) return;
+            e.preventDefault();
+            e.stopPropagation();
+            batchInput.value = trigger.dataset.batchId || '';
+            reasonInput.value = '';
+            confirmButton.disabled = true;
+            clearError();
+            itemsBox.textContent = '';
+            pendingRows = Array.prototype.filter.call(
+                document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row'),
+                function (row) {
+                    return row.dataset.batchId === batchInput.value && row.dataset.loanState === 'waiting';
+                }
+            );
+            pendingRows.forEach(function (row) {
+                var line = document.createElement('div');
+                line.className = 'ps-req-sum-row';
+                var name = document.createElement('span');
+                name.className = 'ps-rsl';
+                name.textContent = row.dataset.equipment || 'Equipment';
+                var number = document.createElement('span');
+                number.className = 'ps-rsv';
+                number.textContent = '#' + String(row.dataset.id || '').padStart(4, '0');
+                line.appendChild(name);
+                line.appendChild(number);
+                itemsBox.appendChild(line);
+            });
+            if (pendingRows.length < 2) {
+                showError('At least two requests in this bundle must still be pending.');
+            }
+            if (typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
+        });
+
+        reasonInput.addEventListener('input', function () {
+            confirmButton.disabled = this.value.trim().length < 5 || pendingRows.length < 2;
+        });
+
+        confirmButton.addEventListener('click', function () {
+            var reason = reasonInput.value.trim();
+            if (reason.length < 5 || pendingRows.length < 2) {
+                showError('Enter an approval reason of at least 5 characters.');
+                return;
+            }
+            confirmButton.disabled = true;
+            confirmButton.dataset.originalText = confirmButton.innerHTML;
+            confirmButton.textContent = 'Approving bundle…';
+            clearError();
+            var body = new FormData();
+            body.append('batch_id', batchInput.value);
+            body.append('override_reason', reason);
+            body.append('csrf_token', getCsrfToken());
+
+            fetch('equipment-booking/api/approve-borrow-bundle.php', { method: 'POST', body: body })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        if (!response.ok || data.status !== 'success') {
+                            throw new Error(data.message || 'Bundle approval failed.');
+                        }
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    var approvedIds = new Set((data.request_ids || []).map(String));
+                    var changed = pendingRows.filter(function (row) {
+                        return approvedIds.has(String(row.dataset.id));
+                    });
+                    changed.forEach(function (row) {
+                        row.classList.remove('is-waiting');
+                        row.classList.add('is-ok');
+                        row.dataset.loanState = 'ok';
+                        row.dataset.status = 'Approved';
+                        var status = row.querySelector('td:nth-child(5) .ps-badge');
+                        if (status) {
+                            status.className = 'ps-badge ps-badge--active';
+                            status.textContent = 'Approved';
+                        }
+                        var actionCell = row.querySelector('td:last-child > div');
+                        if (actionCell) {
+                            actionCell.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal"><span class="material-symbols-outlined">assignment_return</span> Manual Return</button>';
+                        }
+                    });
+                    var waitingChip = document.querySelector('#eqLoanFilter [data-loan-filter="waiting"] .eq-loan-tab-count');
+                    if (waitingChip) {
+                        waitingChip.textContent = String(Math.max(0, (parseInt(waitingChip.textContent, 10) || 0) - changed.length));
+                    }
+                    if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans();
+                    if (typeof psCloseModal === 'function') psCloseModal('eq-bundle-approve-modal');
+                    if (typeof window.showToast === 'function') window.showToast(data.message);
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                })
+                .catch(function (error) {
+                    showError(error.message || 'Network error. Please try again.');
+                })
+                .finally(function () {
+                    confirmButton.disabled = reasonInput.value.trim().length < 5 || pendingRows.length < 2;
+                    confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
+                });
+        });
     })();
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -4176,9 +4405,9 @@
                     // Detect QR type by the endpoint path encoded in the QR URL itself.
                     // Claim QRs point to claim_confirm.php; Return QRs point to return_confirm.php.
                     // This prevents a used Claim QR from accidentally triggering a return.
-                    const isClaimQr  = code.data.includes('claim_confirm.php');
-                    const endpoint   = isClaimQr
-                        ? 'equipment-booking/claim_confirm.php?token='  + encodeURIComponent(token)
+                    const isClaimQr = code.data.includes('claim_confirm.php');
+                    const endpoint = isClaimQr
+                        ? 'equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token)
                         : 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(token);
 
                     fetch(endpoint, {
@@ -4404,6 +4633,82 @@ function psSelectFmt(btn) {
     });
 })();
 
+/* Equipment > On Loan: show the loan's full record in a side drawer. */
+(function () {
+    function el(id) { return document.getElementById(id); }
+    function txt(id, value) {
+        var node = el(id);
+        if (node) node.textContent = value !== undefined && value !== null && String(value).trim() !== ''
+            ? value
+            : '\u2014';
+    }
+
+    function openFor(row) {
+        if (!el('ps-loan-detail-drawer')) return;
+        var d = row.dataset;
+        var state = d.loanState || '';
+        var labels = {
+            scheduled: 'Scheduled',
+            returned: 'Returned',
+            overdue: 'Overdue by ' + Math.max(1, Number(d.daysOverdue) || 0) + ' day' + (Number(d.daysOverdue) === 1 ? '' : 's'),
+            due: 'Due today',
+            pickup: 'Ready for pickup',
+            waiting: 'Pending review',
+            ok: 'Active'
+        };
+        var classes = {
+            scheduled: 'ps-badge--scheduled',
+            returned: 'ps-badge--returned',
+            overdue: 'ps-badge--overdue',
+            due: 'ps-badge--waiting',
+            pickup: 'ps-badge--waiting',
+            waiting: 'ps-badge--waiting',
+            ok: 'ps-badge--active'
+        };
+        var status = el('ps-loan-detail-status');
+        if (status) {
+            status.className = 'ps-badge ps-badge--dot ' + (classes[state] || 'ps-badge--active');
+            status.textContent = labels[state] || d.status || '—';
+        }
+
+        txt('ps-loan-detail-number', '#' + String(d.id || 0).padStart(4, '0'));
+        txt('ps-loan-detail-submitted', d.submitted);
+        txt('ps-loan-detail-equipment', d.equipment);
+        txt('ps-loan-detail-quantity', d.qty ? d.qty + (Number(d.qty) === 1 ? ' unit' : ' units') : '');
+        txt('ps-loan-detail-issued', d.startLabel);
+        txt('ps-loan-detail-due', d.dueLabel);
+        txt('ps-loan-detail-returned', d.returnedAtDisplay || 'Not recorded');
+        var returnedSection = el('ps-loan-detail-returned-section');
+        if (returnedSection) returnedSection.hidden = state !== 'returned';
+        txt('ps-loan-detail-condition', d.condition);
+        txt('ps-loan-detail-room', d.room);
+        txt('ps-loan-detail-instructor', d.instructor);
+        var studentRequest = d.submittedAs === 'student' && d.studentName;
+        txt('ps-loan-detail-borrower', studentRequest ? d.studentName : d.borrower);
+        txt('ps-loan-detail-type', studentRequest ? 'Student (faculty-authorized)' : d.reqType);
+        txt('ps-loan-detail-id-number', studentRequest ? (d.studentId || 'Not recorded') : d.idNumber);
+        txt('ps-loan-detail-authorizer', studentRequest
+            ? (d.borrower || 'Faculty account') + (d.idNumber ? ' (' + d.idNumber + ')' : '')
+            : '');
+        var authorizerRow = el('ps-loan-detail-authorizer-row');
+        if (authorizerRow) authorizerRow.hidden = !studentRequest;
+        txt('ps-loan-detail-note', d.note);
+        txt('ps-loan-detail-handled-by', d.handledBy || 'Not recorded');
+        if (typeof psOpenModal === 'function') psOpenModal('ps-loan-detail-drawer');
+    }
+
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('#eq-loan-table [data-action="eq-open-loan-detail"]');
+        if (!trigger) return;
+        var row = trigger.closest('tr.eq-loan-row');
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        openFor(row);
+    }, true);
+})();
+
 
 /* ═══════════════════════════════════════════════════════════════
    ROOMS — reservation details drawer (Rooms > Reservations table)
@@ -4456,6 +4761,9 @@ function psSelectFmt(btn) {
         txt('ps-rr-purpose', d.purpose);
         txt('ps-rr-who', d.whoSub && d.whoSub.indexOf('Student via') === 0 ? d.who + ' (' + d.whoSub + ')' : d.who);
         txt('ps-rr-type', d.type);
+        txt('ps-rr-student-id', d.whoId);
+        var studentIdRow = el('ps-rr-student-id-row');
+        if (studentIdRow) studentIdRow.hidden = !(d.whoSub && d.whoSub.indexOf('Student via') === 0 && d.whoId);
 
         var badge = el('ps-rr-status');
         var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned', Waiting: 'ps-badge--waiting' };
@@ -4951,7 +5259,7 @@ function psSelectFmt(btn) {
 
         /* geometry */
         var W = Math.max(240, chartEl.clientWidth || 600);
-        var H = Math.max(200, chartEl.clientHeight || 230);
+        var H = Math.max(120, chartEl.clientHeight || 150);
         var m = { l: 4, r: 4, t: ins.bands.length ? 26 : 8, b: 24 };   // extra room on top for the band labels
         var pw = W - m.l - m.r, ph = H - m.t - m.b;
         var step = Math.max(1, Math.ceil(peak / 4));
@@ -5371,6 +5679,37 @@ function psSelectFmt(btn) {
         var page = 1;
         var removedAny = false;   /* a row was removed this session (e.g. a cancelled booking) */
 
+        function groupRows(sourceRows) {
+            var groups = [];
+            var groupByKey = new Map();
+            sourceRows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                var key = batchId ? 'bundle:' + batchId : 'row:' + row.dataset.id;
+                var group = groupByKey.get(key);
+                if (!group) {
+                    group = { batchId: batchId, rows: [] };
+                    groupByKey.set(key, group);
+                    groups.push(group);
+                }
+                group.rows.push(row);
+            });
+            return groups;
+        }
+
+        function orderRowsTogether() {
+            var tbody = table.tBodies[0];
+            if (!tbody) return;
+            var groups = groupRows(rows);
+            rows = [];
+            groups.forEach(function (group) {
+                group.rows.forEach(function (row) {
+                    rows.push(row);
+                    tbody.appendChild(row);
+                });
+            });
+            if (noMatch) tbody.appendChild(noMatch);
+        }
+
         function matchesMode(state) {
             if (mode === 'all') return true;
             if (mode === 'pickup') return state === 'pickup';
@@ -5403,11 +5742,35 @@ function psSelectFmt(btn) {
         function render() {
             var hits = rows.filter(function (r) { return matchesMode(r.dataset.loanState) && matchesQuery(r); });
             var total = hits.length;
-            var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            page = Math.min(Math.max(page, 1), pages);
-            var start = (page - 1) * PAGE_SIZE;
-            var end = Math.min(start + PAGE_SIZE, total);
-            var visible = hits.slice(start, end);
+            var groups = groupRows(hits);
+            var pages = [[]];
+            var pageSize = 0;
+            rows.forEach(function (row) {
+                row.classList.remove('eq-bundle-link-start', 'eq-bundle-link-middle', 'eq-bundle-link-end');
+            });
+            groups.forEach(function (group) {
+                if (group.batchId && group.rows.length > 1) {
+                    group.rows.forEach(function (row, index) {
+                        row.classList.add(index === 0 ? 'eq-bundle-link-start' :
+                            (index === group.rows.length - 1 ? 'eq-bundle-link-end' : 'eq-bundle-link-middle'));
+                    });
+                }
+                if (pageSize > 0 && pageSize + group.rows.length > PAGE_SIZE) {
+                    pages.push([]);
+                    pageSize = 0;
+                }
+                Array.prototype.push.apply(pages[pages.length - 1], group.rows);
+                pageSize += group.rows.length;
+            });
+            if (pages.length > 1 && pages[pages.length - 1].length === 0) pages.pop();
+            var pageCount = Math.max(1, pages.length);
+            page = Math.min(Math.max(page, 1), pageCount);
+            var visible = pages[page - 1] || [];
+            var start = 0;
+            for (var previousPage = 0; previousPage < page - 1; previousPage++) {
+                start += pages[previousPage].length;
+            }
+            var end = start + visible.length;
 
             rows.forEach(function (r) { r.style.display = visible.indexOf(r) !== -1 ? '' : 'none'; });
             if (noMatch) noMatch.hidden = !((rows.length > 0 || removedAny) && total === 0);
@@ -5415,12 +5778,12 @@ function psSelectFmt(btn) {
             if (!pager) return;
             pager.hidden = rows.length === 0;
             if (pgInfo) pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
-            if (pgCtl) pgCtl.hidden = pages <= 1;
+            if (pgCtl) pgCtl.hidden = pageCount <= 1;
             if (pgPrev) pgPrev.disabled = page <= 1;
-            if (pgNext) pgNext.disabled = page >= pages;
+            if (pgNext) pgNext.disabled = page >= pageCount;
             if (pgNums) {
                 pgNums.textContent = '';
-                pageList(pages, page).forEach(function (n) {
+                pageList(pageCount, page).forEach(function (n) {
                     if (n === 'gap') {
                         var gap = document.createElement('span');
                         gap.className = 'inv-pager-gap';
@@ -5439,6 +5802,48 @@ function psSelectFmt(btn) {
                 });
             }
         }
+
+        window.psRefreshEquipmentLoans = function () {
+            rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
+            orderRowsTogether();
+            var pendingByBatch = {};
+            var pendingRowsByBatch = {};
+            rows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                if (batchId && row.dataset.loanState === 'waiting') {
+                    pendingByBatch[batchId] = (pendingByBatch[batchId] || 0) + 1;
+                    if (!pendingRowsByBatch[batchId]) pendingRowsByBatch[batchId] = [];
+                    pendingRowsByBatch[batchId].push(row);
+                }
+            });
+            rows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                var actionCell = row.querySelector('td:last-child > div');
+                if (!actionCell) return;
+                actionCell.querySelectorAll('[data-action="eq-open-bundle-approve"]').forEach(function (button) {
+                    button.remove();
+                });
+                actionCell.classList.remove('has-bundle-approve');
+                if (!batchId || row.dataset.loanState !== 'waiting' || pendingByBatch[batchId] < 2) return;
+                var bundlePendingRows = pendingRowsByBatch[batchId];
+                var middlePendingRow = bundlePendingRows[Math.floor((bundlePendingRows.length - 1) / 2)];
+                if (middlePendingRow !== row) return;
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'ps-btn ps-btn--outline ps-btn--sm';
+                button.dataset.action = 'eq-open-bundle-approve';
+                button.dataset.batchId = batchId;
+                var icon = document.createElement('span');
+                icon.className = 'material-symbols-outlined';
+                icon.textContent = 'done_all';
+                button.appendChild(icon);
+                button.appendChild(document.createTextNode(' Approve all'));
+                actionCell.appendChild(button);
+                actionCell.classList.add('has-bundle-approve');
+            });
+            page = 1;
+            render();
+        };
 
         if (tabBar) {
             tabBar.addEventListener('click', function (e) {
@@ -5672,7 +6077,7 @@ function psSelectFmt(btn) {
             });
         }
 
-        render();
+        window.psRefreshEquipmentLoans();
         try {
             if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {
                 sessionStorage.removeItem('openManualReturnLoanTab');
@@ -5894,859 +6299,6 @@ function psSelectFmt(btn) {
                 }, 0);
             }
         } catch (_) { }
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-    else init();
-})();
-
-/* ================================================================
-   FACULTY REGISTRY UPLOAD
-   Self-contained block. Uses PDF.js (loaded on demand) for PDF parsing
-   and the server-side XLSX reader for Excel workbooks.
-   Calls upload-faculty-registry.php with the parsed rows as JSON.
-================================================================ */
-(function () {
-    'use strict';
-
-    var header = document.getElementById('fac-registry-header');
-    var body = document.getElementById('fac-registry-body');
-    var chevron = document.getElementById('fac-registry-chevron');
-    var fileInput = document.getElementById('fac-reg-file-input');
-    var fileLabel = document.getElementById('fac-reg-file-label');
-    var fileNameEl = document.getElementById('fac-reg-file-name');
-    var importBtn = document.getElementById('fac-reg-import-btn');
-    var replaceChk = document.getElementById('fac-reg-replace-all');
-    var alertEl = document.getElementById('fac-reg-alert');
-    var previewWrap = document.getElementById('fac-reg-preview');
-    var previewTbody = document.getElementById('fac-reg-preview-tbody');
-    var previewCount = document.getElementById('fac-reg-preview-count');
-    var clearBtn = document.getElementById('fac-reg-clear-btn');
-
-    if (!header) return; // Faculty tab not rendered for this admin role
-
-    // ── Collapse / expand ──────────────────────────────────────────
-    function setOpen(open) {
-        if (!body || !chevron || !header) return;
-        body.style.display = open ? '' : 'none';
-        chevron.style.transform = open ? 'rotate(180deg)' : '';
-        header.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-
-    header.addEventListener('click', function () {
-        setOpen(body.style.display === 'none');
-    });
-    header.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(body.style.display === 'none'); }
-    });
-
-    // ── Alert helpers ──────────────────────────────────────────────
-    function showRegAlert(msg, isError) {
-        if (!alertEl) return;
-        alertEl.className = 'alert-banner ' + (isError ? 'alert-danger' : 'alert-success');
-        alertEl.textContent = msg;
-        alertEl.classList.remove('hidden');
-    }
-    function clearRegAlert() {
-        if (!alertEl) return;
-        alertEl.classList.add('hidden');
-        alertEl.textContent = '';
-    }
-
-    // ── Parsed rows store ──────────────────────────────────────────
-    var _parsedRows = [];
-
-    function resetParsed(clearFile) {
-        _parsedRows = [];
-        if (previewWrap) previewWrap.style.display = 'none';
-        if (previewTbody) previewTbody.innerHTML = '';
-        if (clearFile && fileInput) fileInput.value = '';
-        if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-        if (importBtn) importBtn.disabled = true;
-        clearRegAlert();
-    }
-
-    if (clearBtn) {
-        clearBtn.addEventListener('click', function () { resetParsed(true); });
-    }
-
-    // ── Render preview table ───────────────────────────────────────
-    function renderPreview(rows) {
-        if (!previewTbody || !previewWrap || !previewCount) return;
-        var html = '';
-        var newlyHiredCount = 0;
-        rows.forEach(function (r, i) {
-            var isNew = r.faculty_id === '' || r.faculty_id.toUpperCase() === 'NEWLY HIRED';
-            if (isNew) newlyHiredCount++;
-            html +=
-                '<tr>' +
-                '<td>' + (i + 1) + '</td>' +
-                '<td>' + _esc(isNew ? 'NEWLY HIRED' : r.faculty_id) + '</td>' +
-                '<td>' + _esc(r.full_name) + '</td>' +
-                '<td style="text-align:center">' + (isNew ? '<span style="color:var(--warning,#e08000)">&#9679;</span>' : '') + '</td>' +
-                '</tr>';
-        });
-        previewTbody.innerHTML = html;
-        previewCount.textContent = rows.length + ' rows parsed' + (newlyHiredCount > 0 ? ' · ' + newlyHiredCount + ' newly hired' : '');
-        previewWrap.style.display = '';
-        if (importBtn) importBtn.disabled = rows.length === 0;
-    }
-
-    // XSS helper (re-uses the one in the outer IIFE if available, otherwise local)
-    function _esc(str) {
-        var d = document.createElement('div');
-        d.textContent = str || '';
-        return d.innerHTML;
-    }
-
-    // ── PDF parsing via PDF.js ─────────────────────────────────────
-    var _pdfJsReady = false;
-    var _pdfJsLoading = false;
-
-    function loadPdfJs(callback) {
-        if (_pdfJsReady) { callback(); return; }
-        if (_pdfJsLoading) { setTimeout(function () { loadPdfJs(callback); }, 100); return; }
-        _pdfJsLoading = true;
-
-        // Self-hosted — no CDN dependency, no CSP worker-src issues.
-        var script = document.createElement('script');
-        script.src = 'assets/js/vendor/pdf.min.js';
-        script.onload = function () {
-            if (window.pdfjsLib) {
-                // Point the worker at the self-hosted copy using an absolute path
-                // so it resolves correctly regardless of which tab is active.
-                var base = window.location.origin +
-                    window.location.pathname.replace(/\/[^/]*$/, '/');
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-                    base + 'assets/js/vendor/pdf.worker.min.js';
-                window._pdfJsLib = window.pdfjsLib;
-            }
-            _pdfJsReady = true;
-            _pdfJsLoading = false;
-            callback();
-        };
-        script.onerror = function () {
-            _pdfJsLoading = false;
-            callback();
-        };
-        document.head.appendChild(script);
-    }
-
-    /**
-     * Parse the Faculty Identification Records PDF.
-     * Expected table format (from the document in the screenshot):
-     *   Col 0: Faculty ID  (or "NEWLY HIRED")
-     *   Col 1: Professor Name
-     *   Col 2: Programs Handled  (stored as department)
-     *
-     * Strategy: extract all text items per page with their x/y positions,
-     * cluster them into rows by y-coordinate, then columns by x-coordinate.
-     * Rows whose first cell is a Faculty ID pattern or "NEWLY HIRED" are kept.
-     */
-    function parsePdf(file, onDone, onError) {
-        loadPdfJs(function () {
-            var pdfjsLib = window._pdfJsLib;
-            if (!pdfjsLib) { onError('The PDF reader could not be loaded. Please check your internet connection and try again.'); return; }
-
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var typedArray = new Uint8Array(e.target.result);
-                pdfjsLib.getDocument({ data: typedArray }).promise.then(function (pdf) {
-                    var allRows = [];
-                    var pagePromises = [];
-                    for (var p = 1; p <= pdf.numPages; p++) {
-                        pagePromises.push(pdf.getPage(p).then(function (page) {
-                            return page.getTextContent().then(function (tc) {
-                                return tc.items;
-                            });
-                        }));
-                    }
-
-                    Promise.all(pagePromises).then(function (pages) {
-                        pages.forEach(function (items) {
-                            // Group items into lines by rounded y-coordinate
-                            var lineMap = {};
-                            items.forEach(function (item) {
-                                if (!item.str || !item.str.trim()) return;
-                                var y = Math.round(item.transform[5]);
-                                if (!lineMap[y]) lineMap[y] = [];
-                                lineMap[y].push({ x: item.transform[4], text: item.str.trim() });
-                            });
-
-                            // Sort lines top-to-bottom (descending y in PDF coords)
-                            var yKeys = Object.keys(lineMap).map(Number).sort(function (a, b) { return b - a; });
-
-                            yKeys.forEach(function (y) {
-                                var cells = lineMap[y].sort(function (a, b) { return a.x - b.x; });
-                                var col0 = (cells[0] && cells[0].text) || '';
-                                var col1 = (cells[1] && cells[1].text) || '';
-                                var col2 = cells.slice(2).map(function (c) { return c.text; }).join(' ');
-
-                                // Skip header rows and empty rows
-                                var c0up = col0.toUpperCase();
-                                if (!col0 || c0up === 'FACULTY ID' || c0up === 'PROFESSOR NAME') return;
-
-                                // Accept rows where col0 is a Faculty ID pattern OR "NEWLY HIRED"
-                                var isFacultyId = /^FA\d+[A-Z]{2}\d+$/i.test(col0.replace(/\s/g, ''));
-                                var isNewlyHired = c0up.replace(/\s+/g, ' ') === 'NEWLY HIRED';
-
-                                if (!isFacultyId && !isNewlyHired) return;
-
-                                // col1 may be split across cells — rejoin if needed
-                                var name = col1;
-                                if (!name) return;
-
-                                allRows.push({
-                                    faculty_id: isNewlyHired ? 'NEWLY HIRED' : col0.replace(/\s/g, '').toUpperCase(),
-                                    full_name: name,
-                                    department: col2
-                                });
-                            });
-                        });
-
-                        if (allRows.length === 0) {
-                            onError(
-                                'No faculty rows were found in this PDF. ' +
-                                'Make sure it is the Faculty Identification Records document ' +
-                                'and not a scanned image PDF.'
-                            );
-                            return;
-                        }
-                        onDone(allRows);
-                    }).catch(function (err) {
-                        onError('Could not read PDF pages: ' + err.message);
-                    });
-                }).catch(function (err) {
-                    onError('Could not open PDF: ' + err.message);
-                });
-            };
-            reader.onerror = function () { onError('Could not read the file.'); };
-            reader.readAsArrayBuffer(file);
-        });
-    }
-
-    function parseXlsx(file, onDone, onError) {
-        var csrfEl = document.querySelector('input[name="csrf_token"]');
-        var csrfToken = csrfEl ? csrfEl.value : '';
-        if (!csrfToken) {
-            onError('Session expired. Please refresh the page.');
-            return;
-        }
-
-        var form = new FormData();
-        form.append('csrf_token', csrfToken);
-        form.append('file', file);
-        fetch('account-management/api/parse-faculty-registry-xlsx.php', {
-            method: 'POST',
-            body: form
-        }).then(function (response) {
-            return response.json().catch(function () {
-                throw new Error('Unexpected response from the server. Please try again.');
-            }).then(function (data) {
-                if (!response.ok || !data || data.status !== 'success' || !Array.isArray(data.rows)) {
-                    throw new Error((data && data.error) || 'Could not read the XLSX file. Please try again.');
-                }
-                onDone(data.rows);
-            });
-        }).catch(function (err) {
-            onError(err.message || 'Could not read the XLSX file. Please try again.');
-        });
-    }
-
-    // ── File input change ──────────────────────────────────────────
-    if (fileInput) {
-        fileInput.addEventListener('change', function () {
-            var file = this.files && this.files[0];
-            if (!file) return;
-            resetParsed();
-            fileNameEl.textContent = file.name;
-            clearRegAlert();
-
-            // Size guard: 10 MB
-            if (file.size > 10 * 1024 * 1024) {
-                showRegAlert('File is too large. Maximum size is 10 MB.', true);
-                fileInput.value = '';
-                fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-                return;
-            }
-
-            var ext = file.name.split('.').pop().toLowerCase();
-
-            if (ext === 'pdf') {
-                alertEl.className = 'alert-banner alert-info';
-                alertEl.innerHTML = '<span class="fac-reg-parsing">Parsing PDF, this may take a moment</span>';
-                alertEl.classList.remove('hidden');
-                parsePdf(file,
-                    function (rows) {
-                        _parsedRows = rows;
-                        renderPreview(rows);
-                        clearRegAlert();
-                    },
-                    function (err) {
-                        showRegAlert(err, true);
-                        fileInput.value = '';
-                        fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-                    }
-                );
-            } else if (ext === 'xlsx') {
-                alertEl.className = 'alert-banner alert-info';
-                alertEl.textContent = 'Parsing XLSX, this may take a moment';
-                alertEl.classList.remove('hidden');
-                parseXlsx(file,
-                    function (rows) {
-                        _parsedRows = rows;
-                        renderPreview(rows);
-                        clearRegAlert();
-                    },
-                    function (err) {
-                        showRegAlert(err, true);
-                        fileInput.value = '';
-                        fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-                    }
-                );
-            } else {
-                showRegAlert('Unsupported file type. Please choose a PDF or XLSX file.', true);
-                fileInput.value = '';
-                fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-            }
-        });
-    }
-
-    // ── Import button ──────────────────────────────────────────────
-    if (importBtn) {
-        importBtn.addEventListener('click', function () {
-            if (_parsedRows.length === 0) {
-                showRegAlert('No rows to import. Please choose a file first.', true);
-                return;
-            }
-
-            var csrfEl = document.querySelector('input[name="csrf_token"]');
-            var csrfToken = csrfEl ? csrfEl.value : '';
-            if (!csrfToken) {
-                showRegAlert('Session expired. Please refresh the page.', true);
-                return;
-            }
-
-            var originalFile = fileInput && fileInput.files && fileInput.files[0];
-            if (!originalFile) {
-                showRegAlert('Please choose the file again, so the original can be saved with the import.', true);
-                return;
-            }
-
-            importBtn.disabled = true;
-            importBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Importing\u2026';
-
-            // 1) keep the ORIGINAL file (recorded with who / when), then 2) import the rows read from it.
-            //    If the original can't be saved, nothing is imported, so every import has its file on record.
-            var fd = new FormData();
-            fd.append('csrf_token', csrfToken);
-            fd.append('file', originalFile);
-            fetch('account-management/api/upload-faculty-registry-file.php', { method: 'POST', body: fd })
-                .then(function (r) { return r.json().catch(function () { return null; }); })
-                .then(function (stored) {
-                    if (!stored || stored.status !== 'success') {
-                        var saveErr = new Error('original file not saved');
-                        saveErr.saveError = (stored && stored.error) || 'The original file could not be saved, so nothing was imported.';
-                        throw saveErr;
-                    }
-                    return fetch('account-management/api/upload-faculty-registry.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            csrf_token: csrfToken,
-                            rows: _parsedRows,
-                            replace_all: replaceChk ? replaceChk.checked : false,
-                            file_id: stored.file_id
-                        })
-                    });
-                })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.status === 'success') {
-                        var msg = 'Import complete: ' + data.inserted + ' added, ' + data.updated + ' updated';
-                        if (data.skipped > 0) msg += ', ' + data.skipped + ' skipped';
-                        if (data.errors && data.errors.length > 0) msg += '. Some rows had errors — check the page.';
-                        showRegAlert(msg, false);
-
-                        // Show row-level errors if any
-                        if (data.errors && data.errors.length > 0) {
-                            var errHtml = data.errors.map(function (e) { return '<li>' + _esc(e) + '</li>'; }).join('');
-                            alertEl.innerHTML = alertEl.textContent + '<ul style="margin:.5rem 0 0;padding-left:1.2rem;font-size:11px">' + errHtml + '</ul>';
-                        }
-
-                        // Reset file picker; keep the preview visible so Super Admin can see what was imported
-                        if (fileInput) fileInput.value = '';
-                        if (fileNameEl) fileNameEl.textContent = 'Choose file (PDF or XLSX)\u2026';
-                        _parsedRows = [];
-                        if (importBtn) importBtn.disabled = true;
-
-                        // Update the badge count without a full page reload
-                        var badge = document.querySelector('#fac-registry-card .fac-reg-badge');
-                        if (badge && typeof data.total_after !== 'undefined') {
-                            badge.textContent = data.total_after + ' entries';
-                            badge.className = 'fac-reg-badge fac-reg-badge--active';
-                        }
-
-                        // Show the "View registry list" button once the registry has entries
-                        var viewBtnEl = document.getElementById('fac-reg-view-btn');
-                        if (viewBtnEl && typeof data.total_after !== 'undefined') viewBtnEl.hidden = !(data.total_after > 0);
-
-                        // One more file in the "Imported files" history
-                        var filesCountEl = document.getElementById('fac-reg-files-count');
-                        if (filesCountEl) {
-                            filesCountEl.textContent = String((parseInt(filesCountEl.textContent, 10) || 0) + 1);
-                            filesCountEl.hidden = false;
-                        }
-                    } else {
-                        showRegAlert(data.error || 'Import failed. Please try again.', true);
-                        if (importBtn) importBtn.disabled = false;
-                    }
-                })
-                .catch(function (err) {
-                    showRegAlert(err && err.saveError ? err.saveError : 'Network error. Please try again.', true);
-                    if (importBtn) importBtn.disabled = false;
-                })
-                .finally(function () {
-                    importBtn.innerHTML = '<span class="material-symbols-outlined">cloud_upload</span> Import';
-                });
-        });
-    }
-
-    // ── File label click → trigger hidden input ────────────────────
-    if (fileLabel) {
-        fileLabel.addEventListener('click', function () {
-            if (fileInput) fileInput.click();
-        });
-    }
-
-})();
-
-
-/* ================================================================
-   FACULTY REGISTRY — "View registry list" (password-gated)
-   Faculty tab -> Faculty Registry -> View registry list.
-   1) button opens a small modal asking for the Super Admin's own password
-   2) account-management/api/view-faculty-registry.php checks it server-side and
-      only then returns the entries (read-only)
-   3) the list opens in a searchable modal; the data (and the password field)
-      are wiped from memory as soon as either modal closes
-   ================================================================ */
-(function () {
-    'use strict';
-
-    var RENDER_LIMIT = 200;   // rows drawn at once; the search box narrows the rest
-    var _rows = [];           // entries held in memory only while the list modal is open
-    var _files = [];          // imported-files history, likewise only while its modal is open
-    var _fileToken = '';      // short-lived (10 min) key for View / Download; the password itself is never kept
-
-    function $(id) { return document.getElementById(id); }
-    function csrfToken() {
-        var el = document.querySelector('input[name="csrf_token"]');
-        return el ? el.value : '';
-    }
-    function openModal(id) { var m = $(id); if (m) m.classList.add('ps-modal-open'); }
-    function closeModal(id) { var m = $(id); if (m) m.classList.remove('ps-modal-open'); }
-    function isOpen(id) { var m = $(id); return !!(m && m.classList.contains('ps-modal-open')); }
-
-    function init() {
-        var viewBtn = $('fac-reg-view-btn');
-        var pwInput = $('fac-reg-auth-password');
-        var errBox = $('fac-reg-auth-error');
-        var okBtn = $('fac-reg-auth-confirm');
-        var tbody = $('fac-reg-list-tbody');
-        var searchEl = $('fac-reg-list-search');
-        var emptyEl = $('fac-reg-list-empty');
-        var metaEl = $('fac-reg-list-meta');
-        var countEl = $('fac-reg-list-count');
-        if (!viewBtn || !pwInput || !okBtn || !tbody) return; // not the Super Admin Faculty tab
-
-        var okBtnHtml = okBtn.innerHTML;
-
-        /* The same password step guards two things: the registry list, and the original files that were imported. */
-        var filesBtn = $('fac-reg-files-btn');
-        var authMode = 'registry';
-        var AUTH = {
-            registry: {
-                title: 'View Faculty Registry',
-                lead: 'The registry holds every faculty ID and name. Enter your password to open it.',
-                url: 'account-management/api/view-faculty-registry.php'
-            },
-            files: {
-                title: 'Imported Files',
-                lead: 'The original files contain every faculty ID and name. Enter your password to open them.',
-                url: 'account-management/api/list-faculty-registry-files.php'
-            }
-        };
-        function setAuthMode(mode) {
-            authMode = mode;
-            var t = $('fac-reg-auth-title'), l = $('fac-reg-auth-lead');
-            if (t) t.textContent = AUTH[mode].title;
-            if (l) l.textContent = AUTH[mode].lead;
-        }
-
-        function showAuthError(msg) {
-            errBox.textContent = msg;
-            errBox.classList.remove('hidden');
-        }
-        function clearAuthError() {
-            errBox.textContent = '';
-            errBox.classList.add('hidden');
-        }
-        function resetAuth() {
-            pwInput.value = '';
-            pwInput.type = 'password';
-            clearAuthError();
-            okBtn.disabled = false;
-            okBtn.innerHTML = okBtnHtml;
-        }
-
-        /* ── Step 1: password prompt ───────────────────────────── */
-        viewBtn.addEventListener('click', function () {
-            setAuthMode('registry');
-            resetAuth();
-            openModal('fac-reg-auth-modal');
-            setTimeout(function () { pwInput.focus(); }, 50);
-        });
-        if (filesBtn) {
-            filesBtn.addEventListener('click', function () {
-                setAuthMode('files');
-                resetAuth();
-                openModal('fac-reg-auth-modal');
-                setTimeout(function () { pwInput.focus(); }, 50);
-            });
-        }
-
-        ['fac-reg-auth-close', 'fac-reg-auth-cancel'].forEach(function (id) {
-            var el = $(id);
-            if (el) el.addEventListener('click', function () { closeModal('fac-reg-auth-modal'); });
-        });
-
-        pwInput.addEventListener('input', clearAuthError);
-        pwInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
-        });
-
-        okBtn.addEventListener('click', function () {
-            if (okBtn.disabled) return;
-            var pw = pwInput.value;
-            if (pw === '') { showAuthError('Enter your password to continue.'); pwInput.focus(); return; }
-
-            okBtn.disabled = true;
-            okBtn.innerHTML = '<span class="material-symbols-outlined" style="animation:spin 0.8s linear infinite">progress_activity</span> Checking\u2026';
-            clearAuthError();
-
-            fetch(AUTH[authMode].url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    csrf_token: csrfToken(),
-                    current_password: pw
-                }).toString()
-            })
-                .then(function (res) {
-                    return res.json().catch(function () {
-                        return { status: 'error', error: 'Unexpected response from the server. Please try again.' };
-                    });
-                })
-                .then(function (data) {
-                    if (authMode === 'files' && data && data.status === 'success' && Array.isArray(data.files)) {
-                        _files = data.files;
-                        _fileToken = data.access_token || '';
-                        resetAuth();                       // wipe the password straight away
-                        closeModal('fac-reg-auth-modal');
-                        openFiles();
-                    } else if (authMode === 'registry' && data && data.status === 'success' && Array.isArray(data.entries)) {
-                        _rows = data.entries;
-                        resetAuth();                       // wipe the password straight away
-                        closeModal('fac-reg-auth-modal');
-                        openList();
-                    } else {
-                        showAuthError((data && data.error) || (authMode === 'files'
-                            ? 'Could not open the files. Please try again.'
-                            : 'Could not open the registry. Please try again.'));
-                        if (data && data.code === 'bad_password') { pwInput.value = ''; pwInput.focus(); }
-                    }
-                })
-                .catch(function () {
-                    showAuthError('Network error. Please try again.');
-                })
-                .finally(function () {
-                    okBtn.disabled = false;
-                    okBtn.innerHTML = okBtnHtml;
-                });
-        });
-
-        /* ── Step 2: the list ──────────────────────────────────── */
-        function td(text, cls) {
-            var c = document.createElement('td');
-            if (cls) c.className = cls;
-            c.textContent = text;
-            return c;
-        }
-
-        function renderList() {
-            var q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-            var matches = !q ? _rows : _rows.filter(function (r) {
-                return (r.faculty_id || '').toLowerCase().indexOf(q) !== -1 ||
-                    (r.full_name || '').toLowerCase().indexOf(q) !== -1 ||
-                    (r.department || '').toLowerCase().indexOf(q) !== -1;
-            });
-
-            tbody.textContent = '';
-            matches.slice(0, RENDER_LIMIT).forEach(function (r, i) {
-                var tr = document.createElement('tr');
-                tr.appendChild(td(String(i + 1)));
-                if (r.faculty_id) tr.appendChild(td(r.faculty_id));
-                else tr.appendChild(td('Not assigned yet', 'fac-reg-list-pending'));
-                tr.appendChild(td(r.full_name || ''));
-                tr.appendChild(td(r.department || '\u2014'));
-                tbody.appendChild(tr);
-            });
-
-            if (emptyEl) emptyEl.classList.toggle('hidden', matches.length > 0);
-            if (metaEl) {
-                if (matches.length > RENDER_LIMIT) {
-                    metaEl.textContent = 'Showing first ' + RENDER_LIMIT + ' of ' + matches.length +
-                        (q ? ' matches' : ' entries') + ' \u2014 search to narrow down';
-                } else {
-                    metaEl.textContent = q
-                        ? matches.length + (matches.length === 1 ? ' match' : ' matches') + ' of ' + _rows.length
-                        : _rows.length + (_rows.length === 1 ? ' entry' : ' entries');
-                }
-            }
-        }
-
-        function openList() {
-            if (searchEl) searchEl.value = '';
-            if (countEl) countEl.textContent = '(' + _rows.length + ')';
-            renderList();
-            openModal('fac-reg-list-modal');
-            if (searchEl) setTimeout(function () { searchEl.focus(); }, 50);
-        }
-
-        if (searchEl) searchEl.addEventListener('input', renderList);
-
-        ['fac-reg-list-close', 'fac-reg-list-done'].forEach(function (id) {
-            var el = $(id);
-            if (el) el.addEventListener('click', function () { closeModal('fac-reg-list-modal'); });
-        });
-
-
-        /* ── Imported files: history of every original file, with View / Download ── */
-        var filesList = $('fac-reg-files-list');
-        var filesEmpty = $('fac-reg-files-empty');
-        var filesAlert = $('fac-reg-files-alert');
-        var filesTotal = $('fac-reg-files-total');
-        var filesMeta = $('fac-reg-files-meta');
-        var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-        function node(tag, cls, text) {
-            var n = document.createElement(tag);
-            if (cls) n.className = cls;
-            if (text != null) n.textContent = text;
-            return n;
-        }
-        function fmtSize(n) {
-            if (n < 1024) return n + ' B';
-            if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
-            return (n / 1048576).toFixed(1) + ' MB';
-        }
-        // "2026-10-22 15:10:05" (as stored) -> "Oct 22, 2026 3:10 PM"
-        function fmtWhen(str) {
-            var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(str || '');
-            if (!m) return str || '';
-            var h = parseInt(m[4], 10), ap = h >= 12 ? 'PM' : 'AM';
-            h = h % 12 || 12;
-            return MONTHS[parseInt(m[2], 10) - 1] + ' ' + parseInt(m[3], 10) + ', ' + m[1] + ' ' + h + ':' + m[5] + ' ' + ap;
-        }
-        function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
-
-        function showFilesAlert(msg) {
-            if (!filesAlert) return;
-            filesAlert.textContent = msg;
-            filesAlert.classList.remove('hidden');
-        }
-        function clearFilesAlert() {
-            if (!filesAlert) return;
-            filesAlert.textContent = '';
-            filesAlert.classList.add('hidden');
-        }
-
-        function actionBtn(label, icon, cls, disabled, onClick) {
-            var b = node('button', 'ps-btn ps-btn--sm ' + cls);
-            b.type = 'button';
-            b.disabled = !!disabled;
-            b.appendChild(node('span', 'material-symbols-outlined', icon));
-            b.appendChild(document.createTextNode(' ' + label));
-            b.addEventListener('click', function () { onClick(b); });
-            return b;
-        }
-
-        function renderFiles() {
-            filesList.textContent = '';
-            var latestId = null;                         // newest file that was actually imported
-            _files.some(function (f) { if (f.status === 'imported') { latestId = f.id; return true; } return false; });
-
-            _files.forEach(function (f) {
-                var isPdf = f.mime === 'application/pdf';
-                var li = node('li', 'fac-file' + (f.available ? '' : ' is-missing'));
-
-                var icon = node('span', 'fac-file-icon ' + (isPdf ? 'is-pdf' : 'is-xlsx'));
-                icon.appendChild(node('span', 'material-symbols-outlined', isPdf ? 'picture_as_pdf' : 'table_view'));
-
-                var main = node('div', 'fac-file-main');
-                var name = node('div', 'fac-file-name', f.name);
-                name.title = f.name;
-                main.appendChild(name);
-                main.appendChild(node('div', 'fac-file-meta',
-                    fmtSize(f.size) + ' \u00b7 Uploaded by ' + f.uploaded_by + ' \u00b7 ' + fmtWhen(f.uploaded_at)));
-
-                var chips = node('div', 'fac-file-chips');
-                if (f.status === 'imported') {
-                    if (f.id === latestId) chips.appendChild(node('span', 'fac-file-chip is-latest', 'Latest import'));
-                    chips.appendChild(node('span', 'fac-file-chip' + (f.import_mode === 'replace' ? ' is-warn' : ''),
-                        f.import_mode === 'replace' ? 'Replaced the whole registry' : 'Added to the registry'));
-                    chips.appendChild(node('span', 'fac-file-result',
-                        (f.inserted || 0) + ' added \u00b7 ' + (f.updated || 0) + ' updated \u00b7 ' + (f.skipped || 0) + ' skipped' +
-                        (f.rows != null ? ' (of ' + plural(f.rows, 'row', 'rows') + ')' : '')));
-                } else {
-                    var nc = node('span', 'fac-file-chip is-bad', 'Not imported');
-                    nc.title = 'This file was saved, but the import did not finish.';
-                    chips.appendChild(nc);
-                }
-                if (!f.available) chips.appendChild(node('span', 'fac-file-chip is-bad', 'File missing on the server'));
-                main.appendChild(chips);
-
-                var actions = node('div', 'fac-file-actions');
-                if (isPdf) actions.appendChild(actionBtn('View', 'visibility', 'ps-btn--outline', !f.available, function (b) { viewFile(f, b); }));
-                actions.appendChild(actionBtn('Download', 'download', 'ps-btn--ghost', !f.available, function (b) { downloadFile(f, b); }));
-
-                li.appendChild(icon);
-                li.appendChild(main);
-                li.appendChild(actions);
-                filesList.appendChild(li);
-            });
-
-            if (filesEmpty) filesEmpty.classList.toggle('hidden', _files.length > 0);
-            if (filesTotal) filesTotal.textContent = _files.length ? '(' + _files.length + ')' : '';
-            if (filesMeta) filesMeta.textContent = _files.length ? plural(_files.length, 'file', 'files') : '';
-            var cnt = $('fac-reg-files-count');           // keep the button's badge in step with the real count
-            if (cnt) { cnt.textContent = String(_files.length); cnt.hidden = _files.length === 0; }
-        }
-
-        function openFiles() {
-            clearFilesAlert();
-            renderFiles();
-            openModal('fac-reg-files-modal');
-        }
-
-        // The file comes back as a download-style response; failures come back as JSON.
-        function fetchFile(f, disposition) {
-            return fetch('account-management/api/get-faculty-registry-file.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    csrf_token: csrfToken(),
-                    access_token: _fileToken,
-                    file_id: String(f.id),
-                    disposition: disposition
-                }).toString()
-            }).then(function (res) {
-                var ct = res.headers.get('Content-Type') || '';
-                if (!res.ok || ct.indexOf('application/json') === 0) {
-                    return res.json().catch(function () {
-                        return { error: 'Unexpected response from the server. Please try again.' };
-                    }).then(function (d) { throw d; });
-                }
-                return res.blob();
-            });
-        }
-
-        function fileFailed(d) {
-            if (d && d.code === 'token') {               // the 10-minute unlock ran out: ask for the password again
-                closeModal('fac-reg-files-modal');
-                setAuthMode('files');
-                resetAuth();
-                openModal('fac-reg-auth-modal');
-                showAuthError('Your access expired. Enter your password again.');
-                return;
-            }
-            showFilesAlert((d && d.error) || 'Could not open the file. Please try again.');
-        }
-
-        function saveBlob(blob, filename) {
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-        }
-
-        function viewFile(f, btn) {
-            clearFilesAlert();
-            // Opened right inside the click, so the browser doesn't treat it as a blocked pop-up.
-            var w = window.open('', '_blank');
-            if (w) {
-                try { w.opener = null; w.document.title = f.name; w.document.body.textContent = 'Opening file\u2026'; } catch (e) { /* ignore */ }
-            }
-            btn.disabled = true;
-            fetchFile(f, 'inline').then(function (blob) {
-                var url = URL.createObjectURL(blob);
-                if (w && !w.closed) w.location.href = url;   // the browser's own PDF viewer
-                else saveBlob(blob, f.name);                 // pop-ups blocked: download it instead
-                setTimeout(function () { URL.revokeObjectURL(url); }, 10 * 60 * 1000);
-            }).catch(function (d) {
-                if (w && !w.closed) w.close();
-                fileFailed(d);
-            }).finally(function () { btn.disabled = false; });
-        }
-
-        function downloadFile(f, btn) {
-            clearFilesAlert();
-            btn.disabled = true;
-            fetchFile(f, 'attachment').then(function (blob) {
-                saveBlob(blob, f.name);
-            }).catch(fileFailed).finally(function () { btn.disabled = false; });
-        }
-
-        ['fac-reg-files-close', 'fac-reg-files-done'].forEach(function (id) {
-            var el = $(id);
-            if (el) el.addEventListener('click', function () { closeModal('fac-reg-files-modal'); });
-        });
-
-        /* ── Clean-up: however a modal gets closed (buttons, backdrop click,
-              Esc), drop the registry data / password from the page ── */
-        function watch(id, onClosed) {
-            var m = $(id);
-            if (!m || typeof MutationObserver === 'undefined') return;
-            new MutationObserver(function () {
-                if (!m.classList.contains('ps-modal-open')) onClosed();
-            }).observe(m, { attributes: true, attributeFilter: ['class'] });
-        }
-        watch('fac-reg-auth-modal', resetAuth);
-        watch('fac-reg-list-modal', function () {
-            _rows = [];
-            tbody.textContent = '';
-            if (searchEl) searchEl.value = '';
-            if (viewBtn) viewBtn.focus();
-        });
-        watch('fac-reg-files-modal', function () {           // forget the file list and the access token
-            _files = [];
-            _fileToken = '';
-            if (filesList) filesList.textContent = '';
-            clearFilesAlert();
-            if (filesBtn) filesBtn.focus();
-        });
-
-        document.addEventListener('keydown', function (e) {
-            if (e.key !== 'Escape') return;
-            if (isOpen('fac-reg-list-modal')) closeModal('fac-reg-list-modal');
-            else if (isOpen('fac-reg-files-modal')) closeModal('fac-reg-files-modal');
-            else if (isOpen('fac-reg-auth-modal')) closeModal('fac-reg-auth-modal');
-        });
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

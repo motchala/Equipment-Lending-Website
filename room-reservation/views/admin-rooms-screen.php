@@ -409,6 +409,7 @@
                                                 data-time="<?php echo htmlspecialchars($ar_time); ?>"
                                                 data-who="<?php echo htmlspecialchars($ar_name); ?>"
                                                 data-who-sub="<?php echo htmlspecialchars($ar_sub); ?>"
+                                                data-who-id="<?php echo $ar_is_stud ? htmlspecialchars((string)($ar['submitted_by_id'] ?? '')) : ''; ?>"
                                                 data-type="<?php echo htmlspecialchars($ar_type); ?>"
                                                 data-purpose="<?php echo htmlspecialchars($ar['purpose'] ?? ''); ?>"
                                                 data-attendees="<?php echo (int)($ar['attendees'] ?? 0); ?>"
@@ -473,7 +474,7 @@
                         </div>
                         <div class="inv-pager" id="rrPager" hidden>
                             <span class="inv-pager-info" id="rrPagerInfo"></span>
-                            <div class="inv-pager-ctl" id="rrPagerCtl">
+                            <div class="inv-pager-ctl" id="rrPagerCtl" role="navigation" aria-label="Reservation pages">
                                 <button type="button" class="inv-pager-btn" id="rrPgPrev" aria-label="Previous page">
                                     <span class="material-symbols-outlined">chevron_left</span>
                                 </button>
@@ -620,4 +621,3 @@
 <script src="room-reservation/assets/js/admin-rooms-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-schedule.js'); ?>"></script>
 
             </div><!-- /panel-rooms -->
-

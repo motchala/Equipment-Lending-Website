@@ -584,6 +584,7 @@ CREATE TABLE `tbl_requests` (
   `submitted_by_id` varchar(50) DEFAULT NULL,
   `submitted_as` varchar(20) DEFAULT NULL,
   `batch_id` char(36) DEFAULT NULL,
+  `bundle_claim_token` varchar(64) DEFAULT NULL,
   `borrow_time` time DEFAULT NULL,
   `return_time` time DEFAULT NULL,
   `borrow_qty` int(11) NOT NULL DEFAULT 1,
@@ -1059,7 +1060,9 @@ ALTER TABLE `tbl_requests`
   ADD UNIQUE KEY `return_token` (`return_token`),
   ADD UNIQUE KEY `claim_token` (`claim_token`),
   ADD KEY `idx_return_token` (`return_token`),
-  ADD KEY `idx_claim_token` (`claim_token`);
+  ADD KEY `idx_claim_token` (`claim_token`),
+  ADD KEY `idx_batch_id` (`batch_id`),
+  ADD KEY `idx_bundle_claim_token` (`bundle_claim_token`);
 
 --
 -- Indexes for table `tbl_rooms`

@@ -3208,10 +3208,16 @@
                 case 'show-claim-qr': {
                     const token = el.dataset.token;
                     const equipment = el.dataset.equipment;
+                    const isBundle = el.dataset.bundleClaim === '1';
                     const base = window.SERVER_BASE_URL
                         || window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
                     const claimUrl = base + 'equipment-booking/claim_confirm.php?token=' + token;
-                    _openReturnQrModal(equipment, claimUrl, 'Claim QR', 'Show this to the admin to collect your equipment.');
+                    _openReturnQrModal(
+                        equipment,
+                        claimUrl,
+                        isBundle ? 'Claim Bundle QR' : 'Claim QR',
+                        isBundle ? 'Show this one QR to the admin to collect all approved bundled items.' : 'Show this to the admin to collect your equipment.'
+                    );
                     break;
                 }
                 case 'logout':
@@ -6717,4 +6723,3 @@
     });
 
 })();
-

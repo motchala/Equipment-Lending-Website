@@ -218,7 +218,8 @@ try {
     $upd_stmt = $conn->prepare(
         "UPDATE tbl_requests
             SET status           = ?,
-                arbitration_rule = 'override'
+                arbitration_rule = 'override',
+                bundle_claim_token = NULL
           WHERE id = ?"
     );
 
@@ -240,13 +241,19 @@ try {
         $return_token = bin2hex(random_bytes(32)); // 64-char hex token
         $claim_token  = bin2hex(random_bytes(32)); // 64-char hex token
         $tok_stmt = $conn->prepare(
-            "UPDATE tbl_requests SET return_token = ?, claim_token = ? WHERE id = ? AND return_token IS NULL"
+            "UPDATE tbl_requests
+                SET return_token = ?, claim_token = ?, bundle_claim_token = NULL
+              WHERE id = ?"
         );
-        if ($tok_stmt) {
-            $tok_stmt->bind_param('ssi', $return_token, $claim_token, $request_id);
-            $tok_stmt->execute();
-            $tok_stmt->close();
+        if (!$tok_stmt) {
+            throw new RuntimeException('Failed to prepare request token update.');
         }
+        $tok_stmt->bind_param('ssi', $return_token, $claim_token, $request_id);
+        if (!$tok_stmt->execute()) {
+            $tok_stmt->close();
+            throw new RuntimeException('Failed to update request tokens.');
+        }
+        $tok_stmt->close();
     }
 
     // ── If approving, decrement tbl_inventory.quantity by 1 ──────────────────

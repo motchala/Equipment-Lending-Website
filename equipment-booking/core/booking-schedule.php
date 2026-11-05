@@ -62,6 +62,8 @@ final class BookingSchedule
             'room_id'       => 'INT NULL DEFAULT NULL',
             'booking_mode'  => 'VARCHAR(10) NULL DEFAULT NULL',
             'stock_applied' => 'TINYINT(1) NOT NULL DEFAULT 1',
+            'batch_id'      => 'CHAR(36) NULL DEFAULT NULL',
+            'bundle_claim_token' => 'VARCHAR(64) NULL DEFAULT NULL',
         ];
 
         try {
@@ -92,6 +94,26 @@ final class BookingSchedule
                 if (!isset($have[$col])) {
                     self::$ready = false;
                 }
+            }
+
+            try {
+                $indexes = [];
+                $indexResult = $conn->query('SHOW INDEX FROM tbl_requests');
+                while ($indexResult && ($indexRow = $indexResult->fetch_assoc())) {
+                    $indexes[(string)$indexRow['Key_name']] = true;
+                }
+                $indexAdds = [];
+                if (!isset($indexes['idx_batch_id'])) {
+                    $indexAdds[] = 'ADD KEY `idx_batch_id` (`batch_id`)';
+                }
+                if (!isset($indexes['idx_bundle_claim_token'])) {
+                    $indexAdds[] = 'ADD KEY `idx_bundle_claim_token` (`bundle_claim_token`)';
+                }
+                if ($indexAdds) {
+                    $conn->query('ALTER TABLE tbl_requests ' . implode(', ', $indexAdds));
+                }
+            } catch (\Throwable $e) {
+                error_log('BookingSchedule::ensureSchema index setup — ' . $e->getMessage());
             }
         } catch (\Throwable $e) {
             error_log('BookingSchedule::ensureSchema — ' . $e->getMessage());

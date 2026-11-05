@@ -134,6 +134,10 @@
                         <div class="ps-detail-label">Requester Type</div>
                         <div class="ps-detail-value" id="detail-req-type">Faculty</div>
                     </div>
+                    <div class="ps-detail-item" id="detail-authorizer-item" hidden>
+                        <div class="ps-detail-label">Authorized by faculty</div>
+                        <div class="ps-detail-value" id="detail-authorizer">—</div>
+                    </div>
                     <div class="ps-detail-item">
                         <div class="ps-detail-label">Facility</div>
                         <div class="ps-detail-value" id="detail-room" style="font-size:12px">—</div>
@@ -263,3 +267,33 @@
         </aside>
     </div>
 
+    <!-- MODAL: APPROVE ALL PENDING ITEMS IN A BORROW BUNDLE -->
+    <div class="ps-modal-backdrop" id="eq-bundle-approve-modal">
+        <div class="ps-modal ps-modal--sm">
+            <div class="ps-modal-head">
+                <div class="ps-modal-head-icon ps-mhi--success">
+                    <span class="material-symbols-outlined">done_all</span>
+                </div>
+                <h3>Approve Bundle</h3>
+                <button class="ps-modal-close" type="button" data-action="ps-close-modal" data-modal="eq-bundle-approve-modal" aria-label="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="ps-modal-body">
+                <input type="hidden" id="eq-bundle-approve-id" value="">
+                <div id="eq-bundle-approve-alert" class="ps-inline-alert" style="display:none;margin-bottom:.85rem;padding:.6rem .8rem;border-radius:8px;font-size:12.5px"></div>
+                <p class="ps-form-hint" style="margin-top:0">This approves every request still pending in this bundle. Individual declines remain available from each row. The faculty member will receive one Claim Bundle QR.</p>
+                <div class="ps-req-summary" id="eq-bundle-approve-items"></div>
+                <div class="ps-form-group" style="margin-top:1rem">
+                    <label class="ps-form-label" for="eq-bundle-approve-reason">Reason / Note <span style="font-size:11px;color:var(--text-light)">(required, min. 5 characters)</span></label>
+                    <textarea class="ps-form-control" id="eq-bundle-approve-reason" rows="2" placeholder="e.g. Items available, request meets policy..."></textarea>
+                </div>
+            </div>
+            <div class="ps-modal-foot">
+                <button class="ps-btn ps-btn--ghost" type="button" data-action="ps-close-modal" data-modal="eq-bundle-approve-modal">Cancel</button>
+                <button class="ps-btn ps-btn--success" type="button" id="eq-bundle-approve-confirm" disabled>
+                    <span class="material-symbols-outlined">done_all</span> Approve Bundle
+                </button>
+            </div>
+        </div>
+    </div>

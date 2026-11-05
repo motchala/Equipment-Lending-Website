@@ -18,7 +18,7 @@
                     <button class="rq-sub-tab" data-sett-panel="sett-prefs">Preferences</button>
                     <?php if ($is_super_admin): ?>
                         <button class="rq-sub-tab" data-sett-panel="sett-rules">Borrowing Rules</button>
-                        <button class="rq-sub-tab" data-sett-panel="sett-students">Student List</button>
+                        <button class="rq-sub-tab" data-sett-panel="sett-imports">Imports</button>
                     <?php endif; ?>
                     <button class="rq-sub-tab" data-sett-panel="sett-help">Help &amp; FAQ</button>
                 </div>
@@ -365,95 +365,159 @@
                     </div><!-- /sett-rules -->
                 <?php endif; ?>
 
-                <!-- ── STUDENT LIST (Super Admin only) ───────────────────────
-                     Import of the official class lists. The Student Portal checks every
-                     student's ID + name against it (shared/core/student-registry.php).
-                     Script: settings/assets/js/admin-student-registry.js -->
+                <!-- ── IMPORTS (Super Admin only) ─────────────────────────────
+                     Student List + Faculty Registry imports behind ONE password unlock.
+                     The page only ever contains placeholders: real numbers, lists and
+                     files are fetched after unlock (equipment-booking/api/imports.php).
+                     Script: equipment-booking/assets/js/admin-imports.js
+                     Styles: equipment-booking/assets/css/admin-imports.css -->
                 <?php if ($is_super_admin): ?>
                     <?php
-                    require_once PS_ROOT . '/shared/core/student-registry.php';
-                    $stu_status = student_registry_status($conn);
-                    $stu_on     = $stu_status['count'] > 0;
-                    $stu_line   = 'No student list has been imported yet.';
-                    if ($stu_on) {
-                        $stu_line = $stu_status['count'] . ' student' . ($stu_status['count'] === 1 ? '' : 's')
-                            . ' across ' . $stu_status['sections'] . ' section' . ($stu_status['sections'] === 1 ? '' : 's');
-                        if ($stu_status['last_at'] !== '') {
-                            $stu_line .= ' · last imported ' . date('M j, Y g:i A', (int)strtotime($stu_status['last_at']));
-                            if ($stu_status['last_by'] !== '') {
-                                $stu_line .= ' by ' . $stu_status['last_by'];
-                            }
-                        }
-                    }
+                    $imp_cards = [
+                        'students' => [
+                            'title'  => 'Student List',
+                            'icon'   => 'school',
+                            'sub'    => 'Official class lists exported from AIMS',
+                            'types'  => 'PDF',
+                            'accept' => '.pdf,application/pdf',
+                            'stats'  => ['Students', 'Sections', 'Rows in file'],
+                            'cols'   => ['#', 'Student No.', 'Name', 'Section', 'Year level'],
+                            'what'   => 'Students on this list can use the Student Portal. Anyone else is turned away.',
+                        ],
+                        'faculty' => [
+                            'title'  => 'Faculty Registry',
+                            'icon'   => 'badge',
+                            'sub'    => 'Faculty Identification Records',
+                            'types'  => 'PDF or XLSX',
+                            'accept' => '.pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            'stats'  => ['Faculty', 'Newly hired', 'Rows in file'],
+                            'cols'   => ['#', 'Faculty ID', 'Name', 'Programs'],
+                            'what'   => 'Used to confirm a faculty member when their account is created.',
+                        ],
+                    ];
                     ?>
-                    <div class="rq-sub-panel" id="sett-students">
-                        <div class="ps-card stu-reg-card" id="stu-reg-card">
-                            <?= csrf_field() ?>
-                            <div class="ps-card-header">
-                                <h3>
-                                    <span class="material-symbols-outlined">badge</span> Student List
-                                    <?php if ($stu_on): ?>
-                                        <span class="fac-reg-badge fac-reg-badge--active" id="stu-reg-badge"><?= (int)$stu_status['count'] ?> student<?= $stu_status['count'] === 1 ? '' : 's' ?></span>
-                                    <?php else: ?>
-                                        <span class="fac-reg-badge fac-reg-badge--empty" id="stu-reg-badge">Not imported yet</span>
-                                    <?php endif; ?>
-                                </h3>
-                            </div>
-                            <div class="ps-card-body">
-                                <p class="stu-reg-lead">
-                                    Import the official class lists (the PDFs exported from AIMS). The Student Portal uses this list to
-                                    confirm a student is real: the Student ID they enter must be on the list, otherwise they cannot continue.
-                                </p>
-                                <p class="stu-reg-enforce<?= $stu_on ? ' stu-reg-enforce--on' : '' ?>" id="stu-reg-enforce">
-                                    <?= $stu_on
-                                        ? 'Active — students must match this list to continue.'
-                                        : 'Not active yet — students are not checked until a list is imported.' ?>
-                                </p>
-                                <p class="stu-reg-status" id="stu-reg-status"><?= htmlspecialchars($stu_line, ENT_QUOTES, 'UTF-8') ?></p>
+                    <div class="rq-sub-panel" id="sett-imports">
+                        <div class="imp-shell is-locked" id="imp-shell">
 
-                                <div class="fac-reg-upload-row">
-                                    <label for="stu-reg-file-input" class="fac-reg-file-label" id="stu-reg-file-label">
-                                        <span class="material-symbols-outlined">attach_file</span>
-                                        <span id="stu-reg-file-name">Choose class list PDF(s)…</span>
-                                    </label>
-                                    <input type="file" id="stu-reg-file-input" class="stu-reg-file-input" accept=".pdf,application/pdf" multiple>
-                                    <button type="button" id="stu-reg-import-btn" class="ps-btn ps-btn--primary" disabled>
-                                        <span class="material-symbols-outlined">cloud_upload</span> Import
-                                    </button>
-                                </div>
+                            <div class="imp-content" id="imp-content" inert aria-hidden="true">
+                                <?= csrf_field() ?>
 
-                                <label class="fac-reg-replace-row stu-reg-replace" for="stu-reg-replace-all">
-                                    <input type="checkbox" id="stu-reg-replace-all">
-                                    <span>Replace the whole list (removes every student currently listed before importing)</span>
-                                </label>
-
-                                <div id="stu-reg-alert" class="alert-banner hidden" role="alert"></div>
-
-                                <div id="stu-reg-preview" class="stu-reg-preview hidden">
-                                    <div class="stu-reg-preview-head">
-                                        <p class="stu-reg-preview-count" id="stu-reg-preview-count"></p>
-                                        <button type="button" id="stu-reg-clear-btn" class="ps-btn ps-btn--ghost ps-btn--sm">
-                                            <span class="material-symbols-outlined">close</span> Clear
+                                <div class="imp-topbar">
+                                    <div class="imp-topbar-text">
+                                        <h3>Data imports</h3>
+                                        <p>Bring in the official student and faculty lists. The original file of the latest import is kept on record.</p>
+                                    </div>
+                                    <div class="imp-session" id="imp-session">
+                                        <span class="imp-session-dot"></span>
+                                        <span class="imp-session-text" id="imp-session-text">Unlocked</span>
+                                        <button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" id="imp-lock-now">
+                                            <span class="material-symbols-outlined">lock</span> Lock
                                         </button>
                                     </div>
-                                    <div class="tbl-wrap stu-reg-tbl-wrap">
-                                        <table class="admin-table stu-reg-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Student No.</th>
-                                                    <th>Name</th>
-                                                    <th>Section</th>
-                                                    <th>Year Level</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="stu-reg-preview-tbody"></tbody>
-                                        </table>
-                                    </div>
+                                </div>
+
+                                <div class="imp-grid">
+                                    <?php foreach ($imp_cards as $kind => $c): ?>
+                                        <section class="imp-card" data-kind="<?= $kind ?>">
+                                            <header class="imp-card-head">
+                                                <div class="imp-card-icon"><span class="material-symbols-outlined"><?= $c['icon'] ?></span></div>
+                                                <div class="imp-card-titles">
+                                                    <h4><?= htmlspecialchars($c['title']) ?></h4>
+                                                    <p><?= htmlspecialchars($c['sub']) ?></p>
+                                                </div>
+                                                <span class="imp-chip imp-chip--muted" data-role="chip">•••</span>
+                                            </header>
+
+                                            <div class="imp-card-body">
+                                                <p class="imp-what"><?= htmlspecialchars($c['what']) ?></p>
+
+                                                <div class="imp-stats">
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-count">•••</span><span class="imp-stat-label"><?= $c['stats'][0] ?></span></div>
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-extra">••</span><span class="imp-stat-label"><?= $c['stats'][1] ?></span></div>
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-rows">••</span><span class="imp-stat-label"><?= $c['stats'][2] ?></span></div>
+                                                </div>
+                                                <p class="imp-last" data-role="last"><span class="material-symbols-outlined">history</span><span data-role="last-text">Last import •••••••••</span></p>
+
+                                                <div class="imp-drop" data-role="drop" tabindex="0" role="button" aria-label="Choose the <?= htmlspecialchars($c['title']) ?> file">
+                                                    <input type="file" class="imp-file-input" data-role="input" accept="<?= $c['accept'] ?>">
+                                                    <span class="material-symbols-outlined imp-drop-icon">upload_file</span>
+                                                    <strong>Drop the file here</strong>
+                                                    <span class="imp-drop-hint">or click to browse &middot; <?= $c['types'] ?> &middot; up to 10 MB</span>
+                                                </div>
+
+                                                <div class="imp-picked hidden" data-role="picked">
+                                                    <span class="material-symbols-outlined imp-picked-icon" data-role="picked-icon">description</span>
+                                                    <div class="imp-picked-info">
+                                                        <strong data-role="picked-name"></strong>
+                                                        <span data-role="picked-size"></span>
+                                                    </div>
+                                                    <button type="button" class="imp-icon-btn" data-role="clear" aria-label="Remove file"><span class="material-symbols-outlined">close</span></button>
+                                                </div>
+
+                                                <div class="imp-alert hidden" data-role="alert" role="alert"></div>
+
+                                                <div class="imp-preview hidden" data-role="preview">
+                                                    <div class="imp-preview-head"><span data-role="preview-count"></span></div>
+                                                    <div class="imp-table-wrap">
+                                                        <table class="imp-table">
+                                                            <thead><tr><?php foreach ($c['cols'] as $col): ?><th><?= htmlspecialchars($col) ?></th><?php endforeach; ?></tr></thead>
+                                                            <tbody data-role="preview-body"></tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+
+                                                <fieldset class="imp-mode" data-role="mode">
+                                                    <legend>When it is imported</legend>
+                                                <div class="imp-mode-row">
+                                                    <label class="imp-mode-opt">
+                                                        <input type="radio" name="imp-mode-<?= $kind ?>" value="merge" checked>
+                                                        <span class="imp-mode-box">
+                                                            <span class="material-symbols-outlined">merge_type</span>
+                                                            <span><strong>Merge</strong><small>Add new entries, update existing ones</small></span>
+                                                        </span>
+                                                    </label>
+                                                    <label class="imp-mode-opt">
+                                                        <input type="radio" name="imp-mode-<?= $kind ?>" value="replace">
+                                                        <span class="imp-mode-box imp-mode-box--warn">
+                                                            <span class="material-symbols-outlined">sync_alt</span>
+                                                            <span><strong>Replace</strong><small>Remove everyone listed first</small></span>
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                </fieldset>
+
+                                                <button type="button" class="ps-btn ps-btn--primary imp-import-btn" data-role="import" disabled>
+                                                    <span class="material-symbols-outlined">cloud_upload</span> Import
+                                                </button>
+                                            </div>
+
+                                            <footer class="imp-card-foot">
+                                                <button type="button" class="imp-foot-btn" data-role="view-list">
+                                                    <span class="material-symbols-outlined">table_view</span> Imported list
+                                                </button>
+                                                <button type="button" class="imp-foot-btn" data-role="view-files">
+                                                    <span class="material-symbols-outlined">folder_open</span> Original file
+                                                </button>
+                                            </footer>
+                                        </section>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
+
+                            <div class="imp-lock" id="imp-lock">
+                                <div class="imp-lock-inner">
+                                    <button type="button" class="imp-lock-btn" id="imp-lock-btn" aria-label="Unlock Imports">
+                                        <span class="material-symbols-outlined">lock</span>
+                                    </button>
+                                    <h4>Imports are locked</h4>
+                                    <p>Click the lock and enter your password to view or make imports, or to open the files that were imported.</p>
+                                    <p class="imp-lock-msg hidden" id="imp-lock-msg"></p>
+                                    <span class="imp-lock-note"><span class="material-symbols-outlined">lock</span> Password required to unlock</span>
+                                </div>
+                            </div>
+
                         </div>
-                    </div><!-- /sett-students -->
+                    </div><!-- /sett-imports -->
                 <?php endif; ?>
 
                 <!-- ── HELP & FAQ (was the standalone Help Center overlay) ─── -->

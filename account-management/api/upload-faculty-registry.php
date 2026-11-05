@@ -38,6 +38,7 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
     ur_respond(401, ['status' => 'error', 'error' => 'Unauthorized.']);
 }
 
+require_once __DIR__ . '/../../shared/core/imports-lock.php';
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
 
@@ -47,6 +48,7 @@ $conn->set_charset('utf8mb4');
 if (!admin_is_super_admin($conn)) {
     ur_respond(403, ['status' => 'error', 'error' => 'Super Admin only.']);
 }
+imports_require_unlocked();   // Settings -> Imports must be unlocked with the Super Admin's password
 
 $body = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($body)) {

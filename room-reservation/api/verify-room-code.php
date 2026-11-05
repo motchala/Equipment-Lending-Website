@@ -65,7 +65,12 @@ if ($row['is_used']) {
 // ── Student must be on the official student list (Settings → Student List) ──
 // Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
 require_once __DIR__ . '/../../shared/core/student-registry.php';
-$sv = student_registry_validate($conn, $student_id, $student_name);
+$student_course = trim((string)($body['student_course'] ?? ''));
+if (!student_registry_valid_course($student_course)) {
+    echo json_encode(['error' => 'Please select your course.']);
+    exit();
+}
+$sv = student_registry_validate($conn, $student_id);
 if (!$sv['ok']) {
     echo json_encode(['error' => $sv['error']]);
     exit();
@@ -123,6 +128,10 @@ if ($fac_row && !empty($fac_row['email'])) {
                     <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_id) . '</td>
                 </tr>
                 <tr style="background:#f9f5f5;">
+                    <td style="padding:10px 14px;color:#666;">Course</td>
+                    <td style="padding:10px 14px;color:#222;font-weight:700;">' . htmlspecialchars($student_course) . '</td>
+                </tr>
+                <tr>
                     <td style="padding:10px 14px;color:#666;">Status</td>
                     <td style="padding:10px 14px;color:#e65100;font-weight:700;">Form opened &mdash; not yet submitted</td>
                 </tr>

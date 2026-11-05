@@ -10,6 +10,7 @@ declare(strict_types=1);
  * POST (application/json):
  *   csrf_token   string
  *   rows         array of { student_no, full_name, section?, course?, year_level?, school_year?, semester? }
+ *   file_id      int   - the original file stored by upload-student-registry-file.php (required)
  *   replace_all  bool  - true: the list is replaced by this import (old entries removed)
  *                        false: merged - a Student No. already listed is updated, new ones are added
  *
@@ -40,6 +41,8 @@ if (empty($_SESSION['admin']) || $_SESSION['admin'] !== true) {
 require_once __DIR__ . '/../../config/csrf.php';
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../shared/core/student-registry.php';
+require_once __DIR__ . '/../core/student-registry-files.php';
+require_once __DIR__ . '/../../shared/core/imports-lock.php';
 
 $conn = getDB();
 $conn->set_charset('utf8mb4');
@@ -47,6 +50,7 @@ $conn->set_charset('utf8mb4');
 if (!admin_is_super_admin($conn)) {
     usr_respond(403, ['status' => 'error', 'error' => 'Super Admin only.']);
 }
+imports_require_unlocked();   // Settings -> Imports must be unlocked with the Super Admin's password
 
 $body = json_decode((string)file_get_contents('php://input'), true);
 if (!is_array($body)) {
@@ -57,6 +61,22 @@ $submitted = trim((string)($body['csrf_token'] ?? ''));
 $expected  = (string)($_SESSION['csrf_token'] ?? '');
 if ($expected === '' || $submitted === '' || !hash_equals($expected, $submitted)) {
     usr_respond(403, ['status' => 'error', 'error' => 'Invalid session token. Please refresh the page.']);
+}
+
+srf_ensure_table($conn);
+$file_id   = (int)($body['file_id'] ?? 0);
+$file_name = '';
+if ($file_id > 0 && ($fst = $conn->prepare("SELECT original_name FROM tbl_student_registry_files WHERE id = ? AND status = 'uploaded' LIMIT 1"))) {
+    $fst->bind_param('i', $file_id);
+    $fst->execute();
+    $fres = $fst->get_result();
+    if ($fres && $fres->num_rows === 1) {
+        $file_name = (string)$fres->fetch_assoc()['original_name'];
+    }
+    $fst->close();
+}
+if ($file_name === '') {
+    usr_respond(422, ['status' => 'error', 'error' => 'The original file was not saved with this import. Please refresh the page and choose the file again.']);
 }
 
 $rows_input  = $body['rows'] ?? [];
@@ -181,6 +201,26 @@ try {
     usr_respond(500, ['status' => 'error', 'error' => 'The import failed and nothing was changed. Please try again.']);
 }
 
+// Mark the original file as imported, with what happened
+$mode  = $replace_all ? 'replace' : 'merge';
+$total = count($rows_input);
+$recorded = false;
+if ($ust = $conn->prepare(
+    "UPDATE tbl_student_registry_files
+        SET status = 'imported', import_mode = ?, row_count = ?, inserted_count = ?,
+            updated_count = ?, skipped_count = ?, imported_at = NOW()
+      WHERE id = ?"
+)) {
+    $ust->bind_param('siiiii', $mode, $total, $inserted, $updated, $skipped, $file_id);
+    $recorded = $ust->execute() && $ust->affected_rows > 0;
+    $ust->close();
+}
+
+// The import went through and its file is on record: this file REPLACES the previous one
+// (only the latest import's file is kept, like the Faculty Registry). Never runs when the
+// import failed, so a failed import can never cost the previous file.
+$old_files_removed = $recorded ? srf_purge_other_files($conn, $file_id) : 0;
+
 $status = student_registry_status($conn);
 $last_label = $status['last_at'] !== '' ? date('M j, Y g:i A', (int)strtotime($status['last_at'])) : '';
 
@@ -189,7 +229,7 @@ admin_log_activity(
     $conn,
     'settings',
     'Imported student list: ' . $inserted . ' added, ' . $updated . ' updated, ' . $skipped . ' skipped'
-        . ($replace_all ? ' (replaced the whole list)' : '')
+        . ' (file: ' . mb_strimwidth($file_name, 0, 80, '…') . ($replace_all ? ', replaced the whole list' : '') . ($old_files_removed > 0 ? ', replaced the previous file' : '') . ')'
 );
 
 usr_respond(200, [

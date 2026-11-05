@@ -11289,6 +11289,32 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-secondary);
 }
 
+#panel-activity .fact-bundle-note,
+#panel-activity .fact-bundle-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--color-primary);
+    font-size: 0.72rem;
+    font-weight: 650;
+}
+
+#panel-activity .fact-bundle-note {
+    margin: 4px 0 0;
+}
+
+#panel-activity .fact-bundle-chip {
+    padding: 2px 7px;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-primary) 7%, white);
+}
+
+#panel-activity .fact-bundle-note .material-symbols-outlined,
+#panel-activity .fact-bundle-chip .material-symbols-outlined {
+    font-size: 14px;
+}
+
 #panel-activity .fact-attach {
     display: inline-flex;
     align-items: center;

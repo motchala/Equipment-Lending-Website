@@ -6,24 +6,22 @@ declare(strict_types=1);
  * faculty-registry-files.php  (shared helpers)
  *
  * Everything the Faculty Registry needs to keep the ORIGINAL file of every
- * import (Faculty tab -> Faculty Registry), so each import is fully recorded:
+ * import (Settings -> Imports), so each import is fully recorded:
  *
  *   upload-faculty-registry-file.php   stores the original file + a record
  *   upload-faculty-registry.php        marks that record as imported (+ counts) and
  *                                      removes the previous import's file (only the latest is kept)
- *   list-faculty-registry-files.php    password-gated history of all files
- *   get-faculty-registry-file.php      password-gated view / download
+ *   settings/api/imports.php           the file on record + view / download (Super Admin, unlocked)
  *
  * Where things live
  *   - files:   uploads/faculty_registry/<random>.pdf|xlsx  (never the uploaded
  *              name; the folder denies ALL direct web access - files are only
- *              ever served through get-faculty-registry-file.php)
+ *              ever served through settings/api/imports.php)
  *   - records: table tbl_faculty_registry_files (created on first use if the
  *              SQL dump was not re-imported)
  */
 
 const FRF_MAX_BYTES = 10 * 1024 * 1024;   // same 10 MB cap as the Import form
-const FRF_TOKEN_TTL = 600;                // seconds an unlock stays valid (10 min)
 
 function frf_respond(int $code, array $data): never
 {
@@ -50,7 +48,7 @@ function frf_ensure_dir(): bool
         @file_put_contents(
             $ht,
             "# Faculty Registry originals are never served directly.\n" .
-                "# They are only available through account-management/api/get-faculty-registry-file.php\n" .
+                "# They are only available through settings/api/imports.php\n" .
                 "# (Super Admin + password).\n" .
                 "Options -Indexes\n" .
                 "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n" .
@@ -210,9 +208,8 @@ function frf_detect_type(string $tmp_path, string $claimed_ext): ?array
 }
 
 /* ---------------------------------------------------------------------------
- * Password re-entry: identical rules to view-faculty-registry.php, and it uses
- * the same per-session throttle (5 wrong tries, then 5 minutes), so this adds
- * no extra way to guess the password.
+ * Password re-entry for unlocking Settings -> Imports (settings/api/imports.php, action=unlock).
+ * Throttled per session: 5 wrong tries, then a 5 minute cool-down.
  * ------------------------------------------------------------------------ */
 function frf_verify_password(mysqli $conn, string $given): void
 {
@@ -250,33 +247,4 @@ function frf_verify_password(mysqli $conn, string $given): void
         frf_respond(403, ['status' => 'error', 'code' => 'bad_password', 'error' => 'Incorrect password.']);
     }
     unset($_SESSION['mgmt_reauth_fails'], $_SESSION['mgmt_reauth_lock_until']);
-}
-
-/* ---------------------------------------------------------------------------
- * Unlock token. After the password is verified once, the list endpoint hands
- * back a random token (valid 10 minutes, tied to this login session) that the
- * View / Download buttons use, so the password never has to stay in the page.
- * Only a hash of the token is kept in the session.
- * ------------------------------------------------------------------------ */
-function frf_issue_token(): string
-{
-    $token = bin2hex(random_bytes(32));
-    $_SESSION['frf_access'] = [
-        'hash'    => hash('sha256', $token),
-        'expires' => time() + FRF_TOKEN_TTL,
-    ];
-    return $token;
-}
-
-function frf_token_valid(string $token): bool
-{
-    $a = $_SESSION['frf_access'] ?? null;
-    if (!is_array($a) || $token === '' || !isset($a['hash'], $a['expires'])) {
-        return false;
-    }
-    if (time() > (int)$a['expires']) {
-        unset($_SESSION['frf_access']);
-        return false;
-    }
-    return hash_equals((string)$a['hash'], hash('sha256', $token));
 }

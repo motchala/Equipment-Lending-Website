@@ -13,7 +13,7 @@
                             var pgNext = document.getElementById('rrPgNext');
                             var pgNums = document.getElementById('rrPgNums');
                             if (!tbl || !q || !sortSel || !dirBtn || !tabsWrap || !pager) return;
-                            var PAGE_SIZE = 15;
+                            var PAGE_SIZE = 20;
                             var tbody = tbl.tBodies[0];
                             var tab = 'all'; // all | active | Waiting | Approved | Cancelled | Declined
                             var dir = 'desc'; // desc = newest / latest first, asc = oldest / earliest first
@@ -166,9 +166,9 @@
                             }
 
                             function renderPager(total, pages, start, end) {
-                                pager.hidden = total === 0;
+                                pager.hidden = false;
                                 pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
-                                pgCtl.hidden = pages <= 1;
+                                pgCtl.hidden = false;
                                 pgPrev.disabled = page <= 1;
                                 pgNext.disabled = page >= pages;
                                 pgNums.textContent = '';
@@ -186,12 +186,15 @@
                                     btn.dataset.page = String(n);
                                     btn.textContent = String(n);
                                     btn.setAttribute('aria-label', 'Page ' + n);
-                                    if (n === page) btn.setAttribute('aria-current', 'page');
+                                    if (n === page) {
+                                        btn.setAttribute('aria-current', 'page');
+                                        btn.disabled = pages <= 1;
+                                    }
                                     pgNums.appendChild(btn);
                                 });
                             }
 
-                            /* ── Filtering (active tab + search), then 15 rows per page ── */
+                            /* ── Filtering (active tab + search), then 20 rows per page ── */
                             function applyFilter() {
                                 var s = (q.value || '').trim().toLowerCase();
                                 var now = manilaNow();

@@ -154,9 +154,9 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
             : '0 AS extension_count, NULL AS original_return_date, NULL AS original_return_time';
         $images = fact_eq_image_map($conn);
 
-        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.borrow_date, r.borrow_time, $extCol,
+        $cols = "r.id, r.equipment_name, r.borrow_qty, r.room, r.room_id, r.batch_id, r.bundle_claim_token, r.borrow_date, r.borrow_time, $extCol,
                  r.return_date, r.return_time, r.returned_at, r.status, r.reason, r.arbitration_rule,
-                 r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name,
+                 r.request_date, r.return_token, r.claim_token, r.submitted_as, r.submitted_by_name, r.submitted_by_id,
                  rm.room_name, b.building_key, b.name AS building_name,
                  COALESCE(rm.floor_label, CONCAT(rm.floor_number, 'F')) AS floor_label
             FROM tbl_requests r
@@ -196,6 +196,8 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'id'          => fact_i($row, 'id'),
                     'name'        => $name,
                     'qty'         => max(1, fact_i($row, 'borrow_qty')),
+                    'batch_id'    => fact_s($row, 'batch_id'),
+                    'bundle_claim_token' => fact_s($row, 'bundle_claim_token'),
                     'where'       => fact_eq_where($row),
                     'status'      => $status,
                     'reason'      => trim(fact_s($row, 'reason')),
@@ -203,6 +205,7 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                     'token'       => fact_s($row, 'return_token'),
                     'claim_token' => fact_s($row, 'claim_token'),
                     'student'     => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_name')) : '',
+                    'student_id'  => fact_s($row, 'submitted_as') === 'student' ? trim(fact_s($row, 'submitted_by_id')) : '',
                     'image'       => $images[strtolower(trim($name))] ?? '',
                     'icon'        => actEquipIcon($name),
                     'start_date'  => $start->format('Y-m-d'),
@@ -265,6 +268,70 @@ function fact_eq_load(mysqli $conn, string $faculty_id): array
                 }
             }
             $stmt->close();
+        }
+
+        $batchIds = [];
+        $claimGroups = [];
+        foreach (['live', 'upcoming', 'history'] as $bucket) {
+            foreach ($out[$bucket] as $item) {
+                if ($item['batch_id'] !== '') {
+                    $batchIds[$item['batch_id']] = true;
+                }
+                if ($item['bundle_claim_token'] !== '') {
+                    $token = $item['bundle_claim_token'];
+                    $claimGroups[$token]['ids'][] = (int)$item['id'];
+                    $claimGroups[$token]['names'][$item['name']] = true;
+                }
+            }
+        }
+
+        $batchCounts = [];
+        foreach (['live', 'upcoming', 'history'] as $bucket) {
+            foreach ($out[$bucket] as $item) {
+                if ($item['batch_id'] !== '') {
+                    $batchCounts[$item['batch_id']] = ($batchCounts[$item['batch_id']] ?? 0) + 1;
+                }
+            }
+        }
+        if ($batchIds) {
+            $batchList = implode(',', array_map(function (string $batchId) use ($conn): string {
+                return "'" . $conn->real_escape_string($batchId) . "'";
+            }, array_keys($batchIds)));
+            $facultyIdSql = $conn->real_escape_string($faculty_id);
+            $batchCountResult = $conn->query(
+                "SELECT batch_id, COUNT(*) AS item_count
+                   FROM tbl_requests
+                  WHERE faculty_id = '{$facultyIdSql}' AND batch_id IN ({$batchList})
+                  GROUP BY batch_id"
+            );
+            if ($batchCountResult) {
+                while ($countRow = $batchCountResult->fetch_assoc()) {
+                    $batchCounts[(string)$countRow['batch_id']] = (int)$countRow['item_count'];
+                }
+            } else {
+                error_log('[PUPSync] fact_eq_load bundle count failed: ' . $conn->error);
+            }
+        }
+
+        foreach ($claimGroups as &$claimGroup) {
+            $claimGroup['leader_id'] = min($claimGroup['ids']);
+            $claimGroup['count'] = count($claimGroup['ids']);
+        }
+        unset($claimGroup);
+
+        foreach (['live', 'upcoming', 'history'] as $bucket) {
+            foreach ($out[$bucket] as &$item) {
+                $batchId = $item['batch_id'];
+                $item['bundle_count'] = $batchId !== '' ? ($batchCounts[$batchId] ?? 0) : 0;
+                $token = $item['bundle_claim_token'];
+                $claimGroup = $token !== '' ? ($claimGroups[$token] ?? null) : null;
+                $item['bundle_claim_leader'] = $claimGroup !== null
+                    && (int)$item['id'] === $claimGroup['leader_id'];
+                $item['bundle_claim_label'] = $claimGroup !== null
+                    ? 'Bundle (' . $claimGroup['count'] . ' ' . ($claimGroup['count'] === 1 ? 'item' : 'items') . ')'
+                    : '';
+            }
+            unset($item);
         }
 
         // Overdue first (longest overdue on top), then whatever is due soonest
@@ -379,7 +446,11 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
 
     $sub = [fact_h(fact_s($it, 'where'))];
     if (fact_s($it, 'student') !== '') {
-        $sub[] = 'Student: ' . fact_h(fact_s($it, 'student'));
+        $student = 'Student: ' . fact_s($it, 'student');
+        if (fact_s($it, 'student_id') !== '') {
+            $student .= ' (' . fact_s($it, 'student_id') . ')';
+        }
+        $sub[] = fact_h($student);
     }
     if (fact_eq_extended_label($it) !== '') {
         $sub[] = fact_h(fact_eq_extended_label($it));
@@ -392,6 +463,10 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     $html .= fact_eq_tile($it, $rootUrl);
     $html .= '<div class="fact-item-main"><div class="fact-item-top"><h4 class="fact-item-title">' . fact_eq_title($it) . '</h4>'
         . fact_status_chip($status) . '</div>';
+    if (fact_i($it, 'bundle_count') > 1) {
+        $html .= '<p class="fact-bundle-note"><span class="material-symbols-outlined" aria-hidden="true">link</span>'
+            . 'Part of a bundle · ' . fact_i($it, 'bundle_count') . ' items</p>';
+    }
     $html .= '<p class="fact-item-meta">' . $when . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
 
@@ -399,7 +474,12 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     if ($kind === 'upcoming') {
         $upButtons = '';
         // Claim QR — shown while the request is Approved and not yet physically collected
-        if ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
+        if ($status === 'Approved' && !empty($it['bundle_claim_leader']) && fact_s($it, 'bundle_claim_token') !== '') {
+            $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
+                . ' data-token="' . fact_h(fact_s($it, 'bundle_claim_token')) . '"'
+                . ' data-bundle-claim="1"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'bundle_claim_label')) . '">Claim Bundle QR</button>';
+        } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
             $upButtons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
                 . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
                 . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
@@ -425,7 +505,12 @@ function fact_eq_render_item(array $it, string $kind, string $rootUrl, DateTimeI
     if ($kind === 'live') {
         $buttons = '';
         // Claim QR: item is Approved and started but not yet physically collected
-        if ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
+        if ($status === 'Approved' && !empty($it['bundle_claim_leader']) && fact_s($it, 'bundle_claim_token') !== '') {
+            $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
+                . ' data-token="' . fact_h(fact_s($it, 'bundle_claim_token')) . '"'
+                . ' data-bundle-claim="1"'
+                . ' data-equipment="' . fact_h(fact_s($it, 'bundle_claim_label')) . '">Claim Bundle QR</button>';
+        } elseif ($status === 'Approved' && fact_s($it, 'claim_token') !== '') {
             $buttons .= '<button type="button" class="fact-btn fact-btn-ghost" data-action="show-claim-qr"'
                 . ' data-token="' . fact_h(fact_s($it, 'claim_token')) . '"'
                 . ' data-equipment="' . fact_h(fact_s($it, 'name')) . '">Claim QR</button>';
@@ -529,8 +614,16 @@ function fact_eq_render_history_rows(array $d, string $rootUrl): string
         }
 
         $sub = ['Equipment · ' . fact_h(fact_s($it, 'where'))];
+        if (fact_i($it, 'bundle_count') > 1) {
+            $sub[] = '<span class="fact-bundle-chip"><span class="material-symbols-outlined" aria-hidden="true">link</span>'
+                . 'Bundle · ' . fact_i($it, 'bundle_count') . ' items</span>';
+        }
         if (fact_s($it, 'student') !== '') {
-            $sub[0] .= ' · Student: ' . fact_h(fact_s($it, 'student'));
+            $student = 'Student: ' . fact_s($it, 'student');
+            if (fact_s($it, 'student_id') !== '') {
+                $student .= ' (' . fact_s($it, 'student_id') . ')';
+            }
+            $sub[0] .= ' · ' . fact_h($student);
         }
         if (fact_eq_extended_label($it) !== '') {
             $sub[0] .= ' · ' . fact_h(fact_eq_extended_label($it));

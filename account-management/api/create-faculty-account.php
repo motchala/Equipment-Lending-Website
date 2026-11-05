@@ -30,6 +30,48 @@ function send_json($code, $status, $message)
     exit;
 }
 
+function faculty_password_strength_level(string $password): int
+{
+    if (strlen($password) < 8) {
+        return -1;
+    }
+
+    $weak_patterns = [
+        '0123', '1234', '2345', '3456', '4567', '5678', '6789', '7890',
+        '9876', '8765', '7654', '6543', '5432', '4321', '3210',
+        'abcd', 'bcde', 'cdef', 'defg', 'efgh', 'fghi', 'ghij', 'hijk',
+        'ijkl', 'jklm', 'klmn', 'lmno', 'mnop', 'nopq', 'opqr', 'pqrs',
+        'qrst', 'rstu', 'stuv', 'tuvw', 'uvwx', 'vwxy', 'wxyz',
+        'dcba', 'edcb', 'fedc', 'gfed', 'hgfe', 'ihgf', 'jihg', 'kjih',
+        'lkji', 'mlkj', 'nmlk', 'onml', 'ponm', 'qpon', 'rqpo', 'srqp',
+        'tsrq', 'utsr', 'vuts', 'wvut', 'xwvu', 'yxwv', 'zyxw',
+        'qwer', 'wert', 'erty', 'asdf', 'sdfg', 'dfgh', 'zxcv', 'xcvb',
+        'password', 'passw0rd', 'qwerty', 'welcome', 'letmein', 'admin',
+        'iloveyou', 'monkey', 'dragon', 'football', 'baseball', 'master',
+    ];
+    $normalized = strtolower($password);
+    if (preg_match('/(.)\1{3,}/i', $password)) {
+        return 1;
+    }
+    foreach ($weak_patterns as $pattern) {
+        if (strpos($normalized, $pattern) !== false) {
+            return 1;
+        }
+    }
+
+    $score = strlen($password) >= 16 ? 3 : (strlen($password) >= 12 ? 2 : 1);
+    if (preg_match('/[a-z]/', $password)) $score++;
+    if (preg_match('/[A-Z]/', $password)) $score++;
+    if (preg_match('/[0-9]/', $password)) $score++;
+    if (preg_match('/[^A-Za-z0-9]/', $password)) $score++;
+
+    if ($score <= 1) return 0;
+    if ($score <= 2) return 1;
+    if ($score === 3) return 2;
+    if ($score <= 5) return 3;
+    return 4;
+}
+
 // ── Super Admin only (the Faculty tab is hidden from plain Admins; enforce it here too)
 if (!admin_is_super_admin($conn)) {
     send_json(403, 'error', 'Only a Super Admin can create faculty accounts.');
@@ -145,6 +187,9 @@ if ($password_raw === '') {
 }
 if (strlen($password_raw) < 8) {
     send_json(422, 'error', 'Password must be at least 8 characters.');
+}
+if (faculty_password_strength_level($password_raw) < 2) {
+    send_json(422, 'error', 'Password is too weak. Use a stronger password rated Fair or higher.');
 }
 if ($password_raw !== $confirm_raw) {
     send_json(422, 'error', 'Passwords do not match.');

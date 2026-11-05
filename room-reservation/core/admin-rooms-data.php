@@ -112,7 +112,7 @@ $admin_room_reservations_result = $conn->query(
             rr.start_time, rr.end_time,
             TIME_FORMAT(rr.start_time, '%h:%i %p') AS start_fmt,
             TIME_FORMAT(rr.end_time,   '%h:%i %p') AS end_fmt,
-            rr.faculty_name, rr.submitted_as, rr.submitted_by_name,
+            rr.faculty_name, rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id,
             rr.purpose, rr.attendees, rr.status, rr.reason,
             rr.request_date, rr.document_path, rr.notes,
             r.room_name,
