@@ -164,6 +164,7 @@
 
     /* ── Theme DOM helpers ───────────────────────────────────── */
     function _applyThemeDOM(theme) {
+        if (theme !== 'light' && theme !== 'dark') theme = 'light';   // Light / Dark only (High Contrast removed)
         document.documentElement.setAttribute('data-theme', theme);
         document.documentElement.style.removeProperty('--section-tint-start');
         document.documentElement.style.removeProperty('--section-tint-end');
@@ -192,7 +193,9 @@
 
     /* ── Restore persisted state ─────────────────────────────── */
     function restoreState() {
-        const theme = LS.get('theme');
+        let theme = LS.get('theme');
+        // High Contrast was removed: anyone who had it saved falls back to Light.
+        if (theme && theme !== 'light' && theme !== 'dark') { theme = 'light'; LS.set('theme', theme); }
         if (theme && theme !== 'light') _applyThemeDOM(theme);
 
         const ac = LS.get('accentColor'), al = LS.get('accentLight');

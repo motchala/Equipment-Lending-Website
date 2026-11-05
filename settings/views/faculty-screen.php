@@ -315,7 +315,7 @@
                             </span>
                         </div>
                     </div>
-                    <div class="sov-profile-actions">
+                    <div class="sov-profile-actions" id="sovProfileActions">
                         <button type="button" class="sov-btn-outline sov-profile-edit-btn" id="sovEditBtn"
                             data-action="account-edit">
                             <span class="material-symbols-outlined" aria-hidden="true">edit</span>
@@ -438,7 +438,8 @@
                                         <div class="acct-row">
                                             <span class="acct-row-label">Password</span>
                                             <div class="acct-row-value">
-                                                <span class="acct-row-static">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+                                                <?php /* Fixed, decorative mask: never built from the real password, so it says nothing about its length. */ ?>
+                                                <span class="acct-row-static" role="img" aria-label="Password hidden">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
                                             </div>
                                             <span class="sov-gated-action-slot">
                                                 <button type="button" class="sov-btn-outline" data-action="open-pw-modal"
@@ -450,7 +451,7 @@
                                         $sov_pw_untracked = $sov_pw_changed_ts === false;
                                         ?>
                                         <div class="acct-row">
-                                            <span class="acct-row-label">Last Changed</span>
+                                            <span class="acct-row-label">Password Last Changed</span>
                                             <div class="acct-row-value">
                                                 <span class="acct-row-static acct-row-password-change<?php echo $sov_pw_untracked ? ' pw-change-untracked' : ''; ?>"
                                                     id="sovPasswordLastChanged">
@@ -492,15 +493,15 @@
                             </div>
                         </section>
 
-                        <section class="sx-section" aria-labelledby="sxAppearanceTitle">
+                        <section class="sx-section" aria-labelledby="sxPrefsTitle">
                             <header class="sx-section-head">
-                                <span class="sx-section-icon material-symbols-outlined">palette</span>
+                                <span class="sx-section-icon material-symbols-outlined">tune</span>
                                 <div>
-                                    <h2 class="sx-section-title" id="sxAppearanceTitle">Appearance</h2>
-                                    <p class="sx-section-sub">How PUPSync looks on your screen.</p>
+                                    <h2 class="sx-section-title" id="sxPrefsTitle">Preferences</h2>
+                                    <p class="sx-section-sub">How PUPSync looks, what you hear about, and your data.</p>
                                 </div>
                             </header>
-                            <div class="sx-grid sx-grid--single">
+                            <div class="sx-grid">
 
                                 <!-- Theme -->
                                 <div class="acct-card">
@@ -535,6 +536,7 @@
                                             </div>
                                             <span class="sov-theme-name">Dark</span>
                                         </div>
+                                        <?php /* High Contrast theme removed (Light / Dark only):
                                         <div class="sov-theme-option" data-action="apply-theme" data-theme="high-contrast">
                                             <div class="sov-theme-swatch sov-swatch-hc">
                                                 <div class="sov-swatch-topbar"></div>
@@ -548,33 +550,19 @@
                                             </div>
                                             <span class="sov-theme-name">High Contrast</span>
                                         </div>
+                                        */ ?>
                                     </div>
                                     <!-- Hidden legacy elements kept for JS compatibility -->
                                     <select id="themeSelectUnified" style="display:none;">
                                         <option value="light">Light</option>
                                         <option value="dark">Dark</option>
-                                        <option value="high-contrast">High Contrast</option>
                                     </select>
                                     <div style="display:none;">
                                         <div id="tp-light"></div>
                                         <div id="tp-dark"></div>
-                                        <div id="tp-hc"></div>
                                     </div>
                                     <p class="sov-desc-small">Current theme: <strong id="currentThemeLabel">Light</strong></p>
                                 </div>
-
-                            </div>
-                        </section>
-
-                        <section class="sx-section" aria-labelledby="sxNotifTitle">
-                            <header class="sx-section-head">
-                                <span class="sx-section-icon material-symbols-outlined">notifications</span>
-                                <div>
-                                    <h2 class="sx-section-title" id="sxNotifTitle">Notifications &amp; Data</h2>
-                                    <p class="sx-section-sub">Choose what you hear about, and manage your data.</p>
-                                </div>
-                            </header>
-                            <div class="sx-grid ">
 
                                 <!-- Notification Preferences -->
                                 <div class="acct-card">
@@ -784,7 +772,7 @@
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Open <strong>Settings</strong> from the sidebar. Click <strong>Edit Profile</strong> to change your name, department and mobile number. Your department can only be chosen once, your Faculty ID is permanent, and your email is managed by the administrator. You can also add a backup email and change your profile photo.<br><br>To change your password, click <strong>Change</strong> under Password &amp; Security. You will need your current password, the new one must be at least 6 characters, and it can be changed once every 7 days. Settings also lets you choose Light, Dark or High Contrast, pick your email alerts, and <strong>Export Data</strong>. If you cannot sign in, contact the administrator.
+                                        Open <strong>Settings</strong> from the sidebar. Click <strong>Edit Profile</strong> to change your name, department and mobile number. Your department can only be chosen once, your Faculty ID is permanent, and your email is managed by the administrator. You can also add a backup email and change your profile photo.<br><br>To change your password, click <strong>Change</strong> under Password &amp; Security. You will need your current password, the new one must be at least 6 characters, and it can be changed once every 7 days. Settings also lets you choose a Light or Dark theme, pick your email alerts, and <strong>Export Data</strong>. If you cannot sign in, contact the administrator.
                                     </div>
                                 </details>
 

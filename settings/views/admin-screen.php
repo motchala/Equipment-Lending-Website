@@ -167,7 +167,8 @@
                                 </div>
                                 <div class="info-row">
                                     <span class="info-lbl">Current Password</span>
-                                    <span class="info-val">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;</span>
+                                    <?php /* Fixed, decorative mask: never built from the real password, so it says nothing about its length. */ ?>
+                                    <span class="info-val" role="img" aria-label="Password hidden">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
                                     <button class="btn-inline-sm" data-action="open-change-pass"
                                         data-profile-edit-gated disabled aria-hidden="true" tabindex="-1">Change</button>
                                 </div>
@@ -178,7 +179,7 @@
                                     $pwc_untracked = $ts_pwc === false;
                                     ?>
                                     <span class="info-val<?php echo $pwc_untracked ? ' pw-change-untracked' : ''; ?>"
-                                        id="pwLastChangedVal" style="color:var(--text-light)">
+                                        id="pwLastChangedVal">
                                         <?php echo $pwc_untracked ? '— Not tracked' : htmlspecialchars(date('M d, Y · g:i A', $ts_pwc)); ?>
                                     </span>
                                 </div>
@@ -212,9 +213,11 @@
                                     <div class="sett-theme-opt" id="tp-dark" data-action="apply-theme" data-theme="dark">
                                         &#127769; Dark
                                     </div>
+                                    <?php /* High Contrast theme removed (Light / Dark only):
                                     <div class="sett-theme-opt" id="tp-hc" data-action="apply-theme" data-theme="high-contrast">
                                         &#9889; High Contrast
                                     </div>
+                                    */ ?>
                                 </div>
                             </div>
                         </div>

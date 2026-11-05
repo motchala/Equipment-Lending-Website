@@ -65,7 +65,9 @@
     /* ── Restore all persisted state on load ─────────────────────── */
     function restorePersistedState() {
         // 1. Theme
-        const theme = LS.get('theme');
+        let theme = LS.get('theme');
+        // High Contrast was removed (Light / Dark only): anyone who had it saved falls back to Light.
+        if (theme && theme !== 'light' && theme !== 'dark') { theme = 'light'; LS.set('theme', theme); }
         if (theme && theme !== 'light') _applyThemeDOM(theme);
         // Sync unified theme dropdown
         const tsu = document.getElementById('themeSelectUnified');
@@ -103,6 +105,7 @@
 
     /* ── DOM-only helpers (no save, used by restore + public fns) ── */
     function _applyThemeDOM(theme) {
+        if (theme !== 'light' && theme !== 'dark') theme = 'light';   // Light / Dark only
         document.documentElement.setAttribute('data-theme', theme);
         // Remove any JS-set inline tint overrides so the new theme's
         // CSS variable values take over cleanly
@@ -3399,6 +3402,24 @@
             // Update nav items
             document.querySelectorAll('.sov-nav-item').forEach(function (n) { n.classList.remove('active'); });
             this.classList.add('active');
+            // Edit Profile / Save / Cancel only belong to the Settings tab: fade out / in
+            var profileActions = document.getElementById('sovProfileActions');
+            if (profileActions) {
+                clearTimeout(profileActions._leaveTimer);
+                if (targetId !== 'sov-tab-settings') {
+                    if (!profileActions.hidden) {
+                        profileActions.classList.add('is-leaving');
+                        profileActions._leaveTimer = setTimeout(function () { profileActions.hidden = true; }, 230);
+                    }
+                } else {
+                    var wasHidden = profileActions.hidden;
+                    profileActions.hidden = false;
+                    if (wasHidden) {
+                        void profileActions.offsetWidth;   // let the browser paint the faded state first
+                    }
+                    profileActions.classList.remove('is-leaving');
+                }
+            }
             // Update tab panels
             document.querySelectorAll('.sov-tab-panel').forEach(function (p) { p.classList.remove('active'); });
             var panel = document.getElementById(targetId);

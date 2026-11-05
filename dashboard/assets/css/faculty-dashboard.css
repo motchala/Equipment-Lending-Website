@@ -4649,7 +4649,7 @@ body {
     pointer-events: auto;
 }
 
-.act-ai-fab-popover > span:nth-child(2) {
+.act-ai-fab-popover>span:nth-child(2) {
     padding-right: 22px;
 }
 
@@ -5613,16 +5613,26 @@ body {
     justify-content: center;
     gap: 7px;
     min-height: 40px;
-    padding: 8px 14px;
-    border-color: rgba(255, 255, 255, 0.48);
-    background: rgba(87, 0, 0, 0.82);
+    padding: 8px 20px;
+    /* Rounded pill in the system maroon, with a gold-tinted edge and a drop shadow */
+    border: 1.5px solid rgba(251, 191, 36, 0.85);
+    border-radius: 999px;
+    background: var(--color-primary-container);
+    box-shadow: 0 4px 14px rgba(60, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.25);
     color: #fff;
 }
 
 .sov-profile-actions .sov-btn-outline:hover {
-    border-color: rgba(255, 255, 255, 0.78);
-    background: #570000;
+    border-color: #fbbf24;
+    background: var(--color-primary-container);
+    filter: brightness(1.12);
+    box-shadow: 0 6px 18px rgba(60, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.25);
     color: #fff;
+}
+
+.sov-profile-actions .sov-btn-outline:focus-visible {
+    outline: 2px solid #fbbf24;
+    outline-offset: 2px;
 }
 
 .sov-profile-actions .sov-btn-primary {
@@ -5900,6 +5910,35 @@ body {
 
 .pw-change-untracked {
     font-style: italic;
+}
+
+/* "Not tracked" is a placeholder, not a value: regular weight, not bold */
+.acct-row-static.pw-change-untracked {
+    color: var(--color-secondary);
+    /* same gray as the "Not provided" placeholders */
+    font-weight: 500;
+}
+
+/* Edit Profile / Save / Cancel are hidden while the Help & Support tab is open.
+   They fade and drift up slightly first (class is-leaving), then get the hidden attribute. */
+.sov-profile-actions {
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.sov-profile-actions.is-leaving {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.97);
+    pointer-events: none;
+}
+
+.sov-profile-actions[hidden] {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sov-profile-actions {
+        transition: none;
+    }
 }
 
 .acct-row-not-provided {
@@ -13167,7 +13206,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     width: 30px;
     height: 30px;
     border: none;
-    background: rgba(255,255,255,0.92);
+    background: rgba(255, 255, 255, 0.92);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -13176,27 +13215,32 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     z-index: 3;
     transition: background .15s, color .15s;
     color: var(--color-secondary, #777);
-    box-shadow: 0 1px 4px rgba(0,0,0,.15);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
 }
+
 .eq-cart-chk:hover {
     background: #fff;
     color: var(--accent-maroon, #800000);
 }
+
 .eq-item-card--in-cart {
-    box-shadow: 0 0 0 2.5px var(--accent-maroon, #800000), 0 6px 24px rgba(128,0,0,.18);
+    box-shadow: 0 0 0 2.5px var(--accent-maroon, #800000), 0 6px 24px rgba(128, 0, 0, .18);
     transform: translateY(-3px);
     transition: box-shadow .2s, transform .2s;
 }
+
 .eq-item-card--in-cart .eq-cart-chk {
     background: var(--accent-maroon, #800000);
     color: #fff;
 }
+
 /* Checkout modal item rows */
 .eq-cart-checkout-list {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
+
 .eq-cart-checkout-item {
     display: flex;
     align-items: center;
@@ -13205,17 +13249,20 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     border-radius: 8px;
     padding: 10px 12px;
 }
+
 .eq-cco-name {
     flex: 1;
     font-size: 13px;
     font-weight: 600;
     color: var(--color-on-surface, #1a1a1a);
 }
+
 .eq-cco-stock {
     font-size: 11px;
     color: var(--color-secondary, #777);
     white-space: nowrap;
 }
+
 .eq-cco-qty {
     display: flex;
     align-items: center;
@@ -13225,6 +13272,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     border-radius: 20px;
     padding: 2px 6px;
 }
+
 .eq-cco-qty-btn {
     width: 22px;
     height: 22px;
@@ -13239,9 +13287,11 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     justify-content: center;
     border-radius: 50%;
 }
+
 .eq-cco-qty-btn:hover {
     background: var(--color-surface-container, #f5f5f5);
 }
+
 .eq-cco-qty-input {
     width: 32px;
     text-align: center;
@@ -13250,10 +13300,16 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     font-size: 13px;
     font-weight: 700;
     color: var(--color-on-surface, #1a1a1a);
+    appearance: textfield;
+    -webkit-appearance: textfield;
     -moz-appearance: textfield;
 }
+
 .eq-cco-qty-input::-webkit-inner-spin-button,
-.eq-cco-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.eq-cco-qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
 .eq-cart-bar {
     position: sticky;
     bottom: 0;
@@ -13266,10 +13322,11 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     justify-content: space-between;
     padding: 12px 20px;
     border-radius: 12px 12px 0 0;
-    box-shadow: 0 -4px 20px rgba(128,0,0,.25);
+    box-shadow: 0 -4px 20px rgba(128, 0, 0, .25);
     z-index: 50;
     gap: 12px;
 }
+
 .eq-cart-bar-summary {
     display: flex;
     align-items: center;
@@ -13277,13 +13334,15 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     font-weight: 600;
     font-size: 14px;
 }
+
 .eq-cart-bar-actions {
     display: flex;
     gap: 8px;
 }
+
 .eq-cart-bar-clear {
     background: transparent;
-    border: 1.5px solid rgba(255,255,255,.5);
+    border: 1.5px solid rgba(255, 255, 255, .5);
     color: #fff;
     border-radius: 8px;
     padding: 6px 14px;
@@ -13291,6 +13350,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     font-size: 13px;
     font-weight: 600;
 }
+
 .eq-cart-bar-submit {
     background: #fff;
     color: var(--accent-maroon, #800000);
@@ -13304,6 +13364,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     align-items: center;
     gap: 4px;
 }
+
 .eq-cart-checkout-list {
     list-style: none;
     padding: 0;
@@ -13312,6 +13373,7 @@ html.rx-mobile body #settingsOverlay .sov-pagehead::after {
     flex-direction: column;
     gap: 6px;
 }
+
 .eq-cart-checkout-item {
     background: var(--color-surface-container, #f5f5f5);
     border-radius: 8px;
