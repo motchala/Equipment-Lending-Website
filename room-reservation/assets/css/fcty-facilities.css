@@ -2311,6 +2311,13 @@ textarea.fcty-input {
     container-name: fcs;
     margin-top: 40px;
     --fcs-line: color-mix(in srgb, var(--fcty-line) 55%, transparent);
+    --fcs-maroon: #800000;
+    /* day row */
+    --fcs-maroon-ink: #4a0a0a;
+    /* text on the yellow */
+    --fcs-yellow: #f5cc4a;
+    /* time column */
+    --fcs-time-w: 76px;
 }
 
 #rooms-browse .fcs-head {
@@ -2417,20 +2424,34 @@ textarea.fcty-input {
 
 #rooms-browse .fcs-grid {
     display: grid;
-    grid-template-columns: 68px repeat(6, minmax(0, 1fr));
-    padding-bottom: 12px;
-    /* room for the last hour label */
+    grid-template-columns: var(--fcs-time-w) repeat(6, minmax(0, 1fr));
+    align-items: stretch;
 }
 
+/* top-left cell: part of the maroon day row, labels the yellow time column */
 #rooms-browse .fcs-corner {
-    border-bottom: 1px solid var(--fcty-line);
+    display: grid;
+    place-items: center;
+    background: var(--fcs-maroon);
+    color: var(--fcs-yellow);
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
 }
 
+/* day row (maroon) */
 #rooms-browse .fcs-dayhead {
-    padding: 12px 6px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 68px;
+    padding: 10px 6px;
     text-align: center;
-    border-bottom: 1px solid var(--fcty-line);
-    border-left: 1px solid var(--fcs-line);
+    background: var(--fcs-maroon);
+    border-left: 1px solid rgba(255, 255, 255, .16);
 }
 
 #rooms-browse .fcs-dow {
@@ -2438,6 +2459,7 @@ textarea.fcty-input {
     font-size: .7rem;
     font-weight: 700;
     letter-spacing: .08em;
+    line-height: 1;
     text-transform: uppercase;
     color: var(--fcty-muted);
 }
@@ -2447,51 +2469,76 @@ textarea.fcty-input {
     place-items: center;
     min-width: 32px;
     height: 32px;
-    margin-top: 2px;
     padding: 0 4px;
     border-radius: 16px;
     font-size: 1.05rem;
     font-weight: 700;
+    line-height: 1;
     color: var(--fcty-ink);
     font-variant-numeric: tabular-nums;
 }
 
-#rooms-browse .fcs-dayhead.is-today .fcs-dow,
-#rooms-browse .fcs-ag-day.is-today .fcs-dow {
-    color: var(--fcty-brand);
+/* inside the maroon row everything is light; today is the yellow dot */
+#rooms-browse .fcs-dayhead .fcs-dow {
+    color: rgba(255, 255, 255, .78);
 }
 
-#rooms-browse .fcs-dayhead.is-today .fcs-dom,
-#rooms-browse .fcs-ag-day.is-today .fcs-dom {
-    background: var(--fcty-brand);
+#rooms-browse .fcs-dayhead .fcs-dom {
     color: #fff;
 }
 
+#rooms-browse .fcs-dayhead.is-today .fcs-dow {
+    color: var(--fcs-yellow);
+}
+
+#rooms-browse .fcs-dayhead.is-today .fcs-dom {
+    background: var(--fcs-yellow);
+    color: var(--fcs-maroon-ink);
+}
+
+/* time column (yellow). Hour labels are centred on the line that starts their hour. */
 #rooms-browse .fcs-gutter {
     position: relative;
-    height: var(--fcs-h);
+    box-sizing: border-box;
+    height: calc(var(--fcs-h) + var(--fcs-pad) * 2);
+    background: var(--fcs-yellow);
+    border-top: 1px solid rgba(74, 10, 10, .14);
 }
 
 #rooms-browse .fcs-hour {
     position: absolute;
-    right: 10px;
+    left: 0;
+    right: 0;
+    padding: 0 12px 0 6px;
     transform: translateY(-50%);
-    font-size: .7rem;
-    font-weight: 600;
-    color: var(--fcty-muted);
+    text-align: right;
+    font-size: .72rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--fcs-maroon-ink);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
+/* day columns: an hour line at the start of every hour (and one closing the last hour),
+   drawn only inside the padded area so they line up with the labels and the booking blocks */
 #rooms-browse .fcs-col {
     position: relative;
-    height: var(--fcs-h);
+    box-sizing: border-box;
+    height: calc(var(--fcs-h) + var(--fcs-pad) * 2);
+    padding: var(--fcs-pad) 0;
     border-left: 1px solid var(--fcs-line);
-    background-image: repeating-linear-gradient(to bottom,
-            transparent 0,
-            transparent calc(var(--fcs-hh) - 1px),
-            var(--fcs-line) calc(var(--fcs-hh) - 1px),
-            var(--fcs-line) var(--fcs-hh));
+    border-top: 1px solid var(--fcs-line);
+    background-image:
+        linear-gradient(to top, var(--fcs-line) 1px, transparent 1px),
+        repeating-linear-gradient(to bottom,
+            var(--fcs-line) 0,
+            var(--fcs-line) 1px,
+            transparent 1px,
+            transparent var(--fcs-hh));
+    background-origin: content-box;
+    background-clip: content-box;
+    background-repeat: no-repeat, repeat-y;
 }
 
 #rooms-browse .fcs-col.is-today {
@@ -2699,11 +2746,6 @@ textarea.fcty-input {
     --ev: #e59a9a;
 }
 
-[data-theme="dark"] #rooms-browse .fcs-dayhead.is-today .fcs-dow,
-[data-theme="dark"] #rooms-browse .fcs-ag-day.is-today .fcs-dow {
-    color: #e59a9a;
-}
-
 [data-theme="high-contrast"] #rooms-browse .fcs-t-exam {
     --ev: #7cc0ff;
 }
@@ -2715,10 +2757,10 @@ textarea.fcty-input {
 /* nothing booked this week */
 #rooms-browse .fcs-empty {
     position: absolute;
-    left: 68px;
+    left: var(--fcs-time-w);
     right: 0;
-    top: 72px;
-    bottom: 12px;
+    top: 68px;
+    bottom: 0;
     display: grid;
     place-items: center;
     padding: 16px;
@@ -2770,8 +2812,35 @@ textarea.fcty-input {
     border-top: 0;
 }
 
+/* agenda date chip: same maroon as the grid's day row */
 #rooms-browse .fcs-ag-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    align-self: start;
+    padding: 10px 0;
+    border-radius: 12px;
+    background: var(--fcs-maroon);
     text-align: center;
+}
+
+#rooms-browse .fcs-ag-date .fcs-dow {
+    color: rgba(255, 255, 255, .78);
+}
+
+#rooms-browse .fcs-ag-date .fcs-dom {
+    color: #fff;
+}
+
+#rooms-browse .fcs-ag-day.is-today .fcs-ag-date .fcs-dow {
+    color: var(--fcs-yellow);
+}
+
+#rooms-browse .fcs-ag-day.is-today .fcs-ag-date .fcs-dom {
+    background: var(--fcs-yellow);
+    color: var(--fcs-maroon-ink);
 }
 
 #rooms-browse .fcs-ag-list {

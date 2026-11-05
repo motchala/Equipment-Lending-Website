@@ -22,8 +22,10 @@
     if (!root) return;
 
     var HOUR_H = 60;                 /* px per hour in the grid                              */
-    var CORE_START = 8 * 60;         /* the grid always covers 8 AM – 5 PM, and grows to fit */
-    var CORE_END = 17 * 60;          /* anything booked earlier or later                     */
+    var PAD = 14;                    /* breathing room above 7 AM / below 9 PM (first and last
+                                        hour labels sit centred on their lines)                */
+    var CORE_START = 7 * 60;         /* the grid always covers 7 AM – 9 PM, and grows to fit */
+    var CORE_END = 21 * 60;          /* anything booked earlier or later                     */
     var REFETCH_MS = 5 * 60 * 1000;
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -68,9 +70,13 @@
         return ((h % 12) || 12) + ':' + pad(m);
     }
 
-    function meridiem(min) { return (Math.floor(min / 60) % 24) >= 12 ? 'PM' : 'AM'; }
+    /* Philippine convention: exactly 12:00 is "NN" (noon), not "PM" */
+    function meridiem(min) {
+        if (min % (24 * 60) === 12 * 60) return 'NN';
+        return (Math.floor(min / 60) % 24) >= 12 ? 'PM' : 'AM';
+    }
 
-    /* "9:30 – 11:30 AM"  or  "9:30 AM – 12:30 PM" */
+    /* "9:30 – 11:30 AM"  or  "9:30 AM – 12:00 NN" */
     function range(a, b) {
         return meridiem(a) === meridiem(b)
             ? clock(a) + ' – ' + clock(b) + ' ' + meridiem(b)
@@ -79,6 +85,7 @@
 
     function hourLabel(min) {
         var h = Math.floor(min / 60) % 24;
+        if (h === 12) return '12 NN';
         return ((h % 12) || 12) + ' ' + (h >= 12 ? 'PM' : 'AM');
     }
 
@@ -134,7 +141,7 @@
 
     /* ── Layout ────────────────────────────────────────────── */
 
-    /* Grid hours: 8 AM – 5 PM, stretched out to the hour for anything outside that */
+    /* Grid hours: 7 AM – 9 PM, stretched out to the hour for anything outside that */
     function hourWindow(days) {
         var lo = CORE_START, hi = CORE_END;
         days.forEach(function (d) {
@@ -188,7 +195,7 @@
 
     function eventHtml(l, win, date) {
         var it = l.it;
-        var top = (l.s - win.start) / 60 * HOUR_H;
+        var top = PAD + (l.s - win.start) / 60 * HOUR_H;
         var h = Math.max((l.e - l.s) / 60 * HOUR_H, 24);
         var cls = 'fcs-ev ' + typeClass(it.purpose) +
             (l.lanes > 1 ? ' is-lane' : '') +
@@ -223,15 +230,15 @@
         var hours = (win.end - win.start) / 60;
         var gridH = hours * HOUR_H;
         var showNow = d.days.some(function (day) { return day.date === d.today; });
-        var nowTop = (nowMinutes() - win.start) / 60 * HOUR_H;
+        var nowTop = PAD + (nowMinutes() - win.start) / 60 * HOUR_H;
 
-        var heads = '<div class="fcs-corner"></div>';
+        var heads = '<div class="fcs-corner"><span>Time</span></div>';
         var cols = '';
         var labels = '';
         var m;
 
         for (m = win.start; m <= win.end; m += 60) {
-            labels += '<span class="fcs-hour" style="top:' + ((m - win.start) / 60 * HOUR_H) + 'px">' + esc(hourLabel(m)) + '</span>';
+            labels += '<span class="fcs-hour" style="top:' + (PAD + (m - win.start) / 60 * HOUR_H) + 'px">' + esc(hourLabel(m)) + '</span>';
         }
 
         d.days.forEach(function (day, i) {
@@ -255,7 +262,7 @@
 
         return '<div class="fcs-grid-wrap">' +
             '<div class="fcs-grid" role="group" aria-label="Weekly schedule, Monday to Saturday"' +
-            ' style="--fcs-hh:' + HOUR_H + 'px;--fcs-h:' + gridH + 'px">' +
+            ' style="--fcs-hh:' + HOUR_H + 'px;--fcs-h:' + gridH + 'px;--fcs-pad:' + PAD + 'px">' +
             heads + '<div class="fcs-gutter" aria-hidden="true">' + labels + '</div>' + cols +
             '</div>' + empty + '</div>';
     }
@@ -325,7 +332,7 @@
         var lines = body.querySelectorAll('.fcs-now');
         for (var i = 0; i < lines.length; i++) {
             var start = parseInt(lines[i].getAttribute('data-win'), 10);
-            lines[i].style.top = ((n - start) / 60 * HOUR_H) + 'px';
+            lines[i].style.top = (PAD + (n - start) / 60 * HOUR_H) + 'px';
         }
         var evs = body.querySelectorAll('.fcs-ev');
         for (var j = 0; j < evs.length; j++) {
