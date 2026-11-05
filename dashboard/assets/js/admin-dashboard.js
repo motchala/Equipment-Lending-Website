@@ -2416,6 +2416,55 @@
         return s;
     }
 
+    /* ── Rules for NEW admin accounts ─────────────────────────────
+       create-admin-account.php enforces the same rules on the server; these only give instant feedback. */
+    const ADM_EMAIL_DOMAIN = '@admin.edu';
+
+    /* '' when the email is fine, otherwise the message to show. `email` is already trimmed + lower-cased. */
+    function admEmailError(email) {
+        if (!email) return 'Admin email is required.';
+        if (email.slice(-ADM_EMAIL_DOMAIN.length) !== ADM_EMAIL_DOMAIN) {
+            return 'Admin emails must end in ' + ADM_EMAIL_DOMAIN + ' (e.g. name' + ADM_EMAIL_DOMAIN + ').';
+        }
+        const local = email.slice(0, -ADM_EMAIL_DOMAIN.length);
+        if (!local) return 'Add a name before ' + ADM_EMAIL_DOMAIN + ' (e.g. name' + ADM_EMAIL_DOMAIN + ').';
+        if (local.length > 64) return 'The part before ' + ADM_EMAIL_DOMAIN + ' can be at most 64 characters.';
+        if (!/^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/.test(local) || local.indexOf('..') !== -1) {
+            return 'Before ' + ADM_EMAIL_DOMAIN + ', use only letters, numbers, dots, hyphens or underscores (start and end with a letter or number).';
+        }
+        return '';
+    }
+
+    /* Which password rules are met + a strength level for the meter:
+       0 empty · 1 Weak · 2 Fair · 3 Good (all rules met) · 4 Strong (all rules met and 12+ characters). */
+    function admPasswordInfo(pw) {
+        const rules = {
+            len: pw.length >= 8,
+            upper: /[A-Z]/.test(pw),
+            lower: /[a-z]/.test(pw),
+            num: /[0-9]/.test(pw),
+            sym: /[^A-Za-z0-9\s]/.test(pw)
+        };
+        const met = Object.keys(rules).filter(function (k) { return rules[k]; }).length;
+        const ok = met === 5 && pw.length <= 72;
+        let level = 0;
+        if (pw) level = met <= 2 ? 1 : (met < 5 ? 2 : (pw.length >= 12 ? 4 : 3));
+        return { rules: rules, met: met, ok: ok, level: level, label: ['Enter a password', 'Weak', 'Fair', 'Good', 'Strong'][level] };
+    }
+
+    /* The message to show when a password is rejected (same wording as the server). */
+    function admPasswordError(pw) {
+        if (!pw) return 'Password is required.';
+        if (pw.length < 8) return 'Password must be at least 8 characters.';
+        if (pw.length > 72) return 'Password can be at most 72 characters.';
+        const r = admPasswordInfo(pw).rules, missing = [];
+        if (!r.upper) missing.push('an uppercase letter');
+        if (!r.lower) missing.push('a lowercase letter');
+        if (!r.num) missing.push('a number');
+        if (!r.sym) missing.push('a special character (for example ! @ # $ %)');
+        return missing.length ? 'Password must include ' + missing.join(', ') + '.' : '';
+    }
+
     /* "Oct 7" — day shown in the status tag (campus timezone) */
     function admShortDate(ts) {
         return new Date(ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: ADM_TZ });
@@ -2912,6 +2961,39 @@
         /* ── ADD ──────────────────────────────────────────────── */
         const submitBtn = document.getElementById('adm-submit-btn');
 
+        /* Live feedback while typing: email convention + password strength */
+        const admEmailInput = document.getElementById('adm-email');
+        const admEmailHint = document.getElementById('adm-email-hint');
+        const admEmailHintDefault = admEmailHint ? admEmailHint.innerHTML : '';
+        const admPwInput = document.getElementById('adm-password');
+        const admPwMeter = document.getElementById('adm-pw-meter');
+        const admPwLabel = document.getElementById('adm-pw-label');
+        const admPwRules = document.getElementById('adm-pw-rules');
+
+        function showEmailHint(state) {   // state: '' (neutral) | 'ok' | 'bad'
+            if (!admEmailHint) return;
+            const v = admEmailInput.value.trim().toLowerCase();
+            const err = v ? admEmailError(v) : '';
+            admEmailHint.classList.remove('is-ok', 'is-bad');
+            if (state === 'bad' && err) { admEmailHint.textContent = err; admEmailHint.classList.add('is-bad'); }
+            else if (v && !err) { admEmailHint.textContent = 'Looks good.'; admEmailHint.classList.add('is-ok'); }
+            else admEmailHint.innerHTML = admEmailHintDefault;
+        }
+        function renderPasswordStrength() {
+            if (!admPwInput || !admPwMeter) return;
+            const info = admPasswordInfo(admPwInput.value);
+            admPwMeter.setAttribute('data-level', String(info.level));
+            admPwLabel.textContent = info.label;
+            admPwRules.querySelectorAll('li[data-rule]').forEach(function (li) {
+                li.classList.toggle('is-met', !!info.rules[li.getAttribute('data-rule')]);
+            });
+        }
+        if (admEmailInput) {
+            admEmailInput.addEventListener('input', function () { showEmailHint(''); });   // quiet while typing, green once valid
+            admEmailInput.addEventListener('blur', function () { showEmailHint('bad'); }); // spell out the problem when they leave the field
+        }
+        if (admPwInput) admPwInput.addEventListener('input', renderPasswordStrength);
+
         if (addBtn) {
             addBtn.addEventListener('click', function () {
                 if (addBtn.disabled) return;
@@ -2919,6 +3001,8 @@
                 ['adm-fullname', 'adm-email'].forEach(function (id) { document.getElementById(id).value = ''; });
                 document.getElementById('adm-role').value = 'Admin';
                 resetPasswordFields(['adm-password', 'adm-confirm'], addModal);
+                showEmailHint('');
+                renderPasswordStrength();
                 openModal(addModal);
                 document.getElementById('adm-fullname').focus();
             });
@@ -2937,9 +3021,10 @@
             /* Client-side pre-flight (mirrors the server checks) */
             if (!fullName) return showAlert('adm-form-alert', 'Full name is required.');
             if (!email) return showAlert('adm-form-alert', 'Admin email is required.');
-            if (!email.endsWith('@admin.edu')) return showAlert('adm-form-alert', 'Admin emails must end in @admin.edu (e.g. name@admin.edu).');
-            if (!password) return showAlert('adm-form-alert', 'Password is required.');
-            if (password.length < 8) return showAlert('adm-form-alert', 'Password must be at least 8 characters.');
+            const emailErr = admEmailError(email);
+            if (emailErr) return showAlert('adm-form-alert', emailErr);
+            const pwErr = admPasswordError(password);
+            if (pwErr) return showAlert('adm-form-alert', pwErr);
             if (password !== confirm) return showAlert('adm-form-alert', 'Passwords do not match.');
 
             busy = true;
