@@ -97,6 +97,9 @@ final class BorrowCancellation
      */
     public static function cancel(mysqli $conn, int $requestId, string $facultyId): array
     {
+        if (!BookingSchedule::ensureSchema($conn)) {
+            return ['success' => false, 'error' => 'The request could not be cancelled right now. Please try again.'];
+        }
         $now  = new DateTimeImmutable('now', self::tz());
         $peek = self::fetch($conn, $requestId, $facultyId, false);
         if (!$peek) {
@@ -142,7 +145,8 @@ final class BorrowCancellation
             $note = 'Cancelled by faculty';
             $upd = $conn->prepare(
                 "UPDATE tbl_requests
-                    SET status = 'Cancelled', reason = ?, return_token = NULL, stock_applied = 0
+                    SET status = 'Cancelled', reason = ?, return_token = NULL,
+                        claim_token = NULL, bundle_claim_token = NULL, stock_applied = 0
                   WHERE id = ? AND faculty_id = ? AND status IN ('Waiting','Approved')"
             );
             if (!$upd) {

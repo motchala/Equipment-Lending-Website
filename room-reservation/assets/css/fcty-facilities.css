@@ -2600,6 +2600,23 @@ textarea.fcty-input {
     font-variant-numeric: tabular-nums;
 }
 
+#rooms-browse .fcs-ev-student {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    overflow: hidden;
+    color: var(--fcty-muted);
+    font-size: .68rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#rooms-browse .fcs-ev-student .material-symbols-outlined {
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
 #rooms-browse .fcs-ev-where {
     display: flex;
     align-items: center;

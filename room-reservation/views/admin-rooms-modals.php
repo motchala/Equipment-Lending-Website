@@ -56,6 +56,7 @@
                     <div class="ps-kv">
                         <div><span>Name</span><strong id="ps-rr-who">—</strong></div>
                         <div><span>Type</span><strong id="ps-rr-type">—</strong></div>
+                        <div id="ps-rr-student-id-row" hidden><span>Student ID</span><strong id="ps-rr-student-id">—</strong></div>
                     </div>
                 </section>
 
@@ -99,4 +100,3 @@
             </div>
         </aside>
     </div>
-

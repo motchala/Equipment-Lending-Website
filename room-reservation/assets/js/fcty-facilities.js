@@ -906,7 +906,9 @@
             if (!quota) return;
             var chip = $('fcty-quota'), lim = $('fcty-res-limit'), docBlock = $('fcty-doc-block');
             if (chip) {
-                chip.innerHTML = icon('meeting_room') + quota.active + ' of ' + quota.max + ' rooms reserved';
+                chip.innerHTML = icon('meeting_room') + quota.active + ' of ' + quota.max + ' rooms reserved' +
+                    (quota.student_active ? ' (' + quota.student_active + ' student reservation' +
+                        (quota.student_active === 1 ? '' : 's') + ')' : '');
                 chip.hidden = false;
             }
             if (docBlock) docBlock.hidden = !quota.is_adviser;
@@ -920,7 +922,9 @@
                 '<strong>Room limit reached</strong><br>You already have ' + quota.max +
                 ' active room reservations. Wait until one ends to reserve another room.' +
                 '<ul class="fcty-limit-list">' + (quota.reservations || []).map(function (r) {
-                    return '<li>' + esc(r.room_name) + ' \u00b7 ' + longDate(parseYmd(r.date)) + ' \u00b7 ' +
+                    var student = r.student_name ? ' · Student: ' + esc(r.student_name) +
+                        (r.student_id ? ' (' + esc(r.student_id) + ')' : '') : '';
+                    return '<li>' + esc(r.room_name) + student + ' \u00b7 ' + longDate(parseYmd(r.date)) + ' \u00b7 ' +
                         minToLabel(timeToMin(r.start)) + ' \u2013 ' + minToLabel(timeToMin(r.end)) + '</li>';
                 }).join('') + '</ul>');
         }

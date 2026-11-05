@@ -193,9 +193,14 @@
         var cls = 'fcs-ev ' + typeClass(it.purpose) +
             (l.lanes > 1 ? ' is-lane' : '') +
             (h < 58 ? ' is-short' : '') + (h < 38 ? ' is-tiny' : '') +
-            (isPast(date, l.e) ? ' is-past' : '');
+            (isPast(date, l.e) ? ' is-past' : '') +
+            (it.student_name ? ' is-student' : '');
         var where = whereOf(it);
-        var text = it.purpose + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) + (where ? ', ' + where : '');
+        var student = it.student_name
+            ? 'Student: ' + it.student_name + (it.student_id ? ' (' + it.student_id + ')' : '')
+            : '';
+        var text = it.purpose + ', ' + range(l.s, l.e) + ', ' + duration(it.minutes) +
+            (student ? ', ' + student : '') + (where ? ', ' + where : '');
         var style = 'top:' + top + 'px;height:' + (h - 2) + 'px;' +
             'left:calc(' + (l.lane * 100 / l.lanes) + '% + 3px);' +
             'width:calc(' + (100 / l.lanes) + '% - 6px)';
@@ -208,6 +213,7 @@
             '<span class="fcs-ev-dur">' + esc(duration(it.minutes)) + '</span>' +
             '</span>' +
             '<span class="fcs-ev-time">' + esc(range(l.s, l.e)) + '</span>' +
+            (student ? '<span class="fcs-ev-student">' + icon('school') + esc(student) + '</span>' : '') +
             (where ? '<span class="fcs-ev-where">' + icon('location_on') + '<span>' + esc(whereShort(it)) + '</span></span>' : '') +
             '</div>';
     }

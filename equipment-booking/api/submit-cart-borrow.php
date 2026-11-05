@@ -124,6 +124,21 @@ $pseudo_post = [
 
 $submitted = [];
 $failed    = [];
+$cart_names = [];
+foreach ($raw_items as $raw) {
+    if (is_array($raw)) {
+        $name = trim((string)($raw['name'] ?? ''));
+        if ($name !== '') {
+            $cart_names[strtolower($name)] = true;
+        }
+    }
+}
+$batch_id = null;
+if (count($cart_names) > 1) {
+    $uuid = bin2hex(random_bytes(16));
+    $batch_id = substr($uuid, 0, 8) . '-' . substr($uuid, 8, 4) . '-4' . substr($uuid, 13, 3)
+        . '-a' . substr($uuid, 17, 3) . '-' . substr($uuid, 20, 12);
+}
 
 foreach ($raw_items as $raw) {
     $name = trim((string)($raw['name'] ?? ''));
@@ -155,15 +170,15 @@ foreach ($raw_items as $raw) {
          (faculty_name, faculty_id, equipment_name, instructor, room,
           borrow_date, return_date, borrow_time, return_time, borrow_qty, room_id,
           booking_mode, stock_applied, status, request_date, submitted_as,
-          submitted_by_name, submitted_by_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal', ?, ?)"
+          submitted_by_name, submitted_by_id, batch_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'Waiting', NOW(), 'personal', ?, ?, ?)"
     );
     if (!$stmt_ins) {
         $failed[] = ['name' => $name, 'error' => 'Database error. Please try again.'];
         continue;
     }
     $stmt_ins->bind_param(
-        'ssssssssssiiss',
+        'sssssssssiiisss',
         $faculty_name,
         $faculty_id,
         $name,
@@ -177,7 +192,8 @@ foreach ($raw_items as $raw) {
         $room_id,
         $bk['mode'],
         $collector_name,
-        $collector_id
+        $collector_id,
+        $batch_id
     );
     if (!$stmt_ins->execute()) {
         $stmt_ins->close();

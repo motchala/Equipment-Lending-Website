@@ -165,13 +165,13 @@ $faculty_dept = (string)($user_row['department'] ?? '');
 
 $res_stmt = $conn->prepare(
     "SELECT rr.id, r.room_name, b.name AS building_name,
-            rr.reservation_date, rr.start_time, rr.end_time, rr.purpose
+            rr.reservation_date, rr.start_time, rr.end_time, rr.purpose,
+            rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id
        FROM tbl_room_reservations rr
        JOIN tbl_rooms     r ON r.room_id     = rr.room_id
        JOIN tbl_buildings b ON b.building_id = r.building_id
       WHERE rr.faculty_id   = ?
-        AND rr.submitted_as <> 'student'
-        AND rr.status        = 'Approved'
+        AND rr.status        IN ('Approved', 'Waiting')
         AND (rr.reservation_date > CURDATE()
              OR (rr.reservation_date = CURDATE() AND rr.end_time > CURTIME()))
       ORDER BY rr.reservation_date ASC, rr.start_time ASC
@@ -209,7 +209,11 @@ $ctx_reservations = $quota_used === 0
         . ' on ' . $r['reservation_date']
         . ' from ' . substr($r['start_time'], 0, 5)
         . ' to '   . substr($r['end_time'],   0, 5)
-        . ' — Purpose: ' . $r['purpose'],
+        . ' — Purpose: ' . $r['purpose']
+        . ((string)($r['submitted_as'] ?? '') === 'student'
+            ? ' — Student: ' . (string)($r['submitted_by_name'] ?? '')
+                . ((string)($r['submitted_by_id'] ?? '') !== '' ? ' (' . (string)$r['submitted_by_id'] . ')' : '')
+            : ''),
         $res_rows));
 
 // Build a lookup map of valid reservation IDs this faculty owns.
@@ -432,7 +436,7 @@ You are PUPSync Room Assistant, an AI assistant for the Polytechnic University o
 - Maximum active reservations per faculty: 2 at the same time.
 - Cancellation: only allowed more than 1 hour before the start time.
 - Organisation Advisers may attach a supporting document (PDF, JPG, PNG, max 5 MB) for priority.
-- Student-submitted reservations via faculty code do NOT count toward the faculty's quota.
+- Student-submitted reservations via faculty code count toward the faculty's quota and appear in the faculty's activity.
 
 ## CAMPUSES & BUILDINGS
 - **PUP MAIN** (Zapote, Biñan): Building A (Old, 5 floors), Building B (New, 4 floors)

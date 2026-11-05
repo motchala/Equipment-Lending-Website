@@ -28,51 +28,148 @@ $token   = trim($_GET['token'] ?? '');
 $message = '';
 $success = false;
 $req_row = null;
+$claimed_rows = [];
 $is_ajax = (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
 
 if ($token) {
     $conn->begin_transaction();
     try {
-        $stmt = $conn->prepare(
-            "SELECT id, faculty_name, equipment_name, status, claim_token, borrow_qty,
+        $bundle_stmt = $conn->prepare(
+            "SELECT id, faculty_id, faculty_name, equipment_name, status, bundle_claim_token, borrow_qty,
                     submitted_by_name, submitted_by_id
                FROM tbl_requests
-              WHERE claim_token = ? AND status = 'Approved'
-              LIMIT 1 FOR UPDATE"
+              WHERE bundle_claim_token = ? AND status = 'Approved'
+              ORDER BY id
+              FOR UPDATE"
         );
-        $stmt->bind_param('s', $token);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        if (!$bundle_stmt) {
+            throw new RuntimeException('Could not prepare bundle claim lookup.');
+        }
+        $bundle_stmt->bind_param('s', $token);
+        if (!$bundle_stmt->execute()) {
+            $bundle_stmt->close();
+            throw new RuntimeException('Could not read the bundle claim.');
+        }
+        $bundle_result = $bundle_stmt->get_result();
+        while ($bundle_row = $bundle_result->fetch_assoc()) {
+            $claimed_rows[] = $bundle_row;
+        }
+        $bundle_stmt->close();
 
-        if (!$row) {
-            $message = 'Invalid or already-used claim token.';
-        } else {
-            $req_id  = (int)$row['id'];
-            $eq_name = $row['equipment_name'];
-            $borrower = $row['faculty_name'];
-
-            // Mark as On Loan — physical handover confirmed
+        if ($claimed_rows) {
             $upd = $conn->prepare(
-                "UPDATE tbl_requests SET status = 'On Loan', claimed_at = NOW(), claim_token = NULL WHERE id = ?"
+                "UPDATE tbl_requests
+                    SET status = 'On Loan', claimed_at = NOW(),
+                        claim_token = NULL, bundle_claim_token = NULL
+                  WHERE bundle_claim_token = ? AND status = 'Approved'"
             );
-            $upd->bind_param('i', $req_id);
-            $upd->execute();
+            if (!$upd) {
+                throw new RuntimeException('Could not prepare bundle claim update.');
+            }
+            $upd->bind_param('s', $token);
+            if (!$upd->execute() || $upd->affected_rows !== count($claimed_rows)) {
+                $upd->close();
+                throw new RuntimeException('Could not confirm all items in the bundle.');
+            }
             $upd->close();
 
-            // Log it
             $admin_name = $_SESSION['admin_name'] ?? 'Admin';
             $log = $conn->prepare(
                 "INSERT INTO tbl_arbitration_log
                  (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_by_id, override_reason, created_at)
-                 VALUES (?, ?, ?, ?, 'On Loan', 'qr_claim', 'Equipment claimed via QR scan', ?, ?, 'QR Token Claim', NOW())
+                 VALUES (?, ?, ?, ?, 'On Loan', 'qr_claim', 'Equipment claimed via bundle QR scan', ?, ?, 'Bundle QR Token Claim', NOW())
                  ON DUPLICATE KEY UPDATE decision='On Loan', rule_applied='qr_claim', override_by=VALUES(override_by), override_by_id=VALUES(override_by_id), created_at=NOW()"
             );
-            $log->bind_param('issssi', $req_id, $borrower, $borrower, $eq_name, $admin_name, $acting_admin_id);
-            $log->execute();
+            if (!$log) {
+                throw new RuntimeException('Could not prepare bundle claim log.');
+            }
+            foreach ($claimed_rows as $row) {
+                $req_id = (int)$row['id'];
+                $borrower = (string)$row['faculty_name'];
+                $eq_name = (string)$row['equipment_name'];
+                $faculty_id = (string)$row['faculty_id'];
+                $log->bind_param('issssi', $req_id, $faculty_id, $borrower, $eq_name, $admin_name, $acting_admin_id);
+                if (!$log->execute()) {
+                    $log->close();
+                    throw new RuntimeException('Could not record the bundle claim.');
+                }
+            }
             $log->close();
+            $req_row = $claimed_rows[0];
+            $names = array_values(array_unique(array_map(static function (array $row): string {
+                return (string)$row['equipment_name'];
+            }, $claimed_rows)));
+            $equipment_list = implode(', ', $names);
+            $collector_display = trim((string)($req_row['submitted_by_name'] ?? ''));
+            $borrower = (string)$req_row['faculty_name'];
+            $who = $collector_display !== ''
+                ? $collector_display . ', on behalf of ' . $borrower
+                : $borrower;
+            $success = true;
+            $message = 'Claim confirmed — bundled equipment (' . count($claimed_rows) . ' items: '
+                . $equipment_list . ') handed to ' . $who . '.';
+        } else {
+            $stmt = $conn->prepare(
+                "SELECT id, faculty_id, faculty_name, equipment_name, status, claim_token, borrow_qty,
+                        submitted_by_name, submitted_by_id
+                   FROM tbl_requests
+                  WHERE claim_token = ? AND status = 'Approved'
+                  LIMIT 1 FOR UPDATE"
+            );
+            $stmt->bind_param('s', $token);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
 
+            if (!$row) {
+                $message = 'Invalid or already-used claim token.';
+            } else {
+                $req_id = (int)$row['id'];
+                $eq_name = (string)$row['equipment_name'];
+                $borrower = (string)$row['faculty_name'];
+                $upd = $conn->prepare(
+                    "UPDATE tbl_requests SET status = 'On Loan', claimed_at = NOW(), claim_token = NULL WHERE id = ?"
+                );
+                $upd->bind_param('i', $req_id);
+                $upd->execute();
+                $upd->close();
+
+                $admin_name = $_SESSION['admin_name'] ?? 'Admin';
+                $log = $conn->prepare(
+                    "INSERT INTO tbl_arbitration_log
+                     (request_id, borrower_id, borrower_name, equipment_name, decision, rule_applied, reason, override_by, override_by_id, override_reason, created_at)
+                     VALUES (?, ?, ?, ?, 'On Loan', 'qr_claim', 'Equipment claimed via QR scan', ?, ?, 'QR Token Claim', NOW())
+                     ON DUPLICATE KEY UPDATE decision='On Loan', rule_applied='qr_claim', override_by=VALUES(override_by), override_by_id=VALUES(override_by_id), created_at=NOW()"
+                );
+                $log->bind_param('issssi', $req_id, $borrower, $borrower, $eq_name, $admin_name, $acting_admin_id);
+                $log->execute();
+                $log->close();
+                $req_row = $row;
+                $claimed_rows = [$row];
+                $collector_display = trim((string)($row['submitted_by_name'] ?? ''));
+                $who = $collector_display !== ''
+                    ? $collector_display . ', on behalf of ' . $borrower
+                    : $borrower;
+                $success = true;
+                $message = "Claim confirmed — {$eq_name} handed to {$who}.";
+            }
+        }
+
+        if ($success) {
             $conn->commit();
+        } else {
+            $conn->rollback();
+        }
+    } catch (Throwable $e) {
+        $conn->rollback();
+        error_log('[claim_confirm] ' . $e->getMessage());
+        $message = 'Error processing claim. Please try again.';
+    }
+    if ($success) {
+        foreach ($claimed_rows as $claimed_row) {
+            $req_id = (int)$claimed_row['id'];
+            $eq_name = (string)$claimed_row['equipment_name'];
+            $borrower = (string)$claimed_row['faculty_name'];
             admin_log_activity(
                 $conn,
                 'request',
@@ -80,18 +177,7 @@ if ($token) {
                 null,
                 ['action' => 'request_claimed', 'ref_type' => 'request', 'ref_id' => $req_id]
             );
-            $req_row = $row;
-            $collector_display = trim((string)($row['submitted_by_name'] ?? ''));
-            $who = ($collector_display !== '')
-                ? htmlspecialchars($collector_display) . ', on behalf of ' . htmlspecialchars($borrower)
-                : htmlspecialchars($borrower);
-            $success = true;
-            $message = "Claim confirmed — {$eq_name} handed to {$who}.";
         }
-    } catch (Exception $e) {
-        $conn->rollback();
-        error_log('[claim_confirm] ' . $e->getMessage());
-        $message = 'Error processing claim. Please try again.';
     }
 } else {
     $message = 'No token provided.';

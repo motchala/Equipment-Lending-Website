@@ -72,6 +72,7 @@ if ($start_time < '07:00' || $end_time > '20:00') {
 }
 
 require_once __DIR__ . '/../../config/db.php';
+require_once __DIR__ . '/../core/room-quota.php';
 $conn = getDB();
 
 // ── Student must be on the official student list (re-checked here, never trusted from the form) ──
@@ -112,6 +113,21 @@ if (!$room_row) {
 }
 $room_name = $room_row['room_name'];
 
+// Student-authorized reservations use the same faculty account limit and lock as faculty submissions.
+fcty_quota_lock($conn, $faculty_id);
+$active_now = fcty_active_room_reservations($conn, $faculty_id);
+if (count($active_now) >= FCTY_MAX_ACTIVE_ROOM_RESERVATIONS) {
+    fcty_quota_unlock($conn, $faculty_id);
+    echo json_encode([
+        'error' => 'The authorizing faculty account has reached its limit of '
+            . FCTY_MAX_ACTIVE_ROOM_RESERVATIONS . ' active room reservations. Please ask the faculty member to cancel one or wait until one ends.',
+        'limit_reached' => true,
+        'active' => count($active_now),
+        'max' => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
+    ]);
+    exit();
+}
+
 // ── Insert reservation ────────────────────────────────────────────────────
 // Same-day: Approved at once (the engine may flip it to Declined). A LATER DATE waits for an admin.
 require_once __DIR__ . '/../core/room-expiry.php';
@@ -148,11 +164,13 @@ $ins->bind_param(
 if (!$ins->execute()) {
     error_log('[PUPSync] submit-student-reserve insert failed: ' . $conn->error);
     $ins->close();
+    fcty_quota_unlock($conn, $faculty_id);
     echo json_encode(['error' => 'Failed to save reservation. Please try again.']);
     exit();
 }
 $reservation_id = $conn->insert_id;
 $ins->close();
+fcty_quota_unlock($conn, $faculty_id);
 
 // ── Run Arbitration Engine ────────────────────────────────────────────────
 require_once __DIR__ . '/../../equipment-booking/core/arbitration-engine.php';

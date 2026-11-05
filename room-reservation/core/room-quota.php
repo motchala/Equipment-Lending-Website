@@ -13,12 +13,11 @@
  *      applies the overdue block to rooms).
  *   2. One faculty account may hold at most FCTY_MAX_ACTIVE_ROOM_RESERVATIONS
  *      active room reservations at the same time (2 is fine, 3 is not).
- *        "Active" = status Approved AND not finished yet (the end time is still
- *        ahead). Declined / Cancelled / already-finished ones do not count, so
- *        a slot is freed by cancelling or simply by waiting for it to end.
- *        Reservations made by a faculty member's students through their room
- *        code (submitted_as = student) are not the faculty member's own
- *        bookings and do not count.
+ *        "Active" = status Approved or Waiting AND not finished yet (the end
+ *        time is still ahead). Declined / Cancelled / already-finished ones do
+ *        not count, so a slot is freed by cancelling or simply by waiting for it to end.
+ *        Reservations made by students through the faculty member's code count
+ *        toward the same faculty account limit.
  *   3. Only Organization Advisers may attach a supporting document (JPG, PNG or
  *      PDF, max 5 MB). It is optional. Attaching one files the reservation as
  *      submitted_as = adviser and stores the path in document_path, which the
@@ -37,7 +36,7 @@ if (!defined('FCTY_ROOM_DOC_MAX_BYTES')) {
 /**
  * The faculty member's own active room reservations, soonest first.
  *
- * @return array<int, array{id:int, room_name:string, date:string, start:string, end:string}>
+ * @return array<int, array{id:int, room_name:string, date:string, start:string, end:string, submitted_as:string, student_name:string, student_id:string}>
  */
 function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
 {
@@ -51,12 +50,12 @@ function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
     // Approved AND Waiting both count: a request waiting for an admin is still a booking the
     // member has asked for, otherwise the limit could be dodged by filing many future requests.
     $stmt = $conn->prepare(
-        "SELECT rr.id, r.room_name, rr.reservation_date, rr.start_time, rr.end_time
+        "SELECT rr.id, r.room_name, rr.reservation_date, rr.start_time, rr.end_time,
+                rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id
            FROM tbl_room_reservations rr
            JOIN tbl_rooms r ON r.room_id = rr.room_id
           WHERE rr.faculty_id   = ?
             AND rr.status       IN ('Approved', 'Waiting')
-            AND rr.submitted_as <> 'student'
             AND (rr.reservation_date > ?
                  OR (rr.reservation_date = ? AND rr.end_time > ?))
           ORDER BY rr.reservation_date ASC, rr.start_time ASC"
@@ -76,6 +75,9 @@ function fcty_active_room_reservations(mysqli $conn, string $faculty_id): array
             'date'      => (string)$row['reservation_date'],
             'start'     => substr((string)$row['start_time'], 0, 5),
             'end'       => substr((string)$row['end_time'], 0, 5),
+            'submitted_as' => (string)($row['submitted_as'] ?? ''),
+            'student_name' => (string)($row['submitted_as'] ?? '') === 'student' ? (string)($row['submitted_by_name'] ?? '') : '',
+            'student_id' => (string)($row['submitted_as'] ?? '') === 'student' ? (string)($row['submitted_by_id'] ?? '') : '',
         ];
     }
     $stmt->close();
@@ -142,9 +144,8 @@ function fcty_quota_message(): string
  *
  * The equipment half lives in activity/core/faculty-data.php and
  * uses the same helpers, status words and colours defined below.
- * Reservations a faculty member's students made through their room code
- * (submitted_as = student) are not the faculty member's own activity and are
- * left out here, exactly like the room limit above leaves them out.
+ * Reservations made through the faculty member's student authorization code
+ * are included and labeled with the student who made them.
  * ========================================================================== */
 
 /** Escape for HTML. */
@@ -223,6 +224,7 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
         'waitlist' => [],
         'history' => [],
         'active' => 0,
+        'student_active' => 0,
         'max' => FCTY_MAX_ACTIVE_ROOM_RESERVATIONS,
     ];
     $tz  = new DateTimeZone('Asia/Manila');
@@ -233,13 +235,14 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
 
         $stmt = $conn->prepare(
             "SELECT rr.id, rr.room_id, rr.reservation_date, rr.start_time, rr.end_time,
-                    rr.purpose, rr.submitted_as, rr.document_path, rr.status, rr.reason,
+                    rr.purpose, rr.submitted_as, rr.submitted_by_name, rr.submitted_by_id,
+                    rr.document_path, rr.status, rr.reason,
                     r.room_name, b.building_key, b.name AS building_name,
                     COALESCE(r.floor_label, CONCAT(r.floor_number, 'F')) AS floor_label
                FROM tbl_room_reservations rr
                JOIN tbl_rooms     r ON r.room_id     = rr.room_id
                JOIN tbl_buildings b ON b.building_id = r.building_id
-              WHERE rr.faculty_id = ? AND rr.submitted_as <> 'student'
+              WHERE rr.faculty_id = ?
               ORDER BY rr.reservation_date DESC, rr.start_time DESC
               LIMIT 300"
         );
@@ -261,6 +264,8 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
                     'start'     => substr(fact_s($row, 'start_time'), 0, 5),
                     'end'       => substr(fact_s($row, 'end_time'), 0, 5),
                     'purpose'   => fact_s($row, 'purpose'),
+                    'student_name' => fact_s($row, 'submitted_as') === 'student' ? fact_s($row, 'submitted_by_name') : '',
+                    'student_id' => fact_s($row, 'submitted_as') === 'student' ? fact_s($row, 'submitted_by_id') : '',
                     'reason'    => fact_s($row, 'reason'),
                     'letter'    => fact_s($row, 'document_path') !== '',
                     'start_ts'  => $start->getTimestamp(),
@@ -338,6 +343,13 @@ function fact_load_rooms(mysqli $conn, string $faculty_id): array
     }
 
     $out['active'] = count($out['live']) + count($out['upcoming']) + count($out['pending']);
+    foreach (['live', 'upcoming', 'pending'] as $bucket) {
+        foreach ($out[$bucket] as $item) {
+            if (fact_s($item, 'student_name') !== '') {
+                $out['student_active']++;
+            }
+        }
+    }
     return $out;
 }
 
@@ -498,6 +510,13 @@ function fact_render_room_item(array $it, string $kind): string
     if ($kind === 'waitlist') {
         $sub[] = 'We\'ll notify you if this slot opens up';
     } else {
+        if (fact_s($it, 'student_name') !== '') {
+            $student = 'Student reservation by ' . fact_s($it, 'student_name');
+            if (fact_s($it, 'student_id') !== '') {
+                $student .= ' (' . fact_s($it, 'student_id') . ')';
+            }
+            $sub[] = fact_h($student . ' · authorized through your faculty code');
+        }
         if (fact_s($it, 'purpose') !== '') {
             $sub[] = fact_h(fact_s($it, 'purpose'));
         }
@@ -625,6 +644,13 @@ function fact_render_room_history_rows(array $d): string
 
         // Second line: why it ended this way (or what it was for)
         $note = fact_h(fact_s($it, 'purpose'));
+        if (fact_s($it, 'student_name') !== '') {
+            $student = 'Student reservation by ' . fact_s($it, 'student_name');
+            if (fact_s($it, 'student_id') !== '') {
+                $student .= ' (' . fact_s($it, 'student_id') . ')';
+            }
+            $note = fact_h($student . ' · ' . fact_s($it, 'purpose'));
+        }
         if (fact_s($it, 'reason') !== '' && $state !== 'completed') {
             $note = fact_h(fact_s($it, 'reason'));
         }
@@ -657,7 +683,7 @@ function fact_render_room_history_rows(array $d): string
  * which the live-refresh endpoint still returns).
  *
  * @param array<string, mixed> $d result of fact_load_rooms()
- * @return array{reserved: string, reserved_sub: string, next: string, next_sub: string, active: int}
+ * @return array{reserved: string, reserved_sub: string, next: string, next_sub: string, active: int, student_active: int}
  */
 function fact_room_stats(array $d): array
 {
@@ -666,6 +692,7 @@ function fact_room_stats(array $d): array
     $active   = fact_i($d, 'active');
     $max      = max(1, fact_i($d, 'max'));
     $left     = max(0, $max - $active);
+    $studentActive = fact_i($d, 'student_active');
 
     $next = $live[0] ?? $upcoming[0] ?? null;
     $next_value = '—';
@@ -688,9 +715,11 @@ function fact_room_stats(array $d): array
 
     return [
         'reserved'     => $active . ' / ' . $max,
-        'reserved_sub' => $left === 0 ? 'Limit reached' : $left . ' more available',
+        'reserved_sub' => ($left === 0 ? 'Limit reached' : $left . ' more available')
+            . ($studentActive > 0 ? ' · includes ' . $studentActive . ' student reservation' . ($studentActive === 1 ? '' : 's') : ''),
         'next'         => $next_value,
         'next_sub'     => $next_sub,
         'active'       => $active,
+        'student_active' => $studentActive,
     ];
 }

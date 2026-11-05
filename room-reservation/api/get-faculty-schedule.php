@@ -2,11 +2,11 @@
 /**
  * room-reservation/api/get-faculty-schedule.php
  *
- * The logged-in faculty member's own schedule for ONE week, Monday to Saturday
+ * The logged-in faculty member's own and student-authorized schedule for ONE week, Monday to Saturday
  * (Sunday is closed), for the "My class schedule" calendar on the Facilities tab.
  *
- * Source: the faculty member's own APPROVED room reservations (tbl_room_reservations).
- * Reservations made by students through the faculty member's code are not theirs and are left out.
+ * Source: APPROVED room reservations associated with the faculty account (tbl_room_reservations).
+ * Student-submitted reservations are included and labeled with the student.
  * Declined / cancelled reservations never show.
  *
  * GET params:
@@ -92,7 +92,7 @@ try {
                 TIME_FORMAT(r.start_time, '%H:%i') AS start_hm,
                 TIME_FORMAT(r.end_time,   '%H:%i') AS end_hm,
                 TIME_TO_SEC(TIMEDIFF(r.end_time, r.start_time)) AS span_sec,
-                r.purpose,
+                r.purpose, r.submitted_as, r.submitted_by_name, r.submitted_by_id,
                 rm.room_name,
                 rm.floor_label,
                 b.name AS building_name
@@ -101,7 +101,6 @@ try {
            LEFT JOIN tbl_buildings b ON b.building_id = rm.building_id
           WHERE r.faculty_id = ?
             AND r.status = 'Approved'
-            AND r.submitted_as <> 'student'
             AND r.reservation_date BETWEEN ? AND ?
           ORDER BY r.reservation_date ASC, r.start_time ASC"
     );
@@ -125,6 +124,8 @@ try {
             'end'      => $row['end_hm'],
             'minutes'  => $minutes,
             'purpose'  => (string)$row['purpose'],
+            'student_name' => (string)($row['submitted_as'] ?? '') === 'student' ? (string)($row['submitted_by_name'] ?? '') : '',
+            'student_id' => (string)($row['submitted_as'] ?? '') === 'student' ? (string)($row['submitted_by_id'] ?? '') : '',
             'room'     => (string)$row['room_name'],
             'floor'    => (string)($row['floor_label'] ?? ''),
             'building' => (string)($row['building_name'] ?? ''),

@@ -3967,6 +3967,7 @@
             return {
                 id: d.id, status: d.status, condition: d.condition, borrower: d.borrower, idNumber: d.idNumber,
                 reqType: d.reqType, equipment: d.equipment, instructor: d.instructor,
+                submittedAs: d.submittedAs, studentName: d.studentName, studentId: d.studentId,
                 room: d.room, submitted: d.submitted, dateNeeded: d.dateNeeded,
                 returnDate: d.returnDate, returnDateDisplay: d.returnDateDisplay,
                 arbRule: d.arbRule
@@ -3992,7 +3993,8 @@
         function fillApprove(ctx) {
             document.getElementById('approve-request-id').value = ctx.id;
             document.getElementById('ps-approve-reqno').textContent = reqNo(ctx.id);
-            document.getElementById('approve-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('approve-borrower').textContent =
+                ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('approve-equipment').textContent = ctx.equipment || '—';
             document.getElementById('approve-date-needed').textContent = ctx.dateNeeded || '—';
             const dd = document.getElementById('approve-due-date');
@@ -4005,7 +4007,8 @@
         function fillDecline(ctx) {
             document.getElementById('decline-request-id').value = ctx.id;
             document.getElementById('ps-decline-reqno').textContent = reqNo(ctx.id);
-            document.getElementById('decline-borrower').textContent = ctx.borrower || '—';
+            document.getElementById('decline-borrower').textContent =
+                ctx.submittedAs === 'student' && ctx.studentName ? ctx.studentName : (ctx.borrower || '—');
             document.getElementById('decline-equipment').textContent = ctx.equipment || '—';
             if (declineReasonInput) declineReasonInput.value = '';
             if (declineConfirmBtn) declineConfirmBtn.disabled = true;
@@ -4015,9 +4018,14 @@
         function fillDetail(ctx) {
             document.getElementById('detail-request-id').value = ctx.id;
             document.getElementById('detail-submitted').textContent = ctx.submitted || '—';
-            document.getElementById('detail-requester').textContent = ctx.borrower || '—';
-            document.getElementById('detail-id-number').textContent = ctx.idNumber || '—';
-            document.getElementById('detail-req-type').textContent = ctx.reqType || 'Faculty';
+            const studentRequest = ctx.submittedAs === 'student' && ctx.studentName;
+            document.getElementById('detail-requester').textContent = studentRequest ? ctx.studentName : (ctx.borrower || '—');
+            document.getElementById('detail-id-number').textContent = studentRequest ? (ctx.studentId || 'Not recorded') : (ctx.idNumber || '—');
+            document.getElementById('detail-req-type').textContent = studentRequest ? 'Student (faculty-authorized)' : (ctx.reqType || 'Faculty');
+            const authorizerItem = document.getElementById('detail-authorizer-item');
+            const authorizer = document.getElementById('detail-authorizer');
+            if (authorizerItem) authorizerItem.hidden = !studentRequest;
+            if (authorizer) authorizer.textContent = studentRequest ? ctx.borrower + ' (' + ctx.idNumber + ')' : '—';
             document.getElementById('detail-room').textContent = ctx.room || '—';
             document.getElementById('detail-equipment').textContent = ctx.equipment || '—';
             document.getElementById('detail-date-needed').textContent = ctx.dateNeeded || '—';
@@ -4156,6 +4164,7 @@
                                         waitChip.textContent = String(Math.max(0, (parseInt(waitChip.textContent, 10) || 0) - 1));
                                     }
                                 }
+                                if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans();
                             }
                         }
 
@@ -4195,6 +4204,129 @@
                 submitDecision(id, 'Declined', reason, 'ps-decline-alert', declineConfirmBtn, 'Declining…');
             });
         }
+    })();
+
+    (function initBundleApproval() {
+        var modal = document.getElementById('eq-bundle-approve-modal');
+        var batchInput = document.getElementById('eq-bundle-approve-id');
+        var itemsBox = document.getElementById('eq-bundle-approve-items');
+        var reasonInput = document.getElementById('eq-bundle-approve-reason');
+        var alertBox = document.getElementById('eq-bundle-approve-alert');
+        var confirmButton = document.getElementById('eq-bundle-approve-confirm');
+        if (!modal || !batchInput || !itemsBox || !reasonInput || !confirmButton) return;
+
+        var pendingRows = [];
+        function showError(message) {
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+            alertBox.style.background = '#ffeaea';
+            alertBox.style.color = 'var(--danger)';
+        }
+        function clearError() {
+            alertBox.textContent = '';
+            alertBox.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            var trigger = e.target.closest('[data-action="eq-open-bundle-approve"]');
+            if (!trigger) return;
+            e.preventDefault();
+            e.stopPropagation();
+            batchInput.value = trigger.dataset.batchId || '';
+            reasonInput.value = '';
+            confirmButton.disabled = true;
+            clearError();
+            itemsBox.textContent = '';
+            pendingRows = Array.prototype.filter.call(
+                document.querySelectorAll('#eq-loan-table tbody tr.eq-loan-row'),
+                function (row) {
+                    return row.dataset.batchId === batchInput.value && row.dataset.loanState === 'waiting';
+                }
+            );
+            pendingRows.forEach(function (row) {
+                var line = document.createElement('div');
+                line.className = 'ps-req-sum-row';
+                var name = document.createElement('span');
+                name.className = 'ps-rsl';
+                name.textContent = row.dataset.equipment || 'Equipment';
+                var number = document.createElement('span');
+                number.className = 'ps-rsv';
+                number.textContent = '#' + String(row.dataset.id || '').padStart(4, '0');
+                line.appendChild(name);
+                line.appendChild(number);
+                itemsBox.appendChild(line);
+            });
+            if (pendingRows.length < 2) {
+                showError('At least two requests in this bundle must still be pending.');
+            }
+            if (typeof psOpenModal === 'function') psOpenModal('eq-bundle-approve-modal');
+        });
+
+        reasonInput.addEventListener('input', function () {
+            confirmButton.disabled = this.value.trim().length < 5 || pendingRows.length < 2;
+        });
+
+        confirmButton.addEventListener('click', function () {
+            var reason = reasonInput.value.trim();
+            if (reason.length < 5 || pendingRows.length < 2) {
+                showError('Enter an approval reason of at least 5 characters.');
+                return;
+            }
+            confirmButton.disabled = true;
+            confirmButton.dataset.originalText = confirmButton.innerHTML;
+            confirmButton.textContent = 'Approving bundle…';
+            clearError();
+            var body = new FormData();
+            body.append('batch_id', batchInput.value);
+            body.append('override_reason', reason);
+            body.append('csrf_token', getCsrfToken());
+
+            fetch('equipment-booking/api/approve-borrow-bundle.php', { method: 'POST', body: body })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        if (!response.ok || data.status !== 'success') {
+                            throw new Error(data.message || 'Bundle approval failed.');
+                        }
+                        return data;
+                    });
+                })
+                .then(function (data) {
+                    var approvedIds = new Set((data.request_ids || []).map(String));
+                    var changed = pendingRows.filter(function (row) {
+                        return approvedIds.has(String(row.dataset.id));
+                    });
+                    changed.forEach(function (row) {
+                        row.classList.remove('is-waiting');
+                        row.classList.add('is-ok');
+                        row.dataset.loanState = 'ok';
+                        row.dataset.status = 'Approved';
+                        var status = row.querySelector('td:nth-child(5) .ps-badge');
+                        if (status) {
+                            status.className = 'ps-badge ps-badge--active';
+                            status.textContent = 'Approved';
+                        }
+                        var actionCell = row.querySelector('td:last-child > div');
+                        if (actionCell) {
+                            actionCell.innerHTML = '<button type="button" class="ps-btn ps-btn--ghost ps-btn--sm" data-action="ps-open-modal" data-modal="ps-return-modal"><span class="material-symbols-outlined">assignment_return</span> Manual Return</button>';
+                        }
+                    });
+                    var waitingChip = document.querySelector('#eqLoanFilter [data-loan-filter="waiting"] .eq-loan-tab-count');
+                    if (waitingChip) {
+                        waitingChip.textContent = String(Math.max(0, (parseInt(waitingChip.textContent, 10) || 0) - changed.length));
+                    }
+                    if (typeof window.psRefreshEquipmentLoans === 'function') window.psRefreshEquipmentLoans();
+                    if (typeof psCloseModal === 'function') psCloseModal('eq-bundle-approve-modal');
+                    if (typeof window.showToast === 'function') window.showToast(data.message);
+                    if (typeof window.adminDoPoll === 'function') window.adminDoPoll();
+                })
+                .catch(function (error) {
+                    showError(error.message || 'Network error. Please try again.');
+                })
+                .finally(function () {
+                    confirmButton.disabled = reasonInput.value.trim().length < 5 || pendingRows.length < 2;
+                    confirmButton.innerHTML = confirmButton.dataset.originalText || '<span class="material-symbols-outlined">done_all</span> Approve Bundle';
+                });
+        });
     })();
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -4551,9 +4683,15 @@ function psSelectFmt(btn) {
         txt('ps-loan-detail-condition', d.condition);
         txt('ps-loan-detail-room', d.room);
         txt('ps-loan-detail-instructor', d.instructor);
-        txt('ps-loan-detail-borrower', d.borrower);
-        txt('ps-loan-detail-type', d.reqType);
-        txt('ps-loan-detail-id-number', d.idNumber);
+        var studentRequest = d.submittedAs === 'student' && d.studentName;
+        txt('ps-loan-detail-borrower', studentRequest ? d.studentName : d.borrower);
+        txt('ps-loan-detail-type', studentRequest ? 'Student (faculty-authorized)' : d.reqType);
+        txt('ps-loan-detail-id-number', studentRequest ? (d.studentId || 'Not recorded') : d.idNumber);
+        txt('ps-loan-detail-authorizer', studentRequest
+            ? (d.borrower || 'Faculty account') + (d.idNumber ? ' (' + d.idNumber + ')' : '')
+            : '');
+        var authorizerRow = el('ps-loan-detail-authorizer-row');
+        if (authorizerRow) authorizerRow.hidden = !studentRequest;
         txt('ps-loan-detail-note', d.note);
         txt('ps-loan-detail-handled-by', d.handledBy || 'Not recorded');
         if (typeof psOpenModal === 'function') psOpenModal('ps-loan-detail-drawer');
@@ -4623,6 +4761,9 @@ function psSelectFmt(btn) {
         txt('ps-rr-purpose', d.purpose);
         txt('ps-rr-who', d.whoSub && d.whoSub.indexOf('Student via') === 0 ? d.who + ' (' + d.whoSub + ')' : d.who);
         txt('ps-rr-type', d.type);
+        txt('ps-rr-student-id', d.whoId);
+        var studentIdRow = el('ps-rr-student-id-row');
+        if (studentIdRow) studentIdRow.hidden = !(d.whoSub && d.whoSub.indexOf('Student via') === 0 && d.whoId);
 
         var badge = el('ps-rr-status');
         var cls = { Approved: 'ps-badge--active', Declined: 'ps-badge--overdue', Cancelled: 'ps-badge--returned', Waiting: 'ps-badge--waiting' };
@@ -5538,6 +5679,37 @@ function psSelectFmt(btn) {
         var page = 1;
         var removedAny = false;   /* a row was removed this session (e.g. a cancelled booking) */
 
+        function groupRows(sourceRows) {
+            var groups = [];
+            var groupByKey = new Map();
+            sourceRows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                var key = batchId ? 'bundle:' + batchId : 'row:' + row.dataset.id;
+                var group = groupByKey.get(key);
+                if (!group) {
+                    group = { batchId: batchId, rows: [] };
+                    groupByKey.set(key, group);
+                    groups.push(group);
+                }
+                group.rows.push(row);
+            });
+            return groups;
+        }
+
+        function orderRowsTogether() {
+            var tbody = table.tBodies[0];
+            if (!tbody) return;
+            var groups = groupRows(rows);
+            rows = [];
+            groups.forEach(function (group) {
+                group.rows.forEach(function (row) {
+                    rows.push(row);
+                    tbody.appendChild(row);
+                });
+            });
+            if (noMatch) tbody.appendChild(noMatch);
+        }
+
         function matchesMode(state) {
             if (mode === 'all') return true;
             if (mode === 'pickup') return state === 'pickup';
@@ -5570,11 +5742,35 @@ function psSelectFmt(btn) {
         function render() {
             var hits = rows.filter(function (r) { return matchesMode(r.dataset.loanState) && matchesQuery(r); });
             var total = hits.length;
-            var pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-            page = Math.min(Math.max(page, 1), pages);
-            var start = (page - 1) * PAGE_SIZE;
-            var end = Math.min(start + PAGE_SIZE, total);
-            var visible = hits.slice(start, end);
+            var groups = groupRows(hits);
+            var pages = [[]];
+            var pageSize = 0;
+            rows.forEach(function (row) {
+                row.classList.remove('eq-bundle-link-start', 'eq-bundle-link-middle', 'eq-bundle-link-end');
+            });
+            groups.forEach(function (group) {
+                if (group.batchId && group.rows.length > 1) {
+                    group.rows.forEach(function (row, index) {
+                        row.classList.add(index === 0 ? 'eq-bundle-link-start' :
+                            (index === group.rows.length - 1 ? 'eq-bundle-link-end' : 'eq-bundle-link-middle'));
+                    });
+                }
+                if (pageSize > 0 && pageSize + group.rows.length > PAGE_SIZE) {
+                    pages.push([]);
+                    pageSize = 0;
+                }
+                Array.prototype.push.apply(pages[pages.length - 1], group.rows);
+                pageSize += group.rows.length;
+            });
+            if (pages.length > 1 && pages[pages.length - 1].length === 0) pages.pop();
+            var pageCount = Math.max(1, pages.length);
+            page = Math.min(Math.max(page, 1), pageCount);
+            var visible = pages[page - 1] || [];
+            var start = 0;
+            for (var previousPage = 0; previousPage < page - 1; previousPage++) {
+                start += pages[previousPage].length;
+            }
+            var end = start + visible.length;
 
             rows.forEach(function (r) { r.style.display = visible.indexOf(r) !== -1 ? '' : 'none'; });
             if (noMatch) noMatch.hidden = !((rows.length > 0 || removedAny) && total === 0);
@@ -5582,12 +5778,12 @@ function psSelectFmt(btn) {
             if (!pager) return;
             pager.hidden = rows.length === 0;
             if (pgInfo) pgInfo.textContent = total ? 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + total : 'No results';
-            if (pgCtl) pgCtl.hidden = pages <= 1;
+            if (pgCtl) pgCtl.hidden = pageCount <= 1;
             if (pgPrev) pgPrev.disabled = page <= 1;
-            if (pgNext) pgNext.disabled = page >= pages;
+            if (pgNext) pgNext.disabled = page >= pageCount;
             if (pgNums) {
                 pgNums.textContent = '';
-                pageList(pages, page).forEach(function (n) {
+                pageList(pageCount, page).forEach(function (n) {
                     if (n === 'gap') {
                         var gap = document.createElement('span');
                         gap.className = 'inv-pager-gap';
@@ -5606,6 +5802,48 @@ function psSelectFmt(btn) {
                 });
             }
         }
+
+        window.psRefreshEquipmentLoans = function () {
+            rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr.eq-loan-row'));
+            orderRowsTogether();
+            var pendingByBatch = {};
+            var pendingRowsByBatch = {};
+            rows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                if (batchId && row.dataset.loanState === 'waiting') {
+                    pendingByBatch[batchId] = (pendingByBatch[batchId] || 0) + 1;
+                    if (!pendingRowsByBatch[batchId]) pendingRowsByBatch[batchId] = [];
+                    pendingRowsByBatch[batchId].push(row);
+                }
+            });
+            rows.forEach(function (row) {
+                var batchId = row.dataset.batchId || '';
+                var actionCell = row.querySelector('td:last-child > div');
+                if (!actionCell) return;
+                actionCell.querySelectorAll('[data-action="eq-open-bundle-approve"]').forEach(function (button) {
+                    button.remove();
+                });
+                actionCell.classList.remove('has-bundle-approve');
+                if (!batchId || row.dataset.loanState !== 'waiting' || pendingByBatch[batchId] < 2) return;
+                var bundlePendingRows = pendingRowsByBatch[batchId];
+                var middlePendingRow = bundlePendingRows[Math.floor((bundlePendingRows.length - 1) / 2)];
+                if (middlePendingRow !== row) return;
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'ps-btn ps-btn--outline ps-btn--sm';
+                button.dataset.action = 'eq-open-bundle-approve';
+                button.dataset.batchId = batchId;
+                var icon = document.createElement('span');
+                icon.className = 'material-symbols-outlined';
+                icon.textContent = 'done_all';
+                button.appendChild(icon);
+                button.appendChild(document.createTextNode(' Approve all'));
+                actionCell.appendChild(button);
+                actionCell.classList.add('has-bundle-approve');
+            });
+            page = 1;
+            render();
+        };
 
         if (tabBar) {
             tabBar.addEventListener('click', function (e) {
@@ -5839,7 +6077,7 @@ function psSelectFmt(btn) {
             });
         }
 
-        render();
+        window.psRefreshEquipmentLoans();
         try {
             if (sessionStorage.getItem('openManualReturnLoanTab') === '1' || sessionStorage.getItem('openOverdueLoanTab') === '1') {
                 sessionStorage.removeItem('openManualReturnLoanTab');

@@ -111,9 +111,43 @@
                     $eq_wait_total = count($eq_wait_rows);
                     $eq_view_rows  = array_merge($eq_wait_rows, $eq_loan_rows, $eq_ret_rows);
                     $eq_view_total = count($eq_view_rows);
+                    $eq_bundle_counts = [];
+                    $eq_wait_bundle_counts = [];
+                    foreach ($eq_view_rows as $row) {
+                        $batch = trim((string)($row['batch_id'] ?? ''));
+                        if ($batch !== '') {
+                            $eq_bundle_counts[$batch] = ($eq_bundle_counts[$batch] ?? 0) + 1;
+                        }
+                    }
+                    foreach ($eq_wait_rows as $row) {
+                        if (($row['_state'] ?? '') !== 'waiting') continue;
+                        $batch = trim((string)($row['batch_id'] ?? ''));
+                        if ($batch !== '') {
+                            $eq_wait_bundle_counts[$batch] = ($eq_wait_bundle_counts[$batch] ?? 0) + 1;
+                        }
+                    }
+                    if ($eq_bundle_counts) {
+                        $batch_list = implode(',', array_map(function ($batch) use ($conn) {
+                            return "'" . $conn->real_escape_string($batch) . "'";
+                        }, array_keys($eq_bundle_counts)));
+                        $count_result = $conn->query(
+                            "SELECT batch_id, COUNT(*) AS total
+                               FROM tbl_requests
+                              WHERE batch_id IN ({$batch_list})
+                              GROUP BY batch_id"
+                        );
+                        if ($count_result) {
+                            while ($count_row = $count_result->fetch_assoc()) {
+                                $eq_bundle_counts[(string)$count_row['batch_id']] = (int)$count_row['total'];
+                            }
+                        } else {
+                            error_log('[admin-equipment] Bundle count query failed: ' . $conn->error);
+                        }
+                    }
                     $eq_loan_dec   = admin_request_decisions($conn, array_map(function ($x) {
                         return (int)$x['id'];
                     }, $eq_view_rows));
+                    $eq_bundle_approve_shown = [];
                     ?>
 
                     <!-- Equipment sub-tabs: Catalog (the existing screen, unchanged) | On Loan -->
@@ -514,9 +548,11 @@
                                                 // document can only be changed by a Super Admin.
                                                 $lsens = (string)($r['submitted_as'] ?? '') === 'adviser' && trim((string)($r['document_path'] ?? '')) !== '';
                                                 $lcan_cancel = !$lsens || !empty($can_view_sensitive_adviser_requests);
+                                                $lstudent = (string)($r['submitted_as'] ?? '') === 'student' && trim((string)($r['submitted_by_name'] ?? '')) !== '';
                                         ?>
                                                 <tr class="eq-loan-row is-<?php echo $lst; ?>"
                                                     data-id="<?php echo (int)$r['id']; ?>"
+                                                    data-batch-id="<?php echo htmlspecialchars((string)($r['batch_id'] ?? ''), ENT_QUOTES); ?>"
                                                     data-status="<?php echo $lst === 'scheduled' ? 'Scheduled' : htmlspecialchars($r['status']); ?>"
                                                     data-loan-state="<?php echo $lst; ?>"
                                                     data-start-label="<?php echo htmlspecialchars($lstart_lbl); ?>"
@@ -526,6 +562,9 @@
                                                     data-borrower="<?php echo htmlspecialchars($r['faculty_name']); ?>"
                                                     data-id-number="<?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?>"
                                                     data-req-type="<?php echo htmlspecialchars($ltype); ?>"
+                                                    data-submitted-as="<?php echo htmlspecialchars((string)($r['submitted_as'] ?? '')); ?>"
+                                                    data-student-name="<?php echo $lstudent ? htmlspecialchars((string)$r['submitted_by_name']) : ''; ?>"
+                                                    data-student-id="<?php echo $lstudent ? htmlspecialchars((string)($r['submitted_by_id'] ?? '')) : ''; ?>"
                                                     data-equipment="<?php echo htmlspecialchars($r['equipment_name']); ?>"
                                                     data-qty="<?php echo $lqty; ?>"
                                                     data-instructor="<?php echo htmlspecialchars($r['instructor']); ?>"
@@ -543,8 +582,15 @@
                                                     data-returned-at-display="<?php echo !empty($r['returned_at']) ? date('M d, Y g:i A', strtotime($r['returned_at'])) : ''; ?>"
                                                     data-handled-by="<?php echo htmlspecialchars($ldec['by'] ?? ''); ?>">
                                                     <td>
-                                                        <div style="font-weight:600"><?php echo htmlspecialchars($r['faculty_name']); ?></div>
-                                                        <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
+                                                        <div style="font-weight:600"><?php echo htmlspecialchars($lstudent ? (string)$r['submitted_by_name'] : $r['faculty_name']); ?></div>
+                                                        <?php if ($lstudent): ?>
+                                                            <div style="font-size:11px;color:var(--text-light)">
+                                                                Student<?php if (!empty($r['submitted_by_id'])): ?> · <?php echo htmlspecialchars((string)$r['submitted_by_id']); ?><?php endif; ?>
+                                                                · authorized by <?php echo htmlspecialchars($r['faculty_name']); ?>
+                                                            </div>
+                                                        <?php else: ?>
+                                                            <div style="font-size:11px;color:var(--text-light)"><?php echo htmlspecialchars(faculty_id_display($r['faculty_id'], 'Not set')); ?></div>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <div class="ps-appr-item">
@@ -552,6 +598,13 @@
                                                             <?php if ($lqty > 1): ?><span class="ps-appr-qty">&times;<?php echo $lqty; ?></span><?php endif; ?>
                                                         </div>
                                                         <button type="button" class="ps-appr-id" data-action="ps-open-modal" data-modal="ps-req-detail-modal" title="View request details">#<?php echo str_pad($r['id'], 4, '0', STR_PAD_LEFT); ?></button>
+                                                        <?php $lbundle = trim((string)($r['batch_id'] ?? '')); ?>
+                                                        <?php if ($lbundle !== '' && ($eq_bundle_counts[$lbundle] ?? 0) > 1): ?>
+                                                            <span class="eq-bundle-tag">
+                                                                <span class="material-symbols-outlined" aria-hidden="true">link</span>
+                                                                Bundle · <?php echo (int)$eq_bundle_counts[$lbundle]; ?> items
+                                                            </span>
+                                                        <?php endif; ?>
                                                         <?php if ($lst === 'waiting'): ?>
                                                             <?php if ($ldoc): ?>
                                                                 <a class="ps-doc-chip ps-doc-chip--<?php echo $ldoc['kind']; ?>"
@@ -610,6 +663,16 @@
                                                                     data-action="ps-open-modal" data-modal="ps-approve-modal">
                                                                     <span class="material-symbols-outlined">check</span> Approve
                                                                 </button>
+                                                                <?php if ($lbundle !== '' && ($eq_wait_bundle_counts[$lbundle] ?? 0) > 1 && empty($eq_bundle_approve_shown[$lbundle])):
+                                                                    $eq_bundle_approve_shown[$lbundle] = true;
+                                                                ?>
+                                                                    <button type="button" class="ps-btn ps-btn--outline ps-btn--sm"
+                                                                        data-action="eq-open-bundle-approve"
+                                                                        data-batch-id="<?php echo htmlspecialchars($lbundle, ENT_QUOTES); ?>">
+                                                                        <span class="material-symbols-outlined">done_all</span>
+                                                                        Approve all
+                                                                    </button>
+                                                                <?php endif; ?>
                                                                 <button type="button" class="ps-btn ps-btn--danger ps-btn--sm"
                                                                     data-action="ps-open-modal" data-modal="ps-decline-modal">
                                                                     <span class="material-symbols-outlined">close</span> Decline

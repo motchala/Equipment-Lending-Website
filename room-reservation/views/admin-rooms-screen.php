@@ -409,6 +409,7 @@
                                                 data-time="<?php echo htmlspecialchars($ar_time); ?>"
                                                 data-who="<?php echo htmlspecialchars($ar_name); ?>"
                                                 data-who-sub="<?php echo htmlspecialchars($ar_sub); ?>"
+                                                data-who-id="<?php echo $ar_is_stud ? htmlspecialchars((string)($ar['submitted_by_id'] ?? '')) : ''; ?>"
                                                 data-type="<?php echo htmlspecialchars($ar_type); ?>"
                                                 data-purpose="<?php echo htmlspecialchars($ar['purpose'] ?? ''); ?>"
                                                 data-attendees="<?php echo (int)($ar['attendees'] ?? 0); ?>"
@@ -620,4 +621,3 @@
 <script src="room-reservation/assets/js/admin-rooms-schedule.js?v=<?php echo @filemtime(PS_ROOT . '/room-reservation/assets/js/admin-rooms-schedule.js'); ?>"></script>
 
             </div><!-- /panel-rooms -->
-

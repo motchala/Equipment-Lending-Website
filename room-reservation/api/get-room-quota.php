@@ -6,13 +6,14 @@
  * GET (no params) → JSON:
  *   max          int    most active room reservations allowed at once
  *   active       int    how many the faculty member holds right now
+ *   student_active int   active reservations submitted by authorized students
  *   remaining    int    max - active (never below 0)
  *   reservations array  the active ones: id, room_name, date, start, end
  *   is_adviser   bool   Organization Adviser → may attach a supporting document
  *   doc          object accepted document types / size (for the UI)
  *
- * This is informational only. submit-faculty-reserve.php enforces every rule
- * again on the server.
+ * This is informational only. The faculty and student submission endpoints
+ * enforce the limit again on the server.
  */
 
 ini_set('display_errors', '0');
@@ -46,6 +47,9 @@ $max    = FCTY_MAX_ACTIVE_ROOM_RESERVATIONS;
 echo json_encode([
     'max'          => $max,
     'active'       => count($active),
+    'student_active' => count(array_filter($active, static function (array $reservation): bool {
+        return (string)($reservation['student_name'] ?? '') !== '';
+    })),
     'remaining'    => max(0, $max - count($active)),
     'reservations' => $active,
     'is_adviser'   => fcty_is_org_adviser($conn, $faculty_id),
