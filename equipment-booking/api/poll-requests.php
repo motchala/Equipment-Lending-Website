@@ -25,6 +25,7 @@ if (($_GET['view'] ?? '') === 'activity') {
     $activity = fact_eq_load($conn, is_scalar($uid) ? (string)$uid : '');
     header('Cache-Control: no-store');
     echo json_encode([
+        'status' => fact_eq_render_status($activity),
         'body'   => fact_eq_render_body($activity, $root_url),
         'rows'   => fact_eq_render_history_rows($activity, $root_url),
         'stats'  => fact_eq_stats($activity),

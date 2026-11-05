@@ -5691,6 +5691,10 @@
                       (room-reservation/api/leave-waitlist.php). Cancelling a room reservation keeps its own
                       handler near the room code. All of them refresh this screen and the Home key figures.
 
+   7. Paging         the Equipment and Room reservations cards are a fixed size and show 5 rows
+                      per page (groups such as In progress / Upcoming flow across the pages);
+                      the page navigation sits in each card's footer, like the History table's.
+
    Cancel / Join waitlist / Report issue / go-tab buttons are handled by the
    delegated handlers above (data-action="..."). No inline event handlers are
    used (the page's CSP forbids them).
@@ -5715,6 +5719,7 @@
         var histEmpty = $('factHistEmpty');
         var tableWrap = panel.querySelector('.fact-table-wrap');
         var pager = $('factPager');
+        var pagerFoot = $('factHistFoot');
         var pagerInfo = $('factPagerInfo');
         var pagerNums = $('factNums');
         var btnPrev = $('factPrev');
@@ -5761,8 +5766,9 @@
         function renderPager(matched) {
             var pages = Math.max(1, Math.ceil(matched / PER_PAGE));
             var ctl = pager.querySelector('.fact-pager-ctl');
-            if (matched === 0) { pager.hidden = true; return; }
+            if (matched === 0) { pager.hidden = true; if (pagerFoot) pagerFoot.hidden = true; return; }
             pager.hidden = false;
+            if (pagerFoot) pagerFoot.hidden = false;
 
             var from = (state.page - 1) * PER_PAGE + 1;
             var to = Math.min(matched, state.page * PER_PAGE);
@@ -5818,7 +5824,7 @@
             tableWrap.hidden = none;
             histEmpty.hidden = !none;
             noResults.hidden = none || matched.length > 0;
-            if (none) pager.hidden = true; else renderPager(matched.length);
+            if (none) { pager.hidden = true; if (pagerFoot) pagerFoot.hidden = true; } else renderPager(matched.length);
         }
 
         /* Kind tabs */
@@ -5856,18 +5862,71 @@
             apply();
         });
 
-        /* ── 2. Show all / Show less ─────────────────────────────── */
-        panel.addEventListener('click', function (e) {
-            var more = e.target.closest('[data-fact-more]');
-            if (!more) return;
-            var list = more.previousElementSibling;
-            if (!list || !list.classList.contains('fact-list')) return;
+        /* ── 2. Equipment / Room cards: 5 rows per page ─────────────
+           The server draws every row; this script shows 5 at a time (a group such as
+           "In progress" or "Upcoming" is hidden on pages where none of its rows show) and
+           draws the page navigation in the card footer. The page is kept across live
+           refreshes, and pulled back when rows disappear. */
+        var CARD_PER_PAGE = 5;
+        var cards = {
+            equipment: { body: $('factEquipBody'), status: $('factEquipStatus'), pager: $('factEquipPager'), page: 1 },
+            rooms: { body: $('factRoomsBody'), status: $('factRoomsStatus'), pager: $('factRoomsPager'), page: 1 }
+        };
 
-            var collapsed = list.classList.toggle('is-collapsed');
-            more.classList.toggle('is-open', !collapsed);
-            more.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-            var total = list.children.length;
-            more.firstChild.nodeValue = collapsed ? 'Show all ' + total + ' ' : 'Show less ';
+        function renderCardPager(card, total, pages) {
+            var nav = card.pager;
+            if (!nav) return;
+            if (total === 0) { nav.innerHTML = ''; return; }
+
+            var noun = nav.dataset.noun || 'item';
+            var from = (card.page - 1) * CARD_PER_PAGE + 1;
+            var to = Math.min(total, card.page * CARD_PER_PAGE);
+            var html = '<span class="fact-pager-info">' + (pages > 1
+                ? 'Showing ' + from + '\u2013' + to + ' of ' + total
+                : total + ' ' + noun + (total === 1 ? '' : 's')) + '</span>';
+
+            if (pages > 1) {
+                html += '<div class="fact-pager-ctl">'
+                    + '<button type="button" class="fact-pager-btn" data-fact-pg="prev" aria-label="Previous page"'
+                    + (card.page <= 1 ? ' disabled' : '') + '><span class="material-symbols-outlined">chevron_left</span></button>'
+                    + '<div class="fact-pager-nums">';
+                pageList(card.page, pages).forEach(function (n) {
+                    html += n === 'gap'
+                        ? '<span class="fact-pager-gap">\u2026</span>'
+                        : '<button type="button" class="fact-pager-btn' + (n === card.page ? ' is-active' : '') + '" data-fact-pg="' + n + '"'
+                        + (n === card.page ? ' aria-current="page"' : '') + '>' + n + '</button>';
+                });
+                html += '</div><button type="button" class="fact-pager-btn" data-fact-pg="next" aria-label="Next page"'
+                    + (card.page >= pages ? ' disabled' : '') + '><span class="material-symbols-outlined">chevron_right</span></button></div>';
+            }
+            nav.innerHTML = html;
+        }
+
+        function paginateCard(card) {
+            if (!card.body) return;
+            var items = Array.prototype.slice.call(card.body.querySelectorAll('.fact-item'));
+            var pages = Math.max(1, Math.ceil(items.length / CARD_PER_PAGE));
+            card.page = Math.min(Math.max(1, card.page), pages);
+            var start = (card.page - 1) * CARD_PER_PAGE;
+
+            items.forEach(function (el, i) {
+                el.classList.toggle('is-paged-out', i < start || i >= start + CARD_PER_PAGE);
+            });
+            card.body.querySelectorAll('.fact-group').forEach(function (g) {
+                g.hidden = !g.querySelector('.fact-item:not(.is-paged-out)');
+            });
+            renderCardPager(card, items.length, pages);
+        }
+
+        panel.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-fact-pg]');
+            if (!b) return;
+            var nav = b.closest('[data-fact-card]');
+            var card = nav ? cards[nav.dataset.factCard] : null;
+            if (!card) return;
+            var v = b.dataset.factPg;
+            card.page = v === 'prev' ? card.page - 1 : v === 'next' ? card.page + 1 : (parseInt(v, 10) || 1);
+            paginateCard(card);
         });
 
         /* ── 3. Download Report ──────────────────────────────────── */
@@ -5888,28 +5947,12 @@
             }
         }
 
-        /* Swap a card's contents but keep any "Show all" the person already opened */
-        function swapBody(container, html) {
-            var opened = {};
-            container.querySelectorAll('.fact-group').forEach(function (g) {
-                var label = g.querySelector('.fact-group-label');
-                var list = g.querySelector('.fact-list');
-                if (label && list && g.querySelector('[data-fact-more]') && !list.classList.contains('is-collapsed')) {
-                    opened[label.textContent] = true;
-                }
-            });
-            container.innerHTML = html;
-            container.querySelectorAll('.fact-group').forEach(function (g) {
-                var label = g.querySelector('.fact-group-label');
-                var list = g.querySelector('.fact-list');
-                var more = g.querySelector('[data-fact-more]');
-                if (label && list && more && opened[label.textContent]) {
-                    list.classList.remove('is-collapsed');
-                    more.classList.add('is-open');
-                    more.setAttribute('aria-expanded', 'true');
-                    more.firstChild.nodeValue = 'Show less ';
-                }
-            });
+        /* Swap a card's status line and rows, then page them again (the current page is kept) */
+        function swapCard(card, data) {
+            if (!card.body) return;
+            if (card.status && typeof data.status === 'string') card.status.innerHTML = data.status;
+            if (typeof data.body === 'string') card.body.innerHTML = data.body;
+            paginateCard(card);
         }
 
         /* Replace one kind of history row ("room" / "equipment") with fresh ones */
@@ -5935,8 +5978,7 @@
 
         function refreshRooms() {
             load(API_ROOMS, 'rooms', function (data) {
-                var card = $('factRoomsBody');
-                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                swapCard(cards.rooms, data);
                 if (typeof data.rows === 'string') swapHistory('room', data.rows);
                 if (data.stats) setStat('reserved', data.stats.reserved);
             });
@@ -5944,8 +5986,7 @@
 
         function refreshEquipment() {
             load(API_EQUIP, 'equipment', function (data) {
-                var card = $('factEquipBody');
-                if (card && typeof data.body === 'string') swapBody(card, data.body);
+                swapCard(cards.equipment, data);
                 if (typeof data.rows === 'string') swapHistory('equipment', data.rows);
                 if (data.stats) {
                     setStat('pickup',  data.stats.pickup);
@@ -6232,6 +6273,8 @@
         /* ── Start ───────────────────────────────────────────────── */
         sortRows();
         apply();
+        paginateCard(cards.equipment);
+        paginateCard(cards.rooms);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startMyActivity);

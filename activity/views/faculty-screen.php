@@ -10,9 +10,18 @@
                      1. Summary         four cards: Active loans · Overdue · Pending · Room reservations
                                         (same words and numbers as the Home tab's key figures)
                      2. Right now       Equipment card | Room reservations card
-                                        each one: In progress / Upcoming (rooms also: Waitlist)
-                     3. History         one table for both, filtered All / Equipment / Rooms,
-                                        with its page navigation in the header next to the filters
+                                        each one: In progress / Upcoming (rooms also: Waitlist).
+                                        Both cards are a fixed size and show 5 rows per page, with
+                                        the page navigation in the card footer.
+                     3. History         one table for both, filtered All / Equipment / Rooms
+                                        (filters and search in the header, page navigation in the footer)
+
+                   Where every button lives (so a button is only ever in one place):
+                     page header, top right        Download Report
+                     row action bar (Equipment     four fixed slots, left to right:
+                       and Room rows)                Claim QR · Return QR · Extend · Cancel / Withdraw / Leave waitlist
+                     history table, last column    Action: Join waitlist
+                     card / table footer           page navigation
 
                    Both halves are drawn by shared renderers, so the first paint and the live
                    refresh are always identical:
@@ -74,19 +83,31 @@
                 <!-- ── Right now: Equipment | Room reservations ─────────── -->
                 <div class="fact-grid">
 
-                    <section class="fact-card" id="factEquipment" aria-labelledby="factEquipTitle">
+                    <section class="fact-card fact-live" id="factEquipment" aria-labelledby="factEquipTitle">
                         <header class="fact-card-head">
-                            <h3 class="fact-card-title" id="factEquipTitle">Equipment</h3>
+                            <div class="fact-card-heading">
+                                <h3 class="fact-card-title" id="factEquipTitle">Equipment</h3>
+                                <p class="fact-card-sub" id="factEquipStatus"><?php echo fact_eq_render_status($act_eq); ?></p>
+                            </div>
                         </header>
                         <!-- Filled here on first paint; swapped live by the My Activity block at the end of faculty-dashboard.js -->
                         <div class="fact-card-body" id="factEquipBody"><?php echo fact_eq_render_body($act_eq, $root_url); ?></div>
+                        <footer class="fact-card-foot">
+                            <nav class="fact-pager" id="factEquipPager" data-fact-card="equipment" data-noun="request" aria-label="Equipment pages"></nav>
+                        </footer>
                     </section>
 
-                    <section class="fact-card" id="factRooms" aria-labelledby="factRoomsTitle">
+                    <section class="fact-card fact-live" id="factRooms" aria-labelledby="factRoomsTitle">
                         <header class="fact-card-head">
-                            <h3 class="fact-card-title" id="factRoomsTitle">Room reservations</h3>
+                            <div class="fact-card-heading">
+                                <h3 class="fact-card-title" id="factRoomsTitle">Room reservations</h3>
+                                <p class="fact-card-sub" id="factRoomsStatus"><?php echo fact_render_rooms_status($act_rooms); ?></p>
+                            </div>
                         </header>
                         <div class="fact-card-body" id="factRoomsBody"><?php echo fact_render_rooms_body($act_rooms); ?></div>
+                        <footer class="fact-card-foot">
+                            <nav class="fact-pager" id="factRoomsPager" data-fact-card="rooms" data-noun="reservation" aria-label="Room reservation pages"></nav>
+                        </footer>
                     </section>
 
                 </div><!-- /fact-grid -->
@@ -105,14 +126,6 @@
                                 <span class="material-symbols-outlined" aria-hidden="true">search</span>
                                 <input type="text" id="factSearch" placeholder="Search history…" autocomplete="off" aria-label="Search history">
                             </label>
-                            <nav class="fact-pager" id="factPager" aria-label="History pages" hidden>
-                                <span class="fact-pager-info" id="factPagerInfo"></span>
-                                <div class="fact-pager-ctl">
-                                    <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
-                                    <div class="fact-pager-nums" id="factNums"></div>
-                                    <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
-                                </div>
-                            </nav>
                         </div>
                     </header>
 
@@ -123,6 +136,7 @@
                                     <th scope="col">Activity</th>
                                     <th scope="col">When</th>
                                     <th scope="col" class="fact-col-status">Status</th>
+                                    <th scope="col" class="fact-col-action">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="factHistBody"><?php
@@ -133,6 +147,17 @@
                     </div>
 
                     <p class="fact-noresults" id="factNoResults" hidden>No records match your search.</p>
+                    <footer class="fact-card-foot" id="factHistFoot">
+                        <nav class="fact-pager" id="factPager" aria-label="History pages" hidden>
+                            <span class="fact-pager-info" id="factPagerInfo"></span>
+                            <div class="fact-pager-ctl">
+                                <button type="button" class="fact-pager-btn" id="factPrev" aria-label="Previous page"><span class="material-symbols-outlined">chevron_left</span></button>
+                                <div class="fact-pager-nums" id="factNums"></div>
+                                <button type="button" class="fact-pager-btn" id="factNext" aria-label="Next page"><span class="material-symbols-outlined">chevron_right</span></button>
+                            </div>
+                        </nav>
+                    </footer>
+
                     <div class="fact-empty" id="factHistEmpty" hidden>
                         <span class="material-symbols-outlined" aria-hidden="true">history</span>
                         <p class="fact-empty-title">No history yet</p>

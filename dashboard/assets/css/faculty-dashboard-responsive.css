@@ -1096,6 +1096,26 @@ html {
         padding: 14px 16px 16px;
     }
 
+    /* On a phone the cards grow with their 5 rows instead of keeping a fixed height */
+    #panel-activity .fact-live .fact-card-head {
+        height: auto;
+        min-height: 62px;
+    }
+
+    #panel-activity .fact-live .fact-card-body {
+        height: auto;
+        overflow: visible;
+    }
+
+    #panel-activity .fact-live .fact-card-foot {
+        height: auto;
+        min-height: 52px;
+    }
+
+    #panel-activity .fact-card-foot {
+        padding: 10px 16px;
+    }
+
     /* History header: filters, search and page navigation stack, each on their own row */
     #panel-activity .fact-tools {
         width: 100%;
@@ -1159,6 +1179,17 @@ html {
         align-self: center;
     }
 
+    /* The Action cell only takes room when it holds a button */
+    #panel-activity .fact-table td.fact-col-action {
+        grid-column: 1 / -1;
+        width: auto;
+        text-align: left;
+    }
+
+    #panel-activity .fact-table td.fact-col-action:empty {
+        display: none;
+    }
+
     /* A long date range wraps instead of running under the status pill */
     #panel-activity .fact-when {
         white-space: normal;
@@ -1176,6 +1207,19 @@ html {
 
     #panel-activity .fact-item-title {
         white-space: normal;
+    }
+
+    #panel-activity .fact-item-actions {
+        gap: 6px;
+    }
+
+    #panel-activity .fact-item-actions .fact-btn {
+        padding: 0 4px;
+        font-size: 0.7rem;
+    }
+
+    #panel-activity .fact-item-actions .fact-btn[data-icon]::before {
+        display: none;
     }
 
     #panel-activity .fact-stat {
@@ -1203,15 +1247,31 @@ html {
     #panel-activity .fact-btn,
     #panel-activity .fact-linkbtn,
     #panel-activity .fact-note,
-    #panel-activity .fact-more,
     #panel-activity .fact-tools,
     #panel-activity .fact-pager,
+    #panel-activity .fact-card-foot,
+    #panel-activity .fact-col-action,
     #panel-activity .fact-item-actions {
         display: none !important;
     }
 
-    #panel-activity .fact-list.is-collapsed>.fact-item:nth-child(n+4) {
+    /* the fixed-size, paged cards print in full */
+    #panel-activity .fact-item.is-paged-out {
         display: flex !important;
+    }
+
+    #panel-activity .fact-group[hidden] {
+        display: block !important;
+    }
+
+    #panel-activity .fact-live .fact-card-head,
+    #panel-activity .fact-live .fact-card-body {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    #panel-activity .fact-item-sub {
+        white-space: normal;
     }
 
     #panel-activity .fact-table tbody tr.is-paged-out {

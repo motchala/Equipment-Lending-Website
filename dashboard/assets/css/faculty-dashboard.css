@@ -11065,8 +11065,20 @@ body .side-nav .side-nav-user .side-nav-user-name {
    One row anatomy for equipment and rooms alike:
      [tile]  Title ............................ status pill
              When (the line that matters most)
-             Where · extras
-             actions
+             Where · extras                        (one line; hover shows the rest)
+             [Claim QR] [Return QR] [Extend] ... [Cancel]      <- the action bar
+
+   The Equipment and Room reservations cards are a FIXED size (header, body, footer) and show
+   5 rows per page; the page navigation is in the card footer, like every other paginated table.
+
+   Where every button lives (a button only ever appears in its own place):
+     page header, top right        Download Report
+     header of a card / table      filters and search
+     action bar of a row           four fixed slots: Claim QR | Return QR | Extend | Cancel, Withdraw or
+                                   Leave waitlist (far right). A slot that does not apply stays empty, so
+                                   the same button is always in the same spot from row to row.
+     history table, last column    Action: Join waitlist
+     footer of a card / table      page navigation
 
    Status colours are the system-wide ones (same as the Home tab, admin portal and
    Help Center) and nothing else on this screen is coloured:
@@ -11180,7 +11192,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 20px;
-    align-items: start;
+    align-items: stretch;
     margin-bottom: 20px;
 }
 
@@ -11237,16 +11249,103 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-on-surface);
 }
 
+#panel-activity .fact-card-heading {
+    min-width: 0;
+}
+
+/* The line under a card title: always one line, always in the same place */
+#panel-activity .fact-card-sub {
+    margin: 2px 0 0;
+    overflow: hidden;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--color-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-sub-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    font-weight: 600;
+    color: var(--color-error);
+}
+
+#panel-activity .fact-sub-alert>span:not(.material-symbols-outlined) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#panel-activity .fact-sub-alert .material-symbols-outlined {
+    flex-shrink: 0;
+    font-size: 15px;
+}
+
 #panel-activity .fact-card-body {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 16px 20px 18px;
+    gap: 12px;
+    padding: 12px 20px 14px;
+}
+
+/* Footer of a card or table: page navigation, and nothing else */
+#panel-activity .fact-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    min-height: 56px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--color-outline-variant);
+}
+
+#panel-activity .fact-card-foot[hidden] {
+    display: none;
+}
+
+/* Equipment + Room reservations: a fixed size, whatever is (or is not) inside.
+   Five rows plus all four group labels (the most a page can hold) fit without scrolling. */
+#panel-activity .fact-live {
+    display: flex;
+    flex-direction: column;
+}
+
+#panel-activity .fact-live .fact-card-head {
+    flex: none;
+    box-sizing: border-box;
+    height: 72px;
+    flex-wrap: nowrap;
+}
+
+#panel-activity .fact-live .fact-card-body {
+    flex: none;
+    box-sizing: border-box;
+    height: var(--fact-body-h, 684px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+}
+
+#panel-activity .fact-live .fact-card-foot {
+    flex: none;
+    height: 56px;
+}
+
+/* An empty card keeps its size; the message sits in the middle */
+#panel-activity .fact-live .fact-card-body>.fact-empty {
+    flex: 1;
+    justify-content: center;
 }
 
 /* ── Groups & rows inside a card ─────────────────────────────── */
 #panel-activity .fact-group {
     min-width: 0;
+}
+
+#panel-activity .fact-group[hidden] {
+    display: none;
 }
 
 #panel-activity .fact-group-label {
@@ -11264,19 +11363,19 @@ body .side-nav .side-nav-user .side-nav-user-name {
     flex-direction: column;
 }
 
-#panel-activity .fact-list.is-collapsed>.fact-item:nth-child(n+4) {
-    display: none;
-}
-
-/* Rows are plain: a hairline between them, no boxes */
+/* Rows are plain: a hairline between the rows that are showing, no boxes */
 #panel-activity .fact-item {
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    padding: 12px 0;
+    padding: 9px 0;
 }
 
-#panel-activity .fact-item+.fact-item {
+#panel-activity .fact-item.is-paged-out {
+    display: none;
+}
+
+#panel-activity .fact-item:not(.is-paged-out)~.fact-item:not(.is-paged-out) {
     border-top: 1px solid color-mix(in srgb, var(--color-outline-variant) 60%, transparent);
 }
 
@@ -11321,11 +11420,21 @@ body .side-nav .side-nav-user .side-nav-user-name {
     color: var(--color-error);
 }
 
+/* One line, so every row is the same height (hover shows the rest; on a phone, Details does) */
 #panel-activity .fact-item-sub {
     margin: 2px 0 0;
+    overflow: hidden;
     font-size: 0.75rem;
     line-height: 1.45;
     color: var(--color-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-item.rx-open .fact-item-sub {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
 }
 
 #panel-activity .fact-bundle-note,
@@ -11364,12 +11473,28 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 13px;
 }
 
+/* The action bar: four fixed slots, left to right. A button is only ever in its own slot, and a
+   slot with no button stays empty, so Cancel is always at the far right, Extend always third... */
 #panel-activity .fact-item-actions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 118px));
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+#panel-activity .fact-slot {
     display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px 12px;
-    margin-top: 8px;
+    min-width: 0;
+    min-height: 28px;
+}
+
+#panel-activity .fact-slot-end {
+    justify-content: flex-end;
+}
+
+#panel-activity .fact-slot>.fact-btn {
+    width: 100%;
 }
 
 /* Icon tile (equipment photo / room icon) */
@@ -11446,6 +11571,37 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 16px;
 }
 
+/* The icon comes from data-icon, so the button's text is only its label (the page scripts swap that
+   label for "Cancelling…" and back). A button that already holds an icon element does not get a second. */
+#panel-activity .fact-btn[data-icon]::before {
+    content: attr(data-icon);
+    flex: none;
+    font-family: 'Material Symbols Outlined';
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    font-feature-settings: 'liga';
+    -webkit-font-feature-settings: 'liga';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+#panel-activity .fact-btn:has(> .material-symbols-outlined)::before {
+    display: none;
+}
+
+/* Buttons in a row or a table cell are one size */
+#panel-activity .fact-item-actions .fact-btn,
+#panel-activity .fact-col-action .fact-btn {
+    height: 28px;
+    padding: 0 8px;
+    gap: 5px;
+    font-size: 0.75rem;
+}
+
 #panel-activity .fact-btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
@@ -11474,7 +11630,6 @@ body .side-nav .side-nav-user .side-nav-user-name {
 #panel-activity .fact-btn:focus-visible,
 #panel-activity .fact-seg-btn:focus-visible,
 #panel-activity .fact-pager-btn:focus-visible,
-#panel-activity .fact-more:focus-visible,
 #panel-activity .fact-linkbtn:focus-visible {
     outline: 2px solid var(--color-primary);
     outline-offset: 2px;
@@ -11515,41 +11670,8 @@ body .side-nav .side-nav-user .side-nav-user-name {
     font-size: 14px;
 }
 
-#panel-activity .fact-more {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    width: 100%;
-    margin-top: 4px;
-    padding: 6px;
-    border: 0;
-    border-radius: 8px;
-    background: none;
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--color-primary);
-    cursor: pointer;
-}
-
-#panel-activity .fact-more:hover {
-    background: var(--color-surface-container);
-}
-
-#panel-activity .fact-more .material-symbols-outlined {
-    font-size: 18px;
-    transition: transform 0.2s ease;
-}
-
-#panel-activity .fact-more.is-open .material-symbols-outlined {
-    transform: rotate(180deg);
-}
-
 /* ── Room limit line, notice, empty states ───────────────────── */
 #panel-activity .fact-limit {
-    margin: 0;
-    font-size: 0.8125rem;
     color: var(--color-secondary);
 }
 
@@ -11721,7 +11843,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
 }
 
 #panel-activity .fact-table thead th:first-child {
-    width: 55%;
+    width: 48%;
 }
 
 #panel-activity .fact-table td {
@@ -11755,6 +11877,17 @@ body .side-nav .side-nav-user .side-nav-user-name {
 }
 
 #panel-activity .fact-table thead th.fact-col-status {
+    text-align: right;
+}
+
+/* Action column: the only place a history row can have a button (Join waitlist) */
+#panel-activity .fact-col-action {
+    width: 150px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#panel-activity .fact-table thead th.fact-col-action {
     text-align: right;
 }
 
@@ -11805,11 +11938,16 @@ body .side-nav .side-nav-user .side-nav-user-name {
     margin: 0 20px 20px;
 }
 
-/* Pager: lives in the History header, next to the filters */
+/* Pager: in the footer of its card or table. Count on the left, previous / numbers / next on the right */
 #panel-activity .fact-pager {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+#panel-activity .fact-card-foot .fact-pager {
+    flex: 1;
+    justify-content: space-between;
 }
 
 #panel-activity .fact-pager[hidden],
@@ -11827,6 +11965,7 @@ body .side-nav .side-nav-user .side-nav-user-name {
     display: flex;
     align-items: center;
     gap: 2px;
+    margin-left: auto;
 }
 
 #panel-activity .fact-pager-nums {

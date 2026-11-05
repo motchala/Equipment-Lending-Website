@@ -430,19 +430,70 @@ function fact_range_label(
     return $d1 . ($t1 !== '' ? ', ' . $t1 : '') . ' – ' . $d2 . ($t2 !== '' ? ', ' . $t2 : '');
 }
 
-/** A labelled group of rows; more than three collapse behind "Show all". */
+/**
+ * A labelled group of rows. Long lists are not collapsed here: each card pages its rows
+ * (5 per page, page navigation in the card footer) in the My Activity script.
+ */
 function fact_render_group(string $label, array $itemsHtml): string
 {
     if (!$itemsHtml) {
         return '';
     }
-    $total     = count($itemsHtml);
-    $collapsed = $total > 3;
-    $html  = '<div class="fact-group"><h3 class="fact-group-label">' . fact_h($label) . '</h3>';
-    $html .= '<div class="fact-list' . ($collapsed ? ' is-collapsed' : '') . '">' . implode('', $itemsHtml) . '</div>';
-    if ($collapsed) {
-        $html .= '<button type="button" class="fact-more" data-fact-more aria-expanded="false">Show all ' . $total
-            . ' <span class="material-symbols-outlined" aria-hidden="true">expand_more</span></button>';
+    return '<div class="fact-group"><h3 class="fact-group-label">' . fact_h($label) . '</h3>'
+        . '<div class="fact-list">' . implode('', $itemsHtml) . '</div></div>';
+}
+
+/*
+ * ── Where every button on My Activity lives ────────────────────────────────
+ *   Page header, top right        Download Report                        (nothing else)
+ *   Card / table header           filters and search                     (nothing else)
+ *   Row action bar, bottom of     four fixed slots, left to right, and each button only ever
+ *   every Equipment / Room row    appears in its own slot:
+ *                                   claim   Claim QR
+ *                                   return  Return QR
+ *                                   extend  Extend
+ *                                   end     Cancel / Withdraw / Leave waitlist  (far right)
+ *   History table, last column    Action: Join waitlist
+ *   Card / table footer           page navigation (previous, numbers, next)
+ * A slot that does not apply to a row stays empty, so the same button is always in the same
+ * spot from one row to the next. A button that is not allowed right now (too late to cancel,
+ * extension limit reached) stays in its slot, greyed out, with the reason on hover.
+ */
+
+/**
+ * One action button. Same look everywhere: icon + label. The label is plain text (the icon is
+ * drawn by CSS from data-icon) so the page scripts can swap it for "Cancelling…" and back.
+ *
+ * @param array<string, string|int> $data  data-* attributes the page scripts read
+ * @param array{danger?: bool, disabled?: bool, title?: string, aria?: string} $opt
+ */
+function fact_action_btn(string $label, string $icon, array $data = [], array $opt = []): string
+{
+    $attrs = '';
+    foreach ($data as $key => $value) {
+        $attrs .= ' data-' . $key . '="' . fact_h((string)$value) . '"';
+    }
+    $disabled = !empty($opt['disabled']);
+    $title    = (string)($opt['title'] ?? '');
+    $aria     = (string)($opt['aria'] ?? '');
+    return '<button type="button" class="fact-btn fact-btn-ghost' . (!empty($opt['danger']) ? ' is-danger' : '') . '"'
+        . ' data-icon="' . fact_h($icon) . '"' . $attrs
+        . ($disabled ? ' disabled aria-disabled="true"' : '')
+        . ($title !== '' ? ' title="' . fact_h($title) . '"' : '')
+        . ($aria !== '' ? ' aria-label="' . fact_h($aria) . '"' : '')
+        . '>' . fact_h($label) . '</button>';
+}
+
+/**
+ * The action bar at the bottom of a row: the four slots above, always in the same order.
+ *
+ * @param array{claim?: string, return?: string, extend?: string, end?: string} $slots ready-made buttons
+ */
+function fact_render_actions(array $slots): string
+{
+    $html = '<div class="fact-item-actions" role="group" aria-label="Actions">';
+    foreach (['claim', 'return', 'extend', 'end'] as $slot) {
+        $html .= '<span class="fact-slot fact-slot-' . $slot . '">' . ($slots[$slot] ?? '') . '</span>';
     }
     return $html . '</div>';
 }
@@ -526,6 +577,33 @@ function fact_render_room_item(array $it, string $kind): string
         if ($kind === 'pending') {
             $sub[] = 'Waiting for admin approval';
         }
+        if ($kind === 'upcoming' && empty($it['can_cancel'])) {
+            $sub[] = 'Can\'t be cancelled within 1 hour of the start';
+        }
+    }
+
+    // Rooms only have the "end" slot: leave the waitlist / withdraw a request / cancel a reservation
+    $end = '';
+    if ($kind === 'waitlist') {
+        $end = fact_action_btn('Leave waitlist', 'close', [
+            'action' => 'leave-waitlist', 'room-id' => fact_i($it, 'room_id'), 'room-name' => $room,
+            'res-date' => fact_s($it, 'date'), 'start-time' => fact_s($it, 'start'), 'end-time' => fact_s($it, 'end'),
+        ], ['danger' => true, 'title' => 'Stop waiting for this slot']);
+    } elseif ($kind === 'pending') {
+        // A request that is still waiting holds no slot, so it can be withdrawn at any time
+        $end = fact_action_btn('Withdraw', 'close', [
+            'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
+        ], ['danger' => true, 'title' => 'Withdraw this request']);
+    } elseif ($kind === 'upcoming') {
+        // Only upcoming reservations can be cancelled, and not within 1 hour of the start
+        $end = !empty($it['can_cancel'])
+            ? fact_action_btn('Cancel', 'close', [
+                'action' => 'cancel-reservation', 'rr-id' => fact_i($it, 'id'), 'room-name' => $room,
+            ], ['danger' => true, 'title' => 'Cancel this reservation'])
+            : fact_action_btn('Cancel', 'lock', [], [
+                'danger' => true, 'disabled' => true,
+                'title'  => 'Reservations can\'t be cancelled within 1 hour of the start time',
+            ]);
     }
 
     $html  = '<article class="fact-item fact-room" data-rr-id="' . fact_i($it, 'id') . '">';
@@ -534,36 +612,25 @@ function fact_render_room_item(array $it, string $kind): string
     $html .= fact_status_chip($kind === 'waitlist' ? 'Waitlisted' : ($kind === 'pending' ? 'Waiting' : 'Approved')) . '</div>';
     $html .= '<p class="fact-item-meta">' . fact_h($when) . '</p>';
     $html .= '<p class="fact-item-sub">' . implode(' · ', $sub) . '</p>';
-
-    // A waitlist entry can be dropped at any time
-    if ($kind === 'waitlist') {
-        $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost" data-action="leave-waitlist"'
-            . ' data-room-id="' . fact_i($it, 'room_id') . '" data-room-name="' . fact_h($room) . '"'
-            . ' data-res-date="' . fact_h(fact_s($it, 'date')) . '"'
-            . ' data-start-time="' . fact_h(fact_s($it, 'start')) . '" data-end-time="' . fact_h(fact_s($it, 'end')) . '"'
-            . ' title="Stop waiting for this slot">Leave waitlist</button></div>';
-    }
-
-    // Only upcoming reservations can be cancelled, and not within 1 hour of the start
-    if ($kind === 'upcoming') {
-        $html .= '<div class="fact-item-actions">';
-        if (!empty($it['can_cancel'])) {
-            $html .= '<button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-reservation"'
-                . ' data-rr-id="' . fact_i($it, 'id') . '" data-room-name="' . fact_h($room) . '"'
-                . ' title="Cancel this reservation">Cancel</button>';
-        } else {
-            $html .= '<span class="fact-note" title="Reservations can\'t be cancelled within 1 hour of the start time">'
-                . fact_icon('lock') . 'Can\'t be cancelled within 1 hour of the start</span>';
-        }
-        $html .= '</div>';
-    }
-    // A request that is still waiting holds no slot, so it can be withdrawn at any time
-    if ($kind === 'pending') {
-        $html .= '<div class="fact-item-actions"><button type="button" class="fact-btn fact-btn-ghost is-danger" data-action="cancel-reservation"'
-            . ' data-rr-id="' . fact_i($it, 'id') . '" data-room-name="' . fact_h($room) . '"'
-            . ' title="Withdraw this request">Withdraw</button></div>';
-    }
+    $html .= fact_render_actions(['end' => $end]);
     return $html . '</div></article>';
+}
+
+/**
+ * The line under the "Room reservations" title. The room limit is a real rule (see the top of
+ * this file): it is said once, here, in one quiet line that is always in the same place.
+ *
+ * @param array<string, mixed> $d result of fact_load_rooms()
+ */
+function fact_render_rooms_status(array $d): string
+{
+    $active = fact_i($d, 'active');
+    $max    = max(1, fact_i($d, 'max'));
+    $full   = $active >= $max;
+    return '<span class="fact-limit' . ($full ? ' is-full' : '') . '"'
+        . ($full ? ' title="Limit reached. Cancel one or wait until it ends to reserve another."' : '') . '>'
+        . '<strong>' . $active . ' of ' . $max . '</strong> active reservations'
+        . ($full ? ' &middot; Limit reached' : '') . '</span>';
 }
 
 /**
@@ -577,13 +644,7 @@ function fact_render_rooms_body(array $d): string
     $pending  = is_array($d['pending'] ?? null) ? $d['pending'] : [];
     $upcoming = is_array($d['upcoming'] ?? null) ? $d['upcoming'] : [];
     $waitlist = is_array($d['waitlist'] ?? null) ? $d['waitlist'] : [];
-    $active   = fact_i($d, 'active');
-    $max      = max(1, fact_i($d, 'max'));
-    $full     = $active >= $max;
-
-    // The room limit is a real rule (see the top of this file): say it once, in one quiet line.
-    $html = '<p class="fact-limit' . ($full ? ' is-full' : '') . '"><strong>' . $active . ' of ' . $max . '</strong> active reservations'
-        . ($full ? ' &middot; Limit reached. Cancel one or wait until it ends to reserve another.' : '') . '</p>';
+    $html     = '';
 
     if (!$live && !$pending && !$upcoming && !$waitlist) {
         return $html . fact_render_empty('event_available', 'No room reservations', 'Reserve a room for your class, lab session or meeting.');
@@ -654,15 +715,16 @@ function fact_render_room_history_rows(array $d): string
         if (fact_s($it, 'reason') !== '' && $state !== 'completed') {
             $note = fact_h(fact_s($it, 'reason'));
         }
+        // The only action a history row can have lives in its own "Action" column
+        $action   = '';
         $slot_key = fact_i($it, 'room_id') . '|' . fact_s($it, 'date') . '|' . fact_s($it, 'start') . '|' . fact_s($it, 'end');
         if ($state === 'declined' && !empty($it['future']) && isset($waiting[$slot_key])) {
-            $note .= ' <span class="fact-linkbtn is-done">On the waitlist</span>';
+            $action = '<span class="fact-note">' . fact_icon('check') . 'On the waitlist</span>';
         } elseif ($state === 'declined' && !empty($it['future'])) {
-            $note .= ' <button type="button" class="fact-linkbtn" data-action="join-waitlist"'
-                . ' data-room-id="' . fact_i($it, 'room_id') . '" data-room-name="' . fact_h(fact_s($it, 'room')) . '"'
-                . ' data-res-date="' . fact_h(fact_s($it, 'date')) . '"'
-                . ' data-start-time="' . fact_h(fact_s($it, 'start')) . '" data-end-time="' . fact_h(fact_s($it, 'end')) . '">'
-                . 'Join waitlist</button>';
+            $action = fact_action_btn('Join waitlist', 'notifications', [
+                'action' => 'join-waitlist', 'room-id' => fact_i($it, 'room_id'), 'room-name' => fact_s($it, 'room'),
+                'res-date' => fact_s($it, 'date'), 'start-time' => fact_s($it, 'start'), 'end-time' => fact_s($it, 'end'),
+            ]);
         }
 
         $html .= '<tr class="fact-row" data-kind="room" data-status="' . fact_h($state) . '" data-ts="' . fact_i($it, 'start_ts') . '">'
@@ -673,6 +735,7 @@ function fact_render_room_history_rows(array $d): string
             . '</div></div></td>'
             . '<td data-label="When"><span class="fact-when">' . fact_h($day) . '</span><span class="fact-row-sub">' . fact_h($times) . '</span></td>'
             . '<td data-label="Status" class="fact-col-status">' . fact_status_chip($status) . '</td>'
+            . '<td data-label="Action" class="fact-col-action">' . $action . '</td>'
             . '</tr>';
     }
     return $html;
