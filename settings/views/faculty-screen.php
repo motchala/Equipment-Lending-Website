@@ -652,9 +652,29 @@
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Go to the <strong>Equipment</strong> tab on the sidebar, browse the catalog, and click
-                                        <em>Borrow</em> on any available item. Fill in the borrow date, return date, room, and
-                                        instructor, then submit. Your request will be reviewed by the admin.
+                                        Open <strong>Equipment</strong>, find an item and click <strong>Borrow</strong>. To borrow several items at once, tick them and click <strong>Borrow All</strong> (these are always borrowed today).<br><br>Then choose where the equipment is going (a room from Facilities, or <em>Outside</em>) and when you need it: <strong>Today</strong> (pick a start time and 1, 2, 3 or 5 hours) or <strong>Later date</strong> (up to 3 weeks ahead, for 1, 2 or 3 days). Bookings run from 7:00 AM to 9:00 PM, and an item that is out right now can still be booked for later. Finally, choose who will collect it: you or a student.<br><br>Organization Advisers can book up to 12 hours today or 5 days for a later date, and may attach an optional request letter (PDF, JPG, PNG or WEBP, up to 5 MB).
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        What happens after I submit a request?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Your request goes to the admin as <strong>Pending</strong>. You will see the result in your <strong>Notifications</strong> and in <strong>My Activity</strong>.<br><br><strong>Pending</strong>: waiting for the admin.<br><strong>Approved / Ready for pickup</strong>: approved, but not collected yet.<br><strong>Active</strong>: the item is with you.<br><strong>Overdue</strong>: the return time has passed.<br><strong>Returned</strong>: the item is back.<br><strong>Declined</strong>: the admin declined it (the reason is shown), or nobody decided before the borrow date passed.<br><strong>Cancelled</strong>: you or an admin cancelled it.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I collect an approved item?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Open <strong>My Activity</strong> and find the item under <em>Ready for pickup</em>. Tap its <strong>Claim QR</strong> (borrowing several items together gives you one Claim Bundle QR). Show it to the admin at the Admin Office, who scans it. The item then shows as <strong>Active</strong>. If a student is collecting for you, they show the same QR.
                                     </div>
                                 </details>
 
@@ -665,35 +685,95 @@
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Physically return the borrowed item to the Admin Office. The administrator will then confirm and
-                                        mark your item as returned in the system. You can track the status update in <strong>Equipment
-                                            &mdash; My Requests</strong> or the <strong>My Activity</strong> tab.
+                                        Open <strong>My Activity</strong>, find the item under <em>Active loans</em>, and open its <strong>Return QR</strong>. Bring the item to the Admin Office and show the QR so the admin can scan it. The item then shows as <strong>Returned</strong>. If you cannot show the QR, the admin can record the return manually.
                                     </div>
                                 </details>
 
                                 <details class="help-item">
                                     <summary class="help-item-q">
                                         <span class="material-symbols-outlined">help_outline</span>
-                                        Why is my request showing as Overdue?
+                                        Why is my item Overdue, and can I extend it?
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Your item's return date has passed without it being marked as returned. Please return the item
-                                        to the Admin Office immediately. Contact the system administrator if you believe this is an
-                                        error.
+                                        An item is <strong>Overdue</strong> when its return time has passed and it has not been returned. While you have an overdue item you cannot borrow more equipment or generate student codes (room reservations are not affected). Return it to the Admin Office, or use <strong>Extend</strong> in My Activity.<br><br>Extending adds 1, 2, 3 or 5 hours to an hourly loan, or 1, 2 or 3 days to a day loan (Organization Advisers get up to 12 hours or 5 days). You can extend a loan at most 2 times. It is not possible if someone else has booked the item, another faculty member has reserved the room, or it is too late in the day (the office closes at 9:00 PM). The original lateness stays on record.
                                     </div>
                                 </details>
 
                                 <details class="help-item">
                                     <summary class="help-item-q">
                                         <span class="material-symbols-outlined">help_outline</span>
-                                        How do I reserve a facility or room?
+                                        Can I cancel a request?
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Go to the <strong>Facilities</strong> tab on the sidebar. Browse available rooms, check their
-                                        availability, and submit a reservation request. Approvals are handled by the facilities
-                                        coordinator.
+                                        Yes, from <strong>My Activity</strong>. A pending request can be cancelled any time before it would start. An approved booking that has not started can be cancelled up to 1 hour before its start time. Items already with you cannot be cancelled; return them with the Return QR instead.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        Why was my request declined, or why can't I book?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Common reasons: you have an overdue item; the item is already booked or out for that time (the form suggests the next free start); you asked for more than the stock; another faculty member has reserved that room for an overlapping time; the time is outside 7:00 AM to 9:00 PM or more than 3 weeks ahead; or nobody decided before the borrow date passed. The admin's reason, if any, appears in your Notifications and My Activity.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How can my students borrow or reserve with my code?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Your <strong>Dashboard</strong> shows your <strong>Student Access Code</strong>, and every equipment card has its own <strong>Item Code</strong> (open the small arrow on the card). A student opens the Student Portal, enters a code with their name, student ID and course, and then borrows equipment or reserves a facility. Students must be on the official student list.<br><br>Student borrows are approved right away and the student receives a Claim QR. Item codes work once, and a new one is created automatically. <strong>Generate New Code</strong> replaces your Student Access Code. Student room reservations count toward your limit of 2 active reservations.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I reserve a room?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        Open <strong>Facilities</strong>, choose a building, then a floor and a room, and click <strong>Reserve</strong> (or ask the room assistant). Pick the date, start and end time, purpose and number of attendees. Rooms can be booked from 7:00 AM to 8:00 PM, Monday to Saturday, up to 3 weeks ahead. The room's dialog lists today's and this week's reservations so you can spot free times.<br><br>A <strong>same-day</strong> reservation is confirmed immediately if the slot is free. A <strong>later-date</strong> reservation stays Pending until an admin decides. If nobody decides by 12:01 AM on that date, it is declined automatically, and you will be notified. Overdue equipment does not stop you from reserving a room.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How many rooms can I hold, and how do I cancel or join a waitlist?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        You can have at most <strong>2 active room reservations</strong> at once (pending or approved, and not finished yet, including ones students made with your code). A slot frees up when a reservation ends or is cancelled.<br><br>Cancel from <strong>My Activity</strong>; a reservation cannot be cancelled within 1 hour of its start time. If a slot you want is taken, you can join its waitlist and you will be notified if it becomes free.<br><br>Organization Advisers may attach an optional supporting document (JPG, PNG or PDF, up to 5 MB). Those reservations are reviewed by a Super Admin, even for the same day.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        How do I report a room problem, or use the room assistant?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        In the room's dialog under <strong>Facilities</strong>, click <strong>Report issue</strong>. The admin reviews it and may set the room to Maintenance. The <strong>Ask about rooms</strong> button on the Facilities tab opens the room assistant. It answers questions about availability and rules and can help you reserve. You can send up to 20 messages per hour.
+                                    </div>
+                                </details>
+
+                                <details class="help-item">
+                                    <summary class="help-item-q">
+                                        <span class="material-symbols-outlined">help_outline</span>
+                                        Where can I see my activity and notifications?
+                                        <span class="material-symbols-outlined help-item-chevron">expand_more</span>
+                                    </summary>
+                                    <div class="help-item-a">
+                                        <strong>My Activity</strong> shows your loans and room reservations: ready for pickup, active, overdue, pending, and a searchable history (use <strong>Download Report</strong> to save it). Your <strong>Dashboard</strong> shows what needs your attention and your schedule today. The bell on the Dashboard opens your Notifications.
                                     </div>
                                 </details>
 
@@ -704,8 +784,7 @@
                                         <span class="material-symbols-outlined help-item-chevron">expand_more</span>
                                     </summary>
                                     <div class="help-item-a">
-                                        Open <strong>Settings</strong> from the sidebar. Under <strong>Account</strong> you can update your
-                                        name, email, department and mobile number, and change your password securely.
+                                        Open <strong>Settings</strong> from the sidebar. Click <strong>Edit Profile</strong> to change your name, department and mobile number. Your department can only be chosen once, your Faculty ID is permanent, and your email is managed by the administrator. You can also add a backup email and change your profile photo.<br><br>To change your password, click <strong>Change</strong> under Password &amp; Security. You will need your current password, the new one must be at least 6 characters, and it can be changed once every 7 days. Settings also lets you choose Light, Dark or High Contrast, pick your email alerts, and <strong>Export Data</strong>. If you cannot sign in, contact the administrator.
                                     </div>
                                 </details>
 
@@ -714,7 +793,7 @@
                             <div class="help-contact-card">
                                 <span class="material-symbols-outlined help-contact-icon">support_agent</span>
                                 <h4>Still need help?</h4>
-                                <p>Contact the PUPSync system administrator for technical issues or escalations.</p>
+                                <p>Contact the PUPSync system administrator, or visit the Admin Office, for technical issues or escalations.</p>
                                 <a href="mailto:admin@pupsync.edu.ph" class="sov-btn-primary help-contact-btn">
                                     <span class="material-symbols-outlined">mail</span>
                                     Email Administrator

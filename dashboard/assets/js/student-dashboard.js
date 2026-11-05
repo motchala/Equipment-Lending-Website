@@ -1,1069 +1,1187 @@
 ﻿/* ================================================================
-   student-dashboard.js
-   Portal-only version: Screen A only.
+   PUPSYNC — STUDENT PORTAL  (student-dashboard.js)
 
-   Flow:
-     Choice card → facultyCodeModal → Step 1 (verify code)
-       → Step 2 Borrow (equipment form)   → Step 3 (receipt + QR)
-       → Step 2 Room   (reservation form) → Step 3 (result)
+   Flow (one page, no modal):
+     Home ─ pick a service
+       └─ Details ─ faculty code + name + student ID + course   (verify)
+            ├─ Borrow, faculty code → photo grid of equipment  → submit → receipt + QR
+            ├─ Borrow, item code    → the one item, qty / time → submit → receipt + QR
+            └─ Facility             → building → floor → room  → reserve → result
 
-   No Screen B dashboard. No sidebar. No equipment grid.
+   API contracts are unchanged:
+     equipment-booking/api/verify-faculty-code.php   verify-item-code.php
+     equipment-booking/api/submit-student-borrow.php submit-item-borrow.php
+     room-reservation/api/verify-room-code.php       submit-student-reserve.php
 ================================================================ */
+(function () {
+    'use strict';
 
-/* ── Shared HTML escape helpers ──────────────────────────────── */
-function escHTML(str) {
-    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function escAttr(str) {
-    return String(str ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-/* ── Course choices (must match STUDENT_COURSES in shared/core/student-registry.php) ── */
-const STUDENT_COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
-
-/* ── Student ID mask: "20**-*****-BN-*" ─────────────────────────────────────────
-   The 20, the dashes and the BN are fixed; the student only types the 8 digits that
-   replace the asterisks. Typing, Backspace and paste (a full "2024-00048-BN-0" works)
-   are handled here, so the fixed parts can never be edited. The server still
-   validates the final value. */
-function initStudentIdMask(input) {
-    if (!input) return;
-    let digits = '';
-
-    const caretSpot = () => {
-        const at = input.value.indexOf('*');
-        return at === -1 ? input.value.length : at;
-    };
-    const render = () => {
-        const p = (digits + '********').slice(0, 8);
-        input.value = '20' + p.slice(0, 2) + '-' + p.slice(2, 7) + '-BN-' + p.slice(7);
-        const pos = caretSpot();
-        input.setSelectionRange(pos, pos);
-    };
-    const fromText = (txt) => {
-        const t = String(txt || '').toUpperCase();
-        const m = /(\d{4})\D*(\d{5})\D*(?:[A-Z]{2})?\D*(\d)/.exec(t);
-        let d = m ? m[1] + m[2] + m[3] : t.replace(/\D/g, '');
-        if (d.length > 8 && d.startsWith('20')) d = d.slice(2);
-        return d.slice(0, 8);
+    /* ── Constants ───────────────────────────────────────────── */
+    /* Must match STUDENT_COURSES in shared/core/student-registry.php */
+    var COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
+    var OPEN_MIN = 7 * 60;       /* rooms bookable 7:00 AM … */
+    var CLOSE_MIN = 20 * 60;     /* … 8:00 PM (server enforces the same) */
+    var STEP_MIN = 30;
+    var PURPOSES = ['Lecture', 'Lab session', 'Meeting', 'Exam', 'Seminar'];
+    var QR_SRC = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
+    var RECEIPT_KEY = 'pup_last_receipt';
+    var URLS = {
+        verifyFaculty: 'equipment-booking/api/verify-faculty-code.php',
+        verifyItem: 'equipment-booking/api/verify-item-code.php',
+        verifyRoom: 'room-reservation/api/verify-room-code.php',
+        borrow: 'equipment-booking/api/submit-student-borrow.php',
+        itemBorrow: 'equipment-booking/api/submit-item-borrow.php',
+        reserve: 'room-reservation/api/submit-student-reserve.php'
     };
 
-    input.addEventListener('beforeinput', (e) => {
-        const type = e.inputType || '';
-        if (type === 'insertCompositionText' || type === 'insertReplacementText') return; // handled by 'input' below
-        e.preventDefault();
-        if (type === 'insertText' && e.data) digits = (digits + e.data.replace(/\D/g, '')).slice(0, 8);
-        else if (type.indexOf('delete') === 0) digits = digits.slice(0, -1);
-        render();
-    });
-    input.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const d = fromText((e.clipboardData || window.clipboardData).getData('text'));
-        if (d) digits = d;
-        render();
-    });
-    // Fallback for keyboards that cannot be intercepted (some IME / Android keyboards)
-    input.addEventListener('input', () => {
-        const raw = input.value.replace(/\D/g, '');
-        digits = (raw.startsWith('20') ? raw.slice(2) : raw).slice(0, 8);
-        render();
-    });
-    const toSpot = () => setTimeout(() => { const pos = caretSpot(); input.setSelectionRange(pos, pos); }, 0);
-    input.addEventListener('focus', toSpot);
-    input.addEventListener('click', toSpot);
-    input.addEventListener('keydown', (e) => {
-        if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) !== -1) e.preventDefault();
-    });
-}
+    /* ── Small helpers ───────────────────────────────────────── */
+    function $(id) { return document.getElementById(id); }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    /* Dates are built from LOCAL parts — toISOString() is UTC and gives "yesterday" in the Philippines
+       between midnight and 8 AM, which the server then rejects as a past date. */
+    function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function todayStr() { return ymd(new Date()); }
+    function addDays(d, n) { var x = new Date(d.getTime()); x.setDate(x.getDate() + n); return x; }
+    function parseYmd(s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+    function niceDate(s) {
+        var d = parseYmd(s);
+        return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function minToHHMM(m) { return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+    function minToLabel(m) {
+        var h = Math.floor(m / 60), mm = m % 60;
+        return ((h % 12) || 12) + ':' + pad(mm) + ' ' + (h >= 12 ? 'PM' : 'AM');
+    }
+    function hhmmToMin(t) { var p = String(t).split(':'); return (+p[0]) * 60 + (+p[1]); }
+    function nowMin() { var n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
+    function icon(name) { return '<span class="material-symbols-outlined" aria-hidden="true">' + name + '</span>'; }
+    function toInt(v, d) { var n = parseInt(v, 10); return isNaN(n) ? (d || 0) : n; }
 
-/* ================================================================
-   INIT — runs on DOMContentLoaded
-   Always shows Screen A and initialises the portal.
-================================================================ */
-document.addEventListener('DOMContentLoaded', function () {
-    initPortal();
-});
+    /* Image paths come from the database as "uploads/…" or "assets/…". Anything else is ignored. */
+    function safeImg(p) {
+        p = String(p == null ? '' : p).trim();
+        if (!p || p.charAt(0) === '/' || p.indexOf('\\') !== -1 || p.indexOf('..') !== -1 ||
+            /^[a-z][a-z0-9+.\-]*:/i.test(p)) return '';
+        return encodeURI(p);
+    }
+    /* Photo layered over a placeholder icon: if the file is missing the <img> removes itself
+       (see the capture-phase error listener in init) and the placeholder shows through. */
+    function photo(path, alt, ph) {
+        var src = safeImg(path);
+        return '<span class="st-ph">' + icon(ph || 'inventory_2') + '</span>' +
+            (src ? '<img src="' + esc(src) + '" alt="' + esc(alt || '') + '" loading="lazy" data-fallback="1">' : '');
+    }
 
-/* ================================================================
-   PORTAL  (#screen-portal)
-================================================================ */
-function initPortal() {
+    function post(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            credentials: 'same-origin'
+        }).then(function (r) {
+            return r.text().then(function (t) {
+                try { return JSON.parse(t); }
+                catch (e) { return { error: 'The server sent an unexpected reply. Please try again.' }; }
+            });
+        }).catch(function () {
+            return { error: 'Network error. Please check your connection and try again.' };
+        });
+    }
 
-    const facultyCodeModal = document.getElementById('facultyCodeModal');
-    if (!facultyCodeModal) return;
+    function showAlert(id, msg) {
+        var el = $(id);
+        if (!el) return;
+        el.innerHTML = icon('error') + '<span></span>';
+        el.lastChild.textContent = msg;
+        el.hidden = false;
+        if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    function hideAlert(id) { var el = $(id); if (el) el.hidden = true; }
 
-    // The first-paint field (before the modal rebuilds it) is masked too
-    initStudentIdMask(document.getElementById('studentId'));
+    function setBusy(btn, busy, label) {
+        if (!btn) return;
+        if (busy) {
+            if (btn.getAttribute('data-html') == null) btn.setAttribute('data-html', btn.innerHTML);
+            btn.disabled = true;
+            btn.innerHTML = '<span class="st-spin"></span>' + esc(label);
+        } else {
+            btn.disabled = false;
+            if (btn.getAttribute('data-html') != null) {
+                btn.innerHTML = btn.getAttribute('data-html');
+                btn.removeAttribute('data-html');
+            }
+        }
+    }
 
-    let _verified = null;
-    let _lastReceipt = null;
-    let _openingReceipt = false;
+    /* ── Student ID mask: "20**-*****-BN-*" ───────────────────────
+       The 20, the dashes and the BN are fixed; the student only types the 8 digits that
+       replace the asterisks. Typing, Backspace and paste (a full "2024-00048-BN-0" works)
+       are handled here, so the fixed parts can never be edited. The server still
+       validates the final value. Returns { reset() }. */
+    function initStudentIdMask(input) {
+        if (!input) return { reset: function () { } };
+        var digits = '';
 
-    /* Restore receipt banner if one was saved earlier this session */
-    try {
-        const saved = sessionStorage.getItem('pup_last_receipt');
-        if (saved) { _lastReceipt = JSON.parse(saved); showReceiptBanner(_lastReceipt); }
-    } catch (e) { }
+        function caretSpot() {
+            var at = input.value.indexOf('*');
+            return at === -1 ? input.value.length : at;
+        }
+        function render() {
+            var p = (digits + '********').slice(0, 8);
+            input.value = '20' + p.slice(0, 2) + '-' + p.slice(2, 7) + '-BN-' + p.slice(7);
+            var pos = caretSpot();
+            try { input.setSelectionRange(pos, pos); } catch (e) { }
+        }
+        function fromText(txt) {
+            var t = String(txt || '').toUpperCase();
+            var m = /(\d{4})\D*(\d{5})\D*(?:[A-Z]{2})?\D*(\d)/.exec(t);
+            var d = m ? m[1] + m[2] + m[3] : t.replace(/\D/g, '');
+            if (d.length > 8 && d.indexOf('20') === 0) d = d.slice(2);
+            return d.slice(0, 8);
+        }
 
-    function showReceiptBanner(receipt) {
-        const banner = document.getElementById('receiptBanner');
-        const sub = document.getElementById('receiptBannerSub');
-        if (!banner) return;
-        if (sub) sub.textContent = receipt.equipment + ' · Return by ' + receipt.return_date;
-        banner.style.display = 'flex';
-        banner.onclick = function () {
-            _openingReceipt = true;
-            bootstrap.Modal.getOrCreateInstance(facultyCodeModal).show();
+        input.addEventListener('beforeinput', function (e) {
+            var type = e.inputType || '';
+            if (type === 'insertCompositionText' || type === 'insertReplacementText') return; /* handled by 'input' below */
+            e.preventDefault();
+            if (type === 'insertText' && e.data) digits = (digits + e.data.replace(/\D/g, '')).slice(0, 8);
+            else if (type.indexOf('delete') === 0) digits = digits.slice(0, -1);
+            render();
+        });
+        input.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var d = fromText((e.clipboardData || window.clipboardData).getData('text'));
+            if (d) digits = d;
+            render();
+        });
+        /* Fallback for keyboards that cannot be intercepted (some IME / Android keyboards) */
+        input.addEventListener('input', function () {
+            var raw = input.value.replace(/\D/g, '');
+            digits = (raw.indexOf('20') === 0 ? raw.slice(2) : raw).slice(0, 8);
+            render();
+        });
+        function toSpot() { setTimeout(function () { var pos = caretSpot(); try { input.setSelectionRange(pos, pos); } catch (e) { } }, 0); }
+        input.addEventListener('focus', toSpot);
+        input.addEventListener('click', toSpot);
+        input.addEventListener('keydown', function (e) {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) !== -1) e.preventDefault();
+        });
+        return { reset: function () { digits = ''; render(); } };
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       STATE
+    ══════════════════════════════════════════════════════════ */
+    var idMask = null;
+    var st = fresh();
+
+    function fresh() {
+        return {
+            service: null,      /* 'borrow' | 'facility'                          */
+            kind: null,         /* 'faculty' | 'item' | 'room' (what the code was) */
+            verified: null,     /* verify response + the student's own details     */
+            vKey: '',           /* identifies the inputs that produced `verified`  */
+            inv: [],            /* equipment list (faculty-code borrow)            */
+            invMap: {},         /* item_name → item                                */
+            cart: {},           /* item_name → quantity                            */
+            done: [],           /* requests already accepted by the server          */
+            where: null,        /* room / dates locked in after the first accept   */
+            query: '',
+            cat: '',
+            fac: { buildings: [], bid: null, floor: 0, room: null },
+            receipt: null
         };
     }
 
-    /* ── Error helpers ─────────────────────────────────────────── */
-    function showPortalError(msg) {
-        let el = document.getElementById('portalError');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'portalError';
-            el.style.cssText = 'color:#c62828;background:#fce4ec;border-radius:10px;padding:10px 14px;font-size:.85rem;margin-top:12px;display:none;';
-            document.querySelector('.modal-body').appendChild(el);
+    /* ══════════════════════════════════════════════════════════
+       VIEWS + STEPS
+    ══════════════════════════════════════════════════════════ */
+    var VIEWS = ['home', 'details', 'flow'];
+
+    function setStep(n) {
+        var ol = $('steps');
+        if (!ol) return;
+        ol.hidden = !n;
+        for (var i = 0; i < ol.children.length; i++) {
+            var li = ol.children[i];
+            li.classList.toggle('is-active', i === n - 1);
+            li.classList.toggle('is-done', i < n - 1);
+            if (i === n - 1) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
         }
-        el.textContent = msg;
-        el.style.display = 'block';
-    }
-    function clearPortalError() {
-        const el = document.getElementById('portalError');
-        if (el) el.style.display = 'none';
     }
 
-    /* ── Modal show event: read data-action from the card ──────── */
-    facultyCodeModal.addEventListener('show.bs.modal', function (event) {
-        if (_openingReceipt && _lastReceipt) {
-            _openingReceipt = false;
-            showStep3(_lastReceipt);
+    function show(name, step) {
+        VIEWS.forEach(function (v) { $('view-' + v).hidden = (v !== name); });
+        setStep(step || 0);
+        window.scrollTo(0, 0);
+        var h = $('view-' + name).querySelector('h1, h2');
+        if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+    }
+
+    function flow(html, step) {
+        $('view-flow').innerHTML = html;
+        show('flow', step);
+    }
+
+    function goHome() {
+        st = fresh();
+        $('detailsForm').reset();
+        if (idMask) idMask.reset();
+        hideAlert('detailsError');
+        show('home', 0);
+        loadReceiptBanner();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       HOME + DETAILS
+    ══════════════════════════════════════════════════════════ */
+    function startService(service) {
+        st = fresh();
+        st.service = service;
+        var borrow = service === 'borrow';
+        $('detailsTitle').textContent = borrow ? 'Borrow equipment' : 'Reserve a facility';
+        $('detailsIcon').textContent = borrow ? 'inventory_2' : 'meeting_room';
+        $('codeLabel').textContent = borrow ? 'Faculty or item code' : 'Faculty code';
+        $('codeHint').textContent = borrow
+            ? 'Ask your faculty for their one-time code (faculty code or item code).'
+            : 'Ask your faculty for their one-time code.';
+        $('stepChooseLabel').textContent = borrow ? 'Equipment' : 'Facility';
+        hideAlert('detailsError');
+        show('details', 1);
+        var code = $('facultyCode');
+        if (code) setTimeout(function () { code.focus({ preventScroll: true }); }, 60);
+    }
+
+    function onVerify(e) {
+        e.preventDefault();
+        hideAlert('detailsError');
+        var code = $('facultyCode').value.trim();
+        var name = $('studentName').value.trim();
+        var id = $('studentId').value.trim();
+        var course = $('studentCourse').value.trim();
+
+        if (!code) return showAlert('detailsError', 'Please enter the code.');
+        if (!name) return showAlert('detailsError', 'Please enter your name.');
+        if (!id || id.indexOf('*') !== -1) return showAlert('detailsError', 'Please complete your Student ID (replace every asterisk).');
+        if (!course) return showAlert('detailsError', 'Please select your course.');
+
+        /* Code type: item codes are exactly 12 letters/digits (no hyphens); faculty codes are not.
+           Facilities only accept a faculty code. */
+        var kind = st.service === 'facility' ? 'room' : (/^[A-Za-z0-9]{12}$/.test(code) ? 'item' : 'faculty');
+        var key = [kind, code, name, id, course].join('|');
+
+        /* Coming back to this form and pressing Verify again with the same details re-uses the earlier
+           result, so the faculty is not emailed a second "student is about to borrow" notice. */
+        if (st.verified && st.vKey === key) { enterChoose(); return; }
+
+        var url = kind === 'room' ? URLS.verifyRoom : (kind === 'item' ? URLS.verifyItem : URLS.verifyFaculty);
+        var btn = $('btnVerifyCode');
+        setBusy(btn, true, 'Verifying…');
+
+        post(url, { code: code, student_name: name, student_id: id, student_course: course }).then(function (data) {
+            setBusy(btn, false);
+            if (data.error) return showAlert('detailsError', data.error);
+            st.kind = kind;
+            st.vKey = key;
+            st.verified = {};
+            Object.keys(data).forEach(function (k) { st.verified[k] = data[k]; });
+            st.verified.student_name = name;
+            st.verified.student_id = id;
+            st.verified.student_course = course;
+            enterChoose();
+        });
+    }
+
+    function enterChoose() {
+        if (st.kind === 'room') renderFacility();
+        else if (st.kind === 'item') renderItem();
+        else renderBorrow();
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       BORROW — faculty code → photo grid
+    ══════════════════════════════════════════════════════════ */
+    function renderBorrow() {
+        var v = st.verified;
+        st.inv = Array.isArray(v.inventory) ? v.inventory : [];
+        st.invMap = {};
+        st.inv.forEach(function (i) { st.invMap[i.item_name] = i; });
+        st.query = '';
+        st.cat = '';
+
+        var cats = [];
+        st.inv.forEach(function (i) { if (i.category && cats.indexOf(i.category) === -1) cats.push(i.category); });
+        cats.sort();
+
+        var tools = '';
+        if (st.inv.length) {
+            tools = '<div class="st-tools">' +
+                '<label class="st-search">' + icon('search') +
+                '<input type="search" id="eqSearch" placeholder="Search equipment" autocomplete="off" aria-label="Search equipment"></label>' +
+                (cats.length > 1
+                    ? '<div class="st-chips" id="eqCats" role="group" aria-label="Categories">' +
+                    '<button type="button" class="st-chip" data-action="eq-cat" data-cat="" aria-pressed="true">All</button>' +
+                    cats.map(function (c) {
+                        return '<button type="button" class="st-chip" data-action="eq-cat" data-cat="' + esc(c) + '" aria-pressed="false">' + esc(c) + '</button>';
+                    }).join('') + '</div>'
+                    : '') +
+                '</div>';
+        }
+
+        var t0 = todayStr(), t1 = ymd(addDays(new Date(), 1));
+        flow(
+            '<div class="st-pagehead">' +
+            '<button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
+            '<h2 class="st-h2">Choose equipment</h2>' +
+            '<p class="st-sub">Authorized by <strong>' + esc(v.faculty_name) + '</strong> &middot; tap <em>Add</em> on what you need.</p>' +
+            '</div>' +
+            tools +
+            '<div class="st-eq-grid" id="eqGrid"></div>' +
+            '<form class="st-card" id="borrowForm" novalidate>' +
+            '<div class="st-card-head"><span class="st-tile" aria-hidden="true">' + icon('event') + '</span>' +
+            '<div><h3 class="st-h2">Where and when</h3><p class="st-sub">Tell us where you will use it and for how long.</p></div></div>' +
+            '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
+            '<div class="st-field"><label for="borrowRoom">Room / location <span class="st-star">*</span></label>' +
+            '<input type="text" class="st-input" id="borrowRoom" placeholder="e.g. B-205" autocomplete="off"></div>' +
+            '<div class="st-row">' +
+            '<div class="st-field"><label for="borrowDate">Borrow date <span class="st-star">*</span></label>' +
+            '<input type="date" class="st-input" id="borrowDate" min="' + t0 + '" value="' + t0 + '"></div>' +
+            '<div class="st-field"><label for="returnDate">Return date <span class="st-star">*</span></label>' +
+            '<input type="date" class="st-input" id="returnDate" min="' + t1 + '" value="' + t1 + '"></div>' +
+            '</div>' +
+            '<div class="st-alert is-note">' + icon('info') + '<span>Each item creates its own request. Your faculty will be notified.</span></div>' +
+            '</form>' +
+            '<div class="st-submitbar">' +
+            '<div class="st-submit-sum" id="eqSummary"></div>' +
+            '<button type="button" class="st-btn st-btn-primary" id="btnSubmitBorrow" data-action="submit-borrow">' + icon('send') + 'Submit request</button>' +
+            '</div>', 2);
+
+        renderEqGrid();
+        updateSummary();
+    }
+
+    function eqCardHTML(item) {
+        var name = item.item_name;
+        var max = toInt(item.quantity);
+        var isDone = isDoneName(name);
+        var qty = st.cart[name] || 0;
+        var selected = isDone || qty > 0;
+        var foot;
+        if (isDone) {
+            foot = '<span class="st-eq-done">' + icon('check_circle') + 'Submitted</span>';
+        } else if (qty > 0) {
+            foot = '<div class="st-stepper">' +
+                '<button type="button" class="st-step-btn" data-action="eq-dec" aria-label="One less"' + (qty <= 1 ? ' disabled' : '') + '>&minus;</button>' +
+                '<input type="number" class="st-step-input" data-eq-qty min="1" max="' + max + '" value="' + qty + '" inputmode="numeric" aria-label="Quantity of ' + esc(name) + '">' +
+                '<button type="button" class="st-step-btn" data-action="eq-inc" aria-label="One more"' + (qty >= max ? ' disabled' : '') + '>+</button>' +
+                '</div>' +
+                '<button type="button" class="st-icon-btn" data-action="eq-remove" aria-label="Remove ' + esc(name) + '">' + icon('delete') + '</button>';
+        } else {
+            foot = '<button type="button" class="st-btn st-btn-soft st-btn-block st-btn-sm" data-action="eq-add">' + icon('add') + 'Add</button>';
+        }
+        return '<article class="st-eq' + (selected ? ' is-selected' : '') + '" data-name="' + esc(name) + '">' +
+            '<div class="st-eq-img">' + photo(item.image_path, name, 'inventory_2') +
+            '<span class="st-eq-stock">' + icon('check_circle') + max + ' available</span>' +
+            '<span class="st-eq-tick">' + icon('check') + '</span></div>' +
+            '<div class="st-eq-body"><h3 class="st-eq-name">' + esc(name) + '</h3>' +
+            '<p class="st-eq-cat">' + esc(item.category || 'Equipment') + '</p></div>' +
+            '<div class="st-eq-foot">' + foot + '</div></article>';
+    }
+
+    function renderEqGrid() {
+        var grid = $('eqGrid');
+        if (!grid) return;
+        var q = st.query.trim().toLowerCase();
+        var list = st.inv.filter(function (i) {
+            if (st.cat && i.category !== st.cat) return false;
+            return !q || String(i.item_name).toLowerCase().indexOf(q) !== -1 ||
+                String(i.category || '').toLowerCase().indexOf(q) !== -1;
+        });
+        if (!list.length) {
+            grid.innerHTML = '<div class="st-empty">' + icon('inventory_2') +
+                '<strong>' + (st.inv.length ? 'No equipment matches your search' : 'No equipment available right now') + '</strong>' +
+                '<span>' + (st.inv.length ? 'Try a different word or category.' : 'Please check with the Admin Office.') + '</span></div>';
             return;
         }
-        _openingReceipt = false;
-        const card = event.relatedTarget;
-        const action = card?.getAttribute('data-action') || 'borrow';
-        showStep1(action);
-    });
-
-    /* ── STEP 1: verify faculty code ───────────────────────────── */
-    function showStep1(actionType) {
-        // Default to 'borrow' when called without an argument (e.g. Back button from step 2)
-        // but preserve the existing actionType when it's already set.
-        if (actionType === undefined) {
-            const existing = document.getElementById('actionType');
-            actionType = existing?.value || 'borrow';
-        }
-        clearPortalError();
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.25rem;margin-bottom:4px;">Faculty Authorization</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.875rem;">Enter your faculty's one-time code to proceed</p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div class="mb-4">
-                <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Faculty Code</label>
-                <div class="input-group">
-                    <span class="input-group-text" style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-primary);">
-                        <span class="material-symbols-outlined" style="font-size:20px;">key</span>
-                    </span>
-                    <input type="text" class="form-control form-control-lg" id="facultyCode" placeholder="Enter code"
-                        style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);font-size:1rem;padding:12px 16px;letter-spacing:2px;font-family:monospace;"
-                        autocomplete="off" autocapitalize="none">
-                </div>
-                <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:8px;">Ask your faculty for their code (faculty code or item code).</div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Your Name</label>
-                <input type="text" class="form-control" id="studentName" placeholder="Juan Dela Cruz"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Student ID</label>
-                <input type="text" class="form-control" id="studentId" value="20**-*****-BN-*"
-                    inputmode="numeric" autocomplete="off" spellcheck="false"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;font-family:monospace;letter-spacing:2px;">
-                <div class="form-text" style="color:var(--color-secondary);font-size:.8rem;margin-top:6px;">Type only the numbers that replace the asterisks.</div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;color:var(--color-on-surface);font-size:.875rem;">Course</label>
-                <select class="form-select" id="studentCourse" style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-                    <option value="" selected disabled>Select your course</option>
-                    ${STUDENT_COURSES.map(c => `<option value="${c}">${c}</option>`).join('')}
-                </select>
-            </div>
-            <input type="hidden" id="actionType" value="${escAttr(actionType)}">`;
-
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" class="btn" data-bs-dismiss="modal"
-                style="padding:10px 24px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;">
-                Cancel
-            </button>
-            <button type="button" class="btn" id="btnVerifyCode"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;">
-                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">verified</span>
-                Verify &amp; Continue
-            </button>`;
-
-        initStudentIdMask(document.getElementById('studentId'));
-        document.getElementById('btnVerifyCode').addEventListener('click', handleVerify);
+        grid.innerHTML = list.map(eqCardHTML).join('');
     }
 
-
-    /* ── STEP 2 (Borrow): equipment form — multi-item ───────────── */
-    function showStep2(data) {
-        clearPortalError();
-
-        // Build a lookup map: item_name -> quantity (for stock cap on each row)
-        const inventoryMap = {};
-        (data.inventory || []).forEach(i => { inventoryMap[i.item_name] = i.quantity; });
-
-        const inventoryOptions = data.inventory && data.inventory.length
-            ? data.inventory.map(i =>
-                `<option value="${escAttr(i.item_name)}">${escHTML(i.item_name)} — ${escHTML(i.category)} (${i.quantity} available)</option>`
-            ).join('')
-            : '<option disabled>No equipment available</option>';
-
-        const today    = new Date().toISOString().split('T')[0];
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Borrow Equipment</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Authorized by: <strong>${escHTML(data.faculty_name)}</strong></p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div class="mb-2">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Equipment <span style="color:#c62828;">*</span></label>
-                <div id="equipmentRows"></div>
-                <button type="button" id="btnAddEquipRow"
-                    style="margin-top:6px;font-size:.8rem;color:#800000;background:none;border:none;cursor:pointer;padding:2px 0;font-weight:600;">
-                    + Add another item
-                </button>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Room / Location <span style="color:#c62828;">*</span></label>
-                <input type="text" class="form-control" id="borrowRoom" placeholder="e.g. B-205"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-            <div class="row g-3 mb-3">
-                <div class="col">
-                    <label class="form-label" style="font-weight:600;font-size:.875rem;">Borrow Date <span style="color:#c62828;">*</span></label>
-                    <input type="date" class="form-control" id="borrowDate" min="${today}" value="${today}"
-                        style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-                </div>
-                <div class="col">
-                    <label class="form-label" style="font-weight:600;font-size:.875rem;">Return Date <span style="color:#c62828;">*</span></label>
-                    <input type="date" class="form-control" id="returnDate" min="${tomorrow}" value="${tomorrow}"
-                        style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-                </div>
-            </div>
-            <div style="background:#fff8e1;border-radius:10px;padding:10px 14px;font-size:.8rem;color:#795548;">
-                <span class="material-symbols-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px;">info</span>
-                Each item creates a separate request. Your faculty will be notified.
-            </div>`;
-
-        // ── Equipment row helpers ───────────────────────────────────
-        let _rowCount = 0;
-
-        // Collect item names already chosen across all rows
-        function _getChosenItems() {
-            const chosen = {};
-            document.querySelectorAll('#equipmentRows .eq-item-select').forEach(function (s) {
-                if (s.value) chosen[s.value] = true;
-            });
-            return chosen;
+    function findCard(name) {
+        var grid = $('eqGrid');
+        if (!grid) return null;
+        var cards = grid.querySelectorAll('.st-eq');
+        for (var i = 0; i < cards.length; i++) {
+            if (cards[i].getAttribute('data-name') === name) return cards[i];
         }
+        return null;
+    }
 
-        // Rebuild every dropdown: hide items chosen by OTHER rows,
-        // always keep the row's own current selection visible.
-        function _syncDropdowns() {
-            const chosen = _getChosenItems();
-            document.querySelectorAll('#equipmentRows .eq-item-select').forEach(function (sel) {
-                const ownVal = sel.value;
-                let html = '<option value="" disabled' + (ownVal ? '' : ' selected') + '>Choose equipment\u2026</option>';
-                data.inventory.forEach(function (item) {
-                    const takenByOther = chosen[item.item_name] && item.item_name !== ownVal;
-                    if (!takenByOther) {
-                        html += '<option value="' + escAttr(item.item_name) + '"'
-                            + (item.item_name === ownVal ? ' selected' : '') + '>'
-                            + escHTML(item.item_name) + ' \u2014 ' + escHTML(item.category)
-                            + ' (' + item.quantity + ' available)</option>';
-                    }
-                });
-                sel.innerHTML = html;
-            });
+    /* Re-draw ONE card (the other photos and the scroll position stay untouched) and, if asked,
+       put keyboard focus back on a control inside the new card. */
+    function refreshCard(name, focusSel) {
+        var grid = $('eqGrid'), item = st.invMap[name], old = findCard(name);
+        if (!grid || !item || !old) { updateSummary(); return; }
+        var tmp = document.createElement('div');
+        tmp.innerHTML = eqCardHTML(item);
+        var fresh = tmp.firstChild;
+        if (old.parentNode === grid) grid.replaceChild(fresh, old);
+        updateSummary();
+        if (focusSel) {
+            var f = fresh.querySelector(focusSel);
+            if (f) f.focus({ preventScroll: true });
         }
+    }
 
-        function addEquipRow() {
-            _rowCount++;
-            const rowId = 'eqrow-' + _rowCount;
-            const row = document.createElement('div');
-            row.id = rowId;
-            row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+    function setQty(name, qty) {
+        var item = st.invMap[name];
+        if (!item || isDoneName(name)) return;
+        var max = toInt(item.quantity, 1);
+        qty = Math.max(1, Math.min(max, toInt(qty, 1)));
+        var had = !!st.cart[name];
+        st.cart[name] = qty;
+        var card = findCard(name);
+        var input = card && card.querySelector('[data-eq-qty]');
+        if (had && input) {
+            /* already in the cart: adjust the stepper in place (no re-render, focus is kept) */
+            input.value = qty;
+            card.querySelector('[data-action="eq-dec"]').disabled = qty <= 1;
+            card.querySelector('[data-action="eq-inc"]').disabled = qty >= max;
+            updateSummary();
+        } else {
+            refreshCard(name, '[data-eq-qty]');
+        }
+    }
 
-            // Select element
-            const sel = document.createElement('select');
-            sel.className = 'form-select eq-item-select';
-            sel.style.cssText = 'flex:1;background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:8px 12px;font-size:.875rem;';
-            sel.innerHTML = '<option value="" disabled selected>Choose equipment\u2026</option>';
+    function pendingItems() {
+        var out = [];
+        Object.keys(st.cart).forEach(function (n) { if (!isDoneName(n)) out.push({ name: n, qty: st.cart[n] }); });
+        return out;
+    }
+    function isDoneName(n) { return st.done.some(function (d) { return d.equipment === n; }); }
 
-            // Quantity input — disabled until item chosen, max enforced on every keystroke
-            const qty = document.createElement('input');
-            qty.type = 'number';
-            qty.className = 'form-control eq-item-qty';
-            qty.value = '1';
-            qty.min = '1';
-            qty.max = '1';
-            qty.disabled = true;
-            qty.style.cssText = 'width:64px;flex-shrink:0;background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:8px 10px;font-size:.875rem;text-align:center;';
-            qty.title = 'Quantity';
+    function updateSummary() {
+        var el = $('eqSummary'), btn = $('btnSubmitBorrow');
+        if (!el) return;
+        var items = pendingItems();
+        var units = items.reduce(function (s, i) { return s + i.qty; }, 0);
+        el.innerHTML = items.length
+            ? '<strong>' + plural(items.length, 'item') + ' selected</strong><span>' + plural(units, 'unit') + ' in total</span>'
+            : '<strong>No items selected</strong><span>Add at least one item to continue.</span>';
+        if (btn && btn.getAttribute('data-html') == null) btn.disabled = !items.length;
+    }
 
-            qty.addEventListener('input', function () {
-                const max = parseInt(this.max, 10) || 1;
-                const val = parseInt(this.value, 10);
-                if (val > max) this.value = max;
-                if (val < 1 || isNaN(val)) this.value = 1;
-            });
+    function lockWhere(lock) {
+        ['borrowRoom', 'borrowDate', 'returnDate'].forEach(function (id) { var e = $(id); if (e) e.disabled = lock; });
+    }
 
-            sel.addEventListener('change', function () {
-                const maxStock = inventoryMap[this.value] || 1;
-                qty.max = maxStock;
-                qty.disabled = false;
-                if (parseInt(qty.value, 10) > maxStock) qty.value = maxStock;
-                _syncDropdowns();
-            });
+    function submitBorrow() {
+        hideAlert('flowError');
+        var v = st.verified;
+        if (!v) return showAlert('flowError', 'Session expired. Please go back and verify again.');
 
-            // Remove button only for rows after the first
-            if (_rowCount > 1) {
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'eq-row-remove';
-                removeBtn.setAttribute('data-row', rowId);
-                removeBtn.style.cssText = 'flex-shrink:0;background:none;border:none;cursor:pointer;color:#c62828;padding:4px;';
-                removeBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;">remove_circle</span>';
-                row.appendChild(sel);
-                row.appendChild(qty);
-                row.appendChild(removeBtn);
-            } else {
-                const spacer = document.createElement('span');
-                spacer.style.cssText = 'width:26px;flex-shrink:0;display:inline-block;';
-                row.appendChild(sel);
-                row.appendChild(qty);
-                row.appendChild(spacer);
+        var items = pendingItems();
+        if (!items.length) return showAlert('flowError', 'Please add at least one item.');
+        for (var k = 0; k < items.length; k++) {
+            var it = st.invMap[items[k].name];
+            var max = it ? toInt(it.quantity) : 0;
+            if (!items[k].qty || items[k].qty < 1 || items[k].qty > max) {
+                return showAlert('flowError', items[k].name + ': please enter a quantity between 1 and ' + max + '.');
             }
-
-            document.getElementById('equipmentRows').appendChild(row);
-            _syncDropdowns();
         }
 
-        // Start with one row
-        addEquipRow();
+        var room = st.where ? st.where.room : $('borrowRoom').value.trim();
+        var borrow = st.where ? st.where.borrow : $('borrowDate').value.trim();
+        var ret = st.where ? st.where.ret : $('returnDate').value.trim();
+        if (!room) return showAlert('flowError', 'Please enter the room / location.');
+        if (!borrow) return showAlert('flowError', 'Please select a borrow date.');
+        if (!ret) return showAlert('flowError', 'Please select a return date.');
+        if (borrow < todayStr()) return showAlert('flowError', 'Borrow date cannot be in the past.');
+        if (ret <= borrow) return showAlert('flowError', 'Return date must be after the borrow date.');
 
-        document.getElementById('btnAddEquipRow').addEventListener('click', function () {
-            addEquipRow();
-        });
+        var btn = $('btnSubmitBorrow');
+        setBusy(btn, true, 'Submitting…');
+        lockWhere(true);
 
-        // Remove row — re-sync after removal so the item returns to other dropdowns
-        document.getElementById('equipmentRows').addEventListener('click', function (e) {
-            const btn = e.target.closest('.eq-row-remove');
-            if (!btn) return;
-            const rowEl = document.getElementById(btn.dataset.row);
-            if (rowEl) rowEl.remove();
-            _syncDropdowns();
-        });
+        /* One request per item. The faculty code is only marked used when the LAST item goes through
+           (is_last_item). Items the server already accepted are remembered in st.done, so a retry after
+           a failure never books the same item twice. */
+        var i = 0;
+        (function next() {
+            if (i >= items.length) return finishBorrow(room, borrow, ret);
+            var cur = items[i];
+            var last = (i === items.length - 1);
+            post(URLS.borrow, {
+                code_db_id: v.code_db_id,
+                faculty_id: v.faculty_id,
+                faculty_name: v.faculty_name,
+                student_name: v.student_name,
+                student_id: v.student_id,
+                equipment_name: cur.name,
+                quantity: cur.qty,
+                room: room,
+                borrow_date: borrow,
+                return_date: ret,
+                is_last_item: last
+            }).then(function (d) {
+                if (d.error) {
+                    setBusy(btn, false);
+                    updateSummary();
+                    if (st.done.length) {
+                        st.where = { room: room, borrow: borrow, ret: ret };
+                    } else {
+                        lockWhere(false);
+                    }
+                    pendingNamesRefresh();
+                    showAlert('flowError', cur.name + ': ' + d.error +
+                        (st.done.length ? ' Items already submitted are kept — fix this and submit again.' : ''));
+                    return;
+                }
+                st.done.push({
+                    equipment: cur.name, qty: cur.qty, request_id: d.request_id,
+                    claim_token: d.claim_token || '', return_token: d.return_token || ''
+                });
+                st.where = { room: room, borrow: borrow, ret: ret };
+                i++;
+                next();
+            });
+        })();
+    }
 
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" id="btnBackToStep1"
-                style="padding:10px 20px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;cursor:pointer;">
-                ← Back
-            </button>
-            <button type="button" id="btnSubmitBorrow"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;cursor:pointer;">
-                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>
-                Submit Request
-            </button>`;
+    function pendingNamesRefresh() {
+        st.done.forEach(function (d) { refreshCard(d.equipment); });
+    }
 
-        document.getElementById('btnBackToStep1').addEventListener('click', showStep1);
-        document.getElementById('btnSubmitBorrow').addEventListener('click', function () {
-            handleSubmit(inventoryMap);
+    function finishBorrow(room, borrow, ret) {
+        var v = st.verified;
+        var receipt = {
+            kind: 'borrow',
+            student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
+            room: room, borrow_date: borrow, return_date: ret,
+            items: st.done.slice()
+        };
+        st.verified = null; st.vKey = '';
+        saveReceipt(receipt);
+        showReceipt(receipt);
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       BORROW — item code (one item, chosen by the faculty)
+    ══════════════════════════════════════════════════════════ */
+    function renderItem() {
+        var v = st.verified;
+        var avail = toInt(v.quantity);
+        var now = new Date();
+        var later = new Date(now.getTime() + 2 * 3600000);
+        /* "End of class" only makes sense if it is still today */
+        var sameDay = ymd(later) === ymd(now);
+        var laterStr = pad(later.getHours()) + ':' + pad(later.getMinutes());
+
+        flow(
+            '<div class="st-pagehead st-narrow">' +
+            '<button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
+            '<h2 class="st-h2">Borrow equipment</h2>' +
+            '<p class="st-sub">Authorized by <strong>' + esc(v.faculty_name) + '</strong></p>' +
+            '</div>' +
+            '<form class="st-card st-narrow" id="itemForm" novalidate>' +
+            '<div class="st-item">' +
+            '<div class="st-eq-img">' + photo(v.image_path, v.item_name, 'inventory_2') + '</div>' +
+            '<div><p class="st-item-name">' + esc(v.item_name) + '</p>' +
+            '<p class="st-item-meta">' + esc(v.category || 'Equipment') + ' &middot; ' + avail + ' available</p>' +
+            '<p class="st-hint">Pre-selected by your faculty.</p></div></div>' +
+            '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
+            '<div class="st-row">' +
+            '<div class="st-field"><label for="itemQty">Quantity <span class="st-star">*</span></label>' +
+            '<input type="number" class="st-input" id="itemQty" min="1" max="' + avail + '" value="1" inputmode="numeric">' +
+            '<p class="st-hint">Maximum: ' + avail + '</p></div>' +
+            '<div class="st-field"><label for="itemReturnTime">Return by <span class="st-star">*</span></label>' +
+            '<select class="st-input" id="itemReturnTime">' +
+            (sameDay ? '<option value="' + laterStr + '">End of class (~2 hours &middot; ' + minToLabel(hhmmToMin(laterStr)) + ')</option>' : '') +
+            '<option value="17:00">End of day (5:00 PM)</option>' +
+            '<option value="custom">Custom time&hellip;</option></select>' +
+            '<input type="time" class="st-input" id="itemReturnCustom" min="00:01" style="margin-top:8px" hidden></div>' +
+            '</div>' +
+            '<div class="st-field"><label for="itemRoom">Room / location <span class="st-star">*</span></label>' +
+            '<input type="text" class="st-input" id="itemRoom" placeholder="e.g. B-205" autocomplete="off"></div>' +
+            '<div class="st-actions">' +
+            '<button type="button" class="st-btn st-btn-ghost" data-action="back-details">Back</button>' +
+            '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitItem">' + icon('send') + 'Submit request</button>' +
+            '</div></form>', 2);
+
+        $('itemReturnTime').addEventListener('change', function () {
+            $('itemReturnCustom').hidden = this.value !== 'custom';
         });
     }
 
+    function submitItem() {
+        hideAlert('flowError');
+        var v = st.verified;
+        if (!v) return showAlert('flowError', 'Session expired. Please go back and verify again.');
+        var avail = toInt(v.quantity);
+        var qty = toInt($('itemQty').value, 0);
+        var sel = $('itemReturnTime').value;
+        var custom = $('itemReturnCustom').value.trim();
+        var room = $('itemRoom').value.trim();
 
-    /* ── STEP 3 (Borrow): receipt + QR ─────────────────────────── */
-    function showStep3(receipt) {
-        const base = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
-        const claimUrl  = base + 'equipment-booking/claim_confirm.php?token='  + encodeURIComponent(receipt.claim_token  || '');
-        const returnUrl = base + 'equipment-booking/return_confirm.php?token=' + encodeURIComponent(receipt.return_token || '');
+        if (!qty || qty < 1) return showAlert('flowError', 'Please enter a valid quantity.');
+        if (qty > avail) return showAlert('flowError', 'Quantity exceeds available stock (' + avail + ').');
+        var returnTime = sel === 'custom' ? custom : sel;
+        if (!returnTime || !/^\d{2}:\d{2}$/.test(returnTime)) return showAlert('flowError', 'Please select or enter a valid return time.');
+        if (!room) return showAlert('flowError', 'Please enter the room or location.');
 
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Request Approved!</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Show this receipt to the admin to claim your equipment</p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div style="text-align:center;padding:12px 0 16px;">
-                <span class="material-symbols-outlined" style="font-size:44px;color:#2e7d32;display:block;margin-bottom:8px;">check_circle</span>
-                <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">Request #${escHTML(String(receipt.request_id))}</p>
-                <p style="font-size:.78rem;color:#888;margin-bottom:0;">Auto-approved via faculty authorization</p>
-            </div>
-            <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;margin-bottom:16px;line-height:2;">
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Student</span><strong>${escHTML(receipt.student_name)} &nbsp;·&nbsp; ${escHTML(receipt.student_id)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Authorized by</span><strong>${escHTML(receipt.faculty_name)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Equipment</span><strong>${escHTML(receipt.equipment)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Room</span><strong>${escHTML(receipt.room)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Borrow</span><strong>${escHTML(receipt.borrow_date)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Return by</span><strong>${escHTML(receipt.return_date)}</strong></div>
-            </div>
-            <div style="text-align:center;margin-bottom:12px;">
-                <p style="font-size:.78rem;color:#555;font-weight:600;margin-bottom:8px;">
-                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;color:#800000;">qr_code_2</span>
-                    Step 1 — Show this QR to <strong>claim</strong> the equipment
-                </p>
-                <div id="studentClaimQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #800000;"></div>
-            </div>
-            <div style="text-align:center;">
-                <p style="font-size:.78rem;color:#555;font-weight:600;margin-bottom:8px;">
-                    <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;color:#444;">qr_code_2</span>
-                    Step 2 — Show this QR when <strong>returning</strong>
-                </p>
-                <div id="studentReceiptQr" style="display:inline-block;padding:10px;background:#fff;border-radius:14px;border:2px solid #444;"></div>
-            </div>`;
-
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" class="btn" data-bs-dismiss="modal"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;width:100%;">
-                Done
-            </button>`;
-
-        _renderStudentQr(claimUrl, 'studentClaimQr', '#800000');
-        _renderStudentQr(returnUrl, 'studentReceiptQr', '#444444');
+        var btn = $('btnSubmitItem');
+        setBusy(btn, true, 'Submitting…');
+        post(URLS.itemBorrow, {
+            code_db_id: v.code_db_id,
+            faculty_id: v.faculty_id,
+            faculty_name: v.faculty_name,
+            student_name: v.student_name,
+            student_id: v.student_id,
+            item_name: v.item_name,
+            item_id: v.item_id,
+            quantity: qty,
+            room: room,
+            return_time: returnTime
+        }).then(function (d) {
+            if (d.error) { setBusy(btn, false); return showAlert('flowError', d.error); }
+            var today = todayStr();
+            var receipt = {
+                kind: 'borrow',
+                student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
+                room: room, borrow_date: today, return_date: today + ' ' + returnTime,
+                items: [{
+                    equipment: v.item_name, qty: qty, request_id: d.request_id,
+                    claim_token: d.claim_token || '', return_token: d.return_token || ''
+                }]
+            };
+            st.verified = null; st.vKey = '';
+            saveReceipt(receipt);
+            showReceipt(receipt);
+        });
     }
 
-    function _renderStudentQr(url, containerId, darkColor) {
-        const cid   = containerId || 'studentReceiptQr';
-        const dark  = darkColor   || '#800000';
-        function doRender() {
-            const container = document.getElementById(cid);
-            if (!container) return;
-            container.innerHTML = '';
-            const canvasEl = document.createElement('canvas');
-            canvasEl.style.cssText = 'display:block;margin:0 auto;';
-            container.appendChild(canvasEl);
-            QRCode.toCanvas(canvasEl, url, { width: 160, margin: 2, color: { dark, light: '#ffffff' } });
+    /* ══════════════════════════════════════════════════════════
+       FACILITY — building → floor → room → reserve
+    ══════════════════════════════════════════════════════════ */
+    function buildBuildings(rooms) {
+        var map = {}, list = [];
+        rooms.forEach(function (r) {
+            var key = r.building_key || r.building_name || 'building';
+            var b = map[key];
+            if (!b) {
+                var name = r.building_name || 'Building';
+                var m = /^(.*?)\s*\((.+)\)\s*$/.exec(name);
+                var base = m ? m[1] : name;
+                var lm = /Building\s+([A-Za-z])/.exec(base);
+                b = map[key] = {
+                    id: key, name: name, base: base, tag: m ? m[2] : '',
+                    letter: ((lm ? lm[1] : base.charAt(0)) || 'B').toUpperCase(),
+                    image: r.building_image || '', floors: {}, rooms: 0
+                };
+                list.push(b);
+            }
+            var fk = r.floor_number != null ? 'n' + r.floor_number : 'l' + r.floor_label;
+            var f = b.floors[fk];
+            if (!f) {
+                f = b.floors[fk] = {
+                    num: r.floor_number != null ? toInt(r.floor_number) : 999,
+                    label: r.floor_label || (r.floor_number != null ? r.floor_number + 'F' : 'Floor'),
+                    rooms: []
+                };
+            }
+            f.rooms.push(r);
+            b.rooms++;
+        });
+        list.forEach(function (b) {
+            b.floorList = Object.keys(b.floors).map(function (k) { return b.floors[k]; })
+                .sort(function (a, c) { return a.num - c.num; });
+        });
+        list.sort(function (a, c) { return a.name.localeCompare(c.name); });
+        return list;
+    }
+
+    function renderFacility() {
+        var v = st.verified;
+        st.fac = { buildings: buildBuildings(Array.isArray(v.rooms) ? v.rooms : []), bid: null, floor: 0, room: null };
+        if (st.fac.buildings.length === 1) { openBuilding(st.fac.buildings[0].id); return; }
+        renderBuildings();
+    }
+
+    function renderBuildings() {
+        var v = st.verified;
+        var bs = st.fac.buildings;
+        var total = bs.reduce(function (s, b) { return s + b.rooms; }, 0);
+        var body;
+        if (!bs.length) {
+            body = '<div class="st-empty">' + icon('construction') +
+                '<strong>No rooms are open for booking</strong><span>Please check with the Admin Office.</span></div>';
+        } else {
+            body = '<div class="st-panels">' + bs.map(function (b) {
+                var src = safeImg(b.image);
+                return '<button type="button" class="st-panel" data-action="building" data-id="' + esc(b.id) + '"' +
+                    ' aria-label="' + esc(b.name) + ', ' + plural(b.rooms, 'room') + ' available">' +
+                    (src ? '<img class="st-panel-img" src="' + esc(src) + '" alt="" data-fallback="panel">' : '') +
+                    '<span class="st-panel-shade"></span>' +
+                    '<span class="st-panel-letter" aria-hidden="true">' + esc(b.letter) + '</span>' +
+                    '<span class="st-panel-info"><span class="st-panel-name">' + esc(b.base) +
+                    (b.tag ? '<em class="st-tag">' + esc(b.tag) + '</em>' : '') + '</span>' +
+                    '<span class="st-panel-meta">' + plural(b.rooms, 'room') + ' available &middot; ' + plural(b.floorList.length, 'floor') + '</span></span>' +
+                    '<span class="st-panel-go" aria-hidden="true">' + icon('arrow_forward') + '</span></button>';
+            }).join('') + '</div>';
         }
-        if (window._qrStudentLoaded) { doRender(); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js';
-        s.onload = () => { window._qrStudentLoaded = true; doRender(); };
+        flow(
+            '<div class="st-pagehead"><button type="button" class="st-link" data-action="back-details">' + icon('arrow_back') + 'Back</button>' +
+            '<div class="st-headrow"><div><h2 class="st-h2">Choose a building</h2>' +
+            '<p class="st-sub">Authorized by <strong>' + esc(v.faculty_name) + '</strong></p></div>' +
+            (total ? '<span class="st-pill"><span class="st-dot"></span>' + plural(total, 'room') + ' available</span>' : '') +
+            '</div></div>' + body, 2);
+    }
+
+    function currentBuilding() {
+        var bs = st.fac.buildings;
+        for (var i = 0; i < bs.length; i++) if (bs[i].id === st.fac.bid) return bs[i];
+        return null;
+    }
+
+    function openBuilding(id) {
+        st.fac.bid = id;
+        var b = currentBuilding();
+        if (!b) return;
+        /* open on the first floor that has rooms */
+        st.fac.floor = 0;
+        renderRooms();
+    }
+
+    function renderRooms() {
+        var b = currentBuilding();
+        if (!b) return renderBuildings();
+        var floor = b.floorList[st.fac.floor] || b.floorList[0];
+        var src = safeImg(b.image);
+        var single = st.fac.buildings.length === 1;
+
+        var tabs = b.floorList.length > 1
+            ? '<div class="st-floors" role="tablist" aria-label="Floors">' + b.floorList.map(function (f, i) {
+                return '<button type="button" class="st-floor" role="tab" data-action="floor" data-i="' + i + '" aria-selected="' + (i === st.fac.floor ? 'true' : 'false') + '">' +
+                    '<span>' + esc(f.label) + '</span><span class="st-floor-n">' + f.rooms.length + '</span></button>';
+            }).join('') + '</div>'
+            : '';
+
+        var tiles = floor && floor.rooms.length
+            ? '<div class="st-rooms" role="tabpanel" aria-label="Rooms on this floor">' + floor.rooms.map(function (r) {
+                var seats = r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? ' &middot; ' + plural(toInt(r.seating_capacity), 'seat') : '';
+                return '<button type="button" class="st-room" data-action="room" data-id="' + toInt(r.room_id) + '">' +
+                    '<span class="st-room-name">' + esc(r.room_name) + '</span>' +
+                    '<span class="st-room-meta"><span class="st-dot"></span>Available' + seats + '</span></button>';
+            }).join('') + '</div>'
+            : '<div class="st-empty">' + icon('meeting_room') + '<strong>No rooms on this floor</strong></div>';
+
+        flow(
+            '<nav class="st-crumbs" aria-label="Breadcrumb">' +
+            (single
+                ? '<button type="button" data-action="back-details">' + icon('arrow_back') + 'Back</button>'
+                : '<button type="button" data-action="back-buildings">Buildings</button>' + icon('chevron_right')) +
+            '<span aria-current="page">' + esc(b.name) + '</span></nav>' +
+            '<header class="st-hero-b">' +
+            (src ? '<img class="st-panel-img" src="' + esc(src) + '" alt="" data-fallback="panel">' : '') +
+            '<span class="st-panel-shade"></span>' +
+            '<div class="st-hero-b-text"><h2>' + esc(b.base) + (b.tag ? '<em class="st-tag">' + esc(b.tag) + '</em>' : '') + '</h2>' +
+            '<p>' + plural(b.rooms, 'room') + ' available &middot; ' + plural(b.floorList.length, 'floor') + '</p></div></header>' +
+            tabs + tiles, 2);
+    }
+
+    function findRoom(id) {
+        var b = currentBuilding();
+        if (!b) return null;
+        for (var f = 0; f < b.floorList.length; f++) {
+            for (var r = 0; r < b.floorList[f].rooms.length; r++) {
+                if (toInt(b.floorList[f].rooms[r].room_id) === id) return { room: b.floorList[f].rooms[r], floor: b.floorList[f] };
+            }
+        }
+        return null;
+    }
+
+    function startOptions(dateStr) {
+        var isToday = dateStr === todayStr();
+        var cut = nowMin();
+        var html = '<option value="" selected disabled>Select</option>';
+        for (var m = OPEN_MIN; m <= CLOSE_MIN - STEP_MIN; m += STEP_MIN) {
+            html += '<option value="' + minToHHMM(m) + '"' + (isToday && m <= cut ? ' disabled' : '') + '>' + minToLabel(m) + '</option>';
+        }
+        return html;
+    }
+    function endOptions(startVal, selected) {
+        var s = startVal ? hhmmToMin(startVal) : null;
+        var html = '<option value=""' + (selected ? '' : ' selected') + ' disabled>Select</option>';
+        if (s == null) return html;
+        for (var m = s + STEP_MIN; m <= CLOSE_MIN; m += STEP_MIN) {
+            html += '<option value="' + minToHHMM(m) + '"' + (minToHHMM(m) === selected ? ' selected' : '') + '>' + minToLabel(m) + '</option>';
+        }
+        return html;
+    }
+
+    function renderReserve(roomId) {
+        var hit = findRoom(roomId);
+        if (!hit) return renderRooms();
+        var b = currentBuilding();
+        st.fac.room = hit.room;
+        var r = hit.room;
+        var t0 = todayStr();
+        var seats = r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? ' &middot; ' + plural(toInt(r.seating_capacity), 'seat') : '';
+
+        flow(
+            '<div class="st-pagehead st-narrow"><button type="button" class="st-link" data-action="back-rooms">' + icon('arrow_back') + 'Back to rooms</button>' +
+            '<h2 class="st-h2">Reserve a room</h2>' +
+            '<p class="st-sub">Authorized by <strong>' + esc(st.verified.faculty_name) + '</strong></p></div>' +
+            '<form class="st-card st-narrow" id="reserveForm" novalidate>' +
+            '<div class="st-picked"><span class="st-tile" aria-hidden="true">' + icon('meeting_room') + '</span>' +
+            '<div class="st-picked-text"><p class="st-picked-name">' + esc(r.room_name) + '</p>' +
+            '<p class="st-picked-sub">' + esc(b.name) + ' &middot; ' + esc(hit.floor.label) + seats + '</p></div>' +
+            '<button type="button" class="st-btn st-btn-ghost st-btn-sm" data-action="back-rooms">Change</button></div>' +
+            '<div class="st-alert is-error" id="flowError" role="alert" hidden></div>' +
+            '<div class="st-field"><label for="reserveDate">Date <span class="st-star">*</span></label>' +
+            '<input type="date" class="st-input" id="reserveDate" min="' + t0 + '" value="' + t0 + '"></div>' +
+            '<div class="st-row">' +
+            '<div class="st-field"><label for="reserveStart">Start time <span class="st-star">*</span></label>' +
+            '<select class="st-input" id="reserveStart">' + startOptions(t0) + '</select></div>' +
+            '<div class="st-field"><label for="reserveEnd">End time <span class="st-star">*</span></label>' +
+            '<select class="st-input" id="reserveEnd">' + endOptions('', '') + '</select></div>' +
+            '</div>' +
+            '<p class="st-hint" style="margin:-8px 0 16px">Open 7:00 AM &ndash; 8:00 PM, Monday to Saturday.</p>' +
+            '<div class="st-field"><label for="reservePurpose">Purpose <span class="st-star">*</span></label>' +
+            '<input type="text" class="st-input" id="reservePurpose" placeholder="e.g. Club meeting, review session" autocomplete="off" maxlength="200">' +
+            '<div class="st-quick">' + PURPOSES.map(function (p) {
+                return '<button type="button" class="st-chip" data-action="purpose" data-v="' + esc(p) + '">' + esc(p) + '</button>';
+            }).join('') + '</div></div>' +
+            '<div class="st-field" style="max-width:200px"><label for="reserveAttendees">Attendees</label>' +
+            '<input type="number" class="st-input" id="reserveAttendees" value="1" min="1" inputmode="numeric">' +
+            (r.seating_capacity != null && toInt(r.seating_capacity) > 0 ? '<p class="st-hint">This room seats ' + toInt(r.seating_capacity) + '.</p>' : '') + '</div>' +
+            '<div class="st-actions">' +
+            '<button type="button" class="st-btn st-btn-ghost" data-action="back-rooms">Back</button>' +
+            '<button type="submit" class="st-btn st-btn-primary" id="btnSubmitRoom">' + icon('event_available') + 'Reserve room</button>' +
+            '</div></form>', 2);
+    }
+
+    function onReserveFieldChange(target) {
+        if (target.id === 'reserveDate') {
+            var cur = $('reserveStart').value, curEnd = $('reserveEnd').value;
+            $('reserveStart').innerHTML = startOptions(target.value);
+            var keep = cur && $('reserveStart').querySelector('option[value="' + cur + '"]:not([disabled])');
+            if (keep) $('reserveStart').value = cur;
+            var startNow = $('reserveStart').value;
+            var endOk = startNow && curEnd && hhmmToMin(curEnd) > hhmmToMin(startNow);
+            $('reserveEnd').innerHTML = endOptions(startNow, endOk ? curEnd : '');
+            var d = target.value ? parseYmd(target.value) : null;
+            if (d && d.getDay() === 0) showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
+            else hideAlert('flowError');
+        } else if (target.id === 'reserveStart') {
+            var prevEnd = $('reserveEnd').value;
+            var startM = hhmmToMin(target.value);
+            /* keep the old end if it is still after the new start, otherwise default to one hour */
+            var want = prevEnd && hhmmToMin(prevEnd) > startM ? prevEnd : (startM + 60 <= CLOSE_MIN ? minToHHMM(startM + 60) : minToHHMM(startM + STEP_MIN));
+            $('reserveEnd').innerHTML = endOptions(target.value, want);
+        }
+    }
+
+    function submitReserve() {
+        hideAlert('flowError');
+        var v = st.verified, room = st.fac.room;
+        if (!v || !room) return showAlert('flowError', 'Session expired. Please go back and verify again.');
+
+        var date = $('reserveDate').value.trim();
+        var start = $('reserveStart').value.trim();
+        var end = $('reserveEnd').value.trim();
+        var purpose = $('reservePurpose').value.trim();
+        var attendees = Math.max(1, toInt($('reserveAttendees').value, 1));
+
+        if (!date) return showAlert('flowError', 'Please select a date.');
+        if (date < todayStr()) return showAlert('flowError', 'Reservation date and time cannot be in the past.');
+        if (parseYmd(date).getDay() === 0) return showAlert('flowError', 'Reservations are not available on Sundays. Please choose another day.');
+        if (!start) return showAlert('flowError', 'Please select a start time.');
+        if (!end) return showAlert('flowError', 'Please select an end time.');
+        if (end <= start) return showAlert('flowError', 'End time must be after start time.');
+        if (!purpose) return showAlert('flowError', 'Please enter the purpose.');
+
+        var btn = $('btnSubmitRoom');
+        setBusy(btn, true, 'Submitting…');
+
+        var form = {
+            student_name: v.student_name, student_id: v.student_id, faculty_name: v.faculty_name,
+            reservation_date: date, start_time: start, end_time: end, purpose: purpose,
+            building: currentBuilding() ? currentBuilding().name : ''
+        };
+
+        post(URLS.reserve, {
+            code_db_id: v.code_db_id,
+            faculty_id: v.faculty_id,
+            faculty_name: v.faculty_name,
+            student_name: v.student_name,
+            student_id: v.student_id,
+            room_id: toInt(room.room_id),
+            reservation_date: date,
+            start_time: start,
+            end_time: end,
+            purpose: purpose,
+            attendees: attendees
+        }).then(function (d) {
+            setBusy(btn, false);
+            /* A conflict (room taken, past time, …) comes back as an error and the code is NOT used,
+               so the student can simply pick another slot with the same code. */
+            if (d.error) return showAlert('flowError', d.error);
+            st.verified = null; st.vKey = '';
+            showRoomResult(d, form);
+        });
+    }
+
+    function showRoomResult(res, f) {
+        var approved = res.status === 'Approved';
+        var waiting = res.status === 'Waiting';   /* a later date waits for an admin's decision */
+        var title = approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : 'Reservation ' + esc(res.status || 'received'));
+        var note = waiting
+            ? 'This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.'
+            : (res.reason ? res.reason : '');
+        flow(
+            '<div class="st-result"><div class="st-result-top">' +
+            '<span class="st-result-icon' + (waiting ? ' is-wait' : '') + '">' + icon(approved ? 'check_circle' : (waiting ? 'hourglass_top' : 'info')) + '</span>' +
+            '<h2 class="st-h2">' + (approved ? 'Reservation approved' : (waiting ? 'Request sent — pending admin review' : esc(title))) + '</h2>' +
+            '<p>Room reservation #' + esc(String(res.reservation_id)) + '</p>' +
+            (note ? '<p>' + esc(note) + '</p>' : '') + '</div>' +
+            '<div class="st-card"><dl class="st-summary">' +
+            row('Student', f.student_name + ' · ' + f.student_id) +
+            row('Authorized by', f.faculty_name) +
+            row('Room', (res.room_name || '') + (f.building ? ' — ' + f.building : '')) +
+            row('Date', niceDate(f.reservation_date)) +
+            row('Time', minToLabel(hhmmToMin(f.start_time)) + ' – ' + minToLabel(hhmmToMin(f.end_time))) +
+            row('Purpose', f.purpose) +
+            '</dl></div>' +
+            '<div class="st-actions"><button type="button" class="st-btn st-btn-primary st-btn-block" data-action="home">Done</button></div></div>', 3);
+    }
+
+    function row(k, v) { return '<div><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>'; }
+
+    /* ══════════════════════════════════════════════════════════
+       RECEIPT (borrow) — summary + a claim QR and a return QR per request
+    ══════════════════════════════════════════════════════════ */
+    function normReceipt(r) {
+        if (!r || typeof r !== 'object') return null;
+        if (Array.isArray(r.items) && r.items.length) return r;
+        var items = [];
+        if (Array.isArray(r.all_results) && r.all_results.length) {            /* older multi-item shape */
+            items = r.all_results.map(function (x) {
+                return { equipment: x.equipment, qty: x.qty || 1, request_id: x.request_id, claim_token: x.claim_token || '', return_token: x.return_token || '' };
+            });
+        } else if (r.request_id) {                                              /* older single-item shape */
+            items = [{ equipment: r.equipment, qty: 1, request_id: r.request_id, claim_token: r.claim_token || '', return_token: r.return_token || '' }];
+        }
+        if (!items.length) return null;
+        r.items = items;
+        return r;
+    }
+
+    function saveReceipt(r) {
+        st.receipt = r;
+        try { sessionStorage.setItem(RECEIPT_KEY, JSON.stringify(r)); } catch (e) { }
+    }
+
+    function loadReceiptBanner() {
+        var banner = $('receiptBanner');
+        if (!banner) return;
+        var r = null;
+        try { r = normReceipt(JSON.parse(sessionStorage.getItem(RECEIPT_KEY) || 'null')); } catch (e) { }
+        if (!r) { banner.hidden = true; return; }
+        st.receipt = r;
+        var names = r.items.map(function (i) { return (i.qty > 1 ? i.qty + '× ' : '') + i.equipment; }).join(', ');
+        $('receiptBannerSub').textContent = names + ' · Return by ' + fmtWhen(r.return_date);
+        banner.hidden = false;
+    }
+
+    /* "2026-11-07" -> "Sat, Nov 7, 2026"   |   "2026-11-05 15:30" -> "Thu, Nov 5, 2026 · 3:30 PM" */
+    function fmtWhen(s) {
+        s = String(s == null ? '' : s);
+        var m = /^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?/.exec(s);
+        if (!m) return s;
+        return m[2] ? niceDate(m[1]) + ' · ' + minToLabel(hhmmToMin(m[2])) : niceDate(m[1]);
+    }
+
+    function claimUrl(token) { return new URL('equipment-booking/claim_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
+    function returnUrl(token) { return new URL('equipment-booking/return_confirm.php?token=' + encodeURIComponent(token), window.location.href).href; }
+
+    function showReceipt(r) {
+        var many = r.items.length > 1;
+        var reqs = r.items.map(function (it) {
+            var qrs = '';
+            if (it.claim_token) {
+                qrs += '<div class="st-qr-box"><p class="st-qr-title">Claim QR<span>Show this to pick it up</span></p>' +
+                    '<div class="st-qr" data-qr="' + esc(claimUrl(it.claim_token)) + '" data-color="#800000"></div></div>';
+            }
+            if (it.return_token) {
+                qrs += '<div class="st-qr-box"><p class="st-qr-title">Return QR<span>Show this when returning</span></p>' +
+                    '<div class="st-qr is-return" data-qr="' + esc(returnUrl(it.return_token)) + '" data-color="#444444"></div></div>';
+            }
+            return '<div class="st-card st-req"><div class="st-req-head"><span class="st-req-name">' +
+                (it.qty > 1 ? esc(it.qty) + '× ' : '') + esc(it.equipment) + '</span>' +
+                '<span class="st-req-id">Request #' + esc(String(it.request_id)) + '</span></div>' +
+                (qrs ? '<div class="st-qrs">' + qrs + '</div>' : '') + '</div>';
+        }).join('');
+
+        flow(
+            '<div class="st-result"><div class="st-result-top">' +
+            '<span class="st-result-icon">' + icon('check_circle') + '</span>' +
+            '<h2 class="st-h2">' + (many ? 'Requests approved' : 'Request approved') + '</h2>' +
+            '<p>' + (many ? plural(r.items.length, 'item') + ' approved via faculty authorization.' : 'Approved via faculty authorization.') +
+            ' Show the QR codes below to the admin.</p></div>' +
+            '<div class="st-card"><dl class="st-summary">' +
+            row('Student', r.student_name + ' · ' + r.student_id) +
+            row('Authorized by', r.faculty_name) +
+            row('Room', r.room) +
+            row('Borrow', fmtWhen(r.borrow_date)) +
+            row('Return by', fmtWhen(r.return_date)) +
+            '</dl></div>' +
+            '<div class="st-req-list">' + reqs + '</div>' +
+            '<div class="st-actions"><button type="button" class="st-btn st-btn-primary st-btn-block" data-action="done">Done</button></div></div>', 3);
+
+        drawQrs($('view-flow'));
+    }
+
+    /* ── QR codes (library loaded on demand) ───────────────────── */
+    var qrState = 'idle', qrQueue = [];
+    function withQr(cb) {
+        if (window.QRCode) return cb(true);
+        qrQueue.push(cb);
+        if (qrState === 'loading') return;
+        qrState = 'loading';
+        var s = document.createElement('script');
+        s.src = QR_SRC;
+        s.onload = function () { qrState = 'ready'; var q = qrQueue; qrQueue = []; q.forEach(function (f) { f(!!window.QRCode); }); };
+        s.onerror = function () { qrState = 'idle'; var q = qrQueue; qrQueue = []; q.forEach(function (f) { f(false); }); };
         document.head.appendChild(s);
     }
-
-
-    /* ── Verify handler ─────────────────────────────────────────── */
-    function handleVerify() {
-        clearPortalError();
-        const code = (document.getElementById('facultyCode')?.value || '').trim();
-        const name = (document.getElementById('studentName')?.value || '').trim();
-        const id = (document.getElementById('studentId')?.value || '').trim();
-        const course = (document.getElementById('studentCourse')?.value || '').trim();
-        const actionType = (document.getElementById('actionType')?.value || 'borrow').trim();
-
-        if (!code) { showPortalError('Please enter the code.'); return; }
-        if (!name) { showPortalError('Please enter your name.'); return; }
-        if (!id || id.indexOf('*') !== -1) { showPortalError('Please complete your Student ID (replace every asterisk).'); return; }
-        if (!course) { showPortalError('Please select your course.'); return; }
-
-        const btn = document.getElementById('btnVerifyCode');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Verifying…';
-
-        // Detect code type:
-        // Faculty text code: 11 chars with hyphens pattern (abc-123-xy4)
-        // Item code: 12 alphanumeric chars, no hyphens
-        // Room code: handled by actionType === 'room'
-        const isItemCode = actionType !== 'room' && /^[A-Za-z0-9]{12}$/.test(code);
-        const verifyUrl = actionType === 'room'
-            ? 'room-reservation/api/verify-room-code.php'
-            : isItemCode
-                ? 'equipment-booking/api/verify-item-code.php'
-                : 'equipment-booking/api/verify-faculty-code.php';
-
-        fetch(verifyUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, student_name: name, student_id: id, student_course: course }),
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">verified</span>Verify &amp; Continue';
-                    showPortalError(data.error);
-                    return;
-                }
-                _verified = { ...data, student_name: name, student_id: id, student_course: course };
-                if (actionType === 'room') {
-                    showStep2Room(_verified);
-                } else if (isItemCode) {
-                    showStep2Item(_verified);
-                } else {
-                    showStep2(_verified);
-                }
-            })
-            .catch(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">verified</span>Verify & Continue';
-                showPortalError('Network error. Please try again.');
+    function drawQrs(root) {
+        var holders = root.querySelectorAll('[data-qr]');
+        if (!holders.length) return;
+        withQr(function (ok) {
+            Array.prototype.forEach.call(holders, function (h) {
+                if (!ok) { h.innerHTML = '<span class="st-qr-fail">QR could not load.<br>Show the request number instead.</span>'; return; }
+                h.innerHTML = '';
+                var c = document.createElement('canvas');
+                h.appendChild(c);
+                try {
+                    var p = window.QRCode.toCanvas(c, h.getAttribute('data-qr'), {
+                        width: 160, margin: 2, color: { dark: h.getAttribute('data-color') || '#800000', light: '#ffffff' }
+                    });
+                    if (p && p.catch) p.catch(function () { h.innerHTML = '<span class="st-qr-fail">QR could not be drawn.</span>'; });
+                } catch (e) { h.innerHTML = '<span class="st-qr-fail">QR could not be drawn.</span>'; }
             });
+        });
     }
 
-    /* ── Submit borrow — multi-item ─────────────────────────────── */
-    function handleSubmit(inventoryMap) {
-        clearPortalError();
-        if (!_verified) { showPortalError('Session expired. Please go back and verify again.'); return; }
+    /* ══════════════════════════════════════════════════════════
+       EVENTS
+    ══════════════════════════════════════════════════════════ */
+    function nameOfCard(el) {
+        var card = el.closest('.st-eq');
+        return card ? card.getAttribute('data-name') : null;
+    }
 
-        // Collect all selected equipment rows (item name + quantity per row)
-        const rows = document.querySelectorAll('#equipmentRows > div[id^="eqrow-"]');
-        const selectedItems = []; // array of { name, qty }
-        const seen = {};
-        let rowError = false;
-        rows.forEach(function (rowEl) {
-            const sel = rowEl.querySelector('.eq-item-select');
-            const qtyInput = rowEl.querySelector('.eq-item-qty');
-            const val = (sel?.value || '').trim();
-            const qty = parseInt(qtyInput?.value || '1', 10);
-            if (!val) { rowError = true; return; }
-            if (seen[val]) { rowError = true; return; }  // duplicate item — use qty instead of adding a new row
-            if (!qty || qty < 1) { rowError = true; return; }
-            seen[val] = true;
-            selectedItems.push({ name: val, qty });
-        });
+    function onClick(e) {
+        var t = e.target.closest('[data-action]');
+        if (!t) return;
+        var a = t.getAttribute('data-action');
+        var name;
 
-        if (rowError || selectedItems.length === 0) {
-            showPortalError('Please select each item once and enter a valid quantity. To borrow multiple of the same item, change the quantity number on that row.'); return;
-        }
-
-        const room   = (document.getElementById('borrowRoom')?.value  || '').trim();
-        const borrow = (document.getElementById('borrowDate')?.value  || '').trim();
-        const ret    = (document.getElementById('returnDate')?.value  || '').trim();
-
-        if (!room)   { showPortalError('Please enter the room / location.'); return; }
-        if (!borrow) { showPortalError('Please select a borrow date.'); return; }
-        if (!ret)    { showPortalError('Please select a return date.'); return; }
-        if (ret <= borrow) { showPortalError('Return date must be after the borrow date.'); return; }
-
-        const btn = document.getElementById('btnSubmitBorrow');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…';
-
-        // Submit each item one at a time using the same endpoint.
-        // The faculty code is only marked used after the LAST item succeeds.
-        // We send is_last_item=true on the final call so the server knows to mark it used.
-        const results = [];
-
-        function submitNext(index) {
-            if (index >= selectedItems.length) {
-                // All done — show combined receipt
-                const firstResult = results[0];
-                const equipmentList = selectedItems.map(i => i.qty > 1 ? i.qty + 'x ' + i.name : i.name).join(', ');
-                const receipt = {
-                    student_name: _verified.student_name,
-                    student_id:   _verified.student_id,
-                    faculty_name: _verified.faculty_name,
-                    equipment:    equipmentList,
-                    room,
-                    borrow_date:  borrow,
-                    return_date:  ret,
-                    request_id:   firstResult.request_id,
-                    return_token: firstResult.return_token,
-                    all_results:  results,
-                };
-                _lastReceipt = receipt;
-                try { sessionStorage.setItem('pup_last_receipt', JSON.stringify(receipt)); } catch (e) {}
-                _verified = null;
-                showReceiptBanner(receipt);
-                showStep3Multi(receipt);
+        switch (a) {
+            case 'service': return startService(t.getAttribute('data-service'));
+            case 'home': case 'done': return goHome();
+            case 'back-details':
+                hideAlert('detailsError');
+                return show('details', 1);
+            case 'open-receipt':
+                if (st.receipt) showReceipt(st.receipt);
                 return;
-            }
 
-            const isLast   = (index === selectedItems.length - 1);
-            const equipItem = selectedItems[index];
-            const equipName = equipItem.name;
-            const equipQty  = equipItem.qty;
-
-            fetch('equipment-booking/api/submit-student-borrow.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code_db_id:    _verified.code_db_id,
-                    faculty_id:    _verified.faculty_id,
-                    faculty_name:  _verified.faculty_name,
-                    student_name:  _verified.student_name,
-                    student_id:    _verified.student_id,
-                    equipment_name: equipName,
-                    quantity:      equipQty,
-                    room,
-                    borrow_date:   borrow,
-                    return_date:   ret,
-                    is_last_item:  isLast,
-                }),
-            })
-            .then(r => r.json())
-            .then(d => {
-                if (d.error) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
-                    showPortalError(equipName + ': ' + d.error);
-                    return;
-                }
-                results.push({ equipment: equipName, qty: equipQty, request_id: d.request_id, return_token: d.return_token });
-                submitNext(index + 1);
-            })
-            .catch(() => {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
-                showPortalError('Network error while submitting ' + equipName + '. Please try again.');
-            });
-        }
-
-        submitNext(0);
-    }
-
-    /* ── STEP 3 (Multi-item borrow): combined receipt ───────────── */
-    function showStep3Multi(receipt) {
-        const itemCount = receipt.all_results ? receipt.all_results.length : 1;
-        const isSingle  = itemCount === 1;
-
-        // For single item, fall back to the original single-item receipt
-        if (isSingle && receipt.all_results) {
-            showStep3(receipt.all_results[0]
-                ? Object.assign({}, receipt, {
-                    equipment:   receipt.all_results[0].equipment,
-                    request_id:  receipt.all_results[0].request_id,
-                    return_token: receipt.all_results[0].return_token,
-                  })
-                : receipt);
-            return;
-        }
-
-        // Build item rows for the combined receipt
-        const itemRows = (receipt.all_results || []).map(r =>
-            `<div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="color:#666;">• ${escHTML(r.equipment)}</span>
-                <span style="color:#888;font-size:.78rem;">Req #${escHTML(String(r.request_id))}</span>
-            </div>`
-        ).join('');
-
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Requests Approved!</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">${itemCount} items approved via faculty authorization</p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div style="text-align:center;padding:12px 0 16px;">
-                <span class="material-symbols-outlined" style="font-size:44px;color:#2e7d32;display:block;margin-bottom:8px;">check_circle</span>
-                <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">${itemCount} requests submitted</p>
-                <p style="font-size:.78rem;color:#888;margin-bottom:0;">All approved via faculty authorization</p>
-            </div>
-            <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;margin-bottom:16px;line-height:2;">
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Student</span><strong>${escHTML(receipt.student_name)} &nbsp;·&nbsp; ${escHTML(receipt.student_id)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Authorized by</span><strong>${escHTML(receipt.faculty_name)}</strong></div>
-                <div style="display:flex;justify-content:space-between;padding-bottom:4px;"><span style="color:#666;">Items</span><div style="text-align:right;">${itemRows}</div></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Room</span><strong>${escHTML(receipt.room)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Borrow</span><strong>${escHTML(receipt.borrow_date)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Return by</span><strong>${escHTML(receipt.return_date)}</strong></div>
-            </div>
-            <div style="background:#fff8e1;border-radius:10px;padding:10px 14px;font-size:.78rem;color:#795548;">
-                <span class="material-symbols-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px;">info</span>
-                Show each item's QR receipt to the admin to claim equipment. Each request has its own return QR.
-            </div>`;
-
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" class="btn" data-bs-dismiss="modal"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;width:100%;">
-                Done
-            </button>`;
-    }
-
-
-    /* ── STEP 2 (Item Code): item-locked borrow form ────────────── */
-    function showStep2Item(data) {
-        clearPortalError();
-        const now = new Date();
-        const pad = n => String(n).padStart(2, '0');
-
-        // Return time options: end of class (~2h), end of day (17:00), custom
-        const twoHoursLater = new Date(now.getTime() + 2 * 3600000);
-        const twoHoursStr = pad(twoHoursLater.getHours()) + ':' + pad(twoHoursLater.getMinutes());
-        const eodStr = '17:00';
-
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Borrow Equipment</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Authorized by: <strong>${escHTML(data.faculty_name)}</strong></p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Equipment</label>
-                <div style="padding:10px 14px;background:var(--color-surface-container);border-radius:8px;border:1px solid var(--color-outline-variant);font-weight:700;color:var(--color-on-surface);">
-                    ${escHTML(data.item_name)}
-                    <span style="font-weight:400;color:var(--color-secondary);font-size:.85rem;margin-left:8px;">(${data.quantity} available)</span>
-                </div>
-                <div style="font-size:.78rem;color:var(--color-secondary);margin-top:4px;">Pre-selected — set by your faculty.</div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Quantity <span style="color:#c62828;">*</span></label>
-                <input type="number" class="form-control" id="itemQty" min="1" max="${data.quantity}" value="1"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-                <div style="font-size:.78rem;color:var(--color-secondary);margin-top:4px;">Maximum: ${data.quantity}</div>
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Return By <span style="color:#c62828;">*</span></label>
-                <select class="form-select" id="itemReturnTime"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-                    <option value="${twoHoursStr}">End of class (~2 hours · ${twoHoursStr})</option>
-                    <option value="${eodStr}">End of day (5:00 PM)</option>
-                    <option value="custom">Custom time…</option>
-                </select>
-                <input type="time" class="form-control mt-2" id="itemReturnCustom" min="00:01"
-                    style="display:none;background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-            <div class="mb-3">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Room / Location <span style="color:#c62828;">*</span></label>
-                <input type="text" class="form-control" id="itemRoom" placeholder="e.g. B-205"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>`;
-
-        // Show/hide custom time input
-        document.getElementById('itemReturnTime').addEventListener('change', function () {
-            const custom = document.getElementById('itemReturnCustom');
-            custom.style.display = this.value === 'custom' ? '' : 'none';
-        });
-
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" class="btn" id="btnItemBack"
-                style="padding:10px 24px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;">
-                Back
-            </button>
-            <button type="button" class="btn" id="btnSubmitItem"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;">
-                <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>
-                Submit Request
-            </button>`;
-
-        document.getElementById('btnItemBack').addEventListener('click', () => showStep1('borrow'));
-        document.getElementById('btnSubmitItem').addEventListener('click', () => handleSubmitItem(data));
-    }
-
-    function handleSubmitItem(data) {
-        clearPortalError();
-        const qty = parseInt(document.getElementById('itemQty')?.value || '1', 10);
-        const retSel = document.getElementById('itemReturnTime')?.value || '';
-        const retCustom = (document.getElementById('itemReturnCustom')?.value || '').trim();
-        const room = (document.getElementById('itemRoom')?.value || '').trim();
-
-        if (!qty || qty < 1) { showPortalError('Please enter a valid quantity.'); return; }
-        if (qty > data.quantity) { showPortalError('Quantity exceeds available stock (' + data.quantity + ').'); return; }
-
-        const returnTime = retSel === 'custom' ? retCustom : retSel;
-        if (!returnTime || !/^\d{2}:\d{2}$/.test(returnTime)) {
-            showPortalError('Please select or enter a valid return time.'); return;
-        }
-        if (!room) { showPortalError('Please enter the room or location.'); return; }
-
-        const btn = document.getElementById('btnSubmitItem');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…';
-
-        fetch('equipment-booking/api/submit-item-borrow.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                code_db_id:   data.code_db_id,
-                faculty_id:   data.faculty_id,
-                faculty_name: data.faculty_name,
-                student_name: data.student_name,
-                student_id:   data.student_id,
-                item_name:    data.item_name,
-                item_id:      data.item_id,
-                quantity:     qty,
-                room:         room,
-                return_time:  returnTime,
-            }),
-        })
-        .then(r => r.json())
-        .then(d => {
-            if (d.error) {
-                btn.disabled = false;
-                btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
-                showPortalError(d.error);
-                return;
-            }
-            const today = new Date().toISOString().split('T')[0];
-            const receipt = {
-                student_name: data.student_name, student_id: data.student_id,
-                faculty_name: data.faculty_name, equipment: data.item_name,
-                room: room, borrow_date: today, return_date: today + ' ' + returnTime,
-                request_id: d.request_id, return_token: d.return_token,
-            };
-            _lastReceipt = receipt;
-            try { sessionStorage.setItem('pup_last_receipt', JSON.stringify(receipt)); } catch (e) {}
-            _verified = null;
-            showReceiptBanner(receipt);
-            showStep3(receipt);
-        })
-        .catch(() => {
-            btn.disabled = false;
-            btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">send</span>Submit Request';
-            showPortalError('Network error. Please try again.');
-        });
-    }
-
-    /* ── STEP 2 (Room): room reservation form ───────────────────── */
-    function showStep2Room(data) {
-        clearPortalError();
-        const today = new Date().toISOString().split('T')[0];
-
-        document.querySelector('.modal-header').innerHTML = `
-        <div>
-            <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">Reserve a Room</h5>
-            <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Authorized by: <strong>${escHTML(data.faculty_name)}</strong></p>
-        </div>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-        <div class="mb-3" style="position:relative;">
-            <label class="form-label" style="font-weight:600;font-size:.875rem;">Room <span style="color:#c62828;">*</span></label>
-            <input type="text" id="reserveRoomSearch" autocomplete="off" placeholder="Type to search rooms…"
-                class="form-control"
-                style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            <input type="hidden" id="reserveRoomId">
-            <div id="reserveRoomDropdown"
-                style="display:none;position:absolute;left:0;right:0;max-height:220px;overflow-y:auto;
-                       background:var(--color-surface-container,#fff);border:1px solid var(--color-outline-variant,#ccc);
-                       border-radius:0 0 10px 10px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.12);">
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label" style="font-weight:600;font-size:.875rem;">Date <span style="color:#c62828;">*</span></label>
-            <input type="date" class="form-control" id="reserveDate" min="${today}"
-                style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-        </div>
-        <div class="row g-2 mb-3">
-            <div class="col">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Start Time <span style="color:#c62828;">*</span></label>
-                <input type="time" class="form-control" id="reserveStart" min="07:00" max="20:00"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-            <div class="col">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">End Time <span style="color:#c62828;">*</span></label>
-                <input type="time" class="form-control" id="reserveEnd" min="07:00" max="20:00"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-        </div>
-        <div class="mb-3">
-            <label class="form-label" style="font-weight:600;font-size:.875rem;">Purpose <span style="color:#c62828;">*</span></label>
-            <input type="text" class="form-control" id="reservePurpose" placeholder="e.g. Club meeting, review session"
-                style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-        </div>
-        <div class="row g-2 mb-3">
-            <div class="col-5">
-                <label class="form-label" style="font-weight:600;font-size:.875rem;">Attendees</label>
-                <input type="number" class="form-control" id="reserveAttendees" value="1" min="1"
-                    style="background:var(--color-surface-container);border-color:var(--color-outline-variant);color:var(--color-on-surface);padding:10px 14px;">
-            </div>
-        </div>`;
-
-        document.querySelector('.modal-footer').innerHTML = `
-        <button type="button" id="btnBackToStep1"
-            style="padding:10px 20px;border-radius:12px;border:1px solid var(--color-outline-variant);color:var(--color-secondary);font-weight:600;background:transparent;cursor:pointer;">
-            ← Back
-        </button>
-        <button type="button" id="btnSubmitRoom"
-            style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;cursor:pointer;">
-            <span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>
-            Reserve Room
-        </button>`;
-
-        document.getElementById('btnBackToStep1').addEventListener('click', showStep1);
-        document.getElementById('btnSubmitRoom').addEventListener('click', handleSubmitRoom);
-
-        // Wire up the combobox
-        setupRoomCombobox(data.rooms || []);
-    }
-
-    function setupRoomCombobox(rooms) {
-        const searchEl = document.getElementById('reserveRoomSearch');
-        const hiddenEl = document.getElementById('reserveRoomId');
-        const dropdownEl = document.getElementById('reserveRoomDropdown');
-        if (!searchEl || !hiddenEl || !dropdownEl) return;
-
-        function renderOptions(query) {
-            const q = query.trim().toLowerCase();
-            const filtered = q
-                ? rooms.filter(r =>
-                    r.room_name.toLowerCase().includes(q) ||
-                    r.building_name.toLowerCase().includes(q) ||
-                    r.floor_label.toLowerCase().includes(q) ||
-                    r.campus_name.toLowerCase().includes(q))
-                : rooms;
-
-            if (!filtered.length) {
-                dropdownEl.innerHTML = `<div style="padding:10px 14px;font-size:.85rem;color:#999;">No rooms match "${escHTML(query)}"</div>`;
-            } else {
-                dropdownEl.innerHTML = filtered.map(r => `
-                <div class="room-option" data-id="${escAttr(String(r.room_id))}"
-                    data-label="${escAttr(r.campus_name + ' › ' + r.building_name + ' — ' + r.room_name + ' (' + r.floor_label + ')')}"
-                    style="padding:9px 14px;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--color-outline-variant,#eee);line-height:1.4;">
-                    <strong>${escHTML(r.room_name)}</strong>
-                    <span style="color:#888;font-size:.78rem;margin-left:6px;">${escHTML(r.building_name)} · ${escHTML(r.floor_label)}</span>
-                </div>`).join('');
-            }
-            dropdownEl.style.display = 'block';
-        }
-
-        searchEl.addEventListener('input', function () {
-            hiddenEl.value = '';   // clear selection when user types
-            renderOptions(this.value);
-        });
-
-        searchEl.addEventListener('focus', function () {
-            renderOptions(this.value);
-        });
-
-        dropdownEl.addEventListener('mousedown', function (e) {
-            const opt = e.target.closest('.room-option');
-            if (!opt) return;
-            e.preventDefault();   // prevent input blur from hiding dropdown first
-            hiddenEl.value = opt.dataset.id;
-            searchEl.value = opt.dataset.label;
-            dropdownEl.style.display = 'none';
-        });
-
-        document.addEventListener('click', function hideOnOutsideClick(e) {
-            if (!searchEl.contains(e.target) && !dropdownEl.contains(e.target)) {
-                dropdownEl.style.display = 'none';
-                // if the user left the field without selecting a valid option, clear both
-                if (!hiddenEl.value) searchEl.value = '';
-            }
-        }, { capture: true, once: false });
-    }
-
-
-
-    /* ── STEP 3 (Room): result ──────────────────────────────────── */
-    function showStep3Room(result, formData) {
-        const isApproved = result.status === 'Approved';
-        const isPending = result.status === 'Waiting';   // a later date waits for an admin's decision
-        const iconColor = isApproved ? '#2e7d32' : (isPending ? '#b26a00' : '#c62828');
-        const iconName = isApproved ? 'check_circle' : (isPending ? 'hourglass_top' : 'cancel');
-        const statusText = isApproved ? 'Reservation Approved!' : (isPending ? 'Request Sent – Pending Admin Review' : 'Reservation Declined');
-
-        document.querySelector('.modal-header').innerHTML = `
-            <div>
-                <h5 class="modal-title" style="color:#fff;font-family:var(--font-display);font-weight:700;font-size:1.2rem;margin-bottom:4px;">${escHTML(statusText)}</h5>
-                <p style="color:rgba(255,255,255,.8);margin:0;font-size:.85rem;">Room reservation #${escHTML(String(result.reservation_id))}</p>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" style="opacity:.8;"></button>`;
-
-        document.querySelector('.modal-body').innerHTML = `
-            <div style="text-align:center;padding:12px 0 16px;">
-                <span class="material-symbols-outlined" style="font-size:44px;color:${iconColor};display:block;margin-bottom:8px;">${iconName}</span>
-                <p style="font-size:.95rem;font-weight:700;margin-bottom:2px;">${escHTML(statusText)}</p>
-                ${isPending ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">This reservation is for a later date, so an admin has to approve it. If it is not reviewed in time, it is automatically declined at 12:01 AM on the reservation date.</p>` : (result.reason ? `<p style="font-size:.82rem;color:#888;margin-bottom:0;">${escHTML(result.reason)}</p>` : '')}
-            </div>
-            <div style="background:#f9f5f5;border-radius:14px;padding:14px 16px;font-size:.82rem;line-height:2;">
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Student</span><strong>${escHTML(formData.student_name)} · ${escHTML(formData.student_id)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Authorized by</span><strong>${escHTML(formData.faculty_name)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Room</span><strong>${escHTML(result.room_name)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Date</span><strong>${escHTML(formData.reservation_date)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Time</span><strong>${escHTML(formData.start_time)} – ${escHTML(formData.end_time)}</strong></div>
-                <div style="display:flex;justify-content:space-between;"><span style="color:#666;">Purpose</span><strong>${escHTML(formData.purpose)}</strong></div>
-            </div>`;
-
-        document.querySelector('.modal-footer').innerHTML = `
-            <button type="button" class="btn" data-bs-dismiss="modal"
-                style="padding:10px 28px;border-radius:12px;background:linear-gradient(135deg,#800000 0%,#5a0000 100%);color:#fff;font-weight:700;border:none;width:100%;">
-                Done
-            </button>`;
-    }
-
-    /* ── Submit room reservation ────────────────────────────────── */
-    function handleSubmitRoom(verifiedData) {
-        clearPortalError();
-        if (!_verified) { showPortalError('Session expired. Please go back and verify again.'); return; }
-
-        const roomIdStr = (document.getElementById('reserveRoomId')?.value || '').trim();
-        const date = (document.getElementById('reserveDate')?.value || '').trim();
-        const start = (document.getElementById('reserveStart')?.value || '').trim();
-        const end = (document.getElementById('reserveEnd')?.value || '').trim();
-        const purpose = (document.getElementById('reservePurpose')?.value || '').trim();
-        const attendees = parseInt(document.getElementById('reserveAttendees')?.value || '1', 10);
-
-        if (!roomIdStr) { showPortalError('Please select a room.'); return; }
-        if (!date) { showPortalError('Please select a date.'); return; }
-        if (!start) { showPortalError('Please select a start time.'); return; }
-        if (!end) { showPortalError('Please select an end time.'); return; }
-        if (end <= start) { showPortalError('End time must be after start time.'); return; }
-        if (!purpose) { showPortalError('Please enter the purpose.'); return; }
-
-        const btn = document.getElementById('btnSubmitRoom');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" style="width:14px;height:14px;border-width:2px;"></span>Submitting…'; }
-
-        /* Capture student info before nulling _verified */
-        const studentName = _verified.student_name;
-        const studentId = _verified.student_id;
-        const facultyName = _verified.faculty_name;
-
-        fetch('room-reservation/api/submit-student-reserve.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                code_db_id: _verified.code_db_id,
-                faculty_id: _verified.faculty_id,
-                faculty_name: _verified.faculty_name,
-                student_name: _verified.student_name,
-                student_id: _verified.student_id,
-                room_id: parseInt(roomIdStr, 10),
-                reservation_date: date,
-                start_time: start,
-                end_time: end,
-                purpose,
-                attendees,
-            }),
-        })
-            .then(r => r.json())
-            .then(data => {
-                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>Reserve Room'; }
-                if (data.error) { showPortalError(data.error); return; }
-                _verified = null;
-                showStep3Room(data, {
-                    student_name: studentName,
-                    student_id: studentId,
-                    faculty_name: facultyName,
-                    reservation_date: date,
-                    start_time: start,
-                    end_time: end,
-                    purpose,
+            /* equipment */
+            case 'eq-cat':
+                st.cat = t.getAttribute('data-cat') || '';
+                Array.prototype.forEach.call($('eqCats').querySelectorAll('.st-chip'), function (c) {
+                    c.setAttribute('aria-pressed', c === t ? 'true' : 'false');
                 });
-            })
-            .catch(() => {
-                if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;">event_available</span>Reserve Room'; }
-                showPortalError('Network error. Please try again.');
-            });
+                return renderEqGrid();
+            case 'eq-add': name = nameOfCard(t); if (name) setQty(name, 1); return;
+            case 'eq-inc': name = nameOfCard(t); if (name) setQty(name, (st.cart[name] || 1) + 1); return;
+            case 'eq-dec': name = nameOfCard(t); if (name) setQty(name, (st.cart[name] || 1) - 1); return;
+            case 'eq-remove':
+                name = nameOfCard(t);
+                if (name) { delete st.cart[name]; refreshCard(name, '[data-action="eq-add"]'); }
+                return;
+            case 'submit-borrow': return submitBorrow();
+
+            /* facility */
+            case 'building': return openBuilding(t.getAttribute('data-id'));
+            case 'back-buildings': return renderBuildings();
+            case 'floor': st.fac.floor = toInt(t.getAttribute('data-i')); return renderRooms();
+            case 'room': return renderReserve(toInt(t.getAttribute('data-id')));
+            case 'back-rooms': return renderRooms();
+            case 'purpose':
+                $('reservePurpose').value = t.getAttribute('data-v');
+                $('reservePurpose').focus();
+                return;
+        }
     }
 
-} // end initPortal
+    function onInput(e) {
+        var t = e.target;
+        if (t.id === 'eqSearch') { st.query = t.value; renderEqGrid(); }
+    }
+
+    function onChange(e) {
+        var t = e.target;
+        if (t.hasAttribute && t.hasAttribute('data-eq-qty')) {
+            var name = nameOfCard(t);
+            if (name) setQty(name, t.value);
+        } else if (t.id === 'reserveDate' || t.id === 'reserveStart') {
+            onReserveFieldChange(t);
+        }
+    }
+
+    function onSubmit(e) {
+        var f = e.target;
+        if (!f || !f.id) return;
+        if (f.id === 'borrowForm') { e.preventDefault(); submitBorrow(); }
+        else if (f.id === 'itemForm') { e.preventDefault(); submitItem(); }
+        else if (f.id === 'reserveForm') { e.preventDefault(); submitReserve(); }
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       INIT
+    ══════════════════════════════════════════════════════════ */
+    function init() {
+        var course = $('studentCourse');
+        COURSES.forEach(function (c) {
+            var o = document.createElement('option');
+            o.value = c; o.textContent = c;
+            course.appendChild(o);
+        });
+        idMask = initStudentIdMask($('studentId'));
+
+        $('detailsForm').addEventListener('submit', onVerify);
+        document.addEventListener('click', onClick);
+        document.addEventListener('input', onInput);
+        document.addEventListener('change', onChange);
+        document.addEventListener('submit', onSubmit);
+
+        /* A photo that fails to load removes itself; the placeholder icon underneath shows instead.
+           (error events do not bubble, so this listens in the capture phase.) */
+        document.addEventListener('error', function (e) {
+            var t = e.target;
+            if (t && t.tagName === 'IMG' && t.hasAttribute('data-fallback')) t.remove();
+        }, true);
+
+        loadReceiptBanner();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();

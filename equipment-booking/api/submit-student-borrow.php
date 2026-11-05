@@ -77,6 +77,11 @@ if (!$stock_row || $stock_row['quantity'] < $quantity) {
     exit();
 }
 
+// borrow_qty must exist: stock is decremented by $quantity below, and a return restores
+// stock from borrow_qty — so it has to hold the real quantity (same as submit-item-borrow.php).
+require_once __DIR__ . '/../core/booking-schedule.php';
+BookingSchedule::ensureSchema($conn);
+
 // ── Generate return token + claim token ───────────────────────────────────
 $return_token = bin2hex(random_bytes(32));
 $claim_token  = bin2hex(random_bytes(32));
@@ -85,12 +90,12 @@ $claim_token  = bin2hex(random_bytes(32));
 $ins = $conn->prepare(
     "INSERT INTO tbl_requests
         (faculty_name, faculty_id, equipment_name, instructor, room,
-         borrow_date, return_date, status, request_date,
+         borrow_date, return_date, borrow_qty, status, request_date,
          return_token, claim_token, submitted_by_name, submitted_by_id, submitted_as)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Approved', NOW(), ?, ?, ?, ?, 'student')"
 );
 $ins->bind_param(
-    'sssssssssss',
+    'sssssssissss',
     $faculty_name,
     $faculty_id,
     $equipment,
@@ -98,6 +103,7 @@ $ins->bind_param(
     $room,
     $borrow_date,
     $return_date,
+    $quantity,
     $return_token,
     $claim_token,
     $student_name,
