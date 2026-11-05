@@ -17,7 +17,7 @@
     'use strict';
 
     /* ── Constants ───────────────────────────────────────────── */
-    /* Must match STUDENT_COURSES in shared/core/student-registry.php */
+    /* Must match STUDENT_COURSES in shared/core/student-courses.php */
     var COURSES = ['BSIT', 'BSCpE', 'BSIE', 'BSBA', 'BSEEd', 'BSEd', 'BSPSY', 'DIT', 'DCET'];
     var OPEN_MIN = 7 * 60;       /* rooms bookable 7:00 AM … */
     var CLOSE_MIN = 20 * 60;     /* … 8:00 PM (server enforces the same) */
@@ -118,66 +118,9 @@
         }
     }
 
-    /* ── Student ID mask: "20**-*****-BN-*" ───────────────────────
-       The 20, the dashes and the BN are fixed; the student only types the 8 digits that
-       replace the asterisks. Typing, Backspace and paste (a full "2024-00048-BN-0" works)
-       are handled here, so the fixed parts can never be edited. The server still
-       validates the final value. Returns { reset() }. */
-    function initStudentIdMask(input) {
-        if (!input) return { reset: function () { } };
-        var digits = '';
-
-        function caretSpot() {
-            var at = input.value.indexOf('*');
-            return at === -1 ? input.value.length : at;
-        }
-        function render() {
-            var p = (digits + '********').slice(0, 8);
-            input.value = '20' + p.slice(0, 2) + '-' + p.slice(2, 7) + '-BN-' + p.slice(7);
-            var pos = caretSpot();
-            try { input.setSelectionRange(pos, pos); } catch (e) { }
-        }
-        function fromText(txt) {
-            var t = String(txt || '').toUpperCase();
-            var m = /(\d{4})\D*(\d{5})\D*(?:[A-Z]{2})?\D*(\d)/.exec(t);
-            var d = m ? m[1] + m[2] + m[3] : t.replace(/\D/g, '');
-            if (d.length > 8 && d.indexOf('20') === 0) d = d.slice(2);
-            return d.slice(0, 8);
-        }
-
-        input.addEventListener('beforeinput', function (e) {
-            var type = e.inputType || '';
-            if (type === 'insertCompositionText' || type === 'insertReplacementText') return; /* handled by 'input' below */
-            e.preventDefault();
-            if (type === 'insertText' && e.data) digits = (digits + e.data.replace(/\D/g, '')).slice(0, 8);
-            else if (type.indexOf('delete') === 0) digits = digits.slice(0, -1);
-            render();
-        });
-        input.addEventListener('paste', function (e) {
-            e.preventDefault();
-            var d = fromText((e.clipboardData || window.clipboardData).getData('text'));
-            if (d) digits = d;
-            render();
-        });
-        /* Fallback for keyboards that cannot be intercepted (some IME / Android keyboards) */
-        input.addEventListener('input', function () {
-            var raw = input.value.replace(/\D/g, '');
-            digits = (raw.indexOf('20') === 0 ? raw.slice(2) : raw).slice(0, 8);
-            render();
-        });
-        function toSpot() { setTimeout(function () { var pos = caretSpot(); try { input.setSelectionRange(pos, pos); } catch (e) { } }, 0); }
-        input.addEventListener('focus', toSpot);
-        input.addEventListener('click', toSpot);
-        input.addEventListener('keydown', function (e) {
-            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) !== -1) e.preventDefault();
-        });
-        return { reset: function () { digits = ''; render(); } };
-    }
-
     /* ══════════════════════════════════════════════════════════
        STATE
     ══════════════════════════════════════════════════════════ */
-    var idMask = null;
     var st = fresh();
 
     function fresh() {
@@ -231,7 +174,6 @@
     function goHome() {
         st = fresh();
         $('detailsForm').reset();
-        if (idMask) idMask.reset();
         hideAlert('detailsError');
         show('home', 0);
         loadReceiptBanner();
@@ -267,7 +209,7 @@
 
         if (!code) return showAlert('detailsError', 'Please enter the code.');
         if (!name) return showAlert('detailsError', 'Please enter your name.');
-        if (!id || id.indexOf('*') !== -1) return showAlert('detailsError', 'Please complete your Student ID (replace every asterisk).');
+        if (!id) return showAlert('detailsError', 'Please enter your Student ID.');
         if (!course) return showAlert('detailsError', 'Please select your course.');
 
         /* Code type: item codes are exactly 12 letters/digits (no hyphens); faculty codes are not.
@@ -1164,7 +1106,6 @@
             o.value = c; o.textContent = c;
             course.appendChild(o);
         });
-        idMask = initStudentIdMask($('studentId'));
 
         $('detailsForm').addEventListener('submit', onVerify);
         document.addEventListener('click', onClick);

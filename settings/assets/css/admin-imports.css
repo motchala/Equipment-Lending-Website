@@ -968,3 +968,15 @@
         animation: none;
     }
 }
+
+/* Equipment Inventory card: placeholder until that import is built (nothing on it is clickable) */
+.imp-drop--off {
+    cursor: not-allowed;
+    opacity: .55;
+    pointer-events: none;
+}
+
+.imp-card--soon .imp-mode {
+    opacity: .55;
+    pointer-events: none;
+}

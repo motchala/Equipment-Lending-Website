@@ -8,14 +8,14 @@
      UI is never the only protection.
    - While locked the page holds placeholders only. Counts, lists and files are
      fetched after unlock and dropped again when the tab locks.
-   - Student List: AIMS "Class List" PDF (read in the browser with PDF.js).
+   - Equipment Inventory: placeholder card only (the import is not built yet; the card is inert).
      Faculty Registry: Faculty Identification Records, PDF (PDF.js) or XLSX
      (read by parse-faculty-registry-xlsx.php).
    - Every import first stores the ORIGINAL file, then the rows read from it. Only the
      file of the latest import is kept (a new import replaces it).
 
-   No inline handlers / styles (CSP). The two PDF parsers are exposed on
-   window.PUPSyncImports so they can be tested without a browser.
+   No inline handlers / styles (CSP). The PDF parser is exposed on
+   window.PUPSyncImports so it can be tested without a browser.
 ================================================================ */
 (function () {
     'use strict';
@@ -27,12 +27,11 @@
     var KEEPALIVE_MS = 30000;      // at most one "still here" ping per 30 s of activity
 
     var KINDS = {
-        students: {
-            label: 'Student List', icon: 'school', exts: ['pdf'], noun: ['student', 'students'],
-            fileEp: 'account-management/api/upload-student-registry-file.php',
-            rowsEp: 'account-management/api/upload-student-registry.php',
-            cols: ['#', 'Student No.', 'Name', 'Section', 'Year level'],
-            search: 'Search by name or student number…'
+        equipment: {
+            pending: true,   // placeholder: no endpoints, the card is inert
+            label: 'Equipment Inventory', icon: 'inventory_2', exts: ['xlsx', 'csv'], noun: ['item', 'items'],
+            cols: ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
+            search: 'Search by item name or category\u2026'
         },
         faculty: {
             label: 'Faculty Registry', icon: 'badge', exts: ['pdf', 'xlsx'], noun: ['entry', 'entries'],
@@ -48,75 +47,6 @@
        PARSERS (pure)  -  pages: array of pages, each an array of
        { x, y, text } text items as PDF.js returns them.
     ================================================================ */
-
-    /* ── Student List: AIMS "Class List" ───────────────────────────── */
-    var STUDENT_NO_RE = /^\d{4}-\d{5}-[A-Z]{2}-\d$/;
-    var YEAR_LEVEL_RE = /^(.+)\s+(\S+)\s+((?:First|Second|Third|Fourth|Fifth|Sixth)\s+Year)$/i;
-    var LINE_TOLERANCE = 3;        // PDF points: items this close in y belong to one line
-
-    function clusterLines(items) {
-        var sorted = items.filter(function (it) { return it.text && it.text.trim(); })
-            .sort(function (a, b) { return (b.y - a.y) || (a.x - b.x); });
-        var lines = [];
-        sorted.forEach(function (it) {
-            var last = lines[lines.length - 1];
-            if (last && Math.abs(last.y - it.y) <= LINE_TOLERANCE) last.cells.push(it);
-            else lines.push({ y: it.y, cells: [it] });
-        });
-        lines.forEach(function (l) { l.cells.sort(function (a, b) { return a.x - b.x; }); });
-        return lines;
-    }
-    function lineText(line) {
-        return line.cells.map(function (c) { return c.text.trim(); }).join(' ').replace(/\s+/g, ' ').trim();
-    }
-    function formatSchoolYear(raw) {                 // "2627" -> "2026-2027"
-        var m = /^(\d{2})(\d{2})$/.exec(raw);
-        return m ? '20' + m[1] + '-20' + m[2] : raw;
-    }
-    function formatSection(raw) {                    // "BSIT-BN - BACHELOR OF ..." -> "BSIT-BN"
-        return raw.split(/\s+-\s+/)[0].trim();
-    }
-
-    function parseStudentPages(pages) {
-        var rows = [], byNo = {}, unreadable = 0, duplicates = 0;
-        var section = '', schoolYear = '', semester = '';
-
-        pages.forEach(function (items) {
-            clusterLines(items).forEach(function (line) {
-                var text = lineText(line), m;
-                if ((m = /^Section\s+(.+)$/i.exec(text))) { section = formatSection(m[1]); return; }
-                if (/^School Year\b/i.test(text)) {
-                    if ((m = /School Year\s+(\d{4})/i.exec(text))) schoolYear = formatSchoolYear(m[1]);
-                    if ((m = /Semester\s+([A-Za-z]+)/i.exec(text))) semester = m[1];
-                    return;
-                }
-
-                var idx = -1;
-                for (var i = 0; i < line.cells.length; i++) {
-                    if (STUDENT_NO_RE.test(line.cells[i].text.replace(/\s/g, '').toUpperCase())) { idx = i; break; }
-                }
-                if (idx === -1) return;
-
-                var no = line.cells[idx].text.replace(/\s/g, '').toUpperCase();
-                var rest = line.cells.slice(idx + 1).map(function (c) { return c.text.trim(); }).join(' ').replace(/\s+/g, ' ').trim();
-                var name = '', course = '', year = '';
-
-                if ((m = YEAR_LEVEL_RE.exec(rest))) {
-                    name = m[1].trim(); course = m[2].trim(); year = m[3].trim();
-                } else if (line.cells.length >= idx + 3) {
-                    name = line.cells[idx + 1].text.trim();
-                    course = line.cells[idx + 2].text.trim();
-                    year = line.cells.slice(idx + 3).map(function (c) { return c.text.trim(); }).join(' ');
-                }
-                if (!name || name.indexOf(',') === -1) { unreadable++; return; }
-
-                var row = { student_no: no, full_name: name, section: section, course: course, year_level: year, school_year: schoolYear, semester: semester };
-                if (byNo[no] !== undefined) { rows[byNo[no]] = row; duplicates++; }
-                else { byNo[no] = rows.length; rows.push(row); }
-            });
-        });
-        return { rows: rows, unreadable: unreadable, duplicates: duplicates };
-    }
 
     /* ── Faculty Registry: Faculty Identification Records ───────────
        Col 0 Faculty ID (or "NEWLY HIRED"), col 1 Professor Name, rest = Programs.
@@ -155,7 +85,7 @@
         return { rows: allRows, unreadable: 0, duplicates: 0 };
     }
 
-    window.PUPSyncImports = { parseStudentPages: parseStudentPages, parseFacultyPages: parseFacultyPages };
+    window.PUPSyncImports = { parseFacultyPages: parseFacultyPages };
 
     /* ================================================================
        UI
@@ -388,14 +318,17 @@
                 if (guard(d)) return;
                 if (!d || d.status !== 'success') return;
                 sync(d);
-                paintOverview('students', d.students);
                 paintOverview('faculty', d.faculty);
             });
         }
 
         /* ── Import cards ─────────────────────────────────────────── */
         var controllers = {};
-        cards.forEach(function (card) { controllers[card.dataset.kind] = initCard(card); });
+        cards.forEach(function (card) {
+            var k = card.dataset.kind;
+            /* placeholder cards (Equipment Inventory) stay exactly as the page drew them */
+            controllers[k] = (KINDS[k] && KINDS[k].pending) ? { reset: function () { } } : initCard(card);
+        });
         function resetAll() {
             Object.keys(controllers).forEach(function (k) { controllers[k].reset(true); });
         }
@@ -447,32 +380,17 @@
                     if (i >= PREVIEW_LIMIT) return;
                     var tr = document.createElement('tr');
                     tr.appendChild(el('td', 'imp-td-n', String(i + 1)));
-                    if (kind === 'students') {
-                        tr.appendChild(el('td', 'imp-td-mono', r.student_no));
-                        tr.appendChild(el('td', null, r.full_name));
-                        tr.appendChild(el('td', 'imp-td-nw', r.section));
-                        tr.appendChild(el('td', 'imp-td-nw', r.year_level));
-                    } else {
-                        var isNew = r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED';
-                        var idTd = el('td', 'imp-td-mono');
-                        if (isNew) idTd.appendChild(el('span', 'imp-pill imp-pill--gold', 'Newly hired'));
-                        else idTd.textContent = r.faculty_id;
-                        tr.appendChild(idTd);
-                        tr.appendChild(el('td', null, r.full_name));
-                        tr.appendChild(el('td', null, r.department));
-                    }
+                    var isNew = r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED';
+                    var idTd = el('td', 'imp-td-mono');
+                    if (isNew) idTd.appendChild(el('span', 'imp-pill imp-pill--gold', 'Newly hired'));
+                    else idTd.textContent = r.faculty_id;
+                    tr.appendChild(idTd);
+                    tr.appendChild(el('td', null, r.full_name));
+                    tr.appendChild(el('td', null, r.department));
                     previewBody.appendChild(tr);
                 });
                 list.forEach(function (r) { if (kind === 'faculty' && (r.faculty_id === '' || String(r.faculty_id).toUpperCase() === 'NEWLY HIRED')) newly++; });
-                var txt;
-                if (kind === 'students') {
-                    var secs = {};
-                    list.forEach(function (r) { secs[r.section || '-'] = true; });
-                    var n = Object.keys(secs).length;
-                    txt = num(list.length) + ' students \u00b7 ' + n + ' section' + (n === 1 ? '' : 's');
-                } else {
-                    txt = num(list.length) + ' rows read' + (newly ? ' \u00b7 ' + newly + ' newly hired' : '');
-                }
+                var txt = num(list.length) + ' rows read' + (newly ? ' \u00b7 ' + newly + ' newly hired' : '');
                 if (list.length > PREVIEW_LIMIT) txt += ' \u00b7 showing the first ' + PREVIEW_LIMIT;
                 previewCount.textContent = txt;
                 preview.classList.remove('hidden');
@@ -516,11 +434,9 @@
 
                 var job = ext === 'pdf'
                     ? readPdfPages(f).then(function (pages) {
-                        var res = kind === 'students' ? parseStudentPages(pages) : parseFacultyPages(pages);
+                        var res = parseFacultyPages(pages);
                         if (!res.rows.length) {
-                            throw new Error(kind === 'students'
-                                ? 'No students were found. Make sure this is a class list PDF exported from AIMS (not a scanned image).'
-                                : 'No faculty rows were found in this PDF. Make sure it is the Faculty Identification Records document and not a scanned image.');
+                            throw new Error('No faculty rows were found in this PDF. Make sure it is the Faculty Identification Records document and not a scanned image.');
                         }
                         return res;
                     })
@@ -532,7 +448,6 @@
                     renderPreview(rows);
                     var notes = [];
                     if (res.unreadable) notes.push(res.unreadable + ' row(s) could not be read and were left out.');
-                    if (res.duplicates) notes.push(res.duplicates + ' repeated Student No. found; the later entry was kept.');
                     if (notes.length) alertShow('Check the preview before importing.', 'info', notes); else alertHide();
                 }).catch(function (err) {
                     var keep = !unlocked;                        // locked while reading: reset() already ran
@@ -619,7 +534,6 @@
         var listSearch = $('imp-list-search');
 
         function listCells(kind, r, i) {
-            if (kind === 'students') return [String(i + 1), r.student_no, r.full_name, r.section, r.year_level];
             return [String(i + 1), r.is_newly_hired ? 'Newly hired' : r.faculty_id, r.full_name, r.department];
         }
         function drawList() {
@@ -635,7 +549,7 @@
                 if (shown >= LIST_LIMIT) return;
                 var tr = document.createElement('tr');
                 listCells(listKind, r, matched - 1).forEach(function (t, ci) {
-                    var td = el('td', ci === 0 ? 'imp-td-n' : (ci === 1 ? 'imp-td-mono' : (listKind === 'students' && ci >= 3 ? 'imp-td-nw' : null)));
+                    var td = el('td', ci === 0 ? 'imp-td-n' : (ci === 1 ? 'imp-td-mono' : null));
                     if (listKind === 'faculty' && ci === 1 && r.is_newly_hired) td.appendChild(el('span', 'imp-pill imp-pill--gold', t));
                     else td.textContent = t;
                     tr.appendChild(td);

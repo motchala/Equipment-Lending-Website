@@ -12,14 +12,14 @@ declare(strict_types=1);
  *   action=unlock    current_password -> opens the unlock (10 min, sliding)
  *   action=lock      closes it
  *   -- everything below needs the unlock; otherwise HTTP 403 { code: "locked" } --
- *   action=overview  counts + last import for both lists
- *   action=list      kind=students|faculty -> the imported entries
- *   action=files     kind=students|faculty -> history of original files
+ *   action=overview  counts + last import for the faculty list
+ *   action=list      kind=faculty -> the imported entries
+ *   action=files     kind=faculty -> history of original files
  *   action=file      kind, id, disposition=inline|attachment -> streams the original file
  *
- * Importing itself is done by account-management/api/upload-student-registry(-file).php and
- * upload-faculty-registry(-file).php / parse-faculty-registry-xlsx.php, which apply the
- * same unlock check.
+ * Importing itself is done by account-management/api/upload-faculty-registry(-file).php /
+ * parse-faculty-registry-xlsx.php, which apply the same unlock check.
+ * (The Equipment Inventory card on the Imports tab is a placeholder: no import is built yet.)
  */
 
 ini_set('display_errors', '0');
@@ -27,7 +27,6 @@ ini_set('display_errors', '0');
 require_once __DIR__ . '/../../config/security-headers.php';
 require_once __DIR__ . '/../../config/session.php';
 require_once __DIR__ . '/../../account-management/core/faculty-registry-files.php';
-require_once __DIR__ . '/../../account-management/core/student-registry-files.php';
 require_once __DIR__ . '/../../shared/core/imports-lock.php';
 
 header('Content-Type: application/json');
@@ -52,7 +51,6 @@ require_once __DIR__ . '/../../config/csrf.php';
 csrf_verify();
 
 require_once __DIR__ . '/../../config/db.php';
-require_once __DIR__ . '/../../shared/core/student-registry.php';
 $conn = getDB();
 $conn->set_charset('utf8mb4');
 
@@ -60,17 +58,9 @@ if (!admin_is_super_admin($conn)) {
     frf_respond(403, ['status' => 'error', 'code' => 'forbidden', 'error' => 'Super Admin only.']);
 }
 
-/** The two lists Imports manages. */
+/** The lists Imports manages (today: the faculty registry only). */
 function imp_kind(string $kind): ?array
 {
-    if ($kind === 'students') {
-        return [
-            'files_table' => 'tbl_student_registry_files',
-            'ensure'      => 'srf_ensure_table',
-            'path'        => 'srf_stored_path',
-            'fallback'    => 'student-list',
-        ];
-    }
     if ($kind === 'faculty') {
         return [
             'files_table' => 'tbl_faculty_registry_files',
@@ -126,24 +116,8 @@ imports_require_unlocked();
 switch ($action) {
 
     case 'overview':
-        srf_ensure_table($conn);
         frf_ensure_table($conn);
         $out = [];
-
-        // Students
-        $s = student_registry_status($conn);
-        $files = $conn->query('SELECT COUNT(*) AS c FROM tbl_student_registry_files');
-        $out['students'] = [
-            'count'   => $s['count'],
-            'extra'   => $s['sections'],          // sections
-            'last_at' => $s['last_at'],
-            'last_by' => $s['last_by'],
-            'files'   => $files ? (int)$files->fetch_assoc()['c'] : 0,
-        ];
-        $lf = $conn->query("SELECT original_name, row_count FROM tbl_student_registry_files WHERE status = 'imported' ORDER BY imported_at DESC, id DESC LIMIT 1");
-        $r = $lf ? $lf->fetch_assoc() : null;
-        $out['students']['last_file'] = $r ? (string)$r['original_name'] : '';
-        $out['students']['rows']      = $r ? (int)($r['row_count'] ?? 0) : 0;
 
         // Faculty
         $f = ['count' => 0, 'extra' => 0, 'last_at' => '', 'last_by' => '', 'files' => 0, 'last_file' => '', 'rows' => 0];
@@ -174,26 +148,7 @@ switch ($action) {
     case 'list':
         $kind = (string)($_POST['kind'] ?? '');
         $entries = [];
-        if ($kind === 'students') {
-            student_registry_ensure_table($conn);
-            $res = $conn->query(
-                'SELECT student_no, full_name, section, course, year_level, school_year, semester
-                   FROM tbl_student_registry
-                  ORDER BY last_name ASC, given_names ASC
-                  LIMIT 10000'
-            );
-            while ($res && ($row = $res->fetch_assoc())) {
-                $entries[] = [
-                    'student_no'  => (string)$row['student_no'],
-                    'full_name'   => (string)$row['full_name'],
-                    'section'     => (string)($row['section'] ?? ''),
-                    'course'      => (string)($row['course'] ?? ''),
-                    'year_level'  => (string)($row['year_level'] ?? ''),
-                    'school_year' => (string)($row['school_year'] ?? ''),
-                    'semester'    => (string)($row['semester'] ?? ''),
-                ];
-            }
-        } elseif ($kind === 'faculty') {
+        if ($kind === 'faculty') {
             if (imp_table_exists($conn, 'tbl_faculty_registry')) {
                 $res = $conn->query(
                     'SELECT faculty_id, full_name, department, is_newly_hired

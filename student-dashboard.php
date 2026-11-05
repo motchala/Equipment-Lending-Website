@@ -153,9 +153,8 @@ require_once __DIR__ . '/auth/core/role-splash.php';
                 <div class="st-row">
                     <div class="st-field">
                         <label for="studentId">Student ID</label>
-                        <input type="text" id="studentId" class="st-input st-mono" value="20**-*****-BN-*"
-                            inputmode="numeric" autocomplete="off" spellcheck="false">
-                        <p class="st-hint">Type only the numbers that replace the asterisks.</p>
+                        <input type="text" id="studentId" class="st-input" placeholder="Your student number"
+                            maxlength="30" autocomplete="off" spellcheck="false">
                     </div>
                     <div class="st-field">
                         <label for="studentCourse">Course</label>

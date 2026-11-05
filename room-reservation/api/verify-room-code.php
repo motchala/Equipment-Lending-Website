@@ -63,20 +63,14 @@ if ($row['is_used']) {
     exit();
 }
 
-// ── Student must be on the official student list (Settings → Student List) ──
-// Runs after the code is known to be valid and BEFORE anything is sent to the faculty.
-require_once __DIR__ . '/../../shared/core/student-registry.php';
+// ── Course must be one of the Student Portal's courses ──
+// (The Student No. itself is not validated.)
+require_once __DIR__ . '/../../shared/core/student-courses.php';
 $student_course = trim((string)($body['student_course'] ?? ''));
-if (!student_registry_valid_course($student_course)) {
+if (!student_course_valid($student_course)) {
     echo json_encode(['error' => 'Please select your course.']);
     exit();
 }
-$sv = student_registry_validate($conn, $student_id);
-if (!$sv['ok']) {
-    echo json_encode(['error' => $sv['error']]);
-    exit();
-}
-$student_id = $sv['student_no'];
 
 // ── Overdue block (equipment overdue blocks room reservations too) ─────────
 $overdue = $conn->prepare(

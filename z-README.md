@@ -10,7 +10,7 @@ This guide has two parts: **[Set it up](#set-it-up-on-a-computer)** (no coding n
 
 | Who | How they get in | What they do |
 |---|---|---|
-| **Student** | No account. They enter a code from their faculty on the Student Portal. They must be on the imported student list. | Borrow equipment or reserve a facility |
+| **Student** | No account. They enter a code from their faculty on the Student Portal. | Borrow equipment or reserve a facility |
 | **Faculty** | Account created by a Super Admin | Borrow equipment, reserve rooms, track everything in My Activity, give codes to students |
 | **Organization Adviser** | A faculty account marked as an adviser | Same as faculty, with longer booking limits and an optional request letter |
 | **Admin** | Account created by a Super Admin | Review requests, scan QR codes, manage equipment and facilities |
@@ -37,7 +37,7 @@ Everyone signs in on the same page (`landing-page.php`). The system works out wh
 **For admins**
 - A **Dashboard** with what needs attention, an **Activity** timeline of every decision, notifications, and exports.
 - **Equipment** (catalog and loans) and **Facilities** (rooms, reservations, issues, archive).
-- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Settings → Imports** for the official student list and faculty registry.
+- Super Admin only: **Faculty** accounts, **Admins** (up to 5), and **Settings → Imports** for the faculty registry. (An **Equipment Inventory** import card is there too, but it is not built yet.)
 - Both portals have a built-in **Help & Support** page inside Settings.
 
 ---
@@ -94,7 +94,7 @@ The database comes with two admin accounts: **`main@admin.edu`** (Super Admin) a
 4. Sign in with that email and your new password.
 
 ### Things to set up after signing in
-As a Super Admin, go to **Settings → Imports** and import the official **Faculty Registry** and **Student List**. Then use the **Faculty** tab to create faculty accounts (it looks up each person in the registry). Add your equipment under **Equipment → Catalog** and your rooms under **Facilities**.
+As a Super Admin, go to **Settings → Imports** and import the official **Faculty Registry**. Then use the **Faculty** tab to create faculty accounts (it looks up each person in the registry). Add your equipment under **Equipment → Catalog** and your rooms under **Facilities**.
 
 ---
 

@@ -369,7 +369,8 @@
                 <?php endif; ?>
 
                 <!-- ── IMPORTS (Super Admin only) ─────────────────────────────
-                     Student List + Faculty Registry imports behind ONE password unlock.
+                     Equipment Inventory (placeholder: the import is not built yet) + Faculty Registry
+                     imports behind ONE password unlock.
                      The page only ever contains placeholders: real numbers, lists and
                      files are fetched after unlock (equipment-booking/api/imports.php).
                      Script: equipment-booking/assets/js/admin-imports.js
@@ -377,15 +378,17 @@
                 <?php if ($is_super_admin): ?>
                     <?php
                     $imp_cards = [
-                        'students' => [
-                            'title'  => 'Student List',
-                            'icon'   => 'school',
-                            'sub'    => 'Official class lists exported from AIMS',
-                            'types'  => 'PDF',
-                            'accept' => '.pdf,application/pdf',
-                            'stats'  => ['Students', 'Sections', 'Rows in file'],
-                            'cols'   => ['#', 'Student No.', 'Name', 'Section', 'Year level'],
-                            'what'   => 'Students on this list can use the Student Portal. Anyone else is turned away.',
+                        'equipment' => [
+                            'pending' => true,   // look only: this card does nothing yet
+                            'title'   => 'Equipment Inventory',
+                            'icon'    => 'inventory_2',
+                            'sub'     => 'Equipment lists with item names and stock counts',
+                            'types'   => 'XLSX or CSV',
+                            'accept'  => '.xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            'stats'   => ['Items', 'Categories', 'Rows in file'],
+                            'cols'    => ['#', 'Item name', 'Category', 'Quantity', 'Condition'],
+                            'what'    => 'Items on this list are added to the equipment inventory that students and faculty can borrow.',
+                            'replace' => 'Remove the current items first',
                         ],
                         'faculty' => [
                             'title'  => 'Faculty Registry',
@@ -396,6 +399,7 @@
                             'stats'  => ['Faculty', 'Newly hired', 'Rows in file'],
                             'cols'   => ['#', 'Faculty ID', 'Name', 'Programs'],
                             'what'   => 'Used to confirm a faculty member when their account is created.',
+                            'replace' => 'Remove everyone listed first',
                         ],
                     ];
                     ?>
@@ -408,7 +412,7 @@
                                 <div class="imp-topbar">
                                     <div class="imp-topbar-text">
                                         <h3>Data imports</h3>
-                                        <p>Bring in the official student and faculty lists. The original file of the latest import is kept on record.</p>
+                                        <p>Bring in the equipment inventory and the official faculty list. The original file of the latest import is kept on record.</p>
                                     </div>
                                     <div class="imp-session" id="imp-session">
                                         <span class="imp-session-dot"></span>
@@ -420,29 +424,29 @@
                                 </div>
 
                                 <div class="imp-grid">
-                                    <?php foreach ($imp_cards as $kind => $c): ?>
-                                        <section class="imp-card" data-kind="<?= $kind ?>">
+                                    <?php foreach ($imp_cards as $kind => $c): $soon = !empty($c['pending']); ?>
+                                        <section class="imp-card<?= $soon ? ' imp-card--soon' : '' ?>" data-kind="<?= $kind ?>">
                                             <header class="imp-card-head">
                                                 <div class="imp-card-icon"><span class="material-symbols-outlined"><?= $c['icon'] ?></span></div>
                                                 <div class="imp-card-titles">
                                                     <h4><?= htmlspecialchars($c['title']) ?></h4>
                                                     <p><?= htmlspecialchars($c['sub']) ?></p>
                                                 </div>
-                                                <span class="imp-chip imp-chip--muted" data-role="chip">•••</span>
+                                                <span class="imp-chip imp-chip--muted" data-role="chip"><?= $soon ? 'Coming soon' : '•••' ?></span>
                                             </header>
 
                                             <div class="imp-card-body">
                                                 <p class="imp-what"><?= htmlspecialchars($c['what']) ?></p>
 
                                                 <div class="imp-stats">
-                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-count">•••</span><span class="imp-stat-label"><?= $c['stats'][0] ?></span></div>
-                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-extra">••</span><span class="imp-stat-label"><?= $c['stats'][1] ?></span></div>
-                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-rows">••</span><span class="imp-stat-label"><?= $c['stats'][2] ?></span></div>
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-count"><?= $soon ? '—' : '•••' ?></span><span class="imp-stat-label"><?= $c['stats'][0] ?></span></div>
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-extra"><?= $soon ? '—' : '••' ?></span><span class="imp-stat-label"><?= $c['stats'][1] ?></span></div>
+                                                    <div class="imp-stat"><span class="imp-stat-num" data-role="stat-rows"><?= $soon ? '—' : '••' ?></span><span class="imp-stat-label"><?= $c['stats'][2] ?></span></div>
                                                 </div>
-                                                <p class="imp-last" data-role="last"><span class="material-symbols-outlined">history</span><span data-role="last-text">Last import •••••••••</span></p>
+                                                <p class="imp-last" data-role="last"><span class="material-symbols-outlined">history</span><span data-role="last-text"><?= $soon ? 'Nothing imported yet' : 'Last import •••••••••' ?></span></p>
 
-                                                <div class="imp-drop" data-role="drop" tabindex="0" role="button" aria-label="Choose the <?= htmlspecialchars($c['title']) ?> file">
-                                                    <input type="file" class="imp-file-input" data-role="input" accept="<?= $c['accept'] ?>">
+                                                <div class="imp-drop<?= $soon ? ' imp-drop--off' : '' ?>" data-role="drop" tabindex="<?= $soon ? '-1' : '0' ?>" role="button" <?= $soon ? ' aria-disabled="true"' : '' ?> aria-label="Choose the <?= htmlspecialchars($c['title']) ?> file">
+                                                    <input type="file" class="imp-file-input" data-role="input" accept="<?= $c['accept'] ?>" <?= $soon ? ' disabled' : '' ?>>
                                                     <span class="material-symbols-outlined imp-drop-icon">upload_file</span>
                                                     <strong>Drop the file here</strong>
                                                     <span class="imp-drop-hint">or click to browse &middot; <?= $c['types'] ?> &middot; up to 10 MB</span>
@@ -463,7 +467,9 @@
                                                     <div class="imp-preview-head"><span data-role="preview-count"></span></div>
                                                     <div class="imp-table-wrap">
                                                         <table class="imp-table">
-                                                            <thead><tr><?php foreach ($c['cols'] as $col): ?><th><?= htmlspecialchars($col) ?></th><?php endforeach; ?></tr></thead>
+                                                            <thead>
+                                                                <tr><?php foreach ($c['cols'] as $col): ?><th><?= htmlspecialchars($col) ?></th><?php endforeach; ?></tr>
+                                                            </thead>
                                                             <tbody data-role="preview-body"></tbody>
                                                         </table>
                                                     </div>
@@ -471,22 +477,22 @@
 
                                                 <fieldset class="imp-mode" data-role="mode">
                                                     <legend>When it is imported</legend>
-                                                <div class="imp-mode-row">
-                                                    <label class="imp-mode-opt">
-                                                        <input type="radio" name="imp-mode-<?= $kind ?>" value="merge" checked>
-                                                        <span class="imp-mode-box">
-                                                            <span class="material-symbols-outlined">merge_type</span>
-                                                            <span><strong>Merge</strong><small>Add new entries, update existing ones</small></span>
-                                                        </span>
-                                                    </label>
-                                                    <label class="imp-mode-opt">
-                                                        <input type="radio" name="imp-mode-<?= $kind ?>" value="replace">
-                                                        <span class="imp-mode-box imp-mode-box--warn">
-                                                            <span class="material-symbols-outlined">sync_alt</span>
-                                                            <span><strong>Replace</strong><small>Remove everyone listed first</small></span>
-                                                        </span>
-                                                    </label>
-                                                </div>
+                                                    <div class="imp-mode-row">
+                                                        <label class="imp-mode-opt">
+                                                            <input type="radio" name="imp-mode-<?= $kind ?>" value="merge" checked<?= $soon ? ' disabled' : '' ?>>
+                                                            <span class="imp-mode-box">
+                                                                <span class="material-symbols-outlined">merge_type</span>
+                                                                <span><strong>Merge</strong><small>Add new entries, update existing ones</small></span>
+                                                            </span>
+                                                        </label>
+                                                        <label class="imp-mode-opt">
+                                                            <input type="radio" name="imp-mode-<?= $kind ?>" value="replace" <?= $soon ? ' disabled' : '' ?>>
+                                                            <span class="imp-mode-box imp-mode-box--warn">
+                                                                <span class="material-symbols-outlined">sync_alt</span>
+                                                                <span><strong>Replace</strong><small><?= htmlspecialchars($c['replace']) ?></small></span>
+                                                            </span>
+                                                        </label>
+                                                    </div>
                                                 </fieldset>
 
                                                 <button type="button" class="ps-btn ps-btn--primary imp-import-btn" data-role="import" disabled>
@@ -495,10 +501,10 @@
                                             </div>
 
                                             <footer class="imp-card-foot">
-                                                <button type="button" class="imp-foot-btn" data-role="view-list">
+                                                <button type="button" class="imp-foot-btn" data-role="view-list" <?= $soon ? ' disabled' : '' ?>>
                                                     <span class="material-symbols-outlined">table_view</span> Imported list
                                                 </button>
-                                                <button type="button" class="imp-foot-btn" data-role="view-files">
+                                                <button type="button" class="imp-foot-btn" data-role="view-files" <?= $soon ? ' disabled' : '' ?>>
                                                     <span class="material-symbols-outlined">folder_open</span> Original file
                                                 </button>
                                             </footer>
@@ -668,50 +674,50 @@
                                         </details>
 
                                         <?php if ($is_super_admin): ?>
-                                        <details class="hc-faq-item">
-                                            <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">How do I create and manage faculty accounts? (Super Admin)</span>
-                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                                            </summary>
-                                            <div class="hc-faq-a">
-                                                Go to <strong>Faculty → Create Faculty Account</strong>. Enter the first and last name and click <strong>Look up in Faculty Registry</strong> to fill in the Faculty ID, which is permanent. The email must end with <em>@pupsync.edu</em>. Set a password of at least 8 characters (rated Fair or stronger). For an Organization Adviser, tick <strong>Organization adviser</strong> and choose the organization.<br><br>
-                                                Use the edit button on a faculty row to change the name, email, backup email or adviser details. There is no password reset here; faculty change their own password in their Settings.<br><br>
-                                                <strong>Delete Account</strong> is blocked while the faculty member still has pending requests, equipment that is not back, or upcoming reservations. You can override this by confirming with your own password. That declines their pending requests and cancels their upcoming reservations. Equipment already out can still be returned, and all history is kept.
-                                            </div>
-                                        </details>
+                                            <details class="hc-faq-item">
+                                                <summary class="hc-faq-q">
+                                                    <span class="hc-faq-q-text">How do I create and manage faculty accounts? (Super Admin)</span>
+                                                    <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                </summary>
+                                                <div class="hc-faq-a">
+                                                    Go to <strong>Faculty → Create Faculty Account</strong>. Enter the first and last name and click <strong>Look up in Faculty Registry</strong> to fill in the Faculty ID, which is permanent. The email must end with <em>@pupsync.edu</em>. Set a password of at least 8 characters (rated Fair or stronger). For an Organization Adviser, tick <strong>Organization adviser</strong> and choose the organization.<br><br>
+                                                    Use the edit button on a faculty row to change the name, email, backup email or adviser details. There is no password reset here; faculty change their own password in their Settings.<br><br>
+                                                    <strong>Delete Account</strong> is blocked while the faculty member still has pending requests, equipment that is not back, or upcoming reservations. You can override this by confirming with your own password. That declines their pending requests and cancels their upcoming reservations. Equipment already out can still be returned, and all history is kept.
+                                                </div>
+                                            </details>
 
-                                        <details class="hc-faq-item">
-                                            <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">How do I manage admin accounts? (Super Admin)</span>
-                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                                            </summary>
-                                            <div class="hc-faq-a">
-                                                Open <strong>Admins</strong>. There are 5 admin seats in total. Click <strong>Add admin</strong> and enter the full name, an email ending in <em>@admin.edu</em>, the role (<strong>Admin</strong> or <strong>Super Admin</strong>), and a password of 8 to 72 characters with an uppercase letter, a lowercase letter, a number and a special character.<br><br>Select an admin to see their last sign-in and recent activity, or to <strong>Edit</strong>, <strong>Lock</strong> (for up to 30 days) or <strong>Delete</strong> them. Deleting frees a seat. Edit, Lock and Delete ask you to confirm with your password, and Super Admin accounts cannot be edited, locked or deleted from here.
-                                            </div>
-                                        </details>
+                                            <details class="hc-faq-item">
+                                                <summary class="hc-faq-q">
+                                                    <span class="hc-faq-q-text">How do I manage admin accounts? (Super Admin)</span>
+                                                    <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                </summary>
+                                                <div class="hc-faq-a">
+                                                    Open <strong>Admins</strong>. There are 5 admin seats in total. Click <strong>Add admin</strong> and enter the full name, an email ending in <em>@admin.edu</em>, the role (<strong>Admin</strong> or <strong>Super Admin</strong>), and a password of 8 to 72 characters with an uppercase letter, a lowercase letter, a number and a special character.<br><br>Select an admin to see their last sign-in and recent activity, or to <strong>Edit</strong>, <strong>Lock</strong> (for up to 30 days) or <strong>Delete</strong> them. Deleting frees a seat. Edit, Lock and Delete ask you to confirm with your password, and Super Admin accounts cannot be edited, locked or deleted from here.
+                                                </div>
+                                            </details>
 
-                                        <details class="hc-faq-item">
-                                            <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">What are Imports for? (Super Admin)</span>
-                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                                            </summary>
-                                            <div class="hc-faq-a">
-                                                <strong>Settings → Imports</strong> is locked behind your password. Use it to bring in the official lists:<br>
-                                                <strong>Student List</strong> (PDF from AIMS): only students on this list can use the Student Portal.<br>
-                                                <strong>Faculty Registry</strong> (PDF or XLSX): used to confirm a faculty member when you create their account.<br><br>
-                                                Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
-                                            </div>
-                                        </details>
+                                            <details class="hc-faq-item">
+                                                <summary class="hc-faq-q">
+                                                    <span class="hc-faq-q-text">What are Imports for? (Super Admin)</span>
+                                                    <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                </summary>
+                                                <div class="hc-faq-a">
+                                                    <strong>Settings → Imports</strong> is locked behind your password. Use it to bring in:<br>
+                                                    <strong>Equipment Inventory</strong> (XLSX or CSV): for importing equipment lists. This card is a placeholder and is not available yet.<br>
+                                                    <strong>Faculty Registry</strong> (PDF or XLSX): used to confirm a faculty member when you create their account.<br><br>
+                                                    Choose <strong>Merge</strong> to add new entries and update existing ones, or <strong>Replace</strong> to remove everyone listed first. Files can be up to 10 MB, and the original file of the latest import is kept.
+                                                </div>
+                                            </details>
 
-                                        <details class="hc-faq-item">
-                                            <summary class="hc-faq-q">
-                                                <span class="hc-faq-q-text">What is Borrowing Rules? (Super Admin)</span>
-                                                <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
-                                            </summary>
-                                            <div class="hc-faq-a">
-                                                <strong>Settings → Borrowing Rules</strong> holds the rule settings (toggles and limits) for the automatic decision engine. New equipment requests are not decided by it: they wait in <strong>Equipment → Loans → Waiting</strong> for an admin. Any automatic decisions that do happen are listed in <strong>Activity</strong> under <em>Automatic</em>.
-                                            </div>
-                                        </details>
+                                            <details class="hc-faq-item">
+                                                <summary class="hc-faq-q">
+                                                    <span class="hc-faq-q-text">What is Borrowing Rules? (Super Admin)</span>
+                                                    <span class="material-symbols-outlined hc-faq-chevron">expand_more</span>
+                                                </summary>
+                                                <div class="hc-faq-a">
+                                                    <strong>Settings → Borrowing Rules</strong> holds the rule settings (toggles and limits) for the automatic decision engine. New equipment requests are not decided by it: they wait in <strong>Equipment → Loans → Waiting</strong> for an admin. Any automatic decisions that do happen are listed in <strong>Activity</strong> under <em>Automatic</em>.
+                                                </div>
+                                            </details>
                                         <?php endif; ?>
 
                                     </div><!-- /.hc-faq-list -->
